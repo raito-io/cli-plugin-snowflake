@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/raito-io/cli/common/api"
 	_ "github.com/snowflakedb/gosnowflake"
+	"net/url"
 )
 
 const SF_LIMIT = 10000
@@ -36,7 +37,9 @@ func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, er
 		role = "ACCOUNTADMIN"
 	}
 
-	connectionString := fmt.Sprintf("%s:%s@%s/%s?role=%s", snowflakeUser, snowflakePassword, snowflakeAccount, snowflakeDatabase, role)
+	urlUser := url.UserPassword(snowflakeUser.(string), snowflakePassword.(string))
+
+	connectionString := fmt.Sprintf("%s@%s/%s?role=%s", urlUser, snowflakeAccount, snowflakeDatabase, role)
 	logger.Debug(fmt.Sprintf("Using connection string: %s:%s@%s/%s?role=%s", snowflakeUser, "**censured**", snowflakeAccount, snowflakeDatabase, role))
 	conn, err := sql.Open("snowflake", connectionString)
 	if err != nil {
