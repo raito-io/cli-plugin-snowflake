@@ -138,13 +138,13 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 		permissions := make([]string, 0)
 		for k, object := range grantToEntities {
 			if k == 0 {
-				do = &dsb.DataObjectReference{object.Name, object.GrantedOn}
+				do = &dsb.DataObjectReference{FullName: object.Name, Type: object.GrantedOn}
 			} else if do.FullName != object.Name {
 				da.AccessObjects = append(da.AccessObjects, dap.Access{
 					DataObjectReference: do,
 					Permissions:         permissions,
 				})
-				do = &dsb.DataObjectReference{object.Name, object.GrantedOn}
+				do = &dsb.DataObjectReference{FullName: object.Name, Type: object.GrantedOn}
 				permissions = make([]string, 0)
 			}
 			permissions = append(permissions, object.Privilege)
@@ -156,7 +156,12 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 			}
 		}
 
-		fileCreator.AddAccessProvider([]dap.AccessProvider{da})
+		err = fileCreator.AddAccessProvider([]dap.AccessProvider{da})
+		if err != nil {
+			return data_access.DataAccessSyncResult{
+				Error: api.ToErrorResult(fmt.Errorf("error adding access provider to import file: %s", err.Error())),
+			}
+		}
 	}
 
 	return data_access.DataAccessSyncResult{

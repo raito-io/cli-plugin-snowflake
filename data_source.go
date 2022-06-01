@@ -163,7 +163,10 @@ func readTables(fileCreator *dsb.DataSourceFileCreator, conn *sql.DB, schemaFull
 }
 
 func readColumns(fileCreator *dsb.DataSourceFileCreator, conn *sql.DB, tableFullName string) ([]dbEntity, error) {
-	readDbEntities(conn, "SHOW COLUMNS IN TABLE "+tableFullName)
+	_, err := readDbEntities(conn, "SHOW COLUMNS IN TABLE "+tableFullName)
+	if err != nil {
+		return nil, err
+	}
 	return addDbEntitiesToImporter(fileCreator, conn, "column", tableFullName, "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))",
 		func(name string) string { return tableFullName + "." + name },
 		func(name, fullName string) bool { return true })
