@@ -29,6 +29,8 @@ var PermissionMap = map[string]PermissionTarget{
 	"WRITE": {snowflakePermissions: []string{"UPDATE", "INSERT", "DELETE"}, roleName: "W"},
 }
 
+var SNOWFLAKE_DEFAULT_ROLES = []string{"ACCOUNTADMIN", "USERADMIN", "ORGADMIN", "MASKING_ADMIN", "SECURITYADMIN", "SYSADMIN", "PUBLIC"}
+
 const ROLE_SEPARATOR = "_"
 
 type DataAccessSyncer struct {
@@ -45,6 +47,12 @@ func (s *DataAccessSyncer) SyncDataAccess(config *data_access.DataAccessSyncConf
 }
 
 func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
+
+	excludeDefaultRoles := false
+	if v, ok := config.Parameters[SfExcludeDefaultRoles]; ok && v != nil {
+		excludeDefaultRoles = v.(bool)
+	}
+
 	fileCreator, err := dap.NewAccessProviderFileCreator(config)
 	if err != nil {
 		return data_access.DataAccessSyncResult{
@@ -79,7 +87,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 
 	accessProviderMap := make(map[string]*dap.AccessProvider)
 	for _, roleEntity := range roleEntities {
-		logger.Info("Importing SnowFlake ROLE " + roleEntity.Name)
+		logger.Info("Reading SnowFlake ROLE " + roleEntity.Name)
 		// get users granted OF role
 		q := fmt.Sprintf("SHOW GRANTS OF ROLE %s", roleEntity.Name)
 		rows, err := QuerySnowflake(conn, q)
@@ -177,6 +185,13 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 	}
 
 	for _, da := range accessProviderMap {
+		if isSnowFlakeDefaultRole(da.Name) {
+			if excludeDefaultRoles {
+				logger.Info(fmt.Sprintf("Removing role %s from import file because %s is %v", da.Name, SfExcludeDefaultRoles, excludeDefaultRoles))
+				continue
+			}
+			da.NotInternalizable = true
+		}
 		err = fileCreator.AddAccessProvider([]dap.AccessProvider{*da})
 		if err != nil {
 			return data_access.DataAccessSyncResult{
@@ -188,6 +203,15 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 	return data_access.DataAccessSyncResult{
 		Error: nil,
 	}
+}
+
+func isSnowFlakeDefaultRole(s string) bool {
+	for _, u := range SNOWFLAKE_DEFAULT_ROLES {
+		if strings.EqualFold(u, s) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
