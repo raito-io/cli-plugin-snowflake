@@ -29,7 +29,7 @@ var PermissionMap = map[string]PermissionTarget{
 	"WRITE": {snowflakePermissions: []string{"UPDATE", "INSERT", "DELETE"}, roleName: "W"},
 }
 
-var SNOWFLAKE_DEFAULT_ROLES = []string{"ACCOUNTADMIN", "USERADMIN", "ORGADMIN", "MASKING_ADMIN", "SECURITYADMIN", "SYSADMIN", "PUBLIC"}
+var SNOWFLAKE_DEFAULT_ROLES = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
 
 const ROLE_SEPARATOR = "_"
 
