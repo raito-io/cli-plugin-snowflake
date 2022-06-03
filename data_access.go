@@ -45,8 +45,6 @@ func (s *DataAccessSyncer) SyncDataAccess(config *data_access.DataAccessSyncConf
 }
 
 func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
-
-	logger.Error(config.TargetFile)
 	fileCreator, err := dap.NewAccessProviderFileCreator(config)
 	if err != nil {
 		return data_access.DataAccessSyncResult{
@@ -79,6 +77,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 		}
 	}
 
+	accessProviderMap := make(map[string]*dap.AccessProvider)
 	for _, roleEntity := range roleEntities {
 		logger.Info("Importing SnowFlake ROLE " + roleEntity.Name)
 		// get users granted OF role
@@ -121,17 +120,22 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 		}
 
 		users := make([]string, 0)
-		// Todo: handle <ROLE> grantedTo <ROLE>
 		for _, grantee := range grantOfEntities {
 			if grantee.GrantedTo == "USER" {
 				users = append(users, grantee.GranteeName)
 			}
 		}
 
-		var da = dap.AccessProvider{
-			ExternalId: roleEntity.Name,
-			Name:       roleEntity.Name,
-			Users:      users,
+		da, f := accessProviderMap[roleEntity.Name]
+		if !f {
+			accessProviderMap[roleEntity.Name] = &dap.AccessProvider{
+				ExternalId: roleEntity.Name,
+				Name:       roleEntity.Name,
+				Users:      users,
+			}
+			da = accessProviderMap[roleEntity.Name]
+		} else {
+			da.Users = users
 		}
 
 		var do *dsb.DataObjectReference
@@ -156,7 +160,24 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 			}
 		}
 
-		err = fileCreator.AddAccessProvider([]dap.AccessProvider{da})
+		// copy AccessObjects from this role to all roles that have a GRANT on this one
+		for _, grantee := range grantOfEntities {
+			if grantee.GrantedTo == "ROLE" {
+				if _, f := accessProviderMap[grantee.GranteeName]; !f {
+					accessProviderMap[grantee.GranteeName] = &dap.AccessProvider{
+						ExternalId: grantee.GranteeName,
+						Name:       grantee.GranteeName,
+					}
+				}
+				granteeDa := accessProviderMap[grantee.GranteeName]
+				granteeDa.AccessObjects = append(granteeDa.AccessObjects, da.AccessObjects...)
+				logger.Info(fmt.Sprintf("Adding AccessObjects for role %s to grantee %s", roleEntity.Name, granteeDa.Name))
+			}
+		}
+	}
+
+	for _, da := range accessProviderMap {
+		err = fileCreator.AddAccessProvider([]dap.AccessProvider{*da})
 		if err != nil {
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(fmt.Errorf("error adding access provider to import file: %s", err.Error())),
