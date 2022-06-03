@@ -29,7 +29,7 @@ var PermissionMap = map[string]PermissionTarget{
 	"WRITE": {snowflakePermissions: []string{"UPDATE", "INSERT", "DELETE"}, roleName: "W"},
 }
 
-var SNOWFLAKE_DEFAULT_ROLES = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
+var ROLES_NOTINTERNALIZABLE = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
 
 const ROLE_SEPARATOR = "_"
 
@@ -48,9 +48,9 @@ func (s *DataAccessSyncer) SyncDataAccess(config *data_access.DataAccessSyncConf
 
 func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
 
-	excludeDefaultRoles := false
-	if v, ok := config.Parameters[SfExcludeDefaultRoles]; ok && v != nil {
-		excludeDefaultRoles = v.(bool)
+	ownersToExclude := ""
+	if v, ok := config.Parameters[SfExcludedOwners]; ok && v != nil {
+		ownersToExclude = v.(string)
 	}
 
 	fileCreator, err := dap.NewAccessProviderFileCreator(config)
@@ -95,6 +95,13 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 			logger.Error(err.Error())
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(fmt.Errorf("error fetching grants of role: %s", err.Error())),
+			}
+		}
+
+		// check if Role Owner is part of the ones that should be notInternalizable
+		for _, i := range strings.Split(ownersToExclude, ",") {
+			if strings.EqualFold(i, roleEntity.Owner) {
+				ROLES_NOTINTERNALIZABLE = append(ROLES_NOTINTERNALIZABLE, roleEntity.Name)
 			}
 		}
 
@@ -185,11 +192,8 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 	}
 
 	for _, da := range accessProviderMap {
-		if isSnowFlakeDefaultRole(da.Name) {
-			if excludeDefaultRoles {
-				logger.Info(fmt.Sprintf("Removing role %s from import file because %s is %v", da.Name, SfExcludeDefaultRoles, excludeDefaultRoles))
-				continue
-			}
+		if isNotInternizableRole(da.Name) {
+			logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", da.Name))
 			da.NotInternalizable = true
 		}
 		err = fileCreator.AddAccessProvider([]dap.AccessProvider{*da})
@@ -205,9 +209,9 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 	}
 }
 
-func isSnowFlakeDefaultRole(s string) bool {
-	for _, u := range SNOWFLAKE_DEFAULT_ROLES {
-		if strings.EqualFold(u, s) {
+func isNotInternizableRole(role string) bool {
+	for _, r := range ROLES_NOTINTERNALIZABLE {
+		if strings.EqualFold(r, role) {
 			return true
 		}
 	}
@@ -656,6 +660,7 @@ type roleEntity struct {
 	AssignedToUsers int    `db:"assigned_to_users"`
 	GrantedToRoles  int    `db:"granted_to_roles"`
 	GrantedRoles    int    `db:"granted_roles"`
+	Owner           string `db:"owner"`
 }
 
 type grantOfRole struct {
