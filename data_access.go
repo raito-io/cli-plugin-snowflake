@@ -160,6 +160,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 				ExternalId: roleEntity.Name,
 				Name:       roleEntity.Name,
 				Users:      users,
+				Action:     dap.Grant,
 			}
 			da = accessProviderMap[roleEntity.Name]
 		} else {
