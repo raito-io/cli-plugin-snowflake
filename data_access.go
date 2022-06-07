@@ -222,7 +222,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 	}
 }
 
-func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSyncConfig, fileCreator *dap.AccessProviderFileCreator, policyType string) data_access.DataAccessSyncResult {
+func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSyncConfig, fileCreator *dap.AccessProviderFileCreator, policyType string, action dap.Action) data_access.DataAccessSyncResult {
 
 	conn, err := ConnectToSnowflake(config.Parameters, "")
 	if err != nil {
@@ -260,6 +260,7 @@ func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSy
 			ExternalId: fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
 			Name:       fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
 			Users:      make([]string, 0),
+			Action:     action,
 		}
 
 		// get policy definition
@@ -311,8 +312,6 @@ func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSy
 			}
 
 			if policyReference.REF_COLUMN_NAME.Valid {
-				ap.IsFiltered = false
-				ap.IsMask = true
 				dor := dsb.DataObjectReference{
 					Type:     "COLUMN",
 					FullName: fmt.Sprintf("%s.%s.%s.%s", policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME, policyReference.REF_COLUMN_NAME.String),
@@ -323,8 +322,6 @@ func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSy
 					Permissions:         []string{},
 				})
 			} else {
-				ap.IsFiltered = true
-				ap.IsMask = false
 				dor := dsb.DataObjectReference{
 					Type:     "TABLE",
 					FullName: fmt.Sprintf("%s.%s.%s", policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME),
@@ -349,11 +346,11 @@ func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSy
 }
 
 func (s *DataAccessSyncer) importMaskingPolicies(config *data_access.DataAccessSyncConfig, fileCreator *dap.AccessProviderFileCreator) data_access.DataAccessSyncResult {
-	return s.importPoliciesOfType(config, fileCreator, "MASKING POLICY")
+	return s.importPoliciesOfType(config, fileCreator, "MASKING POLICY", dap.Mask)
 }
 
 func (s *DataAccessSyncer) importRowAccessPolicies(config *data_access.DataAccessSyncConfig, fileCreator *dap.AccessProviderFileCreator) data_access.DataAccessSyncResult {
-	return s.importPoliciesOfType(config, fileCreator, "ROW ACCESS POLICY")
+	return s.importPoliciesOfType(config, fileCreator, "ROW ACCESS POLICY", dap.Filtered)
 }
 
 func isNotInternizableRole(role string) bool {
