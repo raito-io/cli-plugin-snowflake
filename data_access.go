@@ -56,6 +56,11 @@ func (s *DataAccessSyncer) SyncDataAccess(config *data_access.DataAccessSyncConf
 		if res.Error != nil {
 			return res
 		}
+		logger.Info("Importing Snowflake Row Access Policies into Raito")
+		res = s.importRowAccessPolicies(config, &fileCreator)
+		if res.Error != nil {
+			return res
+		}
 	}
 
 	logger.Info("Pushing Data Access to Snowflake")
@@ -217,7 +222,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 	}
 }
 
-func (s *DataAccessSyncer) importMaskingPolicies(config *data_access.DataAccessSyncConfig, fileCreator *dap.AccessProviderFileCreator) data_access.DataAccessSyncResult {
+func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSyncConfig, fileCreator *dap.AccessProviderFileCreator, policyType string) data_access.DataAccessSyncResult {
 
 	conn, err := ConnectToSnowflake(config.Parameters, "")
 	if err != nil {
@@ -227,69 +232,68 @@ func (s *DataAccessSyncer) importMaskingPolicies(config *data_access.DataAccessS
 	}
 	defer conn.Close()
 
-	q := "SHOW MASKING POLICIES"
+	policyTypePlural := strings.Replace(policyType, "POLICY", "POLICIES", 1)
+	q := fmt.Sprintf("SHOW %s", policyTypePlural)
 	rows, err := QuerySnowflake(conn, q)
 	if err != nil {
 		return data_access.DataAccessSyncResult{
-			Error: api.ToErrorResult(fmt.Errorf("error fetching all masking policies: %s", err.Error())),
+			Error: api.ToErrorResult(fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())),
 		}
 	}
 
-	var maskingPolicyEntities []maskingPolicyEntity
-	err = scan.Rows(&maskingPolicyEntities, rows)
+	var policyEntities []policyEntity
+	err = scan.Rows(&policyEntities, rows)
 	if err != nil {
 		return data_access.DataAccessSyncResult{
-			Error: api.ToErrorResult(fmt.Errorf("error fetching all masking policies: %s", err.Error())),
+			Error: api.ToErrorResult(fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())),
 		}
 	}
 
-	for _, maskingPolicy := range maskingPolicyEntities {
-		if !strings.EqualFold("MASKING_POLICY", maskingPolicy.Kind) {
+	for _, policy := range policyEntities {
+		if !strings.EqualFold(strings.Replace(policyType, " ", "_", -1), policy.Kind) {
 			continue
 		}
 
-		logger.Info(fmt.Sprintf("Reading SnowFlake POLICY %s in Schema %s, Table %s", maskingPolicy.Name, maskingPolicy.SchemaName, maskingPolicy.DatabaseName))
+		logger.Info(fmt.Sprintf("Reading SnowFlake %s %s in Schema %s, Table %s", policyType, policy.Name, policy.SchemaName, policy.DatabaseName))
 
 		ap := dap.AccessProvider{
-			ExternalId: fmt.Sprintf("%s-%s-%s", maskingPolicy.DatabaseName, maskingPolicy.SchemaName, maskingPolicy.Name),
-			Name:       fmt.Sprintf("%s-%s-%s", maskingPolicy.DatabaseName, maskingPolicy.SchemaName, maskingPolicy.Name),
+			ExternalId: fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
+			Name:       fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
 			Users:      make([]string, 0),
 		}
 
 		// get policy definition
-		q := fmt.Sprintf("DESCRIBE MASKING POLICY %s.%s.%s", maskingPolicy.DatabaseName, maskingPolicy.SchemaName, maskingPolicy.Name)
+		q := fmt.Sprintf("DESCRIBE %s %s.%s.%s", policyType, policy.DatabaseName, policy.SchemaName, policy.Name)
 		rows, err := QuerySnowflake(conn, q)
 		if err != nil {
 			logger.Error(err.Error())
 			return data_access.DataAccessSyncResult{
-				Error: api.ToErrorResult(fmt.Errorf("error fetching all masking policies: %s", err.Error())),
+				Error: api.ToErrorResult(fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())),
 			}
 		}
 
-		var desribeMaskingPolicyEntities []desribeMaskingPolicyEntity
+		var desribeMaskingPolicyEntities []desribePolicyEntity
 		err = scan.Rows(&desribeMaskingPolicyEntities, rows)
 		if err != nil {
 			logger.Error(err.Error())
 			return data_access.DataAccessSyncResult{
-				Error: api.ToErrorResult(fmt.Errorf("error fetching all masking policies: %s", err.Error())),
+				Error: api.ToErrorResult(fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())),
 			}
 		}
 
 		if len(desribeMaskingPolicyEntities) != 1 {
-			logger.Error(fmt.Sprintf("Found %d definitions for Masking policy %s.%s.%s, only expecting one", len(desribeMaskingPolicyEntities), maskingPolicy.DatabaseName, maskingPolicy.SchemaName, maskingPolicy.Name))
+			logger.Error(fmt.Sprintf("Found %d definitions for Masking policy %s.%s.%s, only expecting one", len(desribeMaskingPolicyEntities), policy.DatabaseName, policy.SchemaName, policy.Name))
 		} else {
-			// TODO: extend AccessProvider object to hold the policy string (needs updating of the cli base)
-			body := desribeMaskingPolicyEntities[0].Body
-			logger.Info(body)
+			ap.Policy = desribeMaskingPolicyEntities[0].Body
 		}
 
 		// get policy references
-		q = fmt.Sprintf(`select * from table(information_schema.policy_references(policy_name => '%s.%s.%s'))`, maskingPolicy.DatabaseName, maskingPolicy.SchemaName, maskingPolicy.Name)
+		q = fmt.Sprintf(`select * from table(information_schema.policy_references(policy_name => '%s.%s.%s'))`, policy.DatabaseName, policy.SchemaName, policy.Name)
 		rows, err = QuerySnowflake(conn, q)
 		if err != nil {
 			logger.Error(err.Error())
 			return data_access.DataAccessSyncResult{
-				Error: api.ToErrorResult(fmt.Errorf("error fetching all masking policies: %s", err.Error())),
+				Error: api.ToErrorResult(fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())),
 			}
 		}
 		var policyReferenceEntities []policyReferenceEntity
@@ -297,7 +301,7 @@ func (s *DataAccessSyncer) importMaskingPolicies(config *data_access.DataAccessS
 		if err != nil {
 			logger.Error(err.Error())
 			return data_access.DataAccessSyncResult{
-				Error: api.ToErrorResult(fmt.Errorf("error fetching masking policy references: %s", err.Error())),
+				Error: api.ToErrorResult(fmt.Errorf("error fetching %s policy references: %s", policyType, err.Error())),
 			}
 		}
 
@@ -305,19 +309,32 @@ func (s *DataAccessSyncer) importMaskingPolicies(config *data_access.DataAccessS
 			if !strings.EqualFold("Active", policyReference.POLICY_STATUS) {
 				continue
 			}
-			if !policyReference.REF_COLUMN_NAME.Valid {
-				continue
-			}
 
-			dor := dsb.DataObjectReference{
-				Type:     "COLUMN",
-				FullName: fmt.Sprintf("%s.%s.%s.%s", policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME, policyReference.REF_COLUMN_NAME.String),
-			}
+			if policyReference.REF_COLUMN_NAME.Valid {
+				ap.IsFiltered = false
+				ap.IsMask = true
+				dor := dsb.DataObjectReference{
+					Type:     "COLUMN",
+					FullName: fmt.Sprintf("%s.%s.%s.%s", policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME, policyReference.REF_COLUMN_NAME.String),
+				}
 
-			ap.AccessObjects = append(ap.AccessObjects, dap.Access{
-				DataObjectReference: &dor,
-				Permissions:         []string{"MASK"},
-			})
+				ap.AccessObjects = append(ap.AccessObjects, dap.Access{
+					DataObjectReference: &dor,
+					Permissions:         []string{},
+				})
+			} else {
+				ap.IsFiltered = true
+				ap.IsMask = false
+				dor := dsb.DataObjectReference{
+					Type:     "TABLE",
+					FullName: fmt.Sprintf("%s.%s.%s", policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME),
+				}
+
+				ap.AccessObjects = append(ap.AccessObjects, dap.Access{
+					DataObjectReference: &dor,
+					Permissions:         []string{},
+				})
+			}
 		}
 
 		err = (*fileCreator).AddAccessProvider([]dap.AccessProvider{ap})
@@ -329,6 +346,14 @@ func (s *DataAccessSyncer) importMaskingPolicies(config *data_access.DataAccessS
 	}
 
 	return data_access.DataAccessSyncResult{}
+}
+
+func (s *DataAccessSyncer) importMaskingPolicies(config *data_access.DataAccessSyncConfig, fileCreator *dap.AccessProviderFileCreator) data_access.DataAccessSyncResult {
+	return s.importPoliciesOfType(config, fileCreator, "MASKING POLICY")
+}
+
+func (s *DataAccessSyncer) importRowAccessPolicies(config *data_access.DataAccessSyncConfig, fileCreator *dap.AccessProviderFileCreator) data_access.DataAccessSyncResult {
+	return s.importPoliciesOfType(config, fileCreator, "ROW ACCESS POLICY")
 }
 
 func isNotInternizableRole(role string) bool {
@@ -801,7 +826,7 @@ type Grant struct {
 	On          string
 }
 
-type maskingPolicyEntity struct {
+type policyEntity struct {
 	Name         string `db:"name"`
 	DatabaseName string `db:"database_name"`
 	SchemaName   string `db:"schema_name"`
@@ -809,7 +834,7 @@ type maskingPolicyEntity struct {
 	Owner        string `db:"owner"`
 }
 
-type desribeMaskingPolicyEntity struct {
+type desribePolicyEntity struct {
 	Name string `db:"name"`
 	Body string `db:"body"`
 }
