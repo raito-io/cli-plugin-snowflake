@@ -9,7 +9,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.6.10
 	github.com/stretchr/testify v1.7.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
-	)
+)
 
 require (
 	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
