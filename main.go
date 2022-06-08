@@ -17,7 +17,7 @@ func main() {
 	logger = base.Logger()
 	logger.SetLevel(hclog.Debug)
 
-	err := base.RegisterPlugins(&IdentityStoreSyncer{}, &DataSourceSyncer{}, &DataAccessSyncer{}, &info.InfoImpl{
+	err := base.RegisterPlugins(&IdentityStoreSyncer{}, &DataSourceSyncer{}, &DataAccessSyncer{}, &DataUsageSyncer{}, &info.InfoImpl{
 		Info: api.PluginInfo{
 			Name:    "Snowflake",
 			Version: api.ParseVersion(version),

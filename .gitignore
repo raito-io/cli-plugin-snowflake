@@ -5,12 +5,13 @@
 *.so
 *.dylib
 
+
 # User specific stuff for IntelliJ Idea
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/usage.statistics.xml
-.idea/dictionaries
-.idea/shelf
+.idea
+
+# VSCode stuff
+.vscode
+__debug_bin
 
 # Test binary, built with `go test -c`
 *.test
@@ -20,3 +21,4 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+cli-plugin-snowflake
