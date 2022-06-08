@@ -159,6 +159,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 			accessProviderMap[roleEntity.Name] = &dap.AccessProvider{
 				ExternalId: roleEntity.Name,
 				Name:       roleEntity.Name,
+				NamingHint: roleEntity.Name,
 				Users:      users,
 				Action:     dap.Grant,
 			}
@@ -260,6 +261,7 @@ func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSy
 		ap := dap.AccessProvider{
 			ExternalId: fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
 			Name:       fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
+			NamingHint: policy.Name,
 			Users:      make([]string, 0),
 			Action:     action,
 		}
