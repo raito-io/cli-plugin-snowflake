@@ -14,20 +14,17 @@ import (
 var logger hclog.Logger = base.Logger()
 
 type SnowflakeAccess struct {
+	Database    string   `json:"database"`
 	Schema      string   `json:"schema"`
 	Table       string   `json:"table"`
 	Column      string   `json:"column"`
 	Permissions []string `json:"permissions"`
 }
 
-func ExtractInfoFromQuery(query string) []ap.Access {
+func ExtractInfoFromQuery(query string, databaseName string, schemaName string) []ap.Access {
 
 	// List of all Snowflake keywords: https://docs.snowflake.com/en/sql-reference/sql-all.html
-	// supportedKeywords := []string{
-	// 	"SELECT",
-	// 	"SHOW",
-	// 	"GRANT",
-	// }
+	// TODO: make checking which keywords need to be parsed more efficient
 	unsupportedKeywords := []string{
 		"ALTER",
 		"BEGIN",
@@ -60,10 +57,10 @@ func ExtractInfoFromQuery(query string) []ap.Access {
 		"USE",
 	}
 
-	query = strings.ToLower(query)
+	query = strings.ToUpper(query)
 	query = strings.TrimLeft(query, " \t")
 	for _, keyword := range unsupportedKeywords {
-		returnEmpytObject := strings.HasPrefix(query, strings.ToLower(keyword))
+		returnEmpytObject := strings.HasPrefix(query, strings.ToUpper(keyword))
 		if returnEmpytObject {
 			return []ap.Access{
 				{DataObjectReference: nil, Permissions: []string{strings.ToUpper(keyword)}},
@@ -84,26 +81,30 @@ func ExtractInfoFromQuery(query string) []ap.Access {
 
 	parsedQueries := []SnowflakeAccess{}
 	ParseSyntaxTree(stmt, &parsedQueries)
-	return ConvertSnowflakeToGeneralDataObjects(parsedQueries)
+	return ConvertSnowflakeToGeneralDataObjects(parsedQueries, databaseName, schemaName)
 }
 
-func ConvertSnowflakeToGeneralDataObjects(snowflakeAccess []SnowflakeAccess) []ap.Access {
+func ConvertSnowflakeToGeneralDataObjects(snowflakeAccess []SnowflakeAccess, databaseName string, schemaName string) []ap.Access {
 	generalAccess := []ap.Access{}
 	for _, obj := range snowflakeAccess {
 		newItem := ap.Access{}
 		newItem.Permissions = obj.Permissions
+		if obj.Database == "" && databaseName != "" {
+			obj.Database = strings.ToUpper(databaseName)
+		}
+		if obj.Schema == "" && schemaName != "" {
+			obj.Schema = strings.ToUpper(schemaName)
+		}
 		if obj.Column == "" || obj.Column == "*" {
 			newItem.DataObjectReference = &data_source.DataObjectReference{
 				Type:     "table",
-				FullName: fmt.Sprintf("%s.%s", obj.Schema, obj.Table),
+				FullName: fmt.Sprintf("%s.%s.%s", obj.Database, obj.Schema, obj.Table),
 			}
-			newItem.DataObjectReference.Type = "table"
 		} else {
 			newItem.DataObjectReference = &data_source.DataObjectReference{
-				Type:     "table",
-				FullName: fmt.Sprintf("%s.%s.%s", obj.Schema, obj.Table, obj.Column),
+				Type:     "column",
+				FullName: fmt.Sprintf("%s.%s.%s.%s", obj.Database, obj.Schema, obj.Table, obj.Column),
 			}
-			newItem.DataObjectReference.Type = "column"
 
 		}
 		generalAccess = append(generalAccess, newItem)
