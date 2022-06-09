@@ -72,7 +72,10 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 	maxTime := ""
 	numRows := 0
 	for batchingInfoResult.Next() {
-		batchingInfoResult.Scan(&minTime, &maxTime, &numRows)
+		err := batchingInfoResult.Scan(&minTime, &maxTime, &numRows)
+		if err != nil {
+			return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(err)}
+		}
 		logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", minTime, maxTime, numRows))
 	}
 
