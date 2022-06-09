@@ -139,7 +139,7 @@ func ParseSelectQuery(stmt parser.Select, objectsFromQueries *[]SnowflakeAccess)
 
 	var TableSchema = make(map[string]string)
 	for _, expr := range fromClauses {
-		ExtractFromClauseInfo(expr, &TableSchema)
+		ExtractFromClauseInfo(expr, TableSchema)
 	}
 
 	numberOfTables := len(TableSchema)
@@ -164,42 +164,42 @@ func ParseSelectQuery(stmt parser.Select, objectsFromQueries *[]SnowflakeAccess)
 	*objectsFromQueries = append(*objectsFromQueries, objectsFromThisQuery...)
 }
 
-func ParseSelectExpression(expr parser.SelectExpr, accessedsnowflakeObjects *[]SnowflakeAccess) {
+func ParseSelectExpression(expr parser.SelectExpr, accessedSnowflakeObjects *[]SnowflakeAccess) {
 
 	switch expr := expr.(type) {
 	case *parser.AliasedExpr:
 		aliasedSubExpr := expr.Expr
 		switch aliasedExpr := aliasedSubExpr.(type) {
 		case *parser.ColName:
-			accessedsnowflakeObject := SnowflakeAccess{
+			accessedSnowflakeObject := SnowflakeAccess{
 				Column:      aliasedExpr.Name.String(),
 				Table:       aliasedExpr.Qualifier.Name.String(),
 				Permissions: []string{"SELECT"},
 			}
-			*accessedsnowflakeObjects = append(*accessedsnowflakeObjects, accessedsnowflakeObject)
+			*accessedSnowflakeObjects = append(*accessedSnowflakeObjects, accessedSnowflakeObject)
 		case *parser.FuncExpr:
 			for _, subExpr := range aliasedExpr.Exprs {
-				ParseSelectExpression(subExpr, accessedsnowflakeObjects)
+				ParseSelectExpression(subExpr, accessedSnowflakeObjects)
 			}
 		case *parser.Subquery:
 			switch subQueryExpr := aliasedExpr.Select.(type) {
 			case *parser.Select:
-				ParseSelectQuery(*subQueryExpr, accessedsnowflakeObjects)
+				ParseSelectQuery(*subQueryExpr, accessedSnowflakeObjects)
 			}
 		}
 	case *parser.StarExpr:
-		accessedsnowflakeObject := SnowflakeAccess{
+		accessedSnowflakeObject := SnowflakeAccess{
 			Column:      "*",
 			Table:       expr.TableName.Name.String(),
 			Permissions: []string{"SELECT"},
 		}
-		*accessedsnowflakeObjects = append(*accessedsnowflakeObjects, accessedsnowflakeObject)
+		*accessedSnowflakeObjects = append(*accessedSnowflakeObjects, accessedSnowflakeObject)
 	default:
 		logger.Debug(fmt.Sprintf("Unknown type for %s", expr))
 	}
 }
 
-func ExtractFromClauseInfo(stmt parser.TableExpr, TableInfo *map[string]string) {
+func ExtractFromClauseInfo(stmt parser.TableExpr, TableInfo map[string]string) {
 	// cases to cover:
 	//func (*AliasedTableExpr) iTableExpr() {}
 	//func (*ParenTableExpr) iTableExpr()   {}
@@ -223,10 +223,10 @@ func ExtractFromClauseInfo(stmt parser.TableExpr, TableInfo *map[string]string) 
 	}
 }
 
-func ExtractTableName(stmt parser.SimpleTableExpr, TableInfo *map[string]string) {
+func ExtractTableName(stmt parser.SimpleTableExpr, TableInfo map[string]string) {
 	switch expr := stmt.(type) {
 	case parser.TableName:
-		(*TableInfo)[expr.Name.CompliantName()] = expr.Qualifier.CompliantName()
+		TableInfo[expr.Name.CompliantName()] = expr.Qualifier.CompliantName()
 	case *parser.Subquery:
 		logger.Debug("Subquery not implemented")
 	}
