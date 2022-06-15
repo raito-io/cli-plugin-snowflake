@@ -1,6 +1,6 @@
 module github.com/raito-io/cli-plugin-snowflake
 
-go 1.17
+go 1.18
 
 require (
 	github.com/blockloop/scan v1.3.0
