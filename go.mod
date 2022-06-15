@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/blockloop/scan v1.3.0
 	github.com/hashicorp/go-hclog v1.1.0
-	github.com/raito-io/cli v0.9.0
+	github.com/raito-io/cli v0.9.1
 	github.com/snowflakedb/gosnowflake v1.6.10
 	github.com/stretchr/testify v1.7.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
