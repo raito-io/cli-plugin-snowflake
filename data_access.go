@@ -825,7 +825,7 @@ func executeRevoke(conn *sql.DB, perm, on, role string) error {
 
 func createComment(da *data_access.DataAccess) string {
 	if da.Provider != nil {
-		return fmt.Sprintf("Created by Raito from data policy rule %q", da.Provider.Name)
+		return fmt.Sprintf("Created by Raito from access provider %q", da.Provider.Name)
 	}
 	return "Created by Raito"
 }
