@@ -34,35 +34,24 @@ var ROLES_NOTINTERNALIZABLE = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMI
 const ROLE_SEPARATOR = "_"
 
 type DataAccessSyncer struct {
+	importAccessProviderList []dap.AccessProvider
+	revokedRolesList         []string
 }
 
 func (s *DataAccessSyncer) SyncDataAccess(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
-	if config.ConfigMap.GetBool("runImport") {
-		fileCreator, err := dap.NewAccessProviderFileCreator(config)
-		if err != nil {
-			return data_access.DataAccessSyncResult{
-				Error: api.ToErrorResult(err),
-			}
-		}
-		defer fileCreator.Close()
-
+	if config.RunImport {
 		logger.Info("Importing Snowflake Roles into Raito")
-		res := s.importDataAccess(config, fileCreator)
-
+		res := s.importDataAccess(config)
 		if res.Error != nil {
 			return res
 		}
-
 		logger.Info("Importing Snowflake Masking Policies into Raito")
-		res = s.importMaskingPolicies(config, fileCreator)
-
+		res = s.importMaskingPolicies(config)
 		if res.Error != nil {
 			return res
 		}
-
 		logger.Info("Importing Snowflake Row Access Policies into Raito")
-		res = s.importRowAccessPolicies(config, fileCreator)
-
+		res = s.importRowAccessPolicies(config)
 		if res.Error != nil {
 			return res
 		}
@@ -70,10 +59,47 @@ func (s *DataAccessSyncer) SyncDataAccess(config *data_access.DataAccessSyncConf
 
 	logger.Info("Pushing Data Access to Snowflake")
 
-	return s.exportDataAccess(config)
+	err := s.exportDataAccess(config)
+
+	// write import file and filter roles removed during export
+	if config.RunImport {
+
+		exportList := []dap.AccessProvider{}
+		for _, da := range s.importAccessProviderList {
+			match := false
+			for _, r := range s.revokedRolesList {
+				if strings.EqualFold(r, da.Name) {
+					match = true
+					continue
+				}
+			}
+			if !match {
+				exportList = append(exportList, da)
+			} else {
+				logger.Info(fmt.Sprintf("Dropping role %s from import as it got removed during export", da.Name))
+			}
+		}
+
+		fileCreator, err := dap.NewAccessProviderFileCreator(config)
+		if err != nil {
+			return data_access.DataAccessSyncResult{
+				Error: api.ToErrorResult(err),
+			}
+		}
+		defer fileCreator.Close()
+		err = fileCreator.AddAccessProvider(exportList)
+		if err != nil {
+			return data_access.DataAccessSyncResult{
+				Error: api.ToErrorResult(fmt.Errorf("error adding access provider to import file: %s", err.Error())),
+			}
+		}
+	}
+
+	return err
 }
 
-func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncConfig, fileCreator dap.AccessProviderFileCreator) data_access.DataAccessSyncResult {
+func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
+
 	ownersToExclude := ""
 	if v, ok := config.Parameters[SfExcludedOwners]; ok && v != nil {
 		ownersToExclude = v.(string)
@@ -89,7 +115,6 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 
 	q := "SHOW ROLES"
 	rows, err := QuerySnowflake(conn, q)
-
 	if err != nil {
 		return data_access.DataAccessSyncResult{
 			Error: api.ToErrorResult(fmt.Errorf("error fetching all roles: %s", err.Error())),
@@ -98,7 +123,6 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 
 	var roleEntities []roleEntity
 	err = scan.Rows(&roleEntities, rows)
-
 	if err != nil {
 		return data_access.DataAccessSyncResult{
 			Error: api.ToErrorResult(fmt.Errorf("error fetching all roles: %s", err.Error())),
@@ -106,16 +130,13 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 	}
 
 	accessProviderMap := make(map[string]*dap.AccessProvider)
-
 	for _, roleEntity := range roleEntities {
 		logger.Info("Reading SnowFlake ROLE " + roleEntity.Name)
 		// get users granted OF role
 		q := fmt.Sprintf("SHOW GRANTS OF ROLE %s", roleEntity.Name)
-
-		rows, err = QuerySnowflake(conn, q)
+		rows, err := QuerySnowflake(conn, q)
 		if err != nil {
 			logger.Error(err.Error())
-
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(fmt.Errorf("error fetching grants of role: %s", err.Error())),
 			}
@@ -129,41 +150,35 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 		}
 
 		grantOfEntities := make([]grantOfRole, 0)
-
 		err = scan.Rows(&grantOfEntities, rows)
 		if err != nil {
 			logger.Error(err.Error())
-
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(fmt.Errorf("error fetching grants of role: %s", err.Error())),
 			}
 		}
 
 		// get objects granted TO role
-		q = fmt.Sprintf("SHOW GRANTS TO ROLE %s", roleEntity.Name)
 
+		q = fmt.Sprintf("SHOW GRANTS TO ROLE %s", roleEntity.Name)
 		rows, err = QuerySnowflake(conn, q)
 		if err != nil {
 			logger.Error(err.Error())
-
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(fmt.Errorf("error fetching grants TO role: %s", err.Error())),
 			}
 		}
 
 		grantToEntities := make([]grantToRole, 0)
-
 		err = scan.Rows(&grantToEntities, rows)
 		if err != nil {
 			logger.Error(err.Error())
-
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(fmt.Errorf("error fetching grants TO role: %s", err.Error())),
 			}
 		}
 
 		users := make([]string, 0)
-
 		for _, grantee := range grantOfEntities {
 			if grantee.GrantedTo == "USER" {
 				users = append(users, grantee.GranteeName)
@@ -186,7 +201,6 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 
 		var do *dsb.DataObjectReference
 		permissions := make([]string, 0)
-
 		for k, object := range grantToEntities {
 			if k == 0 {
 				do = &dsb.DataObjectReference{FullName: object.Name, Type: object.GrantedOn}
@@ -198,9 +212,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 				do = &dsb.DataObjectReference{FullName: object.Name, Type: object.GrantedOn}
 				permissions = make([]string, 0)
 			}
-
 			permissions = append(permissions, object.Privilege)
-
 			if k == len(grantToEntities)-1 {
 				da.AccessObjects = append(da.AccessObjects, dap.Access{
 					DataObjectReference: do,
@@ -230,13 +242,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 			logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", da.Name))
 			da.NotInternalizable = true
 		}
-
-		err = fileCreator.AddAccessProvider([]dap.AccessProvider{*da})
-		if err != nil {
-			return data_access.DataAccessSyncResult{
-				Error: api.ToErrorResult(fmt.Errorf("error adding access provider to import file: %s", err.Error())),
-			}
-		}
+		s.importAccessProviderList = append(s.importAccessProviderList, *da)
 	}
 
 	return data_access.DataAccessSyncResult{
@@ -244,7 +250,8 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 	}
 }
 
-func (s *DataAccessSyncer) importPoliciesOfType(config data_access.DataAccessSyncConfig, fileCreator dap.AccessProviderFileCreator, policyType string, action dap.Action) data_access.DataAccessSyncResult {
+func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSyncConfig, policyType string, action dap.Action) data_access.DataAccessSyncResult {
+
 	conn, err := ConnectToSnowflake(config.Parameters, "")
 	if err != nil {
 		return data_access.DataAccessSyncResult{
@@ -255,7 +262,6 @@ func (s *DataAccessSyncer) importPoliciesOfType(config data_access.DataAccessSyn
 
 	policyTypePlural := strings.Replace(policyType, "POLICY", "POLICIES", 1)
 	q := fmt.Sprintf("SHOW %s", policyTypePlural)
-
 	rows, err := QuerySnowflake(conn, q)
 	if err != nil {
 		return data_access.DataAccessSyncResult{
@@ -264,7 +270,6 @@ func (s *DataAccessSyncer) importPoliciesOfType(config data_access.DataAccessSyn
 	}
 
 	var policyEntities []policyEntity
-
 	err = scan.Rows(&policyEntities, rows)
 	if err != nil {
 		return data_access.DataAccessSyncResult{
@@ -289,50 +294,42 @@ func (s *DataAccessSyncer) importPoliciesOfType(config data_access.DataAccessSyn
 
 		// get policy definition
 		q := fmt.Sprintf("DESCRIBE %s %s.%s.%s", policyType, policy.DatabaseName, policy.SchemaName, policy.Name)
-
 		rows, err := QuerySnowflake(conn, q)
 		if err != nil {
 			logger.Error(err.Error())
-
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())),
 			}
 		}
 
-		var describeMaskingPolicyEntities []desribePolicyEntity
-
-		err = scan.Rows(&describeMaskingPolicyEntities, rows)
+		var desribeMaskingPolicyEntities []desribePolicyEntity
+		err = scan.Rows(&desribeMaskingPolicyEntities, rows)
 		if err != nil {
 			logger.Error(err.Error())
-
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())),
 			}
 		}
 
-		if len(describeMaskingPolicyEntities) != 1 {
-			logger.Error(fmt.Sprintf("Found %d definitions for Masking policy %s.%s.%s, only expecting one", len(describeMaskingPolicyEntities), policy.DatabaseName, policy.SchemaName, policy.Name))
+		if len(desribeMaskingPolicyEntities) != 1 {
+			logger.Error(fmt.Sprintf("Found %d definitions for Masking policy %s.%s.%s, only expecting one", len(desribeMaskingPolicyEntities), policy.DatabaseName, policy.SchemaName, policy.Name))
 		} else {
-			ap.Policy = describeMaskingPolicyEntities[0].Body
+			ap.Policy = desribeMaskingPolicyEntities[0].Body
 		}
 
 		// get policy references
 		q = fmt.Sprintf(`select * from table(information_schema.policy_references(policy_name => '%s.%s.%s'))`, policy.DatabaseName, policy.SchemaName, policy.Name)
-
 		rows, err = QuerySnowflake(conn, q)
 		if err != nil {
 			logger.Error(err.Error())
-
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())),
 			}
 		}
-		var policyReferenceEntities []*policyReferenceEntity
-
+		var policyReferenceEntities []policyReferenceEntity
 		err = scan.Rows(&policyReferenceEntities, rows)
 		if err != nil {
 			logger.Error(err.Error())
-
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(fmt.Errorf("error fetching %s policy references: %s", policyType, err.Error())),
 			}
@@ -366,23 +363,18 @@ func (s *DataAccessSyncer) importPoliciesOfType(config data_access.DataAccessSyn
 			}
 		}
 
-		err = fileCreator.AddAccessProvider([]dap.AccessProvider{ap})
-		if err != nil {
-			return data_access.DataAccessSyncResult{
-				Error: api.ToErrorResult(fmt.Errorf("error adding access provider to import file: %s", err.Error())),
-			}
-		}
+		s.importAccessProviderList = append(s.importAccessProviderList, ap)
 	}
 
 	return data_access.DataAccessSyncResult{}
 }
 
-func (s *DataAccessSyncer) importMaskingPolicies(config *data_access.DataAccessSyncConfig, fileCreator dap.AccessProviderFileCreator) data_access.DataAccessSyncResult {
-	return s.importPoliciesOfType(*config, fileCreator, "MASKING POLICY", dap.Mask)
+func (s *DataAccessSyncer) importMaskingPolicies(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
+	return s.importPoliciesOfType(config, "MASKING POLICY", dap.Mask)
 }
 
-func (s *DataAccessSyncer) importRowAccessPolicies(config *data_access.DataAccessSyncConfig, fileCreator dap.AccessProviderFileCreator) data_access.DataAccessSyncResult {
-	return s.importPoliciesOfType(*config, fileCreator, "ROW ACCESS POLICY", dap.Filtered)
+func (s *DataAccessSyncer) importRowAccessPolicies(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
+	return s.importPoliciesOfType(config, "ROW ACCESS POLICY", dap.Filtered)
 }
 
 func isNotInternizableRole(role string) bool {
@@ -391,26 +383,19 @@ func isNotInternizableRole(role string) bool {
 			return true
 		}
 	}
-
 	return false
 }
 
-//nolint:gocyclo
-func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
-	prefix := config.Prefix
-	if prefix == "" {
-		return data_access.DataAccessSyncResult{
-			Error: api.CreateMissingInputParameterError("prefix"),
+func find(s []string, q string) bool {
+	for _, r := range s {
+		if strings.EqualFold(r, q) {
+			return true
 		}
 	}
+	return false
+}
 
-	prefix = strings.ToUpper(strings.TrimSpace(prefix))
-	if !strings.HasSuffix(prefix, ROLE_SEPARATOR) {
-		prefix += ROLE_SEPARATOR
-	}
-
-	logger.Info(fmt.Sprintf("Using prefix %q", prefix))
-
+func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
 	dar := config.DataAccess
 	if dar == nil {
 		logger.Info("No changes in the data access rights recorded since previous sync. Skipping")
@@ -419,13 +404,6 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 
 	daList := dar.AccessRights
 	daMap := make(map[string]*data_access.DataAccess)
-
-	for _, da := range daList {
-		roleName := generateUniqueRoleName(prefix, da)
-		logger.Info(fmt.Sprintf("Generated rolename %q", roleName))
-
-		daMap[roleName] = da
-	}
 
 	// Removing old roles
 	conn, err := ConnectToSnowflake(config.Parameters, "")
@@ -436,52 +414,88 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 	}
 	defer conn.Close()
 
-	q := "SHOW ROLES LIKE '" + prefix + "%'"
-
-	rows, err := QuerySnowflake(conn, q)
-	if err != nil {
-		return data_access.DataAccessSyncResult{
-			Error: api.ToErrorResult(fmt.Errorf("error while cleaning up old roles: %s", err.Error())),
-		}
-	}
-
-	var roleEntities []roleEntity
-
-	err = scan.Rows(&roleEntities, rows)
-	if err != nil {
-		return data_access.DataAccessSyncResult{
-			Error: api.ToErrorResult(fmt.Errorf("error while cleaning up old roles: %s", err.Error())),
-		}
-	}
-
-	err = CheckSFLimitExceeded(q, len(roleEntities))
-	if err != nil {
-		return data_access.DataAccessSyncResult{
-			Error: api.ToErrorResult(fmt.Errorf("error while cleaning up old roles: %s", err.Error())),
-		}
-	}
-
 	rolesToRemove := make([]string, 0, 20)
 	rolesToMerge := make(map[string]struct{})
 
-	for _, roleEntity := range roleEntities {
-		if _, f := daMap[roleEntity.Name]; !f {
-			rolesToRemove = append(rolesToRemove, roleEntity.Name)
-		} else {
-			rolesToMerge[roleEntity.Name] = struct{}{}
+	// When exporting Access from Raito Cloud, prefix will be empty as the delete instructions are passed explicitly during export. For access-as-code the prefix should not be empty as it is used to detect Raito CLI managed roles
+	prefix := config.Prefix
+	if prefix != "" {
+
+		prefix = strings.TrimSpace(prefix)
+		prefix = strings.ToUpper(prefix)
+		if !strings.HasSuffix(prefix, ROLE_SEPARATOR) {
+			prefix = prefix + ROLE_SEPARATOR
+		}
+		logger.Info(fmt.Sprintf("Using prefix %q", prefix))
+
+		for _, da := range daList {
+			logger.Info(fmt.Sprintf("%+v", da))
+			roleName := generateUniqueRoleName(prefix, da)
+			logger.Info(fmt.Sprintf("Generated rolename %q", roleName))
+
+			daMap[roleName] = da
+		}
+
+		q := "SHOW ROLES LIKE '" + prefix + "%'"
+		rows, err := QuerySnowflake(conn, q)
+		if err != nil {
+			return data_access.DataAccessSyncResult{
+				Error: api.ToErrorResult(fmt.Errorf("Error while cleaning up old roles: %s", err.Error())),
+			}
+		}
+		var roleEntities []roleEntity
+		err = scan.Rows(&roleEntities, rows)
+		if err != nil {
+			return data_access.DataAccessSyncResult{
+				Error: api.ToErrorResult(fmt.Errorf("Error while cleaning up old roles: %s", err.Error())),
+			}
+		}
+		err = CheckSFLimitExceeded(q, len(roleEntities))
+		if err != nil {
+			return data_access.DataAccessSyncResult{
+				Error: api.ToErrorResult(fmt.Errorf("Error while cleaning up old roles: %s", err.Error())),
+			}
+		}
+
+		for _, roleEntity := range roleEntities {
+			if _, f := daMap[roleEntity.Name]; !f {
+				if !find(rolesToRemove, roleEntity.Name) {
+					rolesToRemove = append(rolesToRemove, roleEntity.Name)
+				}
+			} else {
+				rolesToMerge[roleEntity.Name] = struct{}{}
+			}
+		}
+	} else {
+		for _, da := range daList {
+			if da.Delete {
+				roleName := generateUniqueRoleName(prefix, da)
+				if !find(rolesToRemove, roleName) {
+					rolesToRemove = append(rolesToRemove, roleName)
+				}
+			} else {
+				key := da.NamingHint
+				if key == "" {
+					key = da.Provider.Name
+				}
+				key += da.DataObject.Name
+				if _, f := daMap[key]; !f {
+					daMap[key] = da
+				}
+			}
 		}
 	}
 
 	if len(rolesToRemove) > 0 {
 		logger.Info(fmt.Sprintf("Removing old Raito roles in Snowflake: %s", rolesToRemove))
-
 		for _, roleToRemove := range rolesToRemove {
-			_, err = QuerySnowflake(conn, "DROP ROLE "+roleToRemove)
-			if err != nil {
+			_, err := QuerySnowflake(conn, "DROP ROLE "+roleToRemove)
+			if err != nil && !strings.Contains(err.Error(), "does not exist") {
 				return data_access.DataAccessSyncResult{
 					Error: api.ToErrorResult(fmt.Errorf("unable to drop role %q: %s", roleToRemove, err.Error())),
 				}
 			}
+			s.revokedRolesList = append(s.revokedRolesList, roleToRemove)
 		}
 	} else {
 		logger.Info("No old Raito roles to remove in Snowflake")
@@ -489,9 +503,20 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 
 	createFutureGrants := config.GetBool(SfCreateFutureGrants)
 
-	for rn, da := range daMap {
+	roleCreated := make(map[string]interface{})
+	for _, da := range daMap {
+
+		if da.Delete {
+			continue
+		}
+
+		rn := generateUniqueRoleName(prefix, da)
 		permissions := getAllSnowflakePermissions(da)
 		permissionString := strings.ToUpper(strings.Join(permissions, ","))
+
+		if len(permissions) == 0 {
+			continue
+		}
 
 		// TODO for now we suppose the permissions on the database and schema level are only USAGE.
 		//      Later we should support to have specific permissions on these levels as well.
@@ -523,38 +548,33 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 
 			// Merge the users for the role (= add the new and remove the old)
 			q := "SHOW GRANTS OF ROLE " + rn
-
-			rows, err = QuerySnowflake(conn, q)
+			rows, err := QuerySnowflake(conn, q)
 			if err != nil {
 				return data_access.DataAccessSyncResult{
-					Error: api.ToErrorResult(fmt.Errorf("error while fetching expectedGrants of existing role %q: %s", rn, err.Error())),
+					Error: api.ToErrorResult(fmt.Errorf("Error while fetching expectedGrants of existing role %q: %s", rn, err.Error())),
 				}
 			}
 			var grantsOfRole []grantOfRole
-
 			err = scan.Rows(&grantsOfRole, rows)
 			if err != nil {
 				return data_access.DataAccessSyncResult{
-					Error: api.ToErrorResult(fmt.Errorf("error while fetching expectedGrants of existing role %q: %s", rn, err.Error())),
+					Error: api.ToErrorResult(fmt.Errorf("Error while fetching expectedGrants of existing role %q: %s", rn, err.Error())),
 				}
 			}
-
 			err = CheckSFLimitExceeded(q, len(grantsOfRole))
 			if err != nil {
 				return data_access.DataAccessSyncResult{
-					Error: api.ToErrorResult(fmt.Errorf("error while fetching expectedGrants of existing role %q: %s", rn, err.Error())),
+					Error: api.ToErrorResult(fmt.Errorf("Error while fetching expectedGrants of existing role %q: %s", rn, err.Error())),
 				}
 			}
 
 			usersOfRole := make([]string, 0, len(grantsOfRole))
-
 			for _, gor := range grantsOfRole {
 				// TODO we ignore other roles that have been granted this role. What should we do with it?
-				if strings.EqualFold(gor.GrantedTo, "USER") {
+				if strings.ToUpper(gor.GrantedTo) == "USER" {
 					usersOfRole = append(usersOfRole, gor.GranteeName)
 				}
 			}
-
 			toAdd := slice.StringSliceDifference(da.Users, usersOfRole, false)
 			toRemove := slice.StringSliceDifference(usersOfRole, da.Users, false)
 			logger.Info(fmt.Sprintf("Identified %d users to add and %d users to remove from role %q", len(toAdd), len(toRemove), rn))
@@ -563,16 +583,15 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 				err = grantUsersToRole(conn, rn, toAdd)
 				if err != nil {
 					return data_access.DataAccessSyncResult{
-						Error: api.ToErrorResult(fmt.Errorf("error while assigning users to role %q: %s", rn, err.Error())),
+						Error: api.ToErrorResult(fmt.Errorf("Error while assigning users to role %q: %s", rn, err.Error())),
 					}
 				}
 			}
-
 			if len(toRemove) > 0 {
 				err = revokeUsersFromRole(conn, rn, toRemove)
 				if err != nil {
 					return data_access.DataAccessSyncResult{
-						Error: api.ToErrorResult(fmt.Errorf("error while unassigning users from role %q: %s", rn, err.Error())),
+						Error: api.ToErrorResult(fmt.Errorf("Error while unassigning users from role %q: %s", rn, err.Error())),
 					}
 				}
 			}
@@ -584,46 +603,42 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 				err = executeRevoke(conn, "ALL", "FUTURE SCHEMAS IN DATABASE "+da.DataObject.Name, rn)
 				if err != nil {
 					return data_access.DataAccessSyncResult{
-						Error: api.ToErrorResult(fmt.Errorf("error while assigning future schema grants in database %q to role %q: %s", da.DataObject.Name, rn, err.Error())),
+						Error: api.ToErrorResult(fmt.Errorf("Error while assigning future schema grants in database %q to role %q: %s", da.DataObject.Name, rn, err.Error())),
 					}
 				}
-
 				err = executeRevoke(conn, "ALL", "FUTURE TABLES IN DATABASE "+da.DataObject.Name, rn)
 				if err != nil {
 					return data_access.DataAccessSyncResult{
-						Error: api.ToErrorResult(fmt.Errorf("error while assigning future table grants in database %q to role %q: %s", da.DataObject.Name, rn, err.Error())),
+						Error: api.ToErrorResult(fmt.Errorf("Error while assigning future table grants in database %q to role %q: %s", da.DataObject.Name, rn, err.Error())),
 					}
 				}
 			} else if da.DataObject.Type == "schema" {
 				err = executeRevoke(conn, "ALL", "FUTURE TABLES IN SCHEMA "+da.DataObject.BuildPath("."), rn)
 				if err != nil {
 					return data_access.DataAccessSyncResult{
-						Error: api.ToErrorResult(fmt.Errorf("error while assigning future table grants in schema %q to role %q: %s", da.DataObject.BuildPath("."), rn, err.Error())),
+						Error: api.ToErrorResult(fmt.Errorf("Error while assigning future table grants in schema %q to role %q: %s", da.DataObject.BuildPath("."), rn, err.Error())),
 					}
 				}
 			}
 
 			q = "SHOW GRANTS TO ROLE " + rn
-
 			rows, err = QuerySnowflake(conn, q)
 			if err != nil {
 				return data_access.DataAccessSyncResult{
-					Error: api.ToErrorResult(fmt.Errorf("error while fetching permissions on role %q: %s", rn, err.Error())),
+					Error: api.ToErrorResult(fmt.Errorf("Error while fetching permissions on role %q: %s", rn, err.Error())),
 				}
 			}
 			var grantsToRole []grantToRole
-
 			err = scan.Rows(&grantsToRole, rows)
 			if err != nil {
 				return data_access.DataAccessSyncResult{
-					Error: api.ToErrorResult(fmt.Errorf("error while fetching permissions on role %q: %s", rn, err.Error())),
+					Error: api.ToErrorResult(fmt.Errorf("Error while fetching permissions on role %q: %s", rn, err.Error())),
 				}
 			}
-
 			err = CheckSFLimitExceeded(q, len(grantsToRole))
 			if err != nil {
 				return data_access.DataAccessSyncResult{
-					Error: api.ToErrorResult(fmt.Errorf("error while fetching permissions on role %q: %s", rn, err.Error())),
+					Error: api.ToErrorResult(fmt.Errorf("Error while fetching permissions on role %q: %s", rn, err.Error())),
 				}
 			}
 
@@ -636,24 +651,29 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 		} else {
 			logger.Info(fmt.Sprintf("Creating role %q from data access %q", rn, da.Id))
 
-			_, err = QuerySnowflake(conn, fmt.Sprintf("CREATE ROLE %s COMMENT='%s'", rn, createComment(da)))
+			if _, f := roleCreated[rn]; !f {
+				_, err := QuerySnowflake(conn, fmt.Sprintf("CREATE OR REPLACE ROLE %s COMMENT='%s'", rn, createComment(da)))
+				if err != nil {
+					return data_access.DataAccessSyncResult{
+						Error: api.ToErrorResult(fmt.Errorf("Error while creating role %q: %s", rn, err.Error())),
+					}
+				}
+				roleCreated[rn] = struct{}{}
+			}
+			err = grantUsersToRole(conn, rn, da.Users)
 			if err != nil {
+				logger.Error("Encountered error :" + err.Error())
 				return data_access.DataAccessSyncResult{
-					Error: api.ToErrorResult(fmt.Errorf("error while creating role %q: %s", rn, err.Error())),
+					Error: api.ToErrorResult(fmt.Errorf("Error while assigning users to role %q: %s", rn, err.Error())),
 				}
 			}
 
-			err = grantUsersToRole(conn, rn, da.Users)
-			if err != nil {
-				return data_access.DataAccessSyncResult{
-					Error: api.ToErrorResult(fmt.Errorf("error while assigning users to role %q: %s", rn, err.Error())),
-				}
-			}
 			// TODO assign role to SYSADMIN if requested (add as input parameter)
 		}
 
 		err = mergeGrants(conn, rn, foundGrants, expectedGrants)
 		if err != nil {
+			logger.Error("Encountered error :" + err.Error())
 			return data_access.DataAccessSyncResult{
 				Error: api.ToErrorResult(err),
 			}
@@ -665,15 +685,11 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 
 func createGrantsForTable(permissions []string, database string, schema string, table string) []interface{} {
 	grants := make([]interface{}, 0, len(permissions)+2)
-
-	grants = append(grants,
-		Grant{"USAGE", "DATABASE " + database},
-		Grant{"USAGE", fmt.Sprintf("SCHEMA %s.%s", database, schema)})
-
+	grants = append(grants, Grant{"USAGE", "DATABASE " + database})
+	grants = append(grants, Grant{"USAGE", fmt.Sprintf("SCHEMA %s.%s", database, schema)})
 	for _, p := range permissions {
 		grants = append(grants, Grant{p, fmt.Sprintf("TABLE %s.%s.%s", database, schema, table)})
 	}
-
 	return grants
 }
 
@@ -681,16 +697,13 @@ func createGrantsForSchema(conn *sql.DB, permissions []string, database string, 
 	q := fmt.Sprintf("SHOW TABLES IN SCHEMA %s.%s", database, schema)
 	tables, _ := readDbEntities(conn, q)
 	grants := make([]interface{}, 0, (len(permissions)*len(tables))+2)
-	grants = append(grants,
-		Grant{"USAGE", "DATABASE " + database},
-		Grant{"USAGE", fmt.Sprintf("SCHEMA %s.%s", database, schema)})
-
+	grants = append(grants, Grant{"USAGE", "DATABASE " + database})
+	grants = append(grants, Grant{"USAGE", fmt.Sprintf("SCHEMA %s.%s", database, schema)})
 	for _, table := range tables {
 		for _, p := range permissions {
 			grants = append(grants, Grant{p, fmt.Sprintf("TABLE %s.%s.%s", database, schema, table.Name)})
 		}
 	}
-
 	return grants
 }
 
@@ -701,8 +714,10 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 	grants = append(grants, Grant{"USAGE", "DATABASE " + database})
 
 	for _, schema := range schemas {
+		if schema.Name == "INFORMATION_SCHEMA" {
+			continue
+		}
 		grants = append(grants, Grant{"USAGE", fmt.Sprintf("SCHEMA %s.%s", database, schema.Name)})
-
 		tables, _ := readDbEntities(conn, fmt.Sprintf("SHOW TABLES IN SCHEMA %s.%s", database, schema.Name))
 		for _, table := range tables {
 			for _, p := range permissions {
@@ -710,7 +725,6 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 			}
 		}
 	}
-
 	return grants
 }
 
@@ -723,16 +737,13 @@ func mergeGrants(conn *sql.DB, role string, found []interface{}, expected []inte
 	for _, g := range toAdd {
 		grant := g.(Grant)
 		err := executeGrant(conn, grant.Permissions, grant.On, role)
-
 		if err != nil {
 			return err
 		}
 	}
-
 	for _, g := range toRemove {
 		grant := g.(Grant)
 		err := executeRevoke(conn, grant.Permissions, grant.On, role)
-
 		if err != nil {
 			return err
 		}
@@ -744,32 +755,26 @@ func mergeGrants(conn *sql.DB, role string, found []interface{}, expected []inte
 func revokeUsersFromRole(conn *sql.DB, role string, users []string) error {
 	statements := make([]string, 0, 200)
 	userCount := len(users)
-
 	for i, user := range users {
 		q := fmt.Sprintf("REVOKE ROLE %s FROM USER %q", role, strings.ToUpper(user))
 		statements = append(statements, q)
 
 		if len(statements) == 200 || i == userCount-1 {
 			logger.Info(fmt.Sprintf("Executing statements to revoke role %q from %d users", role, len(statements)))
-
 			err := executeStatements(conn, statements)
 			if err != nil {
-				return fmt.Errorf("error while revoking users from role %q: %s", role, err.Error())
+				return fmt.Errorf("Error while revoking users from role %q: %s", role, err.Error())
 			}
-
 			logger.Info(fmt.Sprintf("Done revoking role from %d users", len(statements)))
 			statements = make([]string, 0, 200)
 		}
 	}
-
 	return nil
 }
 
 func grantUsersToRole(conn *sql.DB, role string, users []string) error {
 	statements := make([]string, 0, 200)
-
 	userCount := len(users)
-
 	for i, user := range users {
 		q := fmt.Sprintf("GRANT ROLE %s TO USER %q", role, strings.ToUpper(user))
 		statements = append(statements, q)
@@ -777,16 +782,13 @@ func grantUsersToRole(conn *sql.DB, role string, users []string) error {
 		if len(statements) == 200 || i == userCount-1 {
 			logger.Info(fmt.Sprintf("Executing statements to grant role %q to %d users", role, len(statements)))
 			err := executeStatements(conn, statements)
-
 			if err != nil {
-				return fmt.Errorf("error while granting users to role %q: %s", role, err.Error())
+				return fmt.Errorf("Error while granting users to role %q: %s", role, err.Error())
 			}
-
 			logger.Info(fmt.Sprintf("Done granting role to %d users", len(statements)))
 			statements = make([]string, 0, 200)
 		}
 	}
-
 	return nil
 }
 
@@ -798,43 +800,43 @@ func executeStatements(conn *sql.DB, statements []string) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
 func executeGrant(conn *sql.DB, perm, on, role string) error {
 	q := fmt.Sprintf("GRANT %s ON %s TO ROLE %s", perm, on, role)
 	logger.Debug("Executing grant query", "query", q)
-
 	_, err := QuerySnowflake(conn, q)
 	if err != nil {
-		return fmt.Errorf("error while executing grant query on Snowflake for role %q: %s", role, err.Error())
+		return fmt.Errorf("Error while executing grant query on Snowflake for role %q: %s", role, err.Error())
 	}
-
 	return nil
 }
 
 func executeRevoke(conn *sql.DB, perm, on, role string) error {
 	q := fmt.Sprintf("REVOKE %s ON %s FROM ROLE %s", perm, on, role)
 	logger.Debug("Executing revoke query: %s", q)
-
 	_, err := QuerySnowflake(conn, q)
 	if err != nil {
-		return fmt.Errorf("error while executing revoke query on Snowflake for role %q: %s", role, err.Error())
+		return fmt.Errorf("Error while executing revoke query on Snowflake for role %q: %s", role, err.Error())
 	}
-
 	return nil
 }
 
 func createComment(da *data_access.DataAccess) string {
-	if da.Rule != nil {
-		return fmt.Sprintf("Created by Raito from data policy rule %q", da.Rule.Name)
+	if da.Provider != nil {
+		return fmt.Sprintf("Created by Raito from access provider %q", da.Provider.Name)
 	}
-
 	return "Created by Raito"
 }
 
 func generateUniqueRoleName(prefix string, da *data_access.DataAccess) string {
+	if da.NamingHint != "" {
+		return prefix + da.NamingHint
+	} else if da.Provider.Name != "" {
+		return prefix + da.Provider.Name
+	}
+
 	perm := generatePermissionsName(da.Permissions)
 
 	return prefix + strings.ToUpper(da.DataObject.BuildPath(ROLE_SEPARATOR)) + ROLE_SEPARATOR + perm
@@ -845,11 +847,13 @@ func generateUniqueRoleName(prefix string, da *data_access.DataAccess) string {
 func getAllSnowflakePermissions(da *data_access.DataAccess) []string {
 	allPerms := make([]string, 0, len(da.Permissions))
 	for _, perm := range da.Permissions {
+		if perm == "USAGE" {
+			logger.Debug("Skipping explicit USAGE permission as Raito handles this automatically")
+			continue
+		}
 		allPerms = append(allPerms, getSnowflakePermissions(perm)...)
 	}
-
 	sort.Strings(allPerms)
-
 	return allPerms
 }
 
@@ -859,9 +863,7 @@ func getSnowflakePermissions(permission string) []string {
 	if f {
 		return pt.snowflakePermissions
 	}
-
 	logger.Warn(fmt.Sprintf("Unknown raito permission %q found. Mapping as is", permission))
-
 	return []string{permission}
 }
 
@@ -869,7 +871,6 @@ func getSnowflakePermissions(permission string) []string {
 // This is done by renaming sets to a fixed name where possible.
 func generatePermissionsName(permissions []string) string {
 	parts := make([]string, 0, len(permissions))
-
 	for _, p := range permissions {
 		pt, f := PermissionMap[p]
 		if f {
@@ -879,9 +880,7 @@ func generatePermissionsName(permissions []string) string {
 			parts = append(parts, strings.ToUpper(p[0:1]))
 		}
 	}
-
 	sort.Strings(parts)
-
 	return strings.Join(parts, "")
 }
 
