@@ -31,13 +31,14 @@ func (nullString *NullString) Scan(value interface{}) error {
 	} else {
 		*nullString = NullString{ns.String, true}
 	}
+
 	return nil
 }
 
 func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) data_usage.DataUsageSyncResult {
-
 	logger.Info("Creating file for storing data")
 	fileCreator, err := dub.NewDataUsageFileCreator(config)
+
 	if err != nil {
 		return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(err)}
 	}
@@ -63,6 +64,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 	startQuery := time.Now()
 	snowflakeQueryTime := time.Duration(0)
 	batchingInfoResult, err := QuerySnowflake(conn, fetchBatchingInfoQuery)
+
 	if err != nil {
 		return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(err)}
 	}
@@ -71,11 +73,13 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 	minTime := ""
 	maxTime := ""
 	numRows := 0
+
 	for batchingInfoResult.Next() {
 		err := batchingInfoResult.Scan(&minTime, &maxTime, &numRows)
 		if err != nil {
 			return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(err)}
 		}
+
 		logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", minTime, maxTime, numRows))
 	}
 
@@ -87,7 +91,6 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 
 	currentBatch := 0
 	for currentBatch*numRowsPerBatch < numRows {
-
 		paginationClause := fmt.Sprintf("LIMIT %d OFFSET %d", numRowsPerBatch, currentBatch*numRowsPerBatch)
 		if numRows < numRowsPerBatch {
 			paginationClause = ""
@@ -98,13 +101,15 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 		startQuery = time.Now()
 		rows, err := QuerySnowflake(conn, dataUsageQuery)
 		snowflakeQueryTime += time.Since(startQuery).Round(time.Millisecond)
+
 		if err != nil {
 			return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(err)}
 		}
 
 		logger.Info("Scanning query results for batch %d", currentBatch)
-		var returnedRows []queryDbEntities
+		var returnedRows []*queryDbEntities
 		err = scan.Rows(&returnedRows, rows)
+
 		if err != nil {
 			logger.Error(fmt.Sprintf("Error scanning results into objects during batch %d", currentBatch))
 			return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(err)}
@@ -115,13 +120,15 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 
 		timeFormat := "2006-01-02T15:04:05.999999-07:00"
 		executedStatements := make([]dub.Statement, 0, 20)
+
 		for _, returnedRow := range returnedRows {
-			startTime, err := time.Parse(timeFormat, returnedRow.StartTime)
-			if err != nil {
+			startTime, e := time.Parse(timeFormat, returnedRow.StartTime)
+			if e != nil {
 				logger.Error(fmt.Sprintf("Error parsing start time of '%s', expected format is: '%s'", returnedRow.StartTime, timeFormat))
 			}
-			endTime, err := time.Parse(timeFormat, returnedRow.EndTime)
-			if err != nil {
+			endTime, e := time.Parse(timeFormat, returnedRow.EndTime)
+
+			if e != nil {
 				logger.Error(fmt.Sprintf("Error parsing end time of '%s', expected format is: '%s'", returnedRow.StartTime, timeFormat))
 			}
 
@@ -130,6 +137,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 				databaseName = returnedRow.DatabaseName.String
 			}
 			schemaName := ""
+
 			if returnedRow.SchemaName.Valid {
 				schemaName = returnedRow.SchemaName.String
 			}
@@ -155,9 +163,11 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 
 		logger.Info(fmt.Sprintf("Writing statement log to file for batch %d", currentBatch))
 		err = fileCreator.AddStatements(executedStatements)
+
 		if err != nil {
 			return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(err)}
 		}
+
 		logger.Info(fmt.Sprintf("Written %d queries to file for batch %d", len(returnedRows), currentBatch))
 		currentBatch++
 	}
@@ -165,6 +175,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 	sec := time.Since(start).Round(time.Millisecond)
 	logger.Info(fmt.Sprintf("Retrieved %d rows from Snowflake (in %s) and written them to file in %d batch(es), for a total time of %s",
 		fileCreator.GetStatementCount(), snowflakeQueryTime, currentBatch, sec))
+
 	return data_usage.DataUsageSyncResult{}
 }
 

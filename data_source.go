@@ -18,6 +18,7 @@ type DataSourceSyncer struct {
 func (s *DataSourceSyncer) SyncDataSource(config *data_source.DataSourceSyncConfig) data_source.DataSourceSyncResult {
 	logger.Debug("Start syncing data source meta data for snowflake")
 	fileCreator, err := dsb.NewDataSourceFileCreator(config)
+
 	if err != nil {
 		return data_source.DataSourceSyncResult{Error: api.ToErrorResult(err)}
 	}
@@ -36,31 +37,33 @@ func (s *DataSourceSyncer) SyncDataSource(config *data_source.DataSourceSyncConf
 		excludedDatabases = v.(string)
 	}
 	excludedSchemas := ""
+
 	if v, ok := config.Parameters[SfExcludedSchemas]; ok && v != nil {
 		excludedSchemas = v.(string)
 	}
 
-	databases, err := readDatabases(&fileCreator, conn, excludedDatabases)
+	databases, err := readDatabases(fileCreator, conn, excludedDatabases)
 	if err != nil {
 		return data_source.DataSourceSyncResult{Error: api.ToErrorResult(err)}
 	}
+
 	for _, database := range databases {
-		schemas, err := readSchemas(&fileCreator, conn, database.Name, excludedSchemas)
+		schemas, err := readSchemas(fileCreator, conn, database.Name, excludedSchemas)
 		if err != nil {
-			return data_source.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("Error while syncing schemas for database %q between Snowflake and Raito: %s", database.Name, err.Error()))}
+			return data_source.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing schemas for database %q between Snowflake and Raito: %s", database.Name, err.Error()))}
 		}
 
 		for _, schema := range schemas {
-			tables, err := readTables(&fileCreator, conn, database.Name+"."+schema.Name)
+			tables, err := readTables(fileCreator, conn, database.Name+"."+schema.Name)
 			if err != nil {
-				return data_source.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("Error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
+				return data_source.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
 			}
 
 			for _, table := range tables {
-				_, err := readColumns(&fileCreator, conn, database.Name+"."+schema.Name+"."+table.Name)
+				_, err := readColumns(fileCreator, conn, database.Name+"."+schema.Name+"."+table.Name)
 
 				if err != nil {
-					return data_source.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("Error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
+					return data_source.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
 				}
 			}
 		}
@@ -76,22 +79,24 @@ func (s *DataSourceSyncer) SyncDataSource(config *data_source.DataSourceSyncConf
 func readDbEntities(conn *sql.DB, query string) ([]dbEntity, error) {
 	rows, err := conn.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("Error while querying Snowflake: %s", err.Error())
+		return nil, fmt.Errorf("error while querying Snowflake: %s", err.Error())
 	}
 	var dbs []dbEntity
 	err = scan.Rows(&dbs, rows)
+
 	if err != nil {
-		return nil, fmt.Errorf("Error while querying Snowflake: %s", err.Error())
+		return nil, fmt.Errorf("error while querying Snowflake: %s", err.Error())
 	}
 	err = CheckSFLimitExceeded(query, len(dbs))
+
 	if err != nil {
-		return nil, fmt.Errorf("Error while querying Snowflake: %s", err.Error())
+		return nil, fmt.Errorf("error while querying Snowflake: %s", err.Error())
 	}
+
 	return dbs, nil
 }
 
-func addDbEntitiesToImporter(fileCreator *dsb.DataSourceFileCreator, conn *sql.DB, doType string, parent string, query string, externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]dbEntity, error) {
-
+func addDbEntitiesToImporter(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, doType string, parent string, query string, externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]dbEntity, error) {
 	dbs, err := readDbEntities(conn, query)
 
 	if err != nil {
@@ -99,8 +104,10 @@ func addDbEntitiesToImporter(fileCreator *dsb.DataSourceFileCreator, conn *sql.D
 	}
 
 	dataObjects := make([]dsb.DataObject, 0, 20)
+
 	for _, db := range dbs {
 		logger.Debug(fmt.Sprintf("Handling database %q", db.Name))
+
 		fullName := externalIdGenerator(db.Name)
 		if filter(db.Name, fullName) {
 			do := dsb.DataObject{
@@ -115,20 +122,23 @@ func addDbEntitiesToImporter(fileCreator *dsb.DataSourceFileCreator, conn *sql.D
 		}
 	}
 
-	err = (*fileCreator).AddDataObjects(dataObjects)
+	err = fileCreator.AddDataObjects(dataObjects)
 	if err != nil {
 		return nil, err
 	}
+
 	return dbs, nil
 }
 
-func readDatabases(fileCreator *dsb.DataSourceFileCreator, conn *sql.DB, excludedDatabases string) ([]dbEntity, error) {
+func readDatabases(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, excludedDatabases string) ([]dbEntity, error) {
 	excludes := make(map[string]struct{})
+
 	if excludedDatabases != "" {
 		for _, e := range strings.Split(excludedDatabases, ",") {
 			excludes[e] = struct{}{}
 		}
 	}
+
 	return addDbEntitiesToImporter(fileCreator, conn, "database", "", "SHOW DATABASES IN ACCOUNT",
 		func(name string) string { return name },
 		func(name, fullName string) bool {
@@ -137,13 +147,15 @@ func readDatabases(fileCreator *dsb.DataSourceFileCreator, conn *sql.DB, exclude
 		})
 }
 
-func readSchemas(fileCreator *dsb.DataSourceFileCreator, conn *sql.DB, dbName string, excludedSchemas string) ([]dbEntity, error) {
+func readSchemas(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, dbName string, excludedSchemas string) ([]dbEntity, error) {
 	excludes := make(map[string]struct{})
+
 	if excludedSchemas != "" {
 		for _, e := range strings.Split(excludedSchemas, ",") {
 			excludes[e] = struct{}{}
 		}
 	}
+
 	return addDbEntitiesToImporter(fileCreator, conn, "schema", dbName, "SHOW SCHEMAS IN DATABASE "+dbName,
 		func(name string) string { return dbName + "." + name },
 		func(name, fullName string) bool {
@@ -156,17 +168,18 @@ func readSchemas(fileCreator *dsb.DataSourceFileCreator, conn *sql.DB, dbName st
 		})
 }
 
-func readTables(fileCreator *dsb.DataSourceFileCreator, conn *sql.DB, schemaFullName string) ([]dbEntity, error) {
+func readTables(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, schemaFullName string) ([]dbEntity, error) {
 	return addDbEntitiesToImporter(fileCreator, conn, "table", schemaFullName, "SHOW TABLES IN SCHEMA "+schemaFullName,
 		func(name string) string { return schemaFullName + "." + name },
 		func(name, fullName string) bool { return true })
 }
 
-func readColumns(fileCreator *dsb.DataSourceFileCreator, conn *sql.DB, tableFullName string) ([]dbEntity, error) {
+func readColumns(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, tableFullName string) ([]dbEntity, error) {
 	_, err := readDbEntities(conn, "SHOW COLUMNS IN TABLE "+tableFullName)
 	if err != nil {
 		return nil, err
 	}
+
 	return addDbEntitiesToImporter(fileCreator, conn, "column", tableFullName, "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))",
 		func(name string) string { return tableFullName + "." + name },
 		func(name, fullName string) bool { return true })
