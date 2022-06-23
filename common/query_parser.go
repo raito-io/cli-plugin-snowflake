@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/go-hclog"
+	hclog "github.com/hashicorp/go-hclog"
 	"github.com/raito-io/cli/base"
 	ap "github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/data_source"
