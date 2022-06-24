@@ -107,7 +107,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 		}
 
 		logger.Info("Scanning query results for batch %d", currentBatch)
-		var returnedRows []*queryDbEntities
+		var returnedRows []queryDbEntities
 		err = scan.Rows(&returnedRows, rows)
 
 		if err != nil {
@@ -121,8 +121,10 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 		timeFormat := "2006-01-02T15:04:05.999999-07:00"
 		executedStatements := make([]dub.Statement, 0, 20)
 
-		for _, returnedRow := range returnedRows {
+		for ind := range returnedRows {
+			returnedRow := returnedRows[ind]
 			startTime, e := time.Parse(timeFormat, returnedRow.StartTime)
+
 			if e != nil {
 				logger.Error(fmt.Sprintf("Error parsing start time of '%s', expected format is: '%s'", returnedRow.StartTime, timeFormat))
 			}

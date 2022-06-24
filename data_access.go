@@ -366,7 +366,8 @@ func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSy
 			}
 		}
 
-		for _, policyReference := range policyReferenceEntities {
+		for ind := range policyReferenceEntities {
+			policyReference := policyReferenceEntities[ind]
 			if !strings.EqualFold("Active", policyReference.POLICY_STATUS) {
 				continue
 			}
