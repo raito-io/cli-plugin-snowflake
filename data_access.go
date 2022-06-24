@@ -355,7 +355,7 @@ func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSy
 			}
 		}
 
-		var policyReferenceEntities []*policyReferenceEntity
+		var policyReferenceEntities []policyReferenceEntity
 
 		err = scan.Rows(&policyReferenceEntities, rows)
 		if err != nil {
