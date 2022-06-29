@@ -222,7 +222,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 		for k, object := range grantToEntities {
 			if k == 0 {
 				do = &dsb.DataObjectReference{FullName: object.Name, Type: object.GrantedOn}
-			} else if do.FullName != object.Name {
+			} else if do.FullName != object.Name && len(permissions) > 0 {
 				da.AccessObjects = append(da.AccessObjects, dap.Access{
 					DataObjectReference: do,
 					Permissions:         permissions,
@@ -231,9 +231,12 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 				permissions = make([]string, 0)
 			}
 
-			permissions = append(permissions, object.Privilege)
+			// We do not import USAGE as this is handled separately in the data access export
+			if !strings.EqualFold("USAGE", object.Privilege) {
+				permissions = append(permissions, object.Privilege)
+			}
 
-			if k == len(grantToEntities)-1 {
+			if k == len(grantToEntities)-1 && len(permissions) > 0 {
 				da.AccessObjects = append(da.AccessObjects, dap.Access{
 					DataObjectReference: do,
 					Permissions:         permissions,
@@ -250,6 +253,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 						Name:       grantee.GranteeName,
 					}
 				}
+
 				granteeDa := accessProviderMap[grantee.GranteeName]
 				granteeDa.AccessObjects = append(granteeDa.AccessObjects, da.AccessObjects...)
 				logger.Info(fmt.Sprintf("Adding AccessObjects for role %s to grantee %s", roleEntity.Name, granteeDa.Name))
