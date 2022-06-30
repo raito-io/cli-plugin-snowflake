@@ -31,15 +31,15 @@ func ExtractInfoFromQuery(query string, databaseName string, schemaName string) 
 		"COMMENT",
 		"COMMIT",
 		"COPY INTO",
-		"CREATE",
-		"DELETE",
+		// "CREATE",
+		// "DELETE",
 		"DESCRIBE",
 		"DROP",
 		"EXECUTE",
 		"EXPLAIN",
 		"GET",
 		"GRANT",
-		"INSERT",
+		// "INSERT",
 		"LIST",
 		"MERGE",
 		"PUT",
@@ -52,7 +52,7 @@ func ExtractInfoFromQuery(query string, databaseName string, schemaName string) 
 		"TRUNCATE",
 		"UNDROP",
 		"UNSET",
-		"UPDATE",
+		// "UPDATE",
 		"USE",
 	}
 
@@ -70,12 +70,12 @@ func ExtractInfoFromQuery(query string, databaseName string, schemaName string) 
 
 	stmt, err := parser.Parse(query)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Error parsing SQL query: %s", query))
+		// logger.Error(fmt.Sprintf("Error parsing SQL query: %s", query))
 		return []ap.Access{{DataObjectReference: nil, Permissions: []string{"PARSE_ERROR"}}}
 	}
 
 	if stmt == nil {
-		logger.Error(fmt.Sprintf("Empty syntax tree from query: %s", query))
+		// logger.Error(fmt.Sprintf("Empty syntax tree from query: %s", query))
 		return []ap.Access{{DataObjectReference: nil, Permissions: []string{"EMPTY"}}}
 	}
 
@@ -123,6 +123,34 @@ func ParseSyntaxTree(stmt parser.Statement, parsedQueries *[]SnowflakeAccess) {
 	case *parser.Select:
 		logger.Debug("Parse select query")
 		ParseSelectQuery(*v, parsedQueries)
+	case *parser.DDL:
+		logger.Debug("Parse DDL query")
+		ddlInfo := SnowflakeAccess{Table: v.NewName.Name.CompliantName(), Permissions: []string{strings.ToUpper(*&v.Action)}}
+		*parsedQueries = append(*parsedQueries, ddlInfo)
+	case *parser.Insert:
+		logger.Debug("Parse Insert query")
+		insertInfo := SnowflakeAccess{Table: v.Table.Name.CompliantName(), Permissions: []string{strings.ToUpper(*&v.Action)}}
+		*parsedQueries = append(*parsedQueries, insertInfo)
+	case *parser.Update, *parser.Delete:
+		statementType := fmt.Sprintf("%T", v)
+		action := ""
+		var tableExpressions parser.TableExprs
+		if statementType == "*sqlparser.Delete" {
+			action = "DELETE"
+			tableExpressions = v.(*parser.Delete).TableExprs
+		} else if statementType == "*sqlparser.Update" {
+			action = "UPDATE"
+			tableExpressions = v.(*parser.Update).TableExprs
+		}
+		logger.Debug("Parse Update/delete query")
+		var TableSchema = make(map[string]string)
+		for _, expr := range tableExpressions {
+			ExtractFromClauseInfo(expr, TableSchema)
+		}
+		for k, _ := range TableSchema {
+			updateInfo := SnowflakeAccess{Table: k, Permissions: []string{strings.ToUpper(action)}}
+			*parsedQueries = append(*parsedQueries, updateInfo)
+		}
 	case parser.Statement:
 		logger.Debug("Generic statement, not implemented")
 	default:
