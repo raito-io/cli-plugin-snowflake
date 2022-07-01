@@ -145,8 +145,9 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 			}
 			accessedDataObjects := common.ExtractInfoFromQuery(returnedRow.Query, databaseName, schemaName)
 
-			if len(accessedDataObjects) == 0 {
-				logger.Debug(fmt.Sprintf("No data objects returned for query: %s, batch %d", returnedRow.Query, currentBatch))
+			if len(accessedDataObjects) == 0 || accessedDataObjects[0].DataObjectReference == nil {
+				// logger.Debug(fmt.Sprintf("No data objects returned for query: %s, batch %d", returnedRow.Query, currentBatch))
+				continue
 			}
 
 			du := dub.Statement{
@@ -154,8 +155,8 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 				AccessedDataObjects: accessedDataObjects,
 				Status:              returnedRow.Status == "SUCCESS",
 				User:                returnedRow.User,
-				StartTime:           startTime.UnixMilli(),
-				EndTime:             endTime.UnixMilli(),
+				StartTime:           startTime.UTC().Unix(),
+				EndTime:             endTime.UTC().Unix(),
 				TotalTime:           returnedRow.TotalTime,
 				BytesTransferred:    returnedRow.BytesTranferred,
 				RowsReturned:        returnedRow.RowsReturned,
