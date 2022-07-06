@@ -191,6 +191,7 @@ type dbEntity struct {
 
 func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 	logger.Debug("Returning meta data for Snowflake")
+
 	return ds.MetaData{
 		SupportedFeatures: []string{ds.RowFiltering, ds.ColumnMasking},
 		DataObjectTypes: []ds.DataObjectType{
