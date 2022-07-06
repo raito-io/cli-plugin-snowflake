@@ -281,7 +281,7 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 						Permission: "OWNERSHIP",
 					},
 				},
-				Children: []string{ds.Database},
+				Children: []string{},
 			},
 			{
 				Name: ds.Database,
