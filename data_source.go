@@ -9,18 +9,18 @@ import (
 	"github.com/blockloop/scan"
 	dsb "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/common/api"
-	"github.com/raito-io/cli/common/api/data_source"
+	ds "github.com/raito-io/cli/common/api/data_source"
 )
 
 type DataSourceSyncer struct {
 }
 
-func (s *DataSourceSyncer) SyncDataSource(config *data_source.DataSourceSyncConfig) data_source.DataSourceSyncResult {
+func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.DataSourceSyncResult {
 	logger.Debug("Start syncing data source meta data for snowflake")
 	fileCreator, err := dsb.NewDataSourceFileCreator(config)
 
 	if err != nil {
-		return data_source.DataSourceSyncResult{Error: api.ToErrorResult(err)}
+		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
 	}
 	defer fileCreator.Close()
 
@@ -28,7 +28,7 @@ func (s *DataSourceSyncer) SyncDataSource(config *data_source.DataSourceSyncConf
 
 	conn, err := ConnectToSnowflake(config.Parameters, "")
 	if err != nil {
-		return data_source.DataSourceSyncResult{Error: api.ToErrorResult(err)}
+		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
 	}
 	defer conn.Close()
 
@@ -44,26 +44,26 @@ func (s *DataSourceSyncer) SyncDataSource(config *data_source.DataSourceSyncConf
 
 	databases, err := readDatabases(fileCreator, conn, excludedDatabases)
 	if err != nil {
-		return data_source.DataSourceSyncResult{Error: api.ToErrorResult(err)}
+		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
 	}
 
 	for _, database := range databases {
 		schemas, err := readSchemas(fileCreator, conn, database.Name, excludedSchemas)
 		if err != nil {
-			return data_source.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing schemas for database %q between Snowflake and Raito: %s", database.Name, err.Error()))}
+			return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing schemas for database %q between Snowflake and Raito: %s", database.Name, err.Error()))}
 		}
 
 		for _, schema := range schemas {
 			tables, err := readTables(fileCreator, conn, database.Name+"."+schema.Name)
 			if err != nil {
-				return data_source.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
+				return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
 			}
 
 			for _, table := range tables {
 				_, err := readColumns(fileCreator, conn, database.Name+"."+schema.Name+"."+table.Name)
 
 				if err != nil {
-					return data_source.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
+					return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
 				}
 			}
 		}
@@ -73,7 +73,7 @@ func (s *DataSourceSyncer) SyncDataSource(config *data_source.DataSourceSyncConf
 
 	logger.Info(fmt.Sprintf("Fetched %d data objects from Snowflake in %s", fileCreator.GetDataObjectCount(), sec))
 
-	return data_source.DataSourceSyncResult{}
+	return ds.DataSourceSyncResult{}
 }
 
 func readDbEntities(conn *sql.DB, query string) ([]dbEntity, error) {
@@ -106,7 +106,7 @@ func addDbEntitiesToImporter(fileCreator dsb.DataSourceFileCreator, conn *sql.DB
 	dataObjects := make([]dsb.DataObject, 0, 20)
 
 	for _, db := range dbs {
-		logger.Debug(fmt.Sprintf("Handling database %q", db.Name))
+		logger.Debug(fmt.Sprintf("Handling data object (type %s) %q", doType, db.Name))
 
 		fullName := externalIdGenerator(db.Name)
 		if filter(db.Name, fullName) {
@@ -187,4 +187,240 @@ func readColumns(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, tableFullN
 
 type dbEntity struct {
 	Name string `db:"name"`
+}
+
+func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
+	logger.Debug("Returning meta data for Snowflake")
+
+	return ds.MetaData{
+		SupportedFeatures: []string{ds.RowFiltering, ds.ColumnMasking},
+		DataObjectTypes: []ds.DataObjectType{
+			// TODO add data source
+			{
+				Name: ds.Datasource,
+				Permissions: []ds.DataObjectTypePermission{
+					{
+						Permission: "APPLY MASKING POLICY",
+					},
+					{
+						Permission: "APPLY ROW ACCESS POLICY",
+					},
+					{
+						Permission: "APPLY SESSION POLICY",
+					},
+					{
+						Permission: "APPLY TAG",
+					},
+					{
+						Permission: "ATTACH POLICY",
+					},
+					{
+						Permission: "CREATE ACCOUNT",
+					},
+					{
+						Permission: "CREATE ROLE",
+					},
+					{
+						Permission: "CREATE USER",
+					},
+					{
+						Permission: "MANAGE GRANTS",
+					},
+					{
+						Permission: "CREATE DATA EXCHANGE LISTING",
+					},
+					{
+						Permission: "CREATE INTEGRATION",
+					},
+					{
+						Permission: "CREATE NETWORK POLICY",
+					},
+					{
+						Permission: "CREATE SHARE",
+					},
+					{
+						Permission: "CREATE WAREHOUSE",
+					},
+					{
+						Permission: "EXECUTE MANAGED TASK",
+					},
+					{
+						Permission: "EXECUTE TASK",
+					},
+					{
+						Permission: "IMPORT SHARE",
+					},
+					{
+						Permission: "MONITOR EXECUTION",
+					},
+					{
+						Permission: "MONITOR USAGE",
+					},
+					{
+						Permission: "OVERRIDE SHARE RESTRICTIONS",
+					},
+				},
+				Children: []string{ds.Database, "warehouse"},
+			},
+			{
+				Name: "warehouse",
+				Permissions: []ds.DataObjectTypePermission{
+					{
+						Permission: "MODIFY",
+					},
+					{
+						Permission: "MONITOR",
+					},
+					{
+						Permission: "OPERATE",
+					},
+					{
+						Permission: "USAGE",
+					},
+					{
+						Permission: "OWNERSHIP",
+					},
+				},
+				Children: []string{},
+			},
+			{
+				Name: ds.Database,
+				Permissions: []ds.DataObjectTypePermission{
+					{
+						Permission: "CREATE SCHEMA",
+					},
+					{
+						Permission: "USAGE",
+					},
+					{
+						Permission: "MODIFY",
+					},
+					{
+						Permission: "MONITOR",
+					},
+					{
+						Permission: "IMPORTED PRIVILEGES",
+					},
+					{
+						Permission: "OWNERSHIP",
+					},
+				},
+				Children: []string{ds.Schema},
+			},
+			{
+				Name: ds.Schema,
+				Permissions: []ds.DataObjectTypePermission{
+					{
+						Permission: "MODIFY",
+					},
+					{
+						Permission: "MONITOR",
+					},
+					{
+						Permission: "USAGE",
+					},
+					{
+						Permission: "CREATE TABLE",
+					},
+					{
+						Permission: "CREATE EXTERNAL TABLE",
+					},
+					{
+						Permission: "CREATE VIEW",
+					},
+					{
+						Permission: "CREATE MATERIALIZED VIEW",
+					},
+					{
+						Permission: "CREATE MASKING POLICY",
+					},
+					{
+						Permission: "CREATE ROW ACCESS POLICY",
+					},
+					{
+						Permission: "CREATE SESSION POLICY",
+					},
+					{
+						Permission: "CREATE STAGE",
+					},
+					{
+						Permission: "CREATE FILE FORMAT",
+					},
+					{
+						Permission: "CREATE SEQUENCE",
+					},
+					{
+						Permission: "CREATE FUNCTION",
+					},
+					{
+						Permission: "CREATE PIPE",
+					},
+					{
+						Permission: "CREATE STREAM",
+					},
+					{
+						Permission: "CREATE TAG",
+					},
+					{
+						Permission: "CREATE TASK",
+					},
+					{
+						Permission: "CREATE PROCEDURE",
+					},
+					{
+						Permission: "ADD SEARCH OPTIMIZATION",
+					},
+					{
+						Permission: "OWNERSHIP",
+					},
+				},
+				Children: []string{ds.Table, ds.View},
+			},
+			{
+				Name: ds.Table,
+				Permissions: []ds.DataObjectTypePermission{
+					{
+						Permission: "SELECT",
+					},
+					{
+						Permission: "INSERT",
+					},
+					{
+						Permission: "UPDATE",
+					},
+					{
+						Permission: "TRUNCATE",
+					},
+					{
+						Permission: "DELETE",
+					},
+					{
+						Permission: "REFERENCES",
+					},
+					{
+						Permission: "OWNERSHIP",
+					},
+				},
+				Children: []string{ds.Column},
+			},
+			{
+				Name: ds.View,
+				Permissions: []ds.DataObjectTypePermission{
+					{
+						Permission: "SELECT",
+					},
+					{
+						Permission: "REFERENCES",
+					},
+					{
+						Permission: "OWNERSHIP",
+					},
+				},
+				Children: []string{ds.Column},
+			},
+			{
+				Name: ds.Column,
+			},
+		},
+	}
 }
