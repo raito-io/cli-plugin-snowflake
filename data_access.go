@@ -194,7 +194,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 			}
 		}
 
-		users := make([]string, 0)
+		var users []string = nil
 
 		for _, grantee := range grantOfEntities {
 			if grantee.GrantedTo == "USER" {
@@ -311,11 +311,12 @@ func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSy
 		logger.Info(fmt.Sprintf("Reading SnowFlake %s %s in Schema %s, Table %s", policyType, policy.Name, policy.SchemaName, policy.DatabaseName))
 
 		ap := dap.AccessProvider{
-			ExternalId: fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
-			Name:       fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
-			NamingHint: policy.Name,
-			Users:      make([]string, 0),
-			Action:     action,
+			ExternalId:        fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
+			Name:              fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
+			NamingHint:        policy.Name,
+			Users:             nil,
+			Action:            action,
+			NotInternalizable: true,
 		}
 
 		// get policy definition
