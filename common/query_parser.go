@@ -1,17 +1,16 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
-	hclog "github.com/hashicorp/go-hclog"
-	"github.com/raito-io/cli/base"
 	ap "github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/data_source"
+	log "github.com/sirupsen/logrus"
 	parser "github.com/xwb1989/sqlparser"
 )
-
-var logger hclog.Logger = base.Logger()
 
 type SnowflakeAccess struct {
 	Database    string   `json:"database"`
@@ -21,8 +20,108 @@ type SnowflakeAccess struct {
 	Permissions []string `json:"permissions"`
 }
 
-func ExtractInfoFromQuery(query string, databaseName string, schemaName string) []ap.Access {
-	// List of all Snowflake keywords: https://docs.snowflake.com/en/sql-reference/sql-all.html
+type SnowflakeColumn struct {
+	Id   int    `json:"columnId"`
+	Name string `json:"columnName"`
+}
+type SnowflakeAccessedObjects struct {
+	Columns []SnowflakeColumn `json:"columns"`
+	Domain  string            `json:"objectDomain"`
+	Id      int               `json:"objectId"`
+	Name    string            `json:"objectName"`
+}
+
+// List of all Snowflake keywords: https://docs.snowflake.com/en/sql-reference/sql-all.html
+var snowflakeKeywords = []string{"ALTER",
+	"BEGIN",
+	"CALL",
+	"COMMENT",
+	"COMMIT",
+	"COPY INTO",
+	"CREATE",
+	"DELETE",
+	"DESCRIBE",
+	"DROP",
+	"EXECUTE",
+	"EXPLAIN",
+	"GET",
+	"GRANT",
+	"INSERT",
+	"LIST",
+	"MERGE",
+	"PUT",
+	"REMOVE",
+	"REVOKE",
+	"ROLLBACK",
+	"SELECT",
+	"SET",
+	"SHOW",
+	"TRUNCATE",
+	"UNDROP",
+	"UNSET",
+	"UPDATE",
+	"USE"}
+
+var containsKeywordRegex = regexp.MustCompile(fmt.Sprintf(`\b(%s)\b`, strings.Join(snowflakeKeywords, "|")))
+
+func ParseSnowflakeInformation(query string, databaseName string, schemaName string, baseObjectsAccessed *string, directObjectAccessed *string, objectsModified *string) ([]ap.Access, error) {
+
+	numKeywords := 0
+	detectedKeywords := []string{}
+
+	res := containsKeywordRegex.FindAllStringSubmatch(query, -1)
+	numKeywords = len(res)
+
+	for i := range res {
+		detectedKeywords = append(detectedKeywords, res[i][0])
+	}
+
+	if numKeywords == 1 {
+		detectedObjects := []SnowflakeAccessedObjects{}
+		if baseObjectsAccessed != nil {
+			objects := []SnowflakeAccessedObjects{}
+			err := json.Unmarshal([]byte(*baseObjectsAccessed), &objects)
+			if err != nil {
+				log.Error(err)
+			}
+			detectedObjects = append(detectedObjects, objects...)
+		}
+		if directObjectAccessed != nil {
+			objects := []SnowflakeAccessedObjects{}
+			err := json.Unmarshal([]byte(*directObjectAccessed), &objects)
+			if err != nil {
+				log.Error(err)
+			}
+			detectedObjects = append(detectedObjects, objects...)
+		}
+		if objectsModified != nil {
+			objects := []SnowflakeAccessedObjects{}
+			err := json.Unmarshal([]byte(*objectsModified), &objects)
+			if err != nil {
+				log.Error(err)
+			}
+			detectedObjects = append(detectedObjects, objects...)
+		}
+		if len(detectedObjects) > 0 {
+			accessObjects := []ap.Access{}
+			for _, obj := range detectedObjects {
+				newItem := ap.Access{}
+				newItem.Permissions = []string{detectedKeywords[0]}
+				newItem.DataObjectReference = &data_source.DataObjectReference{
+					FullName: strings.ToUpper(obj.Name), Type: strings.ToLower(obj.Domain)}
+				accessObjects = append(accessObjects, newItem)
+			}
+			return accessObjects, nil
+		}
+	} else if numKeywords == 0 {
+		return []ap.Access{}, nil
+	}
+
+	return ExtractInfoFromQuery(query, databaseName, schemaName)
+
+}
+
+func ExtractInfoFromQuery(query string, databaseName string, schemaName string) ([]ap.Access, error) {
 	// TODO: make checking which keywords need to be parsed more efficient
 	unsupportedKeywords := []string{
 		"ALTER",
@@ -64,25 +163,25 @@ func ExtractInfoFromQuery(query string, databaseName string, schemaName string) 
 		if returnEmpytObject {
 			return []ap.Access{
 				{DataObjectReference: nil, Permissions: []string{strings.ToUpper(keyword)}},
-			}
+			}, nil
 		}
 	}
 
 	stmt, err := parser.Parse(query)
 	if err != nil {
-		// logger.Error(fmt.Sprintf("Error parsing SQL query: %s", query))
-		return []ap.Access{{DataObjectReference: nil, Permissions: []string{"PARSE_ERROR"}}}
+		return []ap.Access{{DataObjectReference: nil, Permissions: []string{"PARSE_ERROR"}}},
+			fmt.Errorf("error parsing query: %s", query)
 	}
 
 	if stmt == nil {
-		// logger.Error(fmt.Sprintf("Empty syntax tree from query: %s", query))
-		return []ap.Access{{DataObjectReference: nil, Permissions: []string{"EMPTY"}}}
+		return []ap.Access{{DataObjectReference: nil, Permissions: []string{"EMPTY"}}},
+			fmt.Errorf("syntax tree was returned empty for query: %s", query)
 	}
 
 	parsedQueries := []SnowflakeAccess{}
 	ParseSyntaxTree(stmt, &parsedQueries)
 
-	return ConvertSnowflakeToGeneralDataObjects(parsedQueries, databaseName, schemaName)
+	return ConvertSnowflakeToGeneralDataObjects(parsedQueries, databaseName, schemaName), nil
 }
 
 func ConvertSnowflakeToGeneralDataObjects(snowflakeAccess []SnowflakeAccess, databaseName string, schemaName string) []ap.Access {
@@ -121,14 +220,14 @@ func ConvertSnowflakeToGeneralDataObjects(snowflakeAccess []SnowflakeAccess, dat
 func ParseSyntaxTree(stmt parser.Statement, parsedQueries *[]SnowflakeAccess) {
 	switch v := stmt.(type) {
 	case *parser.Select:
-		logger.Debug("Parse select query")
+		log.Debug("Parse select query")
 		ParseSelectQuery(*v, parsedQueries)
 	case *parser.DDL:
-		logger.Debug("Parse DDL query")
+		log.Debug("Parse DDL query")
 		ddlInfo := SnowflakeAccess{Table: v.NewName.Name.CompliantName(), Permissions: []string{strings.ToUpper(*&v.Action)}}
 		*parsedQueries = append(*parsedQueries, ddlInfo)
 	case *parser.Insert:
-		logger.Debug("Parse Insert query")
+		log.Debug("Parse Insert query")
 		insertInfo := SnowflakeAccess{Table: v.Table.Name.CompliantName(), Permissions: []string{strings.ToUpper(*&v.Action)}}
 		*parsedQueries = append(*parsedQueries, insertInfo)
 	case *parser.Update, *parser.Delete:
@@ -142,7 +241,7 @@ func ParseSyntaxTree(stmt parser.Statement, parsedQueries *[]SnowflakeAccess) {
 			action = "UPDATE"
 			tableExpressions = v.(*parser.Update).TableExprs
 		}
-		logger.Debug("Parse Update/delete query")
+		log.Debug("Parse Update/delete query")
 		var TableSchema = make(map[string]string)
 		for _, expr := range tableExpressions {
 			ExtractFromClauseInfo(expr, TableSchema)
@@ -152,9 +251,9 @@ func ParseSyntaxTree(stmt parser.Statement, parsedQueries *[]SnowflakeAccess) {
 			*parsedQueries = append(*parsedQueries, updateInfo)
 		}
 	case parser.Statement:
-		logger.Debug("Generic statement, not implemented")
+		log.Debug("Generic statement, not implemented")
 	default:
-		logger.Debug(fmt.Sprintf("Unknown type for %s", v))
+		log.Debug(fmt.Sprintf("Unknown type for %s", v))
 	}
 }
 
@@ -231,7 +330,7 @@ func ParseSelectExpression(expr parser.SelectExpr, accessedSnowflakeObjects *[]S
 		}
 		*accessedSnowflakeObjects = append(*accessedSnowflakeObjects, accessedSnowflakeObject)
 	default:
-		logger.Debug(fmt.Sprintf("Unknown type for %s", expr))
+		log.Debug(fmt.Sprintf("Unknown type for %s", expr))
 	}
 }
 
@@ -255,7 +354,7 @@ func ExtractFromClauseInfo(stmt parser.TableExpr, tableInfo map[string]string) {
 		rightExpr := expr.RightExpr
 		ExtractFromClauseInfo(rightExpr, tableInfo)
 	default:
-		logger.Debug("Unknown Table expression type")
+		log.Debug("Unknown Table expression type")
 	}
 }
 
@@ -264,6 +363,6 @@ func ExtractTableName(stmt parser.SimpleTableExpr, tableInfo map[string]string) 
 	case parser.TableName:
 		tableInfo[expr.Name.CompliantName()] = expr.Qualifier.CompliantName()
 	case *parser.Subquery:
-		logger.Debug("Subquery not implemented")
+		log.Debug("Subquery not implemented")
 	}
 }

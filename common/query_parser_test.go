@@ -1,25 +1,31 @@
 package common
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"testing"
 
 	ap "github.com/raito-io/cli/base/access_provider"
 	ds "github.com/raito-io/cli/base/data_source"
+	logger "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
 type QueryTestData struct {
-	query                       string
-	databaseName                string
-	schemaName                  string
-	expectedAccessedDataObjects []ap.Access
+	query                       string      `json:"query"`
+	databaseName                string      `json:"databaseName"`
+	schemaName                  string      `json:"schemaName"`
+	expectedAccessedDataObjects []ap.Access `json:"expectedOutput"`
 }
 
 func testListOfQueries(t *testing.T, testQueries []QueryTestData) {
 	logger.Info(fmt.Sprintf("%d queries to parse for test", len(testQueries)))
 	for _, testData := range testQueries {
-		actualADO := ExtractInfoFromQuery(testData.query, testData.databaseName, testData.schemaName)
+		actualADO, err := ExtractInfoFromQuery(testData.query, testData.databaseName, testData.schemaName)
+		assert.Nil(t, err)
 		if len(actualADO) == 0 {
 			fmt.Println("Error")
 		}
@@ -31,6 +37,26 @@ func testListOfQueries(t *testing.T, testQueries []QueryTestData) {
 
 		assert.ElementsMatch(t, testData.expectedAccessedDataObjects, actualADO)
 	}
+}
+
+func TestQueryFromFile(t *testing.T) {
+
+	var file io.ReadCloser
+	file, err := os.Open("testdata/select_queries.ndjson")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		item := QueryTestData{query: "<empty>", databaseName: "<empty>", schemaName: "<empty>"}
+		// fmt.Println(string(scanner.Bytes()))
+		if err := json.Unmarshal(scanner.Bytes(), &item); err != nil {
+			logger.Error(fmt.Sprintf("%v", err))
+			break
+		}
+		fmt.Printf("%v\n", item)
+	}
+
 }
 
 func TestQueryParserBasic(t *testing.T) {
