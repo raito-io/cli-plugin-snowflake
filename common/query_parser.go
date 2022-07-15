@@ -65,7 +65,6 @@ var snowflakeKeywords = []string{"ALTER",
 var containsKeywordRegex = regexp.MustCompile(fmt.Sprintf(`\b(%s)\b`, strings.Join(snowflakeKeywords, "|")))
 
 func ParseSnowflakeInformation(query string, databaseName string, schemaName string, baseObjectsAccessed *string, directObjectAccessed *string, objectsModified *string) ([]ap.Access, error) {
-
 	numKeywords := 0
 	detectedKeywords := []string{}
 
@@ -78,32 +77,43 @@ func ParseSnowflakeInformation(query string, databaseName string, schemaName str
 
 	if numKeywords == 1 {
 		detectedObjects := []SnowflakeAccessedObjects{}
+
 		if baseObjectsAccessed != nil {
 			objects := []SnowflakeAccessedObjects{}
 			err := json.Unmarshal([]byte(*baseObjectsAccessed), &objects)
+
 			if err != nil {
 				log.Error(err)
 			}
+
 			detectedObjects = append(detectedObjects, objects...)
 		}
+
 		if directObjectAccessed != nil {
 			objects := []SnowflakeAccessedObjects{}
 			err := json.Unmarshal([]byte(*directObjectAccessed), &objects)
+
 			if err != nil {
 				log.Error(err)
 			}
+
 			detectedObjects = append(detectedObjects, objects...)
 		}
+
 		if objectsModified != nil {
 			objects := []SnowflakeAccessedObjects{}
 			err := json.Unmarshal([]byte(*objectsModified), &objects)
+
 			if err != nil {
 				log.Error(err)
 			}
+
 			detectedObjects = append(detectedObjects, objects...)
 		}
+
 		if len(detectedObjects) > 0 {
 			accessObjects := []ap.Access{}
+
 			for _, obj := range detectedObjects {
 				newItem := ap.Access{}
 				newItem.Permissions = []string{detectedKeywords[0]}
@@ -111,6 +121,7 @@ func ParseSnowflakeInformation(query string, databaseName string, schemaName str
 					FullName: strings.ToUpper(obj.Name), Type: strings.ToLower(obj.Domain)}
 				accessObjects = append(accessObjects, newItem)
 			}
+
 			return accessObjects, nil
 		}
 	} else if numKeywords == 0 {
@@ -118,7 +129,6 @@ func ParseSnowflakeInformation(query string, databaseName string, schemaName str
 	}
 
 	return ExtractInfoFromQuery(query, databaseName, schemaName)
-
 }
 
 func ExtractInfoFromQuery(query string, databaseName string, schemaName string) ([]ap.Access, error) {
@@ -224,16 +234,17 @@ func ParseSyntaxTree(stmt parser.Statement, parsedQueries *[]SnowflakeAccess) {
 		ParseSelectQuery(*v, parsedQueries)
 	case *parser.DDL:
 		log.Debug("Parse DDL query")
-		ddlInfo := SnowflakeAccess{Table: v.NewName.Name.CompliantName(), Permissions: []string{strings.ToUpper(*&v.Action)}}
+		ddlInfo := SnowflakeAccess{Table: v.NewName.Name.CompliantName(), Permissions: []string{strings.ToUpper(v.Action)}}
 		*parsedQueries = append(*parsedQueries, ddlInfo)
 	case *parser.Insert:
 		log.Debug("Parse Insert query")
-		insertInfo := SnowflakeAccess{Table: v.Table.Name.CompliantName(), Permissions: []string{strings.ToUpper(*&v.Action)}}
+		insertInfo := SnowflakeAccess{Table: v.Table.Name.CompliantName(), Permissions: []string{strings.ToUpper(v.Action)}}
 		*parsedQueries = append(*parsedQueries, insertInfo)
 	case *parser.Update, *parser.Delete:
 		statementType := fmt.Sprintf("%T", v)
 		action := ""
 		var tableExpressions parser.TableExprs
+
 		if statementType == "*sqlparser.Delete" {
 			action = "DELETE"
 			tableExpressions = v.(*parser.Delete).TableExprs
@@ -241,12 +252,15 @@ func ParseSyntaxTree(stmt parser.Statement, parsedQueries *[]SnowflakeAccess) {
 			action = "UPDATE"
 			tableExpressions = v.(*parser.Update).TableExprs
 		}
+
 		log.Debug("Parse Update/delete query")
 		var TableSchema = make(map[string]string)
+
 		for _, expr := range tableExpressions {
 			ExtractFromClauseInfo(expr, TableSchema)
 		}
-		for k, _ := range TableSchema {
+
+		for k := range TableSchema {
 			updateInfo := SnowflakeAccess{Table: k, Permissions: []string{strings.ToUpper(action)}}
 			*parsedQueries = append(*parsedQueries, updateInfo)
 		}

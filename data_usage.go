@@ -31,6 +31,7 @@ func (nullString *NullString) Scan(value interface{}) error {
 	} else {
 		*nullString = NullString{ns.String, true}
 	}
+
 	return nil
 }
 
@@ -63,7 +64,9 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 	start := time.Now()
 	startQuery := time.Now()
 	snowflakeQueryTime := time.Duration(0)
+
 	logger.Info(fmt.Sprintf("Send query: %s", fetchBatchingInfoQuery))
+
 	batchingInfoResult, err := QuerySnowflake(conn, fetchBatchingInfoQuery)
 
 	if err != nil {
@@ -92,12 +95,14 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 
 	currentBatch := 0
 	accessHistoryAvailable := s.checkAccessHistoryAvailability(conn)
+
 	for currentBatch*numRowsPerBatch < numRows {
 		paginationClause := fmt.Sprintf("LIMIT %d OFFSET %d", numRowsPerBatch, currentBatch*numRowsPerBatch)
 		if numRows < numRowsPerBatch {
 			paginationClause = ""
 		}
 		dataUsageQuery := fmt.Sprintf("SELECT %s FROM %s %s ORDER BY START_TIME, QUERY_ID DESC %s", strings.Join(columns, ", "), queryHistoryTable, filterClause, paginationClause)
+
 		if accessHistoryAvailable {
 			logger.Info("Using access history table in combination with history table")
 			dataUsageQuery = fmt.Sprintf(`SELECT QUERY_ID, QID, EXECUTION_STATUS, QUERY_TEXT, DATABASE_NAME, SCHEMA_NAME, USER_NAME, START_TIME, END_TIME, EXECUTION_TIME, OUTBOUND_DATA_TRANSFER_BYTES, EXTERNAL_FUNCTION_TOTAL_SENT_ROWS, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM (SELECT %s FROM %s %s) as QUERIES LEFT JOIN (SELECT QUERY_ID as QID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY) as ACCESS on QUERIES.QUERY_ID = ACCESS.QID ORDER BY START_TIME, QUERIES.QUERY_ID DESC %s`,
@@ -151,10 +156,10 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 				schemaName = returnedRow.SchemaName.String
 			}
 
-			accessedDataObjects, err := common.ParseSnowflakeInformation(returnedRow.Query, databaseName, schemaName,
+			accessedDataObjects, localErr := common.ParseSnowflakeInformation(returnedRow.Query, databaseName, schemaName,
 				returnedRow.BaseObjectsAccessed, returnedRow.DirectObjectsAccessed, returnedRow.ObjectsModified)
 
-			if err != nil {
+			if localErr != nil {
 				// TODO: add logic to include query
 			} else if len(accessedDataObjects) == 0 || accessedDataObjects[0].DataObjectReference == nil {
 				// logger.Debug(fmt.Sprintf("No data objects returned for query: %s, batch %d", returnedRow.Query, currentBatch))
@@ -176,7 +181,9 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 		}
 
 		currentStatements := fileCreator.GetStatementCount()
+
 		logger.Debug(fmt.Sprintf("Writing data usage export log to file for batch %d", currentBatch))
+
 		err = fileCreator.AddStatements(executedStatements)
 
 		if err != nil {
@@ -209,6 +216,7 @@ func (s *DataUsageSyncer) checkAccessHistoryAvailability(conn *sql.DB) bool {
 	for accessHistoryInfoResult.Next() {
 		numRows++
 	}
+
 	if numRows > 0 {
 		logger.Debug(fmt.Sprintf("Access history query returned %d rows", numRows))
 		return true
