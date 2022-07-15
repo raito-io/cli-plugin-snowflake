@@ -162,6 +162,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 			if localErr != nil {
 				// TODO: add logic to include query
 			} else if len(accessedDataObjects) == 0 || accessedDataObjects[0].DataObjectReference == nil {
+				// nolint
 				// logger.Debug(fmt.Sprintf("No data objects returned for query: %s, batch %d", returnedRow.Query, currentBatch))
 				continue
 			}
