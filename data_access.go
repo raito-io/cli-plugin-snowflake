@@ -586,6 +586,8 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 					Grant{"USAGE", "FUTURE SCHEMAS IN DATABASE " + da.DataObject.Name},
 					Grant{permissionString, "FUTURE TABLES IN DATABASE " + da.DataObject.Name})
 			}
+		} else if da.DataObject.Type == "warehouse" {
+			expectedGrants = append(expectedGrants, createGrantsForWarehouse(permissions, da.DataObject.Name)...)
 		}
 
 		var foundGrants []interface{}
@@ -803,6 +805,17 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 				grants = append(grants, Grant{p, fmt.Sprintf("TABLE %s.%s.%s", database, schema.Name, table.Name)})
 			}
 		}
+	}
+
+	return grants
+}
+
+func createGrantsForWarehouse(permissions []string, warehouse string) []interface{} {
+	grants := make([]interface{}, 0, len(permissions)+2)
+	grants = append(grants, Grant{"USAGE", "WAREHOUSE " + warehouse})
+
+	for _, p := range permissions {
+		grants = append(grants, Grant{p, fmt.Sprintf("WAREHOUSE %s", warehouse)})
 	}
 
 	return grants
