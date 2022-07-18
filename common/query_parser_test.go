@@ -1,131 +1,104 @@
 package common
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 	"testing"
 
 	ap "github.com/raito-io/cli/base/access_provider"
-	ds "github.com/raito-io/cli/base/data_source"
+	logger "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
 type QueryTestData struct {
-	query                       string
-	databaseName                string
-	schemaName                  string
-	expectedAccessedDataObjects []ap.Access
+	Query                       string      `json:"query"`
+	DatabaseName                string      `json:"databaseName"`
+	SchemaName                  string      `json:"schemaName"`
+	ExpectedAccessedDataObjects []ap.Access `json:"expectedOutput"`
 }
 
-func TestQueryParser(t *testing.T) {
-
-	// TODO: create and read test data from yaml file
-	var testQueries []QueryTestData
-	query := "SELECT user_id as userId, user_name, address FROM demo"
-	expectedADO := []ap.Access{
-		{DataObjectReference: &ds.DataObjectReference{FullName: "..DEMO.USER_ID", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: "..DEMO.USER_NAME", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: "..DEMO.ADDRESS", Type: "column"},
-			Permissions: []string{"SELECT"}},
-	}
-	testQueries = append(testQueries, QueryTestData{query: query, databaseName: "", schemaName: "", expectedAccessedDataObjects: expectedADO})
-
-	query = "SELECT user_id as userId, user_name, address FROM demo"
-	expectedADO = []ap.Access{
-		{DataObjectReference: &ds.DataObjectReference{FullName: ".SCHEMA1.DEMO.USER_ID", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: ".SCHEMA1.DEMO.USER_NAME", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: ".SCHEMA1.DEMO.ADDRESS", Type: "column"},
-			Permissions: []string{"SELECT"}},
-	}
-	testQueries = append(testQueries, QueryTestData{query: query, databaseName: "", schemaName: "SCHEMA1", expectedAccessedDataObjects: expectedADO})
-
-	query = "SELECT user_id as userId, user_name, address FROM demo"
-	expectedADO = []ap.Access{
-		{DataObjectReference: &ds.DataObjectReference{FullName: "DATABASE1.SCHEMA1.DEMO.USER_ID", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: "DATABASE1.SCHEMA1.DEMO.USER_NAME", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: "DATABASE1.SCHEMA1.DEMO.ADDRESS", Type: "column"},
-			Permissions: []string{"SELECT"}},
-	}
-	testQueries = append(testQueries, QueryTestData{query: query, databaseName: "DATABASE1", schemaName: "SCHEMA1", expectedAccessedDataObjects: expectedADO})
-
-	query = "SELECT demo.user_id as UserId, demo.user_name, address FROM schema1.demo as test"
-	expectedADO = []ap.Access{
-		{DataObjectReference: &ds.DataObjectReference{FullName: ".SCHEMA1.DEMO.USER_ID", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: ".SCHEMA1.DEMO.USER_NAME", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: ".SCHEMA1.DEMO.ADDRESS", Type: "column"},
-			Permissions: []string{"SELECT"}},
-	}
-	testQueries = append(testQueries, QueryTestData{query: query, databaseName: "", schemaName: "", expectedAccessedDataObjects: expectedADO})
-
-	query = "SELECT orders.product, SUM(orders.quantity) AS product_units, accounts.* " +
-		"FROM orders LEFT JOIN accounts ON orders.account_id = accounts.id " +
-		"WHERE orders.region IN (SELECT region FROM top_regions) " +
-		"ORDER BY product_units LIMIT 100"
-	expectedADO = []ap.Access{
-		{DataObjectReference: &ds.DataObjectReference{FullName: "..ORDERS.PRODUCT", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: "..ORDERS.QUANTITY", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: "..ACCOUNTS", Type: "table"},
-			Permissions: []string{"SELECT"}},
-	}
-	testQueries = append(testQueries, QueryTestData{query: query, databaseName: "", schemaName: "", expectedAccessedDataObjects: expectedADO})
-
-	query = "select * from t GROUP BY ROLLUP(b,a)"
-	expectedADO = []ap.Access{
-		{DataObjectReference: &ds.DataObjectReference{FullName: "..T", Type: "table"},
-			Permissions: []string{"SELECT"}},
-	}
-	testQueries = append(testQueries, QueryTestData{query: query, databaseName: "", schemaName: "", expectedAccessedDataObjects: expectedADO})
-
-	query = "GRANT SELECT ON  demo_table TO  raito;"
-	expectedADO = []ap.Access{
-		{
-			DataObjectReference: nil,
-			Permissions:         []string{"GRANT"},
-		},
-	}
-	testQueries = append(testQueries, QueryTestData{query: query, databaseName: "", schemaName: "", expectedAccessedDataObjects: expectedADO})
-
-	query = "SHOW GRANTS TO ROLE MASKING_ADMIN"
-	expectedADO = []ap.Access{
-		{
-			DataObjectReference: nil,
-			Permissions:         []string{"SHOW"},
-		},
-	}
-	testQueries = append(testQueries, QueryTestData{query: query, databaseName: "", schemaName: "", expectedAccessedDataObjects: expectedADO})
-
-	query = "SELECT name, (SELECT max(pop) FROM cities\n WHERE cities.state = states.name)\n    FROM states;"
-	expectedADO = []ap.Access{
-		{DataObjectReference: &ds.DataObjectReference{FullName: "..STATES.NAME", Type: "column"},
-			Permissions: []string{"SELECT"}},
-		{DataObjectReference: &ds.DataObjectReference{FullName: "..CITIES.POP", Type: "column"},
-			Permissions: []string{"SELECT"}},
-	}
-	testQueries = append(testQueries, QueryTestData{query: query, databaseName: "", schemaName: "", expectedAccessedDataObjects: expectedADO})
-
+func testListOfQueries(t *testing.T, testQueries []QueryTestData) {
 	logger.Info(fmt.Sprintf("%d queries to parse for test", len(testQueries)))
-
 	for _, testData := range testQueries {
-		actualADO := ExtractInfoFromQuery(testData.query, testData.databaseName, testData.schemaName)
+		actualADO, err := ExtractInfoFromQuery(testData.Query, testData.DatabaseName, testData.SchemaName)
+		assert.Nil(t, err)
 		if len(actualADO) == 0 {
 			fmt.Println("Error")
 		}
-		logger.Info(fmt.Sprintf("Testing: %s, %d data objects retrieved", testData.query, len(actualADO)))
+		logger.Info(fmt.Sprintf("Testing: %s, %d data objects retrieved", testData.Query, len(actualADO)))
 
-		fmt.Println(testData.query)
+		fmt.Println(testData.Query)
 
 		assert.NotNil(t, actualADO)
 
-		assert.Equal(t, testData.expectedAccessedDataObjects, actualADO)
+		assert.ElementsMatch(t, testData.ExpectedAccessedDataObjects, actualADO)
+	}
+}
+
+func getTestDataFromFile(t *testing.T, filename string) []QueryTestData {
+	var file io.ReadCloser
+	file, err := os.Open(filename)
+	assert.Nil(t, err)
+	if err != nil {
+		logger.Error(fmt.Sprintf("error opening file %s: %s", filename, err.Error()))
+	}
+	defer file.Close()
+
+	testData := []QueryTestData{}
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		var item QueryTestData
+
+		if strings.HasPrefix(scanner.Text(), "#") || len(scanner.Text()) <= 2 {
+			continue
+		}
+
+		if err := json.Unmarshal(scanner.Bytes(), &item); err != nil {
+			logger.Error(fmt.Sprintf("error unmarshalling json in %s, %v", filename, err))
+			return nil
+		}
+		testData = append(testData, item)
 	}
 
+	assert.NotEmpty(t, testData)
+
+	return testData
+}
+
+func printTestData(testData []QueryTestData) {
+	for _, obj := range testData {
+		byteData, _ := json.Marshal(obj)
+		fmt.Println(string(byteData))
+	}
+
+}
+
+func runTestFromFile(t *testing.T, filename string) {
+	testData := getTestDataFromFile(t, filename)
+	testListOfQueries(t, testData)
+
+}
+
+func TestQueryParserBasic(t *testing.T) {
+	runTestFromFile(t, "./testdata/select_queries.ndjson")
+}
+
+func TestQueryParserCreate(t *testing.T) {
+	runTestFromFile(t, "./testdata/create_queries.ndjson")
+}
+
+func TestQueryParserInsert(t *testing.T) {
+	runTestFromFile(t, "./testdata/insert_queries.ndjson")
+}
+
+func TestQueryParserUpdate(t *testing.T) {
+	runTestFromFile(t, "./testdata/update_queries.ndjson")
+}
+
+func TestQueryParserDelete(t *testing.T) {
+	runTestFromFile(t, "./testdata/delete_queries.ndjson")
 }

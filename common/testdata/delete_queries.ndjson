@@ -1,0 +1,1 @@
+{"query":"delete from sessions where id = 7;","databaseName":"","schemaName":"","expectedOutput":[{"dataObjectReference":{"fullName":"..SESSIONS","type":"table"},"permissions":["DELETE"]}]}
