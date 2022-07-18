@@ -66,6 +66,19 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 					return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
 				}
 			}
+
+			views, err := readViews(fileCreator, conn, database.Name+"."+schema.Name)
+			if err != nil {
+				return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
+			}
+
+			for _, view := range views {
+				_, err := readColumns(fileCreator, conn, database.Name+"."+schema.Name+"."+view.Name)
+
+				if err != nil {
+					return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))}
+				}
+			}
 		}
 	}
 
@@ -170,6 +183,12 @@ func readSchemas(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, dbName str
 
 func readTables(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, schemaFullName string) ([]dbEntity, error) {
 	return addDbEntitiesToImporter(fileCreator, conn, "table", schemaFullName, "SHOW TABLES IN SCHEMA "+schemaFullName,
+		func(name string) string { return schemaFullName + "." + name },
+		func(name, fullName string) bool { return true })
+}
+
+func readViews(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, schemaFullName string) ([]dbEntity, error) {
+	return addDbEntitiesToImporter(fileCreator, conn, "view", schemaFullName, "SHOW VIEWS IN SCHEMA "+schemaFullName,
 		func(name string) string { return schemaFullName + "." + name },
 		func(name, fullName string) bool { return true })
 }
