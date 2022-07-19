@@ -222,11 +222,13 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 		for k, object := range grantToEntities {
 			if k == 0 {
 				do = &dsb.DataObjectReference{FullName: object.Name, Type: object.GrantedOn}
-			} else if do.FullName != object.Name && len(permissions) > 0 {
-				da.AccessObjects = append(da.AccessObjects, dap.Access{
-					DataObjectReference: do,
-					Permissions:         permissions,
-				})
+			} else if do.FullName != object.Name {
+				if len(permissions) > 0 {
+					da.AccessObjects = append(da.AccessObjects, dap.Access{
+						DataObjectReference: do,
+						Permissions:         permissions,
+					})
+				}
 				do = &dsb.DataObjectReference{FullName: object.Name, Type: object.GrantedOn}
 				permissions = make([]string, 0)
 			}
@@ -568,6 +570,8 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 		var expectedGrants []interface{}
 		if da.DataObject.Type == "table" {
 			expectedGrants = append(expectedGrants, createGrantsForTable(permissions, da.DataObject.Parent.Parent.Name, da.DataObject.Parent.Name, da.DataObject.Name)...)
+		} else if da.DataObject.Type == "view" {
+			expectedGrants = append(expectedGrants, createGrantsForView(permissions, da.DataObject.Parent.Parent.Name, da.DataObject.Parent.Name, da.DataObject.Name)...)
 		} else if da.DataObject.Type == "schema" {
 			expectedGrants = append(expectedGrants, createGrantsForSchema(conn, permissions, da.DataObject.Parent.Name, da.DataObject.Name)...)
 
@@ -582,6 +586,8 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 					Grant{"USAGE", "FUTURE SCHEMAS IN DATABASE " + da.DataObject.Name},
 					Grant{permissionString, "FUTURE TABLES IN DATABASE " + da.DataObject.Name})
 			}
+		} else if da.DataObject.Type == "warehouse" {
+			expectedGrants = append(expectedGrants, createGrantsForWarehouse(permissions, da.DataObject.Name)...)
 		}
 
 		var foundGrants []interface{}
@@ -750,6 +756,19 @@ func createGrantsForTable(permissions []string, database string, schema string, 
 	return grants
 }
 
+func createGrantsForView(permissions []string, database string, schema string, view string) []interface{} {
+	grants := make([]interface{}, 0, len(permissions)+2)
+	grants = append(grants,
+		Grant{"USAGE", "DATABASE " + database},
+		Grant{"USAGE", fmt.Sprintf("SCHEMA %s.%s", database, schema)})
+
+	for _, p := range permissions {
+		grants = append(grants, Grant{p, fmt.Sprintf("VIEW %s.%s.%s", database, schema, view)})
+	}
+
+	return grants
+}
+
 func createGrantsForSchema(conn *sql.DB, permissions []string, database string, schema string) []interface{} {
 	q := fmt.Sprintf("SHOW TABLES IN SCHEMA %s.%s", database, schema)
 	tables, _ := readDbEntities(conn, q)
@@ -786,6 +805,17 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 				grants = append(grants, Grant{p, fmt.Sprintf("TABLE %s.%s.%s", database, schema.Name, table.Name)})
 			}
 		}
+	}
+
+	return grants
+}
+
+func createGrantsForWarehouse(permissions []string, warehouse string) []interface{} {
+	grants := make([]interface{}, 0, len(permissions)+2)
+	grants = append(grants, Grant{"USAGE", "WAREHOUSE " + warehouse})
+
+	for _, p := range permissions {
+		grants = append(grants, Grant{p, fmt.Sprintf("WAREHOUSE %s", warehouse)})
 	}
 
 	return grants

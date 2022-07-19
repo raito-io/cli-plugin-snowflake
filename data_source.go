@@ -42,6 +42,11 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 		excludedSchemas = v.(string)
 	}
 
+	_, err = readWarehouses(fileCreator, conn)
+	if err != nil {
+		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
+	}
+
 	databases, err := readDatabases(fileCreator, conn, excludedDatabases)
 	if err != nil {
 		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
@@ -60,10 +65,23 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 			}
 
 			for _, table := range tables {
-				_, err := readColumns(fileCreator, conn, database.Name+"."+schema.Name+"."+table.Name)
+				_, err = readColumns(fileCreator, conn, database.Name+"."+schema.Name+"."+table.Name)
 
 				if err != nil {
 					return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
+				}
+			}
+
+			views, err := readViews(fileCreator, conn, database.Name+"."+schema.Name)
+			if err != nil {
+				return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
+			}
+
+			for _, view := range views {
+				_, err := readColumns(fileCreator, conn, database.Name+"."+schema.Name+"."+view.Name)
+
+				if err != nil {
+					return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))}
 				}
 			}
 		}
@@ -104,6 +122,7 @@ func addDbEntitiesToImporter(fileCreator dsb.DataSourceFileCreator, conn *sql.DB
 	}
 
 	dataObjects := make([]dsb.DataObject, 0, 20)
+	dbEntities := make([]dbEntity, 0, 20)
 
 	for _, db := range dbs {
 		logger.Debug(fmt.Sprintf("Handling data object (type %s) %q", doType, db.Name))
@@ -119,6 +138,7 @@ func addDbEntitiesToImporter(fileCreator dsb.DataSourceFileCreator, conn *sql.DB
 				ParentExternalId: parent,
 			}
 			dataObjects = append(dataObjects, do)
+			dbEntities = append(dbEntities, db)
 		}
 	}
 
@@ -127,7 +147,13 @@ func addDbEntitiesToImporter(fileCreator dsb.DataSourceFileCreator, conn *sql.DB
 		return nil, err
 	}
 
-	return dbs, nil
+	return dbEntities, nil
+}
+
+func readWarehouses(fileCreator dsb.DataSourceFileCreator, conn *sql.DB) ([]dbEntity, error) {
+	return addDbEntitiesToImporter(fileCreator, conn, "warehouse", "", "SHOW WAREHOUSES",
+		func(name string) string { return name },
+		func(name, fullName string) bool { return true })
 }
 
 func readDatabases(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, excludedDatabases string) ([]dbEntity, error) {
@@ -146,7 +172,6 @@ func readDatabases(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, excluded
 			return !f
 		})
 }
-
 func readSchemas(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, dbName string, excludedSchemas string) ([]dbEntity, error) {
 	excludes := make(map[string]struct{})
 
@@ -170,6 +195,12 @@ func readSchemas(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, dbName str
 
 func readTables(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, schemaFullName string) ([]dbEntity, error) {
 	return addDbEntitiesToImporter(fileCreator, conn, "table", schemaFullName, "SHOW TABLES IN SCHEMA "+schemaFullName,
+		func(name string) string { return schemaFullName + "." + name },
+		func(name, fullName string) bool { return true })
+}
+
+func readViews(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, schemaFullName string) ([]dbEntity, error) {
+	return addDbEntitiesToImporter(fileCreator, conn, "view", schemaFullName, "SHOW VIEWS IN SCHEMA "+schemaFullName,
 		func(name string) string { return schemaFullName + "." + name },
 		func(name, fullName string) bool { return true })
 }
