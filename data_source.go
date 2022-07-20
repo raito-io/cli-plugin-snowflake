@@ -224,9 +224,9 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 	logger.Debug("Returning meta data for Snowflake")
 
 	return ds.MetaData{
+		Type:              "snowflake",
 		SupportedFeatures: []string{ds.RowFiltering, ds.ColumnMasking},
 		DataObjectTypes: []ds.DataObjectType{
-			// TODO add data source
 			{
 				Name: ds.Datasource,
 				Permissions: []ds.DataObjectTypePermission{
