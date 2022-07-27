@@ -32,6 +32,16 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 	}
 	defer conn.Close()
 
+	// for data source level access import & export convenience we retrieve the snowflake account and use it as datasource name
+	sfAccount, err := getSnowflakeAccountName(conn)
+
+	if err != nil {
+		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
+	}
+
+	fileCreator.GetDataSourceDetails().SetName(sfAccount)
+	fileCreator.GetDataSourceDetails().SetFullname(sfAccount)
+
 	excludedDatabases := ""
 	if v, ok := config.Parameters[SfExcludedDatabases]; ok && v != nil {
 		excludedDatabases = v.(string)
@@ -112,6 +122,25 @@ func readDbEntities(conn *sql.DB, query string) ([]dbEntity, error) {
 	}
 
 	return dbs, nil
+}
+
+func getSnowflakeAccountName(conn *sql.DB) (string, error) {
+	rows, err := conn.Query("select current_account()")
+	if err != nil {
+		return "", fmt.Errorf("error while querying Snowflake: %s", err.Error())
+	}
+	var r []string
+	err = scan.Rows(&r, rows)
+
+	if err != nil {
+		return "", fmt.Errorf("error while querying Snowflake: %s", err.Error())
+	}
+
+	if len(r) != 1 {
+		return "", fmt.Errorf("error retrieving account information from snowflake")
+	}
+
+	return r[0], nil
 }
 
 func addDbEntitiesToImporter(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, doType string, parent string, query string, externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]dbEntity, error) {

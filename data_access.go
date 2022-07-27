@@ -233,9 +233,15 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 				permissions = make([]string, 0)
 			}
 
+			if do.Type == "ACCOUNT" {
+				do.Type = "DATASOURCE"
+			}
+
 			// We do not import USAGE as this is handled separately in the data access export
 			if !strings.EqualFold("USAGE", object.Privilege) {
-				permissions = append(permissions, object.Privilege)
+				if isAcceptedGrantedOnType(object.GrantedOn) {
+					permissions = append(permissions, object.Privilege)
+				}
 			}
 
 			if k == len(grantToEntities)-1 && len(permissions) > 0 {
@@ -275,6 +281,18 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 	return data_access.DataAccessSyncResult{
 		Error: nil,
 	}
+}
+
+func isAcceptedGrantedOnType(grantedOn string) bool {
+	acceptedTypes := []string{"ACCOUNT", "WAREHOUSE", "DATASET", "SCHEMA", "TABLE", "COLUMN"}
+
+	for _, t := range acceptedTypes {
+		if strings.EqualFold(t, grantedOn) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSyncConfig, policyType string, action dap.Action) data_access.DataAccessSyncResult {
