@@ -606,6 +606,8 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 			}
 		} else if da.DataObject.Type == "warehouse" {
 			expectedGrants = append(expectedGrants, createGrantsForWarehouse(permissions, da.DataObject.Name)...)
+		} else if da.DataObject.Type == "datasource" {
+			expectedGrants = append(expectedGrants, createGrantsForAccount(permissions)...)
 		}
 
 		var foundGrants []interface{}
@@ -810,6 +812,10 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 
 	grants = append(grants, Grant{"USAGE", "DATABASE " + database})
 
+	for _, p := range permissions {
+		grants = append(grants, Grant{p, fmt.Sprintf("DATABASE %s", database)})
+	}
+
 	for _, schema := range schemas {
 		if schema.Name == "INFORMATION_SCHEMA" {
 			continue
@@ -825,6 +831,8 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 		}
 	}
 
+	logger.Error(fmt.Sprintf("%+v\n\n\n", grants...))
+
 	return grants
 }
 
@@ -834,6 +842,17 @@ func createGrantsForWarehouse(permissions []string, warehouse string) []interfac
 
 	for _, p := range permissions {
 		grants = append(grants, Grant{p, fmt.Sprintf("WAREHOUSE %s", warehouse)})
+	}
+
+	return grants
+}
+
+func createGrantsForAccount(permissions []string) []interface{} {
+	grants := make([]interface{}, 0, len(permissions))
+
+	for _, p := range permissions {
+		grants = append(grants, Grant{p, "ACCOUNT"})
+		logger.Error(fmt.Sprintf("%+v", Grant{p, "ACCOUNT"}))
 	}
 
 	return grants

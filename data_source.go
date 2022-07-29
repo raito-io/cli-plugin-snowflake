@@ -57,6 +57,22 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
 	}
 
+	// TODO: shares are databases that are shared with the account. They also show up in SHOW DATABASES but they need different treatment
+	// main reason is that for export they can only have "IMPORTED PRIVILEGES" granted on the shared db level and nothing else.
+	// for now we can just exclude them but they need to be treated later on
+	shares, err := readShares(conn)
+	if err != nil {
+		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
+	}
+
+	for _, share := range shares {
+		if excludedDatabases != "" {
+			excludedDatabases = excludedDatabases + ","
+
+		}
+		excludedDatabases = excludedDatabases + share.Name
+	}
+
 	databases, err := readDatabases(fileCreator, conn, excludedDatabases)
 	if err != nil {
 		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
@@ -177,6 +193,20 @@ func addDbEntitiesToImporter(fileCreator dsb.DataSourceFileCreator, conn *sql.DB
 	}
 
 	return dbEntities, nil
+}
+
+func readShares(conn *sql.DB) ([]dbEntity, error) {
+	_, err := readDbEntities(conn, "SHOW SHARES")
+	if err != nil {
+		return nil, err
+	}
+
+	shares, err := readDbEntities(conn, "select \"database_name\" as \"name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'")
+	if err != nil {
+		return nil, err
+	}
+
+	return shares, err
 }
 
 func readWarehouses(fileCreator dsb.DataSourceFileCreator, conn *sql.DB) ([]dbEntity, error) {
