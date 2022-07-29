@@ -16,6 +16,7 @@ type DataSourceSyncer struct {
 }
 
 func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.DataSourceSyncResult {
+	logger.Error("WORKS")
 	logger.Debug("Start syncing data source meta data for snowflake")
 	fileCreator, err := dsb.NewDataSourceFileCreator(config)
 
@@ -67,10 +68,9 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 
 	for _, share := range shares {
 		if excludedDatabases != "" {
-			excludedDatabases = excludedDatabases + ","
-
+			excludedDatabases += ","
 		}
-		excludedDatabases = excludedDatabases + share.Name
+		excludedDatabases += share.Name
 	}
 
 	databases, err := readDatabases(fileCreator, conn, excludedDatabases)
