@@ -55,10 +55,16 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 	queryHistoryTable := "SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY"
 
 	// TODO: should be configurable
-	numberOfDays := 7
+	numberOfDays := 14
 	startDate := time.Now().AddDate(0, 0, -numberOfDays)
-	dateFormat := "2006-01-02"
-	filterClause := fmt.Sprintf("WHERE start_time >= '%s'", startDate.Format(dateFormat))
+	if config != nil && config.ConfigMap.Parameters["lastUsed"] != nil {
+		startDateRaw, err := time.Parse(time.RFC3339, config.ConfigMap.Parameters["lastUsed"].(string))
+		if err == nil && startDateRaw.After(startDate) {
+			startDate = startDateRaw
+		}
+	}
+	logger.Info(fmt.Sprintf("using start date %s", startDate.Format(time.RFC3339)))
+	filterClause := fmt.Sprintf("WHERE start_time >= '%s'", startDate.Format(time.RFC3339))
 
 	fetchBatchingInfoQuery := fmt.Sprintf("SELECT min(START_TIME) as minTime, max(START_TIME) as maxTime, COUNT(START_TIME) as numRows FROM %s %s", queryHistoryTable, filterClause)
 	start := time.Now()
@@ -74,24 +80,29 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 	}
 	snowflakeQueryTime += time.Since(startQuery).Round(time.Millisecond)
 
-	minTime := ""
-	maxTime := ""
+	var minTime *string
+	var maxTime *string
 	numRows := 0
 
 	for batchingInfoResult.Next() {
 		err := batchingInfoResult.Scan(&minTime, &maxTime, &numRows)
 		if err != nil {
+			logger.Info(fmt.Sprintf("%v", batchingInfoResult))
 			return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(err)}
 		}
+		if numRows == 0 || minTime == nil || maxTime == nil {
+			errorMessage := fmt.Sprintf("no usage information available with query: %s => result: numRows: %d, minTime: %v, maxtime: %v",
+				fetchBatchingInfoQuery, numRows, minTime, maxTime)
+			logger.Info(errorMessage)
+			return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(fmt.Errorf(errorMessage))}
+		}
 
-		logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", minTime, maxTime, numRows))
+		logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", *minTime, *maxTime, numRows))
 	}
 
-	columns := []string{
-		"QUERY_ID", "EXECUTION_STATUS", "QUERY_TEXT", "DATABASE_NAME", "SCHEMA_NAME", "USER_NAME",
-		"START_TIME", "END_TIME", "EXECUTION_TIME", "OUTBOUND_DATA_TRANSFER_BYTES", "EXTERNAL_FUNCTION_TOTAL_SENT_ROWS"}
+	columns := s.getColumnNames("db")
 
-	filterClause = fmt.Sprintf("WHERE START_TIME >= '%s' and START_TIME <= '%s'", minTime, maxTime)
+	filterClause = fmt.Sprintf("WHERE START_TIME >= '%s' and START_TIME <= '%s'", *minTime, *maxTime)
 
 	currentBatch := 0
 	accessHistoryAvailable := s.checkAccessHistoryAvailability(conn)
@@ -105,8 +116,8 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 
 		if accessHistoryAvailable {
 			logger.Info("Using access history table in combination with history table")
-			dataUsageQuery = fmt.Sprintf(`SELECT QUERY_ID, QID, EXECUTION_STATUS, QUERY_TEXT, DATABASE_NAME, SCHEMA_NAME, USER_NAME, START_TIME, END_TIME, EXECUTION_TIME, OUTBOUND_DATA_TRANSFER_BYTES, EXTERNAL_FUNCTION_TOTAL_SENT_ROWS, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM (SELECT %s FROM %s %s) as QUERIES LEFT JOIN (SELECT QUERY_ID as QID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY) as ACCESS on QUERIES.QUERY_ID = ACCESS.QID ORDER BY START_TIME, QUERIES.QUERY_ID DESC %s`,
-				strings.Join(columns, ", "), queryHistoryTable, filterClause, paginationClause)
+			dataUsageQuery = fmt.Sprintf(`SELECT %s, QID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM (SELECT %s FROM %s %s) as QUERIES LEFT JOIN (SELECT QUERY_ID as QID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY) as ACCESS on QUERIES.QUERY_ID = ACCESS.QID ORDER BY START_TIME, QUERIES.QUERY_ID DESC %s`,
+				strings.Join(columns, ", "), strings.Join(columns, ", "), queryHistoryTable, filterClause, paginationClause)
 		}
 
 		logger.Debug(fmt.Sprintf("Retrieving paginated query log from Snowflake with query: %s, batch %d", dataUsageQuery, currentBatch))
@@ -170,13 +181,15 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 			du := dub.Statement{
 				ExternalId:          returnedRow.ExternalId,
 				AccessedDataObjects: accessedDataObjects,
-				Status:              returnedRow.Status == "SUCCESS",
+				Success:             returnedRow.Status == "SUCCESS",
+				Status:              returnedRow.Status,
 				User:                returnedRow.User,
-				StartTime:           startTime.UTC().Unix(),
-				EndTime:             endTime.UTC().Unix(),
-				TotalTime:           returnedRow.TotalTime,
-				BytesTransferred:    returnedRow.BytesTranferred,
-				RowsReturned:        returnedRow.RowsReturned,
+				Role:                returnedRow.Role,
+				StartTime:           startTime.Unix(),
+				EndTime:             endTime.Unix(),
+				Bytes:               returnedRow.BytesTranferred,
+				Rows:                returnedRow.RowsReturned,
+				Credits:             returnedRow.CloudCreditsUsed,
 			}
 			executedStatements = append(executedStatements, du)
 		}
@@ -226,25 +239,39 @@ func (s *DataUsageSyncer) checkAccessHistoryAvailability(conn *sql.DB) bool {
 	return false
 }
 
+func (s *DataUsageSyncer) getColumnNames(tag string) []string {
+	columNames := []string{}
+	val := reflect.ValueOf(QueryDbEntities{})
+	for i := 0; i < val.Type().NumField(); i++ {
+		tagValue := val.Type().Field(i).Tag.Get(tag)
+		if tagValue != "" {
+			columNames = append(columNames, val.Type().Field(i).Tag.Get(tag))
+		}
+	}
+	return columNames
+}
+
 type QueryDbEntities struct {
 	ExternalId            string     `db:"QUERY_ID"`
-	AccessId              NullString `db:"QID"`
 	Status                string     `db:"EXECUTION_STATUS"`
 	Query                 string     `db:"QUERY_TEXT"`
+	ErrorMessage          NullString `db:"ERROR_MESSAGE"`
 	DatabaseName          NullString `db:"DATABASE_NAME"`
 	SchemaName            NullString `db:"SCHEMA_NAME"`
 	User                  string     `db:"USER_NAME"`
+	Role                  string     `db:"ROLE_NAME"`
 	StartTime             string     `db:"START_TIME"`
 	EndTime               string     `db:"END_TIME"`
-	TotalTime             float32    `db:"EXECUTION_TIME"`
 	BytesTranferred       int        `db:"OUTBOUND_DATA_TRANSFER_BYTES"`
 	RowsReturned          int        `db:"EXTERNAL_FUNCTION_TOTAL_SENT_ROWS"`
-	DirectObjectsAccessed *string    `db:"DIRECT_OBJECTS_ACCESSED"`
-	BaseObjectsAccessed   *string    `db:"BASE_OBJECTS_ACCESSED"`
-	ObjectsModified       *string    `db:"OBJECTS_MODIFIED"`
+	CloudCreditsUsed      float32    `db:"CREDITS_USED_CLOUD_SERVICES"`
+	AccessId              NullString `db-table2:"QID"`
+	DirectObjectsAccessed *string    `db-table2:"DIRECT_OBJECTS_ACCESSED"`
+	BaseObjectsAccessed   *string    `db-table2:"BASE_OBJECTS_ACCESSED"`
+	ObjectsModified       *string    `db-table2:"OBJECTS_MODIFIED"`
 }
 
 func (entity QueryDbEntities) String() string {
-	return fmt.Sprintf("ID: %s, Status: %s, SQL Query: %s, DatabaseName: %s, SchemaName: %s, UserName: %s, StartTime: %s, EndTime: %s, TotalTime: %f",
-		entity.ExternalId, entity.Status, entity.Query, entity.DatabaseName.String, entity.SchemaName.String, entity.User, entity.StartTime, entity.EndTime, entity.TotalTime)
+	return fmt.Sprintf("ID: %s, Status: %s, SQL Query: %s, DatabaseName: %s, SchemaName: %s, UserName: %s, StartTime: %s, EndTime: %s",
+		entity.ExternalId, entity.Status, entity.Query, entity.DatabaseName.String, entity.SchemaName.String, entity.User, entity.StartTime, entity.EndTime)
 }
