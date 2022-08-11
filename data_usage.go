@@ -56,7 +56,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 
 	// TODO: should be configurable
 	numberOfDays := 14
-	startDate := time.Now().AddDate(0, 0, -numberOfDays)
+	startDate := time.Now().Truncate(24*time.Hour).AddDate(0, 0, -numberOfDays)
 	if config != nil && config.ConfigMap.Parameters["lastUsed"] != nil {
 		startDateRaw, err := time.Parse(time.RFC3339, config.ConfigMap.Parameters["lastUsed"].(string))
 		if err == nil && startDateRaw.After(startDate) {
@@ -64,7 +64,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 		}
 	}
 	logger.Info(fmt.Sprintf("using start date %s", startDate.Format(time.RFC3339)))
-	filterClause := fmt.Sprintf("WHERE start_time >= '%s'", startDate.Format(time.RFC3339))
+	filterClause := fmt.Sprintf("WHERE start_time > '%s'", startDate.Format(time.RFC3339))
 
 	fetchBatchingInfoQuery := fmt.Sprintf("SELECT min(START_TIME) as minTime, max(START_TIME) as maxTime, COUNT(START_TIME) as numRows FROM %s %s", queryHistoryTable, filterClause)
 	start := time.Now()
@@ -170,28 +170,36 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 			accessedDataObjects, localErr := common.ParseSnowflakeInformation(returnedRow.Query, databaseName, schemaName,
 				returnedRow.BaseObjectsAccessed, returnedRow.DirectObjectsAccessed, returnedRow.ObjectsModified)
 
+			emptyDu := dub.Statement{
+				StartTime: 0,
+				Query:     returnedRow.Query,
+			}
 			if localErr != nil {
 				// TODO: add logic to include query
+				executedStatements = append(executedStatements, emptyDu)
+				continue
 			} else if len(accessedDataObjects) == 0 || accessedDataObjects[0].DataObjectReference == nil {
 				// nolint
 				// logger.Debug(fmt.Sprintf("No data objects returned for query: %s, batch %d", returnedRow.Query, currentBatch))
+				executedStatements = append(executedStatements, emptyDu)
 				continue
-			}
+			} else {
 
-			du := dub.Statement{
-				ExternalId:          returnedRow.ExternalId,
-				AccessedDataObjects: accessedDataObjects,
-				Success:             returnedRow.Status == "SUCCESS",
-				Status:              returnedRow.Status,
-				User:                returnedRow.User,
-				Role:                returnedRow.Role,
-				StartTime:           startTime.Unix(),
-				EndTime:             endTime.Unix(),
-				Bytes:               returnedRow.BytesTranferred,
-				Rows:                returnedRow.RowsReturned,
-				Credits:             returnedRow.CloudCreditsUsed,
+				du := dub.Statement{
+					ExternalId:          returnedRow.ExternalId,
+					AccessedDataObjects: accessedDataObjects,
+					Success:             returnedRow.Status == "SUCCESS",
+					Status:              returnedRow.Status,
+					User:                returnedRow.User,
+					Role:                returnedRow.Role,
+					StartTime:           startTime.Unix(),
+					EndTime:             endTime.Unix(),
+					Bytes:               returnedRow.BytesTranferred,
+					Rows:                returnedRow.RowsReturned,
+					Credits:             returnedRow.CloudCreditsUsed,
+				}
+				executedStatements = append(executedStatements, du)
 			}
-			executedStatements = append(executedStatements, du)
 		}
 
 		currentStatements := fileCreator.GetStatementCount()
