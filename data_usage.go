@@ -57,12 +57,14 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 	// TODO: should be configurable
 	numberOfDays := 14
 	startDate := time.Now().Truncate(24*time.Hour).AddDate(0, 0, -numberOfDays)
+
 	if config != nil && config.ConfigMap.Parameters["lastUsed"] != nil {
-		startDateRaw, err := time.Parse(time.RFC3339, config.ConfigMap.Parameters["lastUsed"].(string))
-		if err == nil && startDateRaw.After(startDate) {
+		startDateRaw, errLocal := time.Parse(time.RFC3339, config.ConfigMap.Parameters["lastUsed"].(string))
+		if errLocal == nil && startDateRaw.After(startDate) {
 			startDate = startDateRaw
 		}
 	}
+
 	logger.Info(fmt.Sprintf("using start date %s", startDate.Format(time.RFC3339)))
 	filterClause := fmt.Sprintf("WHERE start_time > '%s'", startDate.Format(time.RFC3339))
 
@@ -90,11 +92,13 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 			logger.Info(fmt.Sprintf("%v", batchingInfoResult))
 			return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(err)}
 		}
+
 		if numRows == 0 || minTime == nil || maxTime == nil {
 			errorMessage := fmt.Sprintf("no usage information available with query: %s => result: numRows: %d, minTime: %v, maxtime: %v",
 				fetchBatchingInfoQuery, numRows, minTime, maxTime)
 			logger.Info(errorMessage)
-			return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(fmt.Errorf(errorMessage))}
+
+			return data_usage.DataUsageSyncResult{Error: api.ToErrorResult(fmt.Errorf("%s", errorMessage))}
 		}
 
 		logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", *minTime, *maxTime, numRows))
@@ -181,7 +185,6 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 				executedStatements = append(executedStatements, emptyDu)
 				continue
 			} else {
-
 				du := dub.Statement{
 					ExternalId:          returnedRow.ExternalId,
 					AccessedDataObjects: accessedDataObjects,
@@ -247,12 +250,14 @@ func (s *DataUsageSyncer) checkAccessHistoryAvailability(conn *sql.DB) bool {
 func (s *DataUsageSyncer) getColumnNames(tag string) []string {
 	columNames := []string{}
 	val := reflect.ValueOf(QueryDbEntities{})
+
 	for i := 0; i < val.Type().NumField(); i++ {
 		tagValue := val.Type().Field(i).Tag.Get(tag)
 		if tagValue != "" {
 			columNames = append(columNames, val.Type().Field(i).Tag.Get(tag))
 		}
 	}
+
 	return columNames
 }
 
