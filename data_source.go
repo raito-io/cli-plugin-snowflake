@@ -205,6 +205,7 @@ func readViews(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, schemaFullNa
 		func(name, fullName string) bool { return true })
 }
 
+//nolint // check, linter is correct, return value of function is never used
 func readColumns(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, tableFullName string) ([]dbEntity, error) {
 	_, err := readDbEntities(conn, "SHOW COLUMNS IN TABLE "+tableFullName)
 	if err != nil {
