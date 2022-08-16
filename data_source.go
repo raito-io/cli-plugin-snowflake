@@ -291,11 +291,11 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 				Permissions: []ds.DataObjectTypePermission{
 					{
 						Permission:  "APPLY MASKING POLICY",
-						Description: "Grants ability to set a Column-level Security masking policy on a table or view column and to set a masking policy on a tag.\nThis global privilege also allows executing the DESCRIBE operation on tables and views.",
+						Description: "Grants ability to set a Column-level Security masking policy on a table or view column and to set a masking policy on a tag. This global privilege also allows executing the DESCRIBE operation on tables and views.",
 					},
 					{
 						Permission:  "APPLY ROW ACCESS POLICY",
-						Description: "Grants the ability to add and drop a row access policy on a table or view.\nThis global privilege also allows executing the DESCRIBE operation on tables and views.",
+						Description: "Grants the ability to add and drop a row access policy on a table or view. This global privilege also allows executing the DESCRIBE operation on tables and views.",
 					},
 					{
 						Permission:  "APPLY SESSION POLICY",
@@ -359,7 +359,7 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 					},
 					{
 						Permission:  "MONITOR EXECUTION",
-						Description: "Grants ability to monitor any pipes or tasks in the account.\nThe USAGE privilege is also required on each database and schema that stores these objects.",
+						Description: "Grants ability to monitor any pipes or tasks in the account. The USAGE privilege is also required on each database and schema that stores these objects.",
 					},
 					{
 						Permission:  "MONITOR USAGE",

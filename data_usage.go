@@ -54,8 +54,8 @@ func (s *DataUsageSyncer) SyncDataUsage(config *data_usage.DataUsageSyncConfig) 
 	const numRowsPerBatch = 10000
 	queryHistoryTable := "SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY"
 
-	// TODO: should be configurable
-	numberOfDays := 7
+	// TODO[LATER]: number of days should be configurable
+	numberOfDays := 14
 	startDate := time.Now().AddDate(0, 0, -numberOfDays)
 	dateFormat := "2006-01-02"
 	filterClause := fmt.Sprintf("WHERE start_time >= '%s'", startDate.Format(dateFormat))
