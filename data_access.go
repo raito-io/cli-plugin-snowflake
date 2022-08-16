@@ -30,6 +30,7 @@ var PermissionMap = map[string]PermissionTarget{
 }
 
 var ROLES_NOTINTERNALIZABLE = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
+var ACCEPTED_TYPES = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATASET": {}, "SCHEMA": {}, "TABLE": {}, "COLUMN": {}}
 
 const ROLE_SEPARATOR = "_"
 
@@ -239,7 +240,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 
 			// We do not import USAGE as this is handled separately in the data access export
 			if !strings.EqualFold("USAGE", object.Privilege) {
-				if isAcceptedGrantedOnType(object.GrantedOn) {
+				if _, f := ACCEPTED_TYPES[strings.ToUpper(object.GrantedOn)]; f {
 					permissions = append(permissions, object.Privilege)
 				}
 			}
@@ -281,18 +282,6 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 	return data_access.DataAccessSyncResult{
 		Error: nil,
 	}
-}
-
-func isAcceptedGrantedOnType(grantedOn string) bool {
-	acceptedTypes := []string{"ACCOUNT", "WAREHOUSE", "DATASET", "SCHEMA", "TABLE", "COLUMN"}
-
-	for _, t := range acceptedTypes {
-		if strings.EqualFold(t, grantedOn) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (s *DataAccessSyncer) importPoliciesOfType(config *data_access.DataAccessSyncConfig, policyType string, action dap.Action) data_access.DataAccessSyncResult {
@@ -830,8 +819,6 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 			}
 		}
 	}
-
-	logger.Error(fmt.Sprintf("%+v\n\n\n", grants...))
 
 	return grants
 }

@@ -16,7 +16,6 @@ type DataSourceSyncer struct {
 }
 
 func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.DataSourceSyncResult {
-	logger.Error("WORKS")
 	logger.Debug("Start syncing data source meta data for snowflake")
 	fileCreator, err := dsb.NewDataSourceFileCreator(config)
 
