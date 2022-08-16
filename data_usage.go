@@ -270,10 +270,10 @@ type QueryDbEntities struct {
 	BytesTranferred       int        `db:"OUTBOUND_DATA_TRANSFER_BYTES"`
 	RowsReturned          int        `db:"EXTERNAL_FUNCTION_TOTAL_SENT_ROWS"`
 	CloudCreditsUsed      float32    `db:"CREDITS_USED_CLOUD_SERVICES"`
-	AccessId              NullString `db-table2:"QID"`
-	DirectObjectsAccessed *string    `db-table2:"DIRECT_OBJECTS_ACCESSED"`
-	BaseObjectsAccessed   *string    `db-table2:"BASE_OBJECTS_ACCESSED"`
-	ObjectsModified       *string    `db-table2:"OBJECTS_MODIFIED"`
+	AccessId              NullString // column name: QID
+	DirectObjectsAccessed *string    // column name: DIRECT_OBJECTS_ACCESSED
+	BaseObjectsAccessed   *string    // column name: BASE_OBJECTS_ACCESSED
+	ObjectsModified       *string    // column name: OBJECTS_MODIFIED
 }
 
 func (entity QueryDbEntities) String() string {
