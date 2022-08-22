@@ -22,3 +22,4 @@ __debug_bin
 # Dependency directories (remove the comment below to include it)
 # vendor/
 cli-plugin-snowflake
+local*.sh
