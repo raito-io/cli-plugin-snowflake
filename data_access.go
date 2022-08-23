@@ -30,6 +30,7 @@ var PermissionMap = map[string]PermissionTarget{
 }
 
 var ROLES_NOTINTERNALIZABLE = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
+var ACCEPTED_TYPES = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "COLUMN": {}, "SHARED-DATABASE": {}}
 
 const ROLE_SEPARATOR = "_"
 
@@ -233,9 +234,15 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 				permissions = make([]string, 0)
 			}
 
+			if do.Type == "ACCOUNT" {
+				do.Type = "DATASOURCE"
+			}
+
 			// We do not import USAGE as this is handled separately in the data access export
 			if !strings.EqualFold("USAGE", object.Privilege) {
-				permissions = append(permissions, object.Privilege)
+				if _, f := ACCEPTED_TYPES[strings.ToUpper(object.GrantedOn)]; f {
+					permissions = append(permissions, object.Privilege)
+				}
 			}
 
 			if k == len(grantToEntities)-1 && len(permissions) > 0 {
@@ -578,6 +585,10 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 			if createFutureGrants {
 				expectedGrants = append(expectedGrants, Grant{permissionString, "FUTURE TABLES IN SCHEMA " + da.DataObject.BuildPath(".")})
 			}
+		} else if da.DataObject.Type == "shared-database" {
+			for _, p := range permissions {
+				expectedGrants = append(expectedGrants, Grant{p, fmt.Sprintf("DATABASE %s", da.DataObject.Name)})
+			}
 		} else if da.DataObject.Type == "database" {
 			expectedGrants = append(expectedGrants, createGrantsForDatabase(conn, permissions, da.DataObject.Name)...)
 
@@ -588,6 +599,8 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 			}
 		} else if da.DataObject.Type == "warehouse" {
 			expectedGrants = append(expectedGrants, createGrantsForWarehouse(permissions, da.DataObject.Name)...)
+		} else if da.DataObject.Type == "datasource" {
+			expectedGrants = append(expectedGrants, createGrantsForAccount(permissions)...)
 		}
 
 		var foundGrants []interface{}
@@ -792,6 +805,10 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 
 	grants = append(grants, Grant{"USAGE", "DATABASE " + database})
 
+	for _, p := range permissions {
+		grants = append(grants, Grant{p, fmt.Sprintf("DATABASE %s", database)})
+	}
+
 	for _, schema := range schemas {
 		if schema.Name == "INFORMATION_SCHEMA" {
 			continue
@@ -816,6 +833,17 @@ func createGrantsForWarehouse(permissions []string, warehouse string) []interfac
 
 	for _, p := range permissions {
 		grants = append(grants, Grant{p, fmt.Sprintf("WAREHOUSE %s", warehouse)})
+	}
+
+	return grants
+}
+
+func createGrantsForAccount(permissions []string) []interface{} {
+	grants := make([]interface{}, 0, len(permissions))
+
+	for _, p := range permissions {
+		grants = append(grants, Grant{p, "ACCOUNT"})
+		logger.Error(fmt.Sprintf("%+v", Grant{p, "ACCOUNT"}))
 	}
 
 	return grants

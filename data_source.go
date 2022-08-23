@@ -32,6 +32,16 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 	}
 	defer conn.Close()
 
+	// for data source level access import & export convenience we retrieve the snowflake account and use it as datasource name
+	sfAccount, err := getSnowflakeAccountName(conn)
+
+	if err != nil {
+		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
+	}
+
+	fileCreator.GetDataSourceDetails().SetName(sfAccount)
+	fileCreator.GetDataSourceDetails().SetFullname(sfAccount)
+
 	excludedDatabases := ""
 	if v, ok := config.Parameters[SfExcludedDatabases]; ok && v != nil {
 		excludedDatabases = v.(string)
@@ -47,38 +57,65 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
 	}
 
+	// TODO: shares are databases that are shared with the account. They also show up in SHOW DATABASES but they need different treatment
+	// main reason is that for export they can only have "IMPORTED PRIVILEGES" granted on the shared db level and nothing else.
+	// for now we can just exclude them but they need to be treated later on
+	shares, err := readShares(fileCreator, conn, excludedDatabases)
+	if err != nil {
+		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
+	}
+
+	sharesMap := make(map[string]struct{}, 0)
+
+	// exclude shares from database import as we treat them separately
+	for _, share := range shares {
+		if excludedDatabases != "" {
+			excludedDatabases += ","
+		}
+		excludedDatabases += share.Name
+		sharesMap[share.Name] = struct{}{}
+	}
+
 	databases, err := readDatabases(fileCreator, conn, excludedDatabases)
 	if err != nil {
 		return ds.DataSourceSyncResult{Error: api.ToErrorResult(err)}
 	}
 
+	// add shares to the list again to fetch their descendants
+	databases = append(databases, shares...)
+
 	for _, database := range databases {
-		schemas, err := readSchemas(fileCreator, conn, database.Name, excludedSchemas)
+		doTypePrefix := ""
+		if _, f := sharesMap[database.Name]; f {
+			doTypePrefix = "shared-"
+		}
+
+		schemas, err := readSchemas(fileCreator, conn, doTypePrefix, database.Name, excludedSchemas)
 		if err != nil {
 			return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing schemas for database %q between Snowflake and Raito: %s", database.Name, err.Error()))}
 		}
 
 		for _, schema := range schemas {
-			tables, err := readTables(fileCreator, conn, database.Name+"."+schema.Name)
+			tables, err := readTables(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name)
 			if err != nil {
 				return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
 			}
 
 			for _, table := range tables {
-				_, err = readColumns(fileCreator, conn, database.Name+"."+schema.Name+"."+table.Name)
+				_, err = readColumns(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name+"."+table.Name)
 
 				if err != nil {
 					return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
 				}
 			}
 
-			views, err := readViews(fileCreator, conn, database.Name+"."+schema.Name)
+			views, err := readViews(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name)
 			if err != nil {
 				return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
 			}
 
 			for _, view := range views {
-				_, err := readColumns(fileCreator, conn, database.Name+"."+schema.Name+"."+view.Name)
+				_, err := readColumns(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name+"."+view.Name)
 
 				if err != nil {
 					return ds.DataSourceSyncResult{Error: api.ToErrorResult(fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))}
@@ -112,6 +149,25 @@ func readDbEntities(conn *sql.DB, query string) ([]dbEntity, error) {
 	}
 
 	return dbs, nil
+}
+
+func getSnowflakeAccountName(conn *sql.DB) (string, error) {
+	rows, err := conn.Query("select current_account()")
+	if err != nil {
+		return "", fmt.Errorf("error while querying Snowflake: %s", err.Error())
+	}
+	var r []string
+	err = scan.Rows(&r, rows)
+
+	if err != nil {
+		return "", fmt.Errorf("error while querying Snowflake: %s", err.Error())
+	}
+
+	if len(r) != 1 {
+		return "", fmt.Errorf("error retrieving account information from snowflake")
+	}
+
+	return r[0], nil
 }
 
 func addDbEntitiesToImporter(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, doType string, parent string, query string, externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]dbEntity, error) {
@@ -150,6 +206,28 @@ func addDbEntitiesToImporter(fileCreator dsb.DataSourceFileCreator, conn *sql.DB
 	return dbEntities, nil
 }
 
+func readShares(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, excludedDatabases string) ([]dbEntity, error) {
+	_, err := readDbEntities(conn, "SHOW SHARES")
+	if err != nil {
+		return nil, err
+	}
+
+	excludes := make(map[string]struct{})
+
+	if excludedDatabases != "" {
+		for _, e := range strings.Split(excludedDatabases, ",") {
+			excludes[e] = struct{}{}
+		}
+	}
+
+	return addDbEntitiesToImporter(fileCreator, conn, "shared-database", "", "select \"database_name\" as \"name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'",
+		func(name string) string { return name },
+		func(name, fullName string) bool {
+			_, f := excludes[fullName]
+			return !f
+		})
+}
+
 func readWarehouses(fileCreator dsb.DataSourceFileCreator, conn *sql.DB) ([]dbEntity, error) {
 	return addDbEntitiesToImporter(fileCreator, conn, "warehouse", "", "SHOW WAREHOUSES",
 		func(name string) string { return name },
@@ -165,14 +243,14 @@ func readDatabases(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, excluded
 		}
 	}
 
-	return addDbEntitiesToImporter(fileCreator, conn, "database", "", "SHOW DATABASES IN ACCOUNT",
+	return addDbEntitiesToImporter(fileCreator, conn, ds.Database, "", "SHOW DATABASES IN ACCOUNT",
 		func(name string) string { return name },
 		func(name, fullName string) bool {
 			_, f := excludes[fullName]
 			return !f
 		})
 }
-func readSchemas(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, dbName string, excludedSchemas string) ([]dbEntity, error) {
+func readSchemas(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, dbName string, excludedSchemas string) ([]dbEntity, error) {
 	excludes := make(map[string]struct{})
 
 	if excludedSchemas != "" {
@@ -181,7 +259,7 @@ func readSchemas(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, dbName str
 		}
 	}
 
-	return addDbEntitiesToImporter(fileCreator, conn, "schema", dbName, "SHOW SCHEMAS IN DATABASE "+dbName,
+	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Schema, dbName, "SHOW SCHEMAS IN DATABASE "+dbName,
 		func(name string) string { return dbName + "." + name },
 		func(name, fullName string) bool {
 			_, f := excludes[fullName]
@@ -193,26 +271,26 @@ func readSchemas(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, dbName str
 		})
 }
 
-func readTables(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, schemaFullName string) ([]dbEntity, error) {
-	return addDbEntitiesToImporter(fileCreator, conn, "table", schemaFullName, "SHOW TABLES IN SCHEMA "+schemaFullName,
+func readTables(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, schemaFullName string) ([]dbEntity, error) {
+	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Table, schemaFullName, "SHOW TABLES IN SCHEMA "+schemaFullName,
 		func(name string) string { return schemaFullName + "." + name },
 		func(name, fullName string) bool { return true })
 }
 
-func readViews(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, schemaFullName string) ([]dbEntity, error) {
-	return addDbEntitiesToImporter(fileCreator, conn, "view", schemaFullName, "SHOW VIEWS IN SCHEMA "+schemaFullName,
+func readViews(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, schemaFullName string) ([]dbEntity, error) {
+	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.View, schemaFullName, "SHOW VIEWS IN SCHEMA "+schemaFullName,
 		func(name string) string { return schemaFullName + "." + name },
 		func(name, fullName string) bool { return true })
 }
 
 //nolint // check, linter is correct, return value of function is never used
-func readColumns(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, tableFullName string) ([]dbEntity, error) {
+func readColumns(fileCreator dsb.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, tableFullName string) ([]dbEntity, error) {
 	_, err := readDbEntities(conn, "SHOW COLUMNS IN TABLE "+tableFullName)
 	if err != nil {
 		return nil, err
 	}
 
-	return addDbEntitiesToImporter(fileCreator, conn, "column", tableFullName, "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))",
+	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Column, tableFullName, "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))",
 		func(name string) string { return tableFullName + "." + name },
 		func(name, fullName string) bool { return true })
 }
@@ -230,6 +308,7 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 		DataObjectTypes: []ds.DataObjectType{
 			{
 				Name: ds.Datasource,
+				Type: ds.Datasource,
 				Permissions: []ds.DataObjectTypePermission{
 					{
 						Permission:  "APPLY MASKING POLICY",
@@ -312,10 +391,11 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 						Description: "Grants ability to set value for the SHARE_RESTRICTIONS parameter which enables a Business Critical provider account to add a consumer account (with Non-Business Critical edition) to a share.",
 					},
 				},
-				Children: []string{ds.Database, "warehouse"},
+				Children: []string{ds.Database, "shared-" + ds.Database, "warehouse"},
 			},
 			{
 				Name: "warehouse",
+				Type: "warehouse",
 				Permissions: []ds.DataObjectTypePermission{
 					{
 						Permission:  "MODIFY",
@@ -342,6 +422,7 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 			},
 			{
 				Name: ds.Database,
+				Type: ds.Database,
 				Permissions: []ds.DataObjectTypePermission{
 					{
 						Permission:  "CREATE SCHEMA",
@@ -360,10 +441,6 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 						Description: "Enables performing the DESCRIBE command on the database.",
 					},
 					{
-						Permission:  "IMPORTED PRIVILEGES",
-						Description: "Enables roles other than the owning role to access a shared database; applies only to shared databases.",
-					},
-					{
 						Permission:  "OWNERSHIP",
 						Description: "Grants full control over the database. Only a single role can hold this privilege on a specific object at a time.",
 					},
@@ -372,6 +449,7 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 			},
 			{
 				Name: ds.Schema,
+				Type: ds.Schema,
 				Permissions: []ds.DataObjectTypePermission{
 					{
 						Permission:  "MODIFY",
@@ -462,6 +540,7 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 			},
 			{
 				Name: ds.Table,
+				Type: ds.Table,
 				Permissions: []ds.DataObjectTypePermission{
 					{
 						Permission:  "SELECT",
@@ -496,6 +575,7 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 			},
 			{
 				Name: ds.View,
+				Type: ds.View,
 				Permissions: []ds.DataObjectTypePermission{
 					{
 						Permission:  "SELECT",
@@ -514,6 +594,38 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 			},
 			{
 				Name: ds.Column,
+				Type: ds.Column,
+			},
+			{
+				Name: "shared-" + ds.Database,
+				Type: ds.Database,
+				Permissions: []ds.DataObjectTypePermission{
+					{
+						Permission:  "IMPORTED PRIVILEGES",
+						Description: "Enables roles other than the owning role to access a shared database; applies only to shared databases.",
+					},
+				},
+				Children: []string{"shared-" + ds.Schema},
+			},
+			{
+				Name:     "shared-" + ds.Schema,
+				Type:     ds.Schema,
+				Children: []string{"shared-" + ds.Table, "shared-" + ds.View},
+			},
+			{
+				Name:     "shared-" + ds.Table,
+				Type:     ds.Table,
+				Children: []string{"shared-" + ds.Column},
+			},
+			{
+				Name:        "shared-" + ds.View,
+				Type:        ds.View,
+				Permissions: []ds.DataObjectTypePermission{},
+				Children:    []string{"shared-" + ds.Column},
+			},
+			{
+				Name: "shared-" + ds.Column,
+				Type: ds.Column,
 			},
 		},
 	}
