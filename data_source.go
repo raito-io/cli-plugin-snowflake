@@ -67,7 +67,7 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 
 	sharesMap := make(map[string]struct{}, 0)
 
-	// exclude shares from database import as we treat them seperately
+	// exclude shares from database import as we treat them separately
 	for _, share := range shares {
 		if excludedDatabases != "" {
 			excludedDatabases += ","
