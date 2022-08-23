@@ -585,6 +585,10 @@ func (s *DataAccessSyncer) exportDataAccess(config *data_access.DataAccessSyncCo
 			if createFutureGrants {
 				expectedGrants = append(expectedGrants, Grant{permissionString, "FUTURE TABLES IN SCHEMA " + da.DataObject.BuildPath(".")})
 			}
+		} else if da.DataObject.Type == "shared-database" {
+			for _, p := range permissions {
+				expectedGrants = append(expectedGrants, Grant{p, fmt.Sprintf("DATABASE %s", da.DataObject.Name)})
+			}
 		} else if da.DataObject.Type == "database" {
 			expectedGrants = append(expectedGrants, createGrantsForDatabase(conn, permissions, da.DataObject.Name)...)
 
