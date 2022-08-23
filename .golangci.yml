@@ -71,7 +71,7 @@ linters:
     - gofmt
     - goimports
     #- gomnd # Magic numbers should be fixed and enable gomnd,
-    - gocyclo
+    #- gocyclo
     - gosec
     - gosimple
     - govet

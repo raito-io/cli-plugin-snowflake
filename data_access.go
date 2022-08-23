@@ -13,6 +13,7 @@ import (
 	"github.com/raito-io/cli/base/util/slice"
 	"github.com/raito-io/cli/common/api"
 	"github.com/raito-io/cli/common/api/data_access"
+	ds "github.com/raito-io/cli/common/api/data_source"
 	sf "github.com/snowflakedb/gosnowflake"
 )
 
@@ -106,6 +107,26 @@ func (s *DataAccessSyncer) SyncDataAccess(config *data_access.DataAccessSyncConf
 	return err
 }
 
+func getShareNames(conn *sql.DB) (map[string]struct{}, error) {
+	_, err := readDbEntities(conn, "SHOW SHARES")
+	if err != nil {
+		return nil, err
+	}
+
+	entities, err := readDbEntities(conn, "select \"database_name\" as \"name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'")
+
+	if err != nil {
+		return nil, err
+	}
+
+	shares := make(map[string]struct{}, len(entities))
+	for _, e := range entities {
+		shares[e.Name] = struct{}{}
+	}
+
+	return shares, nil
+}
+
 func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncConfig) data_access.DataAccessSyncResult {
 	ownersToExclude := ""
 	if v, ok := config.Parameters[SfExcludedOwners]; ok && v != nil {
@@ -119,6 +140,13 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 		}
 	}
 	defer conn.Close()
+
+	shares, err := getShareNames(conn)
+	if err != nil {
+		return data_access.DataAccessSyncResult{
+			Error: api.ToErrorResult(err),
+		}
+	}
 
 	q := "SHOW ROLES"
 
@@ -220,6 +248,8 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 		var do *dsb.DataObjectReference
 		permissions := make([]string, 0)
 
+		sharesApplied := make(map[string]struct{}, 0)
+
 		for k, object := range grantToEntities {
 			if k == 0 {
 				do = &dsb.DataObjectReference{FullName: object.Name, Type: object.GrantedOn}
@@ -242,6 +272,19 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 			if !strings.EqualFold("USAGE", object.Privilege) {
 				if _, f := ACCEPTED_TYPES[strings.ToUpper(object.GrantedOn)]; f {
 					permissions = append(permissions, object.Privilege)
+				}
+
+				if strings.EqualFold(object.GrantedOn, "TABLE") {
+					database_name := strings.Split(object.Name, ".")[0]
+					if _, f := shares[database_name]; f {
+						if _, f := sharesApplied[database_name]; !f {
+							da.AccessObjects = append(da.AccessObjects, dap.Access{
+								DataObjectReference: &dsb.DataObjectReference{FullName: database_name, Type: "shared-" + ds.Database},
+								Permissions:         []string{"IMPORTED PRIVILEGES"},
+							})
+							sharesApplied[database_name] = struct{}{}
+						}
+					}
 				}
 			}
 
