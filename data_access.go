@@ -30,7 +30,7 @@ var PermissionMap = map[string]PermissionTarget{
 }
 
 var ROLES_NOTINTERNALIZABLE = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
-var ACCEPTED_TYPES = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATASET": {}, "SCHEMA": {}, "TABLE": {}, "COLUMN": {}}
+var ACCEPTED_TYPES = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "COLUMN": {}, "SHARED-DATABASE": {}}
 
 const ROLE_SEPARATOR = "_"
 
