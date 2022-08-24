@@ -223,7 +223,7 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 			}
 		}
 
-		var users []string = nil
+		users := make([]string, 0)
 
 		for _, grantee := range grantOfEntities {
 			if grantee.GrantedTo == "USER" {
@@ -234,11 +234,12 @@ func (s *DataAccessSyncer) importDataAccess(config *data_access.DataAccessSyncCo
 		da, f := accessProviderMap[roleEntity.Name]
 		if !f {
 			accessProviderMap[roleEntity.Name] = &dap.AccessProvider{
-				ExternalId: roleEntity.Name,
-				Name:       roleEntity.Name,
-				NamingHint: roleEntity.Name,
-				Users:      users,
-				Action:     dap.Grant,
+				ExternalId:    roleEntity.Name,
+				Name:          roleEntity.Name,
+				NamingHint:    roleEntity.Name,
+				Users:         users,
+				Action:        dap.Grant,
+				AccessObjects: make([]dap.Access, 0),
 			}
 			da = accessProviderMap[roleEntity.Name]
 		} else {
