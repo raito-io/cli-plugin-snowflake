@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/raito-io/cli/common/api"
+	e "github.com/raito-io/cli/base/util/error"
 	_ "github.com/snowflakedb/gosnowflake"
 )
 
@@ -14,22 +14,22 @@ const SfLimit = 10000
 func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, error) {
 	snowflakeUser := params[SfUser]
 	if snowflakeUser == nil {
-		return nil, api.CreateMissingInputParameterError(SfUser)
+		return nil, e.CreateMissingInputParameterError(SfUser)
 	}
 	snowflakePassword := params[SfPassword]
 
 	if snowflakePassword == nil {
-		return nil, api.CreateMissingInputParameterError(SfPassword)
+		return nil, e.CreateMissingInputParameterError(SfPassword)
 	}
 	snowflakeAccount := params[SfAccount]
 
 	if snowflakeAccount == nil {
-		return nil, api.CreateMissingInputParameterError(SfAccount)
+		return nil, e.CreateMissingInputParameterError(SfAccount)
 	}
 	snowflakeDatabase := params[SfDatabase]
 
 	if snowflakeDatabase == nil {
-		return nil, api.CreateMissingInputParameterError(SfDatabase)
+		return nil, e.CreateMissingInputParameterError(SfDatabase)
 	}
 
 	if role == "" {
@@ -49,7 +49,7 @@ func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, er
 	conn, err := sql.Open("snowflake", connectionString)
 
 	if err != nil {
-		return nil, api.CreateSourceConnectionError(fmt.Sprintf("%s:%s@%s/%s?role=%s", snowflakeUser, "**censured**", snowflakeAccount, snowflakeDatabase, role), err.Error())
+		return nil, e.CreateSourceConnectionError(fmt.Sprintf("%s:%s@%s/%s?role=%s", snowflakeUser, "**censured**", snowflakeAccount, snowflakeDatabase, role), err.Error())
 	}
 
 	return conn, nil
