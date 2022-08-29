@@ -101,7 +101,7 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 			}
 
 			for _, table := range tables {
-				_, err = readColumns(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name+"."+table.Name)
+				err = readColumns(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name+"."+table.Name)
 
 				if err != nil {
 					return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
@@ -114,7 +114,7 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 			}
 
 			for _, view := range views {
-				_, err := readColumns(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name+"."+view.Name)
+				err := readColumns(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name+"."+view.Name)
 
 				if err != nil {
 					return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))}
@@ -282,16 +282,17 @@ func readViews(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix 
 		func(name, fullName string) bool { return true })
 }
 
-// nolint // check, linter is correct, return value of function is never used
-func readColumns(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, tableFullName string) ([]dbEntity, error) {
+func readColumns(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, tableFullName string) error {
 	_, err := readDbEntities(conn, "SHOW COLUMNS IN TABLE "+tableFullName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Column, tableFullName, "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))",
+	_, err = addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Column, tableFullName, "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))",
 		func(name string) string { return tableFullName + "." + name },
 		func(name, fullName string) bool { return true })
+
+	return err
 }
 
 type dbEntity struct {

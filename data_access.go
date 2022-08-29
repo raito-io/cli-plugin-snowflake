@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/raito-io/cli/base/access_provider/importer"
 	"sort"
 	"strings"
 
 	"github.com/blockloop/scan"
 	"github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/access_provider/exporter"
+	"github.com/raito-io/cli/base/access_provider/importer"
 	ds "github.com/raito-io/cli/base/data_source"
 	e "github.com/raito-io/cli/base/util/error"
 	"github.com/raito-io/cli/base/util/slice"
@@ -50,7 +50,7 @@ func (s *AccessSyncer) SyncAccess(config *access_provider.AccessSyncConfig) acce
 		}
 		defer fileCreator.Close()
 
-		err = s.importAccess(config, &fileCreator)
+		err = s.importAccess(config, fileCreator)
 
 		if err != nil {
 			return access_provider.AccessSyncResult{
@@ -60,7 +60,7 @@ func (s *AccessSyncer) SyncAccess(config *access_provider.AccessSyncConfig) acce
 
 		logger.Info("Reading masking policies from")
 
-		err = s.importMaskingPolicies(config, &fileCreator)
+		err = s.importMaskingPolicies(config, fileCreator)
 		if err != nil {
 			return access_provider.AccessSyncResult{
 				Error: e.ToErrorResult(err),
@@ -69,7 +69,7 @@ func (s *AccessSyncer) SyncAccess(config *access_provider.AccessSyncConfig) acce
 
 		logger.Info("Reading row access policies from Snowflake")
 
-		err = s.importRowAccessPolicies(config, &fileCreator)
+		err = s.importRowAccessPolicies(config, fileCreator)
 		if err != nil {
 			return access_provider.AccessSyncResult{
 				Error: e.ToErrorResult(err),
@@ -115,7 +115,7 @@ func getShareNames(conn *sql.DB) (map[string]struct{}, error) {
 	return shares, nil
 }
 
-func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fileCreator *exporter.AccessProviderFileCreator) error {
+func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fileCreator exporter.AccessProviderFileCreator) error {
 	ownersToExclude := ""
 	if v, ok := config.Parameters[SfExcludedOwners]; ok && v != nil {
 		ownersToExclude = v.(string)
@@ -210,7 +210,7 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fi
 				Name:       roleEntity.Name,
 				NamingHint: roleEntity.Name,
 				Action:     exporter.Grant,
-				Access: []exporter.Access{
+				Access: []*exporter.Access{
 					{
 						NamingHint: roleEntity.Name,
 						Who: &exporter.WhoItem{
@@ -300,7 +300,7 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fi
 			da.NotInternalizable = true
 		}
 
-		err := (*fileCreator).AddAccessProviders([]exporter.AccessProvider{*da})
+		err := fileCreator.AddAccessProviders([]exporter.AccessProvider{*da})
 		if err != nil {
 			return fmt.Errorf("error adding access provider to import file: %s", err.Error())
 		}
@@ -309,7 +309,7 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fi
 	return nil
 }
 
-func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncConfig, fileCreator *exporter.AccessProviderFileCreator, policyType string, action exporter.Action) error {
+func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncConfig, fileCreator exporter.AccessProviderFileCreator, policyType string, action exporter.Action) error {
 	conn, err := ConnectToSnowflake(config.Parameters, "")
 	if err != nil {
 		return err
@@ -344,7 +344,7 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncCo
 			NamingHint:        policy.Name,
 			Action:            action,
 			NotInternalizable: true,
-			Access: []exporter.Access{
+			Access: []*exporter.Access{
 				{
 					NamingHint: policy.Name,
 					Who:        nil,
@@ -415,13 +415,14 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncCo
 					FullName: fmt.Sprintf("%s.%s.%s", policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME),
 				}
 			}
+
 			ap.Access[0].What = append(ap.Access[0].What, exporter.WhatItem{
 				DataObject:  &dor,
 				Permissions: []string{},
 			})
 		}
 
-		err = (*fileCreator).AddAccessProviders([]exporter.AccessProvider{ap})
+		err = fileCreator.AddAccessProviders([]exporter.AccessProvider{ap})
 		if err != nil {
 			return fmt.Errorf("error adding access provider to import file: %s", err.Error())
 		}
@@ -430,11 +431,11 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncCo
 	return nil
 }
 
-func (s *AccessSyncer) importMaskingPolicies(config *access_provider.AccessSyncConfig, fileCreator *exporter.AccessProviderFileCreator) error {
+func (s *AccessSyncer) importMaskingPolicies(config *access_provider.AccessSyncConfig, fileCreator exporter.AccessProviderFileCreator) error {
 	return s.importPoliciesOfType(config, fileCreator, "MASKING POLICY", exporter.Mask)
 }
 
-func (s *AccessSyncer) importRowAccessPolicies(config *access_provider.AccessSyncConfig, fileCreator *exporter.AccessProviderFileCreator) error {
+func (s *AccessSyncer) importRowAccessPolicies(config *access_provider.AccessSyncConfig, fileCreator exporter.AccessProviderFileCreator) error {
 	return s.importPoliciesOfType(config, fileCreator, "ROW ACCESS POLICY", exporter.Filtered)
 }
 
@@ -485,23 +486,24 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncConfig) er
 
 		logger.Info(fmt.Sprintf("Using prefix %q", prefix))
 
-		for _, ap := range apList {
+		for apIndex, ap := range apList {
 			for accessIndex, access := range ap.Access {
-				roleName, err := generateUniqueRoleName(prefix, &ap, accessIndex)
-				if err != nil {
-					return err
+				roleName, err2 := generateUniqueRoleName(prefix, &apList[apIndex], accessIndex)
+				if err2 != nil {
+					return err2
 				}
+
 				logger.Info(fmt.Sprintf("Generated rolename %q", roleName))
-				apMap[roleName] = EnrichedAccess{Access: &access, AccessProvider: &ap}
+				apMap[roleName] = EnrichedAccess{Access: access, AccessProvider: &apList[apIndex]}
 			}
 		}
 	} else {
-		for _, ap := range apList {
+		for apIndex, ap := range apList {
 			if ap.Delete {
 				for accessIndex := range ap.Access {
-					roleName, err := generateUniqueRoleName(prefix, &ap, accessIndex)
-					if err != nil {
-						return err
+					roleName, err2 := generateUniqueRoleName(prefix, &apList[apIndex], accessIndex)
+					if err2 != nil {
+						return err2
 					}
 					if !find(rolesToRemove, roleName) {
 						rolesToRemove = append(rolesToRemove, roleName)
@@ -509,12 +511,12 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncConfig) er
 				}
 			} else {
 				for accessIndex, access := range ap.Access {
-					roleName, err := generateUniqueRoleName(prefix, &ap, accessIndex)
-					if err != nil {
-						return err
+					roleName, err2 := generateUniqueRoleName(prefix, &apList[apIndex], accessIndex)
+					if err2 != nil {
+						return err2
 					}
 					if _, f := apMap[roleName]; !f {
-						apMap[roleName] = EnrichedAccess{Access: &access, AccessProvider: &ap}
+						apMap[roleName] = EnrichedAccess{Access: access, AccessProvider: &apList[apIndex]}
 					}
 				}
 			}
@@ -606,8 +608,9 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 
 		// Build the expected expectedGrants
 		var expectedGrants []interface{}
-		for _, what := range da.What {
-			permissions := getAllSnowflakePermissions(&what)
+
+		for whatIndex, what := range da.What {
+			permissions := getAllSnowflakePermissions(&da.What[whatIndex])
 			permissionString := strings.ToUpper(strings.Join(permissions, ","))
 
 			if len(permissions) == 0 {
@@ -619,18 +622,21 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 				if err != nil {
 					return err
 				}
+
 				expectedGrants = append(expectedGrants, grants...)
 			} else if what.DataObject.Type == ds.View {
 				grants, err := createGrantsForView(permissions, what.DataObject.FullName)
 				if err != nil {
 					return err
 				}
+
 				expectedGrants = append(expectedGrants, grants...)
 			} else if what.DataObject.Type == ds.Schema {
 				grants, err := createGrantsForSchema(conn, permissions, what.DataObject.FullName)
 				if err != nil {
 					return err
 				}
+
 				expectedGrants = append(expectedGrants, grants...)
 
 				if createFutureGrants {
@@ -1031,7 +1037,7 @@ func generateUniqueRoleName(prefix string, ap *importer.AccessProvider, accessIn
 	} else if ap.Name != "" {
 		name := generateRoleNameFromAPName(ap.Name)
 		if len(name) < 10 {
-			return "", fmt.Errorf("generated role name %q needs to be at least 10 characters.", name)
+			return "", fmt.Errorf("generated role name %q needs to be at least 10 characters", name)
 		}
 		return fmt.Sprintf("%s%s%s%d", prefix, name, ROLE_SEPARATOR, accessIndex), nil
 	}
@@ -1041,6 +1047,7 @@ func generateUniqueRoleName(prefix string, ap *importer.AccessProvider, accessIn
 
 func generateRoleNameFromAPName(name string) string {
 	generated := ""
+
 	for _, c := range name {
 		if c == '-' || c == '_' || c == ' ' {
 			generated += "_"
@@ -1048,6 +1055,7 @@ func generateRoleNameFromAPName(name string) string {
 			generated += strings.ToUpper(string(c))
 		}
 	}
+
 	return generated
 }
 
@@ -1084,26 +1092,6 @@ func getSnowflakePermissions(permission string) []string {
 	logger.Warn(fmt.Sprintf("Unknown raito permission %q found. Mapping as is", permission))
 
 	return []string{permission}
-}
-
-// generatePermissionsName generates a user-friendly name for the set of permissions for a data access.
-// This is done by renaming sets to a fixed name where possible.
-func generatePermissionsName(permissions []string) string {
-	parts := make([]string, 0, len(permissions))
-
-	for _, p := range permissions {
-		pt, f := PermissionMap[p]
-		if f {
-			parts = append(parts, strings.ToUpper(pt.roleName))
-		} else {
-			// TODO In theory this can still cause conflicts if there are multiple permissions with the same starting letter
-			parts = append(parts, strings.ToUpper(p[0:1]))
-		}
-	}
-
-	sort.Strings(parts)
-
-	return strings.Join(parts, "")
 }
 
 type roleEntity struct {
