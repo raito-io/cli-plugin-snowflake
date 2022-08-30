@@ -6,7 +6,7 @@ import (
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/raito-io/cli/base"
 	"github.com/raito-io/cli/base/info"
-	"github.com/raito-io/cli/common/api"
+	"github.com/raito-io/cli/base/util/plugin"
 )
 
 var version = "0.0.0"
@@ -17,11 +17,11 @@ func main() {
 	logger = base.Logger()
 	logger.SetLevel(hclog.Debug)
 
-	err := base.RegisterPlugins(&IdentityStoreSyncer{}, &DataSourceSyncer{}, &DataAccessSyncer{}, &DataUsageSyncer{}, &info.InfoImpl{
-		Info: api.PluginInfo{
+	err := base.RegisterPlugins(&IdentityStoreSyncer{}, &DataSourceSyncer{}, &AccessSyncer{}, &DataUsageSyncer{}, &info.InfoImpl{
+		Info: plugin.PluginInfo{
 			Name:    "Snowflake",
-			Version: api.ParseVersion(version),
-			Parameters: []api.ParameterInfo{
+			Version: plugin.ParseVersion(version),
+			Parameters: []plugin.ParameterInfo{
 				{Name: "sf-account", Description: "The account name of the Snowflake account to connect to. For example, xy123456.eu-central-1", Mandatory: true},
 				{Name: "sf-user", Description: "The username to authenticate against the Snowflake account.", Mandatory: true},
 				{Name: "sf-password", Description: "The username to authenticate against the Snowflake account.", Mandatory: true},

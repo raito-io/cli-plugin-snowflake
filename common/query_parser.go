@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	ap "github.com/raito-io/cli/base/access_provider"
+	ap "github.com/raito-io/cli/base/access_provider/exporter"
 	"github.com/raito-io/cli/base/data_source"
 	log "github.com/sirupsen/logrus"
 	parser "github.com/xwb1989/sqlparser"
@@ -64,7 +64,7 @@ var snowflakeKeywords = []string{"ALTER",
 
 var containsKeywordRegex = regexp.MustCompile(fmt.Sprintf(`\b(%s)\b`, strings.Join(snowflakeKeywords, "|")))
 
-func ParseSnowflakeInformation(query string, databaseName string, schemaName string, baseObjectsAccessed *string, directObjectAccessed *string, objectsModified *string) ([]ap.Access, error) {
+func ParseSnowflakeInformation(query string, databaseName string, schemaName string, baseObjectsAccessed *string, directObjectAccessed *string, objectsModified *string) ([]ap.WhatItem, error) {
 	numKeywords := 0
 	detectedKeywords := []string{}
 
@@ -112,26 +112,26 @@ func ParseSnowflakeInformation(query string, databaseName string, schemaName str
 		}
 
 		if len(detectedObjects) > 0 {
-			accessObjects := []ap.Access{}
+			accessObjects := []ap.WhatItem{}
 
 			for _, obj := range detectedObjects {
-				newItem := ap.Access{}
-				newItem.Permissions = []string{detectedKeywords[0]}
-				newItem.DataObjectReference = &data_source.DataObjectReference{
-					FullName: strings.ToUpper(obj.Name), Type: strings.ToLower(obj.Domain)}
-				accessObjects = append(accessObjects, newItem)
+				accessObjects = append(accessObjects, ap.WhatItem{
+					Permissions: []string{detectedKeywords[0]},
+					DataObject: &data_source.DataObjectReference{
+						FullName: strings.ToUpper(obj.Name), Type: strings.ToLower(obj.Domain)},
+				})
 			}
 
 			return accessObjects, nil
 		}
 	} else if numKeywords == 0 {
-		return []ap.Access{}, nil
+		return []ap.WhatItem{}, nil
 	}
 
 	return ExtractInfoFromQuery(query, databaseName, schemaName)
 }
 
-func ExtractInfoFromQuery(query string, databaseName string, schemaName string) ([]ap.Access, error) {
+func ExtractInfoFromQuery(query string, databaseName string, schemaName string) ([]ap.WhatItem, error) {
 	// TODO: make checking which keywords need to be parsed more efficient
 	unsupportedKeywords := []string{
 		"ALTER",
@@ -171,20 +171,20 @@ func ExtractInfoFromQuery(query string, databaseName string, schemaName string) 
 	for _, keyword := range unsupportedKeywords {
 		returnEmpytObject := strings.HasPrefix(query, strings.ToUpper(keyword))
 		if returnEmpytObject {
-			return []ap.Access{
-				{DataObjectReference: nil, Permissions: []string{strings.ToUpper(keyword)}},
+			return []ap.WhatItem{
+				{DataObject: nil, Permissions: []string{strings.ToUpper(keyword)}},
 			}, nil
 		}
 	}
 
 	stmt, err := parser.Parse(query)
 	if err != nil {
-		return []ap.Access{{DataObjectReference: nil, Permissions: []string{"PARSE_ERROR"}}},
+		return []ap.WhatItem{{DataObject: nil, Permissions: []string{"PARSE_ERROR"}}},
 			fmt.Errorf("error parsing query: %s", query)
 	}
 
 	if stmt == nil {
-		return []ap.Access{{DataObjectReference: nil, Permissions: []string{"EMPTY"}}},
+		return []ap.WhatItem{{DataObject: nil, Permissions: []string{"EMPTY"}}},
 			fmt.Errorf("syntax tree was returned empty for query: %s", query)
 	}
 
@@ -194,11 +194,11 @@ func ExtractInfoFromQuery(query string, databaseName string, schemaName string) 
 	return ConvertSnowflakeToGeneralDataObjects(parsedQueries, databaseName, schemaName), nil
 }
 
-func ConvertSnowflakeToGeneralDataObjects(snowflakeAccess []SnowflakeAccess, databaseName string, schemaName string) []ap.Access {
-	generalAccess := []ap.Access{}
+func ConvertSnowflakeToGeneralDataObjects(snowflakeAccess []SnowflakeAccess, databaseName string, schemaName string) []ap.WhatItem {
+	generalAccess := []ap.WhatItem{}
 
 	for _, obj := range snowflakeAccess {
-		newItem := ap.Access{}
+		newItem := ap.WhatItem{}
 		newItem.Permissions = obj.Permissions
 
 		if obj.Database == "" && databaseName != "" {
@@ -210,12 +210,12 @@ func ConvertSnowflakeToGeneralDataObjects(snowflakeAccess []SnowflakeAccess, dat
 		}
 
 		if obj.Column == "" || obj.Column == "*" {
-			newItem.DataObjectReference = &data_source.DataObjectReference{
+			newItem.DataObject = &data_source.DataObjectReference{
 				Type:     "table",
 				FullName: fmt.Sprintf("%s.%s.%s", obj.Database, obj.Schema, obj.Table),
 			}
 		} else {
-			newItem.DataObjectReference = &data_source.DataObjectReference{
+			newItem.DataObject = &data_source.DataObjectReference{
 				Type:     "column",
 				FullName: fmt.Sprintf("%s.%s.%s.%s", obj.Database, obj.Schema, obj.Table, obj.Column),
 			}

@@ -6,19 +6,18 @@ import (
 	"time"
 
 	"github.com/blockloop/scan"
-	isb "github.com/raito-io/cli/base/identity_store"
-	"github.com/raito-io/cli/common/api"
-	"github.com/raito-io/cli/common/api/identity_store"
+	is "github.com/raito-io/cli/base/identity_store"
+	e "github.com/raito-io/cli/base/util/error"
 )
 
 type IdentityStoreSyncer struct {
 }
 
-func (s *IdentityStoreSyncer) SyncIdentityStore(config *identity_store.IdentityStoreSyncConfig) identity_store.IdentityStoreSyncResult {
-	fileCreator, err := isb.NewIdentityStoreFileCreator(config)
+func (s *IdentityStoreSyncer) SyncIdentityStore(config *is.IdentityStoreSyncConfig) is.IdentityStoreSyncResult {
+	fileCreator, err := is.NewIdentityStoreFileCreator(config)
 	if err != nil {
-		return identity_store.IdentityStoreSyncResult{
-			Error: api.ToErrorResult(err),
+		return is.IdentityStoreSyncResult{
+			Error: e.ToErrorResult(err),
 		}
 	}
 	defer fileCreator.Close()
@@ -28,8 +27,8 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(config *identity_store.IdentityS
 
 	rows, err := ConnectAndQuery(config.Parameters, "", q)
 	if err != nil {
-		return identity_store.IdentityStoreSyncResult{
-			Error: api.ToErrorResult(err),
+		return is.IdentityStoreSyncResult{
+			Error: e.ToErrorResult(err),
 		}
 	}
 
@@ -50,19 +49,19 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(config *identity_store.IdentityS
 
 	err = scan.Rows(&userRows, rows)
 	if err != nil {
-		return identity_store.IdentityStoreSyncResult{
-			Error: api.ToErrorResult(fmt.Errorf("error while parsing result from users query: %s", err.Error())),
+		return is.IdentityStoreSyncResult{
+			Error: e.ToErrorResult(fmt.Errorf("error while parsing result from users query: %s", err.Error())),
 		}
 	}
 
 	err = CheckSFLimitExceeded(q, len(userRows))
 	if err != nil {
-		return identity_store.IdentityStoreSyncResult{
-			Error: api.ToErrorResult(fmt.Errorf("error while fetching users: %s", err.Error())),
+		return is.IdentityStoreSyncResult{
+			Error: e.ToErrorResult(fmt.Errorf("error while fetching users: %s", err.Error())),
 		}
 	}
 
-	users := make([]isb.User, 0, 20)
+	users := make([]is.User, 0, 20)
 
 	for _, userRow := range userRows {
 		logger.Debug(fmt.Sprintf("Handling user %q", userRow.UserName))
@@ -71,7 +70,7 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(config *identity_store.IdentityS
 			logger.Debug("Skipping user as it's owned by an excluded owner")
 			continue
 		}
-		user := isb.User{
+		user := is.User{
 			ExternalId: userRow.UserName,
 			UserName:   userRow.UserName,
 			Name:       userRow.DisplayName,
@@ -82,8 +81,8 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(config *identity_store.IdentityS
 
 	err = fileCreator.AddUsers(users)
 	if err != nil {
-		return identity_store.IdentityStoreSyncResult{
-			Error: api.ToErrorResult(err),
+		return is.IdentityStoreSyncResult{
+			Error: e.ToErrorResult(err),
 		}
 	}
 
@@ -91,7 +90,7 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(config *identity_store.IdentityS
 
 	logger.Info(fmt.Sprintf("Fetched %d users from Snowflake in %s", fileCreator.GetUserCount(), sec))
 
-	return identity_store.IdentityStoreSyncResult{}
+	return is.IdentityStoreSyncResult{}
 }
 
 type userEntity struct {

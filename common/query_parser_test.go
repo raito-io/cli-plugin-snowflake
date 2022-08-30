@@ -9,16 +9,16 @@ import (
 	"strings"
 	"testing"
 
-	ap "github.com/raito-io/cli/base/access_provider"
+	ap "github.com/raito-io/cli/base/access_provider/exporter"
 	logger "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
 type QueryTestData struct {
-	Query                       string      `json:"query"`
-	DatabaseName                string      `json:"databaseName"`
-	SchemaName                  string      `json:"schemaName"`
-	ExpectedAccessedDataObjects []ap.Access `json:"expectedOutput"`
+	Query                       string        `json:"query"`
+	DatabaseName                string        `json:"databaseName"`
+	SchemaName                  string        `json:"schemaName"`
+	ExpectedAccessedDataObjects []ap.WhatItem `json:"expectedOutput"`
 }
 
 func testListOfQueries(t *testing.T, testQueries []QueryTestData) {
