@@ -56,7 +56,6 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 		return ds.DataSourceSyncResult{Error: e.ToErrorResult(err)}
 	}
 
-	// TODO: shares are databases that are shared with the account. They also show up in SHOW DATABASES but they need different treatment
 	// main reason is that for export they can only have "IMPORTED PRIVILEGES" granted on the shared db level and nothing else.
 	// for now we can just exclude them but they need to be treated later on
 	shares, err := readShares(fileCreator, conn, excludedDatabases)
