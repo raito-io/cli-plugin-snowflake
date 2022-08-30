@@ -551,7 +551,7 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncConfig) er
 		logger.Info("No old Raito roles to remove in Snowflake")
 	}
 
-	return s.generateAccessControls(apMap, existingRoles, config, conn)
+	return s.generateAccessControls(apMap, existingRoles, conn)
 }
 
 // findRoles returns a map where the keys are all the roles that exist in Snowflake right now and the key indicates if it was found in apMap or not.
@@ -592,7 +592,7 @@ type EnrichedAccess struct {
 	AccessProvider *importer.AccessProvider
 }
 
-func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, existingRoles map[string]bool, config *access_provider.AccessSyncConfig, conn *sql.DB) error {
+func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, existingRoles map[string]bool, conn *sql.DB) error {
 	roleCreated := make(map[string]interface{})
 
 	for rn, ea := range apMap {
