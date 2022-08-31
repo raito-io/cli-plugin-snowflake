@@ -263,6 +263,7 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fi
 						})
 						sharesApplied[database_name] = struct{}{}
 					}
+
 					if !strings.HasPrefix(do.Type, "SHARED") {
 						do.Type = "SHARED-" + do.Type
 					}
@@ -715,8 +716,13 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 			}
 
 			foundGrants = make([]interface{}, 0, len(grantsToRole))
+
 			for _, grant := range grantsToRole {
-				foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn + " " + grant.Name})
+				if strings.EqualFold(grant.GrantedOn, "ACCOUNT") {
+					foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn})
+				} else {
+					foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn + " " + grant.Name})
+				}
 			}
 
 			logger.Info(fmt.Sprintf("Done updating users granted to role %q", rn))
@@ -750,6 +756,11 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 }
 
 func (s *AccessSyncer) getGrantsToRole(rn string, conn *sql.DB) ([]grantToRole, error) {
+	shares, e := getShareNames(conn)
+	if e != nil {
+		return nil, fmt.Errorf("error while fetching permissions on role %q: %s", rn, e.Error())
+	}
+
 	q := "SHOW GRANTS TO ROLE " + rn
 
 	rows, e := QuerySnowflake(conn, q)
@@ -757,15 +768,23 @@ func (s *AccessSyncer) getGrantsToRole(rn string, conn *sql.DB) ([]grantToRole, 
 		return nil, fmt.Errorf("error while fetching permissions on role %q: %s", rn, e.Error())
 	}
 	var grantsToRole []grantToRole
+	var res []grantToRole
 
-	e = scan.Rows(&grantsToRole, rows)
+	e = scan.Rows(&res, rows)
 	if e != nil {
 		return nil, fmt.Errorf("error while fetching permissions on role %q: %s", rn, e.Error())
 	}
 
-	e = CheckSFLimitExceeded(q, len(grantsToRole))
+	e = CheckSFLimitExceeded(q, len(res))
 	if e != nil {
 		return nil, fmt.Errorf("error while fetching permissions on role %q: %s", rn, e.Error())
+	}
+
+	for _, r := range res {
+		db := strings.Split(r.Name, ".")[0]
+		if _, f := shares[db]; !f {
+			grantsToRole = append(grantsToRole, r)
+		}
 	}
 
 	return grantsToRole, nil
@@ -896,7 +915,6 @@ func createGrantsForAccount(permissions []string) []interface{} {
 
 	for _, p := range permissions {
 		grants = append(grants, Grant{p, "ACCOUNT"})
-		logger.Error(fmt.Sprintf("%+v", Grant{p, "ACCOUNT"}))
 	}
 
 	return grants
