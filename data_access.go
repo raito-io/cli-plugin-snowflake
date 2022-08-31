@@ -551,7 +551,7 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncConfig) er
 		logger.Info("No old Raito roles to remove in Snowflake")
 	}
 
-	return s.generateAccessControls(apMap, existingRoles, config, conn)
+	return s.generateAccessControls(apMap, existingRoles, conn)
 }
 
 // findRoles returns a map where the keys are all the roles that exist in Snowflake right now and the key indicates if it was found in apMap or not.
@@ -592,8 +592,7 @@ type EnrichedAccess struct {
 	AccessProvider *importer.AccessProvider
 }
 
-func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, existingRoles map[string]bool, config *access_provider.AccessSyncConfig, conn *sql.DB) error {
-	createFutureGrants := config.GetBool(SfCreateFutureGrants)
+func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, existingRoles map[string]bool, conn *sql.DB) error {
 	roleCreated := make(map[string]interface{})
 
 	for rn, ea := range apMap {
@@ -611,7 +610,6 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 
 		for whatIndex, what := range da.What {
 			permissions := getAllSnowflakePermissions(&da.What[whatIndex])
-			permissionString := strings.ToUpper(strings.Join(permissions, ","))
 
 			if len(permissions) == 0 {
 				continue
@@ -638,22 +636,12 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 				}
 
 				expectedGrants = append(expectedGrants, grants...)
-
-				if createFutureGrants {
-					expectedGrants = append(expectedGrants, Grant{permissionString, "FUTURE TABLES IN SCHEMA " + what.DataObject.FullName})
-				}
 			} else if what.DataObject.Type == "shared-database" {
 				for _, p := range permissions {
 					expectedGrants = append(expectedGrants, Grant{p, fmt.Sprintf("DATABASE %s", what.DataObject.FullName)})
 				}
 			} else if what.DataObject.Type == ds.Database {
 				expectedGrants = append(expectedGrants, createGrantsForDatabase(conn, permissions, what.DataObject.FullName)...)
-
-				if createFutureGrants {
-					expectedGrants = append(expectedGrants,
-						Grant{"USAGE", "FUTURE SCHEMAS IN DATABASE " + what.DataObject.FullName},
-						Grant{permissionString, "FUTURE TABLES IN DATABASE " + what.DataObject.FullName})
-				}
 			} else if what.DataObject.Type == "warehouse" {
 				expectedGrants = append(expectedGrants, createGrantsForWarehouse(permissions, what.DataObject.FullName)...)
 			} else if what.DataObject.Type == ds.Datasource {
