@@ -254,16 +254,17 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fi
 					permissions = append(permissions, object.Privilege)
 				}
 
-				if strings.EqualFold(object.GrantedOn, "TABLE") {
-					database_name := strings.Split(object.Name, ".")[0]
-					if _, f := shares[database_name]; f {
-						if _, f := sharesApplied[database_name]; !f {
-							da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
-								DataObject:  &ds.DataObjectReference{FullName: database_name, Type: "shared-" + ds.Database},
-								Permissions: []string{"IMPORTED PRIVILEGES"},
-							})
-							sharesApplied[database_name] = struct{}{}
-						}
+				database_name := strings.Split(object.Name, ".")[0]
+				if _, f := shares[database_name]; f {
+					if _, f := sharesApplied[database_name]; strings.EqualFold(object.GrantedOn, "TABLE") && !f {
+						da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
+							DataObject:  &ds.DataObjectReference{FullName: database_name, Type: "shared-" + ds.Database},
+							Permissions: []string{"IMPORTED PRIVILEGES"},
+						})
+						sharesApplied[database_name] = struct{}{}
+					}
+					if !strings.HasPrefix(do.Type, "SHARED") {
+						do.Type = "SHARED-" + do.Type
 					}
 				}
 			}
