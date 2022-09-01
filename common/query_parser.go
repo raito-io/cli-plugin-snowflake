@@ -114,12 +114,19 @@ func ParseSnowflakeInformation(query string, databaseName string, schemaName str
 		if len(detectedObjects) > 0 {
 			accessObjects := []ap.WhatItem{}
 
+			foundAccessObjects := map[data_source.DataObjectReference]interface{}{}
+
 			for _, obj := range detectedObjects {
-				accessObjects = append(accessObjects, ap.WhatItem{
-					Permissions: []string{detectedKeywords[0]},
-					DataObject: &data_source.DataObjectReference{
-						FullName: strings.ToUpper(obj.Name), Type: strings.ToLower(obj.Domain)},
-				})
+				item := data_source.DataObjectReference{FullName: strings.ToUpper(obj.Name), Type: strings.ToLower(obj.Domain)}
+
+				if _, found := foundAccessObjects[item]; !found {
+					accessObjects = append(accessObjects, ap.WhatItem{
+						Permissions: []string{detectedKeywords[0]},
+						DataObject: &data_source.DataObjectReference{
+							FullName: strings.ToUpper(obj.Name), Type: strings.ToLower(obj.Domain)},
+					})
+					foundAccessObjects[item] = true
+				}
 			}
 
 			return accessObjects, nil
