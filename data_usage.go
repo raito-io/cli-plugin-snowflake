@@ -40,12 +40,14 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 	fileCreator, err := du.NewDataUsageFileCreator(config)
 
 	if err != nil {
+		logger.Info(err.Error())
 		return du.DataUsageSyncResult{Error: e.ToErrorResult(err)}
 	}
 	defer fileCreator.Close()
 
 	conn, err := ConnectToSnowflake(config.Parameters, "")
 	if err != nil {
+		logger.Info(err.Error())
 		return du.DataUsageSyncResult{Error: e.ToErrorResult(err)}
 	}
 	defer conn.Close()
@@ -103,7 +105,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 		logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", *minTime, *maxTime, numRows))
 	}
 
-	columns := s.getColumnNames("db")
+	columns := s.getColumnNames("db", "useColumnName")
 
 	filterClause = fmt.Sprintf("WHERE START_TIME >= '%s' and START_TIME <= '%s'", *minTime, *maxTime)
 
@@ -147,6 +149,8 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 		timeFormat := "2006-01-02T15:04:05.999999-07:00"
 		executedStatements := make([]du.Statement, 0, 20)
 
+		unparsableQueries := map[string]interface{}{}
+
 		for ind := range returnedRows {
 			returnedRow := returnedRows[ind]
 			startTime, e := time.Parse(timeFormat, returnedRow.StartTime)
@@ -177,12 +181,11 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 				StartTime: 0,
 				Query:     returnedRow.Query,
 			}
-			if localErr != nil {
-				executedStatements = append(executedStatements, emptyDu)
-				continue
-			} else if len(accessedDataObjects) == 0 || accessedDataObjects[0].DataObject == nil {
-				executedStatements = append(executedStatements, emptyDu)
-				continue
+			if localErr != nil || len(accessedDataObjects) == 0 || accessedDataObjects[0].DataObject == nil {
+				if _, found := unparsableQueries[emptyDu.Query]; !found {
+					executedStatements = append(executedStatements, emptyDu)
+					unparsableQueries[emptyDu.Query] = true
+				}
 			} else {
 				du := du.Statement{
 					ExternalId:          returnedRow.ExternalId,
@@ -246,13 +249,14 @@ func (s *DataUsageSyncer) checkAccessHistoryAvailability(conn *sql.DB) bool {
 	return false
 }
 
-func (s *DataUsageSyncer) getColumnNames(tag string) []string {
+func (s *DataUsageSyncer) getColumnNames(tag string, includeTag string) []string {
 	columNames := []string{}
 	val := reflect.ValueOf(QueryDbEntities{})
 
 	for i := 0; i < val.Type().NumField(); i++ {
 		tagValue := val.Type().Field(i).Tag.Get(tag)
-		if tagValue != "" {
+		includeTagValue := val.Type().Field(i).Tag.Get(includeTag)
+		if tagValue != "" && strings.EqualFold(includeTagValue, "true") {
 			columNames = append(columNames, val.Type().Field(i).Tag.Get(tag))
 		}
 	}
@@ -261,26 +265,26 @@ func (s *DataUsageSyncer) getColumnNames(tag string) []string {
 }
 
 type QueryDbEntities struct {
-	ExternalId            string     `db:"QUERY_ID"`
-	Status                string     `db:"EXECUTION_STATUS"`
-	Query                 string     `db:"QUERY_TEXT"`
-	ErrorMessage          NullString `db:"ERROR_MESSAGE"`
-	DatabaseName          NullString `db:"DATABASE_NAME"`
-	SchemaName            NullString `db:"SCHEMA_NAME"`
-	User                  string     `db:"USER_NAME"`
-	Role                  string     `db:"ROLE_NAME"`
-	StartTime             string     `db:"START_TIME"`
-	EndTime               string     `db:"END_TIME"`
-	BytesTranferred       int        `db:"OUTBOUND_DATA_TRANSFER_BYTES"`
-	RowsReturned          int        `db:"EXTERNAL_FUNCTION_TOTAL_SENT_ROWS"`
-	CloudCreditsUsed      float32    `db:"CREDITS_USED_CLOUD_SERVICES"`
-	AccessId              NullString // column name: QID
-	DirectObjectsAccessed *string    // column name: DIRECT_OBJECTS_ACCESSED
-	BaseObjectsAccessed   *string    // column name: BASE_OBJECTS_ACCESSED
-	ObjectsModified       *string    // column name: OBJECTS_MODIFIED
+	ExternalId            string     `db:"QUERY_ID" useColumnName:"true"`
+	Status                string     `db:"EXECUTION_STATUS" useColumnName:"true"`
+	Query                 string     `db:"QUERY_TEXT" useColumnName:"true"`
+	ErrorMessage          NullString `db:"ERROR_MESSAGE" useColumnName:"true"`
+	DatabaseName          NullString `db:"DATABASE_NAME" useColumnName:"true"`
+	SchemaName            NullString `db:"SCHEMA_NAME" useColumnName:"true"`
+	User                  string     `db:"USER_NAME" useColumnName:"true"`
+	Role                  string     `db:"ROLE_NAME" useColumnName:"true"`
+	StartTime             string     `db:"START_TIME" useColumnName:"true"`
+	EndTime               string     `db:"END_TIME" useColumnName:"true"`
+	BytesTranferred       int        `db:"OUTBOUND_DATA_TRANSFER_BYTES"useColumnName:"true"`
+	RowsReturned          int        `db:"EXTERNAL_FUNCTION_TOTAL_SENT_ROWS" useColumnName:"true"`
+	CloudCreditsUsed      float32    `db:"CREDITS_USED_CLOUD_SERVICES" useColumnName:"true"`
+	AccessId              NullString `db:"QID"`
+	DirectObjectsAccessed *string    `db:"DIRECT_OBJECTS_ACCESSED"`
+	BaseObjectsAccessed   *string    `db:"BASE_OBJECTS_ACCESSED"`
+	ObjectsModified       *string    `db:"OBJECTS_MODIFIED"`
 }
 
 func (entity QueryDbEntities) String() string {
-	return fmt.Sprintf("ID: %s, Status: %s, SQL Query: %s, DatabaseName: %s, SchemaName: %s, UserName: %s, StartTime: %s, EndTime: %s",
-		entity.ExternalId, entity.Status, entity.Query, entity.DatabaseName.String, entity.SchemaName.String, entity.User, entity.StartTime, entity.EndTime)
+	return fmt.Sprintf("ID: %s, Status: %s, SQL Query: %s, DatabaseName: %s, SchemaName: %s, UserName: %s, RoleName: %s, StartTime: %s, EndTime: %s, DirectObjectsAccessed: %v, BaseObjectsAccess: %v",
+		entity.ExternalId, entity.Status, entity.Query, entity.DatabaseName.String, entity.SchemaName.String, entity.User, entity.Role, entity.StartTime, entity.EndTime, entity.DirectObjectsAccessed, entity.BaseObjectsAccessed)
 }
