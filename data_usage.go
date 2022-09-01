@@ -256,6 +256,7 @@ func (s *DataUsageSyncer) getColumnNames(tag string, includeTag string) []string
 	for i := 0; i < val.Type().NumField(); i++ {
 		tagValue := val.Type().Field(i).Tag.Get(tag)
 		includeTagValue := val.Type().Field(i).Tag.Get(includeTag)
+
 		if tagValue != "" && strings.EqualFold(includeTagValue, "true") {
 			columNames = append(columNames, val.Type().Field(i).Tag.Get(tag))
 		}
@@ -275,7 +276,7 @@ type QueryDbEntities struct {
 	Role                  string     `db:"ROLE_NAME" useColumnName:"true"`
 	StartTime             string     `db:"START_TIME" useColumnName:"true"`
 	EndTime               string     `db:"END_TIME" useColumnName:"true"`
-	BytesTranferred       int        `db:"OUTBOUND_DATA_TRANSFER_BYTES"useColumnName:"true"`
+	BytesTranferred       int        `db:"OUTBOUND_DATA_TRANSFER_BYTES" useColumnName:"true"`
 	RowsReturned          int        `db:"EXTERNAL_FUNCTION_TOTAL_SENT_ROWS" useColumnName:"true"`
 	CloudCreditsUsed      float32    `db:"CREDITS_USED_CLOUD_SERVICES" useColumnName:"true"`
 	AccessId              NullString `db:"QID"`
