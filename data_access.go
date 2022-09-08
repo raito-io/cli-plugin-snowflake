@@ -196,10 +196,13 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fi
 		}
 
 		users := make([]string, 0)
+		accessProviders := make([]string, 0)
 
 		for _, grantee := range grantOfEntities {
 			if grantee.GrantedTo == "USER" {
 				users = append(users, grantee.GranteeName)
+			} else if grantee.GrantedTo == "ROLE" {
+				accessProviders = append(accessProviders, grantee.GranteeName)
 			}
 		}
 
@@ -214,7 +217,9 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fi
 					{
 						NamingHint: roleEntity.Name,
 						Who: &exporter.WhoItem{
-							Users: users,
+							Users:           users,
+							AccessProviders: accessProviders,
+							Groups:          []string{},
 						},
 						What: make([]exporter.WhatItem, 0),
 					},
@@ -275,23 +280,6 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fi
 					DataObject:  do,
 					Permissions: permissions,
 				})
-			}
-		}
-
-		// copy AccessObjects from this role to all roles that have a GRANT on this one
-		// TODO implement real inheritance
-		for _, grantee := range grantOfEntities {
-			if grantee.GrantedTo == "ROLE" {
-				if _, f := accessProviderMap[grantee.GranteeName]; !f {
-					accessProviderMap[grantee.GranteeName] = &exporter.AccessProvider{
-						ExternalId: grantee.GranteeName,
-						Name:       grantee.GranteeName,
-					}
-				}
-
-				granteeDa := accessProviderMap[grantee.GranteeName]
-				granteeDa.Access[0].What = append(granteeDa.Access[0].What, da.Access[0].What...)
-				logger.Info(fmt.Sprintf("Adding AccessObjects for role %s to grantee %s", roleEntity.Name, granteeDa.Name))
 			}
 		}
 	}
@@ -604,6 +592,18 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 		// Note: we don't expand groups ourselves here, because Snowflake doesn't have the concept of groups.
 		users := slice.StringSliceMerge(da.Who.Users, da.Who.UsersInGroups)
 
+		// Extract RoleNames from Access Providers that are among the whoList of this one
+		roles := make([]string, 0)
+
+		for _, apWho := range da.Who.AccessProviders {
+			for rn2, ea2 := range apMap {
+				if strings.EqualFold(ea2.AccessProvider.Id, apWho) {
+					roles = append(roles, rn2)
+					break
+				}
+			}
+		}
+
 		// TODO for now we suppose the permissions on the database and schema level are only USAGE.
 		//      Later we should support to have specific permissions on these levels as well.
 
@@ -662,11 +662,14 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 			}
 
 			usersOfRole := make([]string, 0, len(grantsOfRole))
+			rolesOfRole := make([]string, 0, len(grantsOfRole))
 
 			for _, gor := range grantsOfRole {
 				// TODO we ignore other roles that have been granted this role. What should we do with it?
 				if strings.EqualFold(gor.GrantedTo, "USER") {
 					usersOfRole = append(usersOfRole, gor.GranteeName)
+				} else if strings.EqualFold(gor.GrantedTo, "ROLE") {
+					rolesOfRole = append(rolesOfRole, gor.GranteeName)
 				}
 			}
 
@@ -685,6 +688,24 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 				e := revokeUsersFromRole(conn, rn, toRemove)
 				if e != nil {
 					return fmt.Errorf("error while unassigning users from role %q: %s", rn, e.Error())
+				}
+			}
+
+			toAdd = slice.StringSliceDifference(roles, rolesOfRole, false)
+			toRemove = slice.StringSliceDifference(rolesOfRole, roles, false)
+			logger.Info(fmt.Sprintf("Identified %d roles to add and %d roles to remove from role %q", len(toAdd), len(toRemove), rn))
+
+			if len(toAdd) > 0 {
+				e := grantRolesToRole(conn, rn, toAdd)
+				if e != nil {
+					return fmt.Errorf("error while assigning role to role %q: %s", rn, e.Error())
+				}
+			}
+
+			if len(toRemove) > 0 {
+				e := revokeRolesFromRole(conn, rn, toRemove)
+				if e != nil {
+					return fmt.Errorf("error while unassigning role from role %q: %s", rn, e.Error())
 				}
 			}
 
@@ -742,6 +763,13 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 
 				return fmt.Errorf("error while assigning users to role %q: %s", rn, err.Error())
 			}
+
+			err = grantRolesToRole(conn, rn, roles)
+			if err != nil {
+				logger.Error("Encountered error :" + err.Error())
+
+				return fmt.Errorf("error while assigning roles to role %q: %s", rn, err.Error())
+			}
 			// TODO assign role to SYSADMIN if requested (add as input parameter)
 		}
 
@@ -780,10 +808,19 @@ func (s *AccessSyncer) getGrantsToRole(rn string, conn *sql.DB) ([]grantToRole, 
 		return nil, fmt.Errorf("error while fetching permissions on role %q: %s", rn, e.Error())
 	}
 
+	sharedDbsHandled := make(map[string]struct{})
+
 	for _, r := range res {
+		if strings.EqualFold(r.GrantedOn, "ROLE") { // ROLE USAGE permissions are handled separately
+			continue
+		}
 		db := strings.Split(r.Name, ".")[0]
+
 		if _, f := shares[db]; !f {
 			grantsToRole = append(grantsToRole, r)
+		} else if _, f := sharedDbsHandled[db]; !f {
+			grantsToRole = append(grantsToRole, grantToRole{Privilege: "IMPORTED PRIVILEGES", GrantedOn: "DATABASE", Name: db})
+			sharedDbsHandled[db] = struct{}{}
 		}
 	}
 
@@ -971,6 +1008,30 @@ func revokeUsersFromRole(conn *sql.DB, role string, users []string) error {
 	return nil
 }
 
+func revokeRolesFromRole(conn *sql.DB, role string, roles []string) error {
+	statements := make([]string, 0, 200)
+	roleCount := len(roles)
+
+	for i, otherRole := range roles {
+		q := fmt.Sprintf("REVOKE ROLE %s FROM ROLE %q", role, strings.ToUpper(otherRole))
+		statements = append(statements, q)
+
+		if len(statements) == 200 || i == roleCount-1 {
+			logger.Info(fmt.Sprintf("Executing statements to revoke role %q from %d roles", role, len(statements)))
+
+			err := executeStatements(conn, statements)
+			if err != nil {
+				return fmt.Errorf("error while revoking roles from role %q: %s", role, err.Error())
+			}
+
+			logger.Info(fmt.Sprintf("Done revoking role from %d roles", len(statements)))
+			statements = make([]string, 0, 200)
+		}
+	}
+
+	return nil
+}
+
 func grantUsersToRole(conn *sql.DB, role string, users []string) error {
 	statements := make([]string, 0, 200)
 	userCount := len(users)
@@ -988,6 +1049,34 @@ func grantUsersToRole(conn *sql.DB, role string, users []string) error {
 			}
 
 			logger.Info(fmt.Sprintf("Done granting role to %d users", len(statements)))
+			statements = make([]string, 0, 200)
+		}
+	}
+
+	return nil
+}
+
+func grantRolesToRole(conn *sql.DB, role string, roles []string) error {
+	statements := make([]string, 0, 200)
+	roleCount := len(roles)
+
+	for i, otherRole := range roles {
+		// execute a CREATE IF NOT EXISTS for the other Role as it could be that it does not exist and will be created after this one
+		q := fmt.Sprintf("CREATE ROLE IF NOT EXISTS %q", strings.ToUpper(otherRole))
+		statements = append(statements, q)
+
+		q = fmt.Sprintf("GRANT ROLE %s TO ROLE %q", role, strings.ToUpper(otherRole))
+		statements = append(statements, q)
+
+		if len(statements) == 200 || i == roleCount-1 {
+			logger.Info(fmt.Sprintf("Executing statements to grant role %q to %d roles", role, len(statements)))
+
+			err := executeStatements(conn, statements)
+			if err != nil {
+				return fmt.Errorf("error while granting roles to role %q: %s", role, err.Error())
+			}
+
+			logger.Info(fmt.Sprintf("Done granting role to %d roles", len(statements)))
 			statements = make([]string, 0, 200)
 		}
 	}
