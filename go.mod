@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/blockloop/scan v1.3.0
 	github.com/hashicorp/go-hclog v1.1.0
-	github.com/raito-io/cli v0.16.0
+	github.com/raito-io/cli v0.18.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/snowflakedb/gosnowflake v1.6.10
 	github.com/stretchr/testify v1.7.0
