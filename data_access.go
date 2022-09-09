@@ -595,7 +595,7 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 		// Extract RoleNames from Access Providers that are among the whoList of this one
 		roles := make([]string, 0)
 
-		for _, apWho := range da.Who.AccessProviders {
+		for _, apWho := range da.Who.InheritFrom {
 			for rn2, ea2 := range apMap {
 				if strings.EqualFold(ea2.AccessProvider.Id, apWho) {
 					roles = append(roles, rn2)
