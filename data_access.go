@@ -38,7 +38,7 @@ const ROLE_SEPARATOR = "_"
 type AccessSyncer struct {
 }
 
-func (s *AccessSyncer) SyncImportAccess(config *access_provider.AccessSyncImportConfig) access_provider.AccessSyncResult {
+func (s *AccessSyncer) SyncToTarget(config *access_provider.AccessSyncToTarget) access_provider.AccessSyncResult {
 	logger.Info("Reading roles from Snowflake")
 
 	fileCreator, err := exporter.NewAccessProviderFileCreator(config)
@@ -80,7 +80,7 @@ func (s *AccessSyncer) SyncImportAccess(config *access_provider.AccessSyncImport
 	}
 }
 
-func (s *AccessSyncer) SyncExportAccess(config *access_provider.AccessSyncExportConfig) access_provider.AccessSyncResult {
+func (s *AccessSyncer) SyncFromTarget(config *access_provider.AccessSyncFromTarget) access_provider.AccessSyncResult {
 	logger.Info("Configuring access providers as roles in Snowflake")
 
 	err := s.exportAccess(config)
@@ -115,7 +115,7 @@ func getShareNames(conn *sql.DB) (map[string]struct{}, error) {
 	return shares, nil
 }
 
-func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncImportConfig, fileCreator exporter.AccessProviderFileCreator) error {
+func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncToTarget, fileCreator exporter.AccessProviderFileCreator) error {
 	ownersToExclude := ""
 	if v, ok := config.Parameters[SfExcludedOwners]; ok && v != nil {
 		ownersToExclude = v.(string)
@@ -299,7 +299,7 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncImportConf
 	return nil
 }
 
-func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncImportConfig, fileCreator exporter.AccessProviderFileCreator, policyType string, action exporter.Action) error {
+func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncToTarget, fileCreator exporter.AccessProviderFileCreator, policyType string, action exporter.Action) error {
 	conn, err := ConnectToSnowflake(config.Parameters, "")
 	if err != nil {
 		return err
@@ -421,11 +421,11 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncIm
 	return nil
 }
 
-func (s *AccessSyncer) importMaskingPolicies(config *access_provider.AccessSyncImportConfig, fileCreator exporter.AccessProviderFileCreator) error {
+func (s *AccessSyncer) importMaskingPolicies(config *access_provider.AccessSyncToTarget, fileCreator exporter.AccessProviderFileCreator) error {
 	return s.importPoliciesOfType(config, fileCreator, "MASKING POLICY", exporter.Mask)
 }
 
-func (s *AccessSyncer) importRowAccessPolicies(config *access_provider.AccessSyncImportConfig, fileCreator exporter.AccessProviderFileCreator) error {
+func (s *AccessSyncer) importRowAccessPolicies(config *access_provider.AccessSyncToTarget, fileCreator exporter.AccessProviderFileCreator) error {
 	return s.importPoliciesOfType(config, fileCreator, "ROW ACCESS POLICY", exporter.Filtered)
 }
 
@@ -449,7 +449,7 @@ func find(s []string, q string) bool {
 	return false
 }
 
-func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncExportConfig) error {
+func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncFromTarget) error {
 	dar, err := importer.ParseAccessProviderImportFile(config)
 	if err != nil {
 		return fmt.Errorf("error parsing acccess providers from %q: %s", config.SourceFile, err.Error())
@@ -553,7 +553,7 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncExportConf
 	defer fileCreator.Close()
 
 	for roleName, access := range apMap {
-		fileCreator.AddAccessProviderNameTranslation(importer.AccessProviderNameTranslation{
+		fileCreator.AddAccessProviderActualName(importer.AccessProviderActualNameTranslation{
 			AccessProviderId:         access.AccessProvider.Id,
 			AccessProviderActualName: roleName,
 		})
