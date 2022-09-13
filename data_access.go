@@ -38,56 +38,56 @@ const ROLE_SEPARATOR = "_"
 type AccessSyncer struct {
 }
 
-func (s *AccessSyncer) SyncAccess(config *access_provider.AccessSyncConfig) access_provider.AccessSyncResult {
-	if config.TargetFile != "" {
-		logger.Info("Reading roles from Snowflake")
+func (s *AccessSyncer) SyncImportAccess(config *access_provider.AccessSyncImportConfig) access_provider.AccessSyncResult {
+	logger.Info("Reading roles from Snowflake")
 
-		fileCreator, err := exporter.NewAccessProviderFileCreator(config)
-		if err != nil {
-			return access_provider.AccessSyncResult{
-				Error: e.ToErrorResult(err),
-			}
+	fileCreator, err := exporter.NewAccessProviderFileCreator(config)
+	if err != nil {
+		return access_provider.AccessSyncResult{
+			Error: e.ToErrorResult(err),
 		}
-		defer fileCreator.Close()
+	}
+	defer fileCreator.Close()
 
-		err = s.importAccess(config, fileCreator)
+	err = s.importAccess(config, fileCreator)
 
-		if err != nil {
-			return access_provider.AccessSyncResult{
-				Error: e.ToErrorResult(err),
-			}
-		}
-
-		logger.Info("Reading masking policies from")
-
-		err = s.importMaskingPolicies(config, fileCreator)
-		if err != nil {
-			return access_provider.AccessSyncResult{
-				Error: e.ToErrorResult(err),
-			}
-		}
-
-		logger.Info("Reading row access policies from Snowflake")
-
-		err = s.importRowAccessPolicies(config, fileCreator)
-		if err != nil {
-			return access_provider.AccessSyncResult{
-				Error: e.ToErrorResult(err),
-			}
+	if err != nil {
+		return access_provider.AccessSyncResult{
+			Error: e.ToErrorResult(err),
 		}
 	}
 
-	if config.SourceFile != "" {
-		logger.Info("Configuring access providers as roles in Snowflake")
+	logger.Info("Reading masking policies from")
 
-		err := s.exportAccess(config)
-		if err != nil {
-			return access_provider.AccessSyncResult{
-				Error: e.ToErrorResult(err),
-			}
+	err = s.importMaskingPolicies(config, fileCreator)
+	if err != nil {
+		return access_provider.AccessSyncResult{
+			Error: e.ToErrorResult(err),
 		}
-	} else {
-		logger.Info("No access providers to import into Snowflake. Skipping.")
+	}
+
+	logger.Info("Reading row access policies from Snowflake")
+
+	err = s.importRowAccessPolicies(config, fileCreator)
+	if err != nil {
+		return access_provider.AccessSyncResult{
+			Error: e.ToErrorResult(err),
+		}
+	}
+
+	return access_provider.AccessSyncResult{
+		Error: nil,
+	}
+}
+
+func (s *AccessSyncer) SyncExportAccess(config *access_provider.AccessSyncExportConfig) access_provider.AccessSyncResult {
+	logger.Info("Configuring access providers as roles in Snowflake")
+
+	err := s.exportAccess(config)
+	if err != nil {
+		return access_provider.AccessSyncResult{
+			Error: e.ToErrorResult(err),
+		}
 	}
 
 	return access_provider.AccessSyncResult{
@@ -115,7 +115,7 @@ func getShareNames(conn *sql.DB) (map[string]struct{}, error) {
 	return shares, nil
 }
 
-func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fileCreator exporter.AccessProviderFileCreator) error {
+func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncImportConfig, fileCreator exporter.AccessProviderFileCreator) error {
 	ownersToExclude := ""
 	if v, ok := config.Parameters[SfExcludedOwners]; ok && v != nil {
 		ownersToExclude = v.(string)
@@ -299,7 +299,7 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncConfig, fi
 	return nil
 }
 
-func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncConfig, fileCreator exporter.AccessProviderFileCreator, policyType string, action exporter.Action) error {
+func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncImportConfig, fileCreator exporter.AccessProviderFileCreator, policyType string, action exporter.Action) error {
 	conn, err := ConnectToSnowflake(config.Parameters, "")
 	if err != nil {
 		return err
@@ -421,11 +421,11 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncCo
 	return nil
 }
 
-func (s *AccessSyncer) importMaskingPolicies(config *access_provider.AccessSyncConfig, fileCreator exporter.AccessProviderFileCreator) error {
+func (s *AccessSyncer) importMaskingPolicies(config *access_provider.AccessSyncImportConfig, fileCreator exporter.AccessProviderFileCreator) error {
 	return s.importPoliciesOfType(config, fileCreator, "MASKING POLICY", exporter.Mask)
 }
 
-func (s *AccessSyncer) importRowAccessPolicies(config *access_provider.AccessSyncConfig, fileCreator exporter.AccessProviderFileCreator) error {
+func (s *AccessSyncer) importRowAccessPolicies(config *access_provider.AccessSyncImportConfig, fileCreator exporter.AccessProviderFileCreator) error {
 	return s.importPoliciesOfType(config, fileCreator, "ROW ACCESS POLICY", exporter.Filtered)
 }
 
@@ -449,7 +449,7 @@ func find(s []string, q string) bool {
 	return false
 }
 
-func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncConfig) error {
+func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncExportConfig) error {
 	dar, err := importer.ParseAccessProviderImportFile(config)
 	if err != nil {
 		return fmt.Errorf("error parsing acccess providers from %q: %s", config.SourceFile, err.Error())
@@ -541,7 +541,25 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncConfig) er
 		logger.Info("No old Raito roles to remove in Snowflake")
 	}
 
-	return s.generateAccessControls(apMap, existingRoles, conn)
+	err = s.generateAccessControls(apMap, existingRoles, conn)
+	if err != nil {
+		return err
+	}
+
+	fileCreator, err := importer.NewAccessProviderFileCreator(config)
+	if err != nil {
+		return err
+	}
+	defer fileCreator.Close()
+
+	for roleName, access := range apMap {
+		fileCreator.AddAccessProviderNameTranslation(importer.AccessProviderNameTranslation{
+			AccessProviderId:         access.AccessProvider.Id,
+			AccessProviderActualName: roleName,
+		})
+	}
+
+	return err
 }
 
 // findRoles returns a map where the keys are all the roles that exist in Snowflake right now and the key indicates if it was found in apMap or not.
