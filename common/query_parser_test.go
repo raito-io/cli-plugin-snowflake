@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	ap "github.com/raito-io/cli/base/access_provider/sync_to_target"
+	ap "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	logger "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
