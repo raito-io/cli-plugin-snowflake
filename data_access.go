@@ -9,8 +9,8 @@ import (
 
 	"github.com/blockloop/scan"
 	"github.com/raito-io/cli/base/access_provider"
-	"github.com/raito-io/cli/base/access_provider/exporter"
-	"github.com/raito-io/cli/base/access_provider/importer"
+	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
+	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	ds "github.com/raito-io/cli/base/data_source"
 	e "github.com/raito-io/cli/base/util/error"
 	"github.com/raito-io/cli/base/util/slice"
@@ -546,17 +546,28 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 		return err
 	}
 
-	fileCreator, err := importer.NewAccessProviderFileCreator(config)
+	fileCreator, err := importer.NewFeedbackFileCreator(config)
 	if err != nil {
 		return err
 	}
 	defer fileCreator.Close()
 
+	feedbackMap := make(map[string][]importer.AccessSyncFeedbackInformation)
+
 	for roleName, access := range apMap {
-		fileCreator.AddAccessProviderActualName(importer.AccessProviderActualNameTranslation{
-			AccessProviderId:         access.AccessProvider.Id,
-			AccessProviderActualName: roleName,
-		})
+		feedbackElement := importer.AccessSyncFeedbackInformation{AccessId: access.Access.Id, ActualName: roleName}
+		if feedbackObjects, found := feedbackMap[access.AccessProvider.Id]; found {
+			feedbackMap[access.AccessProvider.Id] = append(feedbackObjects, feedbackElement)
+		} else {
+			feedbackMap[access.AccessProvider.Id] = []importer.AccessSyncFeedbackInformation{feedbackElement}
+		}
+	}
+
+	for apId, feedbackObjects := range feedbackMap {
+		err = fileCreator.AddAccessProviderFeedback(apId, feedbackObjects...)
+		if err != nil {
+			return err
+		}
 	}
 
 	return err
