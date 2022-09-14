@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	ap "github.com/raito-io/cli/base/access_provider/exporter"
+	ap "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	"github.com/raito-io/cli/base/data_source"
 	log "github.com/sirupsen/logrus"
 	parser "github.com/xwb1989/sqlparser"
