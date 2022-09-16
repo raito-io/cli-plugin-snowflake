@@ -21,5 +21,7 @@ __debug_bin
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-cli-plugin-snowflake
+cli-plugin-snowflake*
 local*.sh
+raito*.yml
+raito*.json
