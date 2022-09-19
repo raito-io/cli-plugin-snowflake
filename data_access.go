@@ -36,7 +36,8 @@ var ACCEPTED_TYPES = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABA
 
 const ROLE_SEPARATOR = "_"
 
-var roleConstraints = roleGenerator.AllowedCharacters{
+// https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
+var roleNameConstraints = roleGenerator.NamingConstraints{
 	UpperCaseLetters:  true,
 	LowerCaseLetters:  false,
 	Numbers:           true,
@@ -475,7 +476,7 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 		}
 	}
 
-	uniqueRoleNameGenerator, err := roleGenerator.NewUniqueGenerator(logger, prefix, &roleConstraints)
+	uniqueRoleNameGenerator, err := roleGenerator.NewUniqueGenerator(logger, prefix, &roleNameConstraints)
 	if err != nil {
 		return err
 	}
