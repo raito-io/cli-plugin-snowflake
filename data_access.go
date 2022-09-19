@@ -369,7 +369,7 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncFr
 		}
 
 		// get policy references
-		q = fmt.Sprintf(`select * from table(information_schema.policy_references(policy_name => '%s.%s.%s'))`, policy.DatabaseName, policy.SchemaName, policy.Name)
+		q = fmt.Sprintf(`select * from table(%s.information_schema.policy_references(policy_name => '%s.%s.%s'))`, policy.DatabaseName, policy.DatabaseName, policy.SchemaName, policy.Name)
 
 		rows, err = QuerySnowflake(conn, q)
 		if err != nil {
