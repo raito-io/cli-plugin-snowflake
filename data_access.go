@@ -476,7 +476,7 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 		}
 	}
 
-	uniqueRoleNameGenerator, err := roleGenerator.NewUniqueGenerator(logger, prefix, &roleNameConstraints)
+	uniqueRoleNameGenerator, err := roleGenerator.NewUniqueNameGenerator(logger, prefix, &roleNameConstraints)
 	if err != nil {
 		return err
 	}
