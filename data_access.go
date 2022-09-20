@@ -11,6 +11,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
+	roleGenerator "github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	ds "github.com/raito-io/cli/base/data_source"
 	e "github.com/raito-io/cli/base/util/error"
 	"github.com/raito-io/cli/base/util/slice"
@@ -34,6 +35,15 @@ var ROLES_NOTINTERNALIZABLE = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMI
 var ACCEPTED_TYPES = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "COLUMN": {}, "SHARED-DATABASE": {}}
 
 const ROLE_SEPARATOR = "_"
+
+// https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
+var roleNameConstraints = roleGenerator.NamingConstraints{
+	UpperCaseLetters:  true,
+	LowerCaseLetters:  false,
+	Numbers:           true,
+	SpecialCharacters: "_$",
+	MaxLength:         255,
+}
 
 type AccessSyncer struct {
 }
@@ -215,7 +225,7 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncFromTarget
 				Action:     exporter.Grant,
 				Access: []*exporter.Access{
 					{
-						NamingHint: roleEntity.Name,
+						ActualName: roleEntity.Name,
 						Who: &exporter.WhoItem{
 							Users:           users,
 							AccessProviders: accessProviders,
@@ -336,7 +346,7 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncFr
 			NotInternalizable: true,
 			Access: []*exporter.Access{
 				{
-					NamingHint: policy.Name,
+					ActualName: policy.Name,
 					Who:        nil,
 					What:       make([]exporter.WhatItem, 0),
 				},
@@ -455,6 +465,20 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 		return fmt.Errorf("error parsing acccess providers from %q: %s", config.SourceFile, err.Error())
 	}
 
+	prefix := config.Prefix
+	if prefix != "" {
+		logger.Info(fmt.Sprintf("Using prefix %q", prefix))
+
+		if !strings.HasSuffix(prefix, ROLE_SEPARATOR) {
+			prefix += ROLE_SEPARATOR
+		}
+	}
+
+	uniqueRoleNameGenerator, err := roleGenerator.NewUniqueNameGenerator(logger, prefix, &roleNameConstraints)
+	if err != nil {
+		return err
+	}
+
 	apList := dar.AccessProviders
 	apMap := make(map[string]EnrichedAccess)
 
@@ -467,21 +491,15 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 	rolesToRemove := make([]string, 0)
 
 	// When exporting Access from Raito Cloud, prefix will be empty as the delete instructions are passed explicitly during export. For access-as-code the prefix should not be empty as it is used to detect Raito CLI managed roles
-	prefix := config.Prefix
 	if prefix != "" {
-		prefix = strings.ToUpper(strings.TrimSpace(prefix))
-		if !strings.HasSuffix(prefix, ROLE_SEPARATOR) {
-			prefix += ROLE_SEPARATOR
-		}
-
-		logger.Info(fmt.Sprintf("Using prefix %q", prefix))
-
 		for apIndex, ap := range apList {
-			for accessIndex, access := range ap.Access {
-				roleName, err2 := generateUniqueRoleName(prefix, &apList[apIndex], accessIndex)
-				if err2 != nil {
-					return err2
-				}
+			roleNames, err2 := uniqueRoleNameGenerator.Generate(&apList[apIndex])
+			if err2 != nil {
+				return err2
+			}
+
+			for _, access := range ap.Access {
+				roleName := roleNames[access.Id]
 
 				logger.Info(fmt.Sprintf("Generated rolename %q", roleName))
 				apMap[roleName] = EnrichedAccess{Access: access, AccessProvider: &apList[apIndex]}
@@ -489,22 +507,22 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 		}
 	} else {
 		for apIndex, ap := range apList {
+			roleNames, err2 := uniqueRoleNameGenerator.Generate(&apList[apIndex])
+			if err2 != nil {
+				return err2
+			}
+
 			if ap.Delete {
-				for accessIndex := range ap.Access {
-					roleName, err2 := generateUniqueRoleName(prefix, &apList[apIndex], accessIndex)
-					if err2 != nil {
-						return err2
-					}
+				for _, access := range ap.Access {
+					roleName := roleNames[access.Id]
+
 					if !find(rolesToRemove, roleName) {
 						rolesToRemove = append(rolesToRemove, roleName)
 					}
 				}
 			} else {
-				for accessIndex, access := range ap.Access {
-					roleName, err2 := generateUniqueRoleName(prefix, &apList[apIndex], accessIndex)
-					if err2 != nil {
-						return err2
-					}
+				for _, access := range ap.Access {
+					roleName := roleNames[access.Id]
 					if _, f := apMap[roleName]; !f {
 						apMap[roleName] = EnrichedAccess{Access: access, AccessProvider: &apList[apIndex]}
 					}
@@ -1151,41 +1169,6 @@ func executeRevoke(conn *sql.DB, perm, on, role string) error {
 
 func createComment(ap *importer.AccessProvider) string {
 	return fmt.Sprintf("Created by Raito from access provider %q. %s", ap.Name, ap.Description)
-}
-
-func generateUniqueRoleName(prefix string, ap *importer.AccessProvider, accessIndex int) (string, error) {
-	access := ap.Access[accessIndex]
-	if access.NamingHint != "" {
-		return fmt.Sprintf("%s%s", prefix, access.NamingHint), nil
-	} else if ap.NamingHint != "" {
-		return fmt.Sprintf("%s%s%s%d", prefix, ap.NamingHint, ROLE_SEPARATOR, accessIndex), nil
-	} else if ap.Name != "" {
-		name := generateRoleNameFromAPName(ap.Name)
-		if len(name) < 10 {
-			return "", fmt.Errorf("generated role name %q needs to be at least 10 characters", name)
-		}
-		return fmt.Sprintf("%s%s%s%d", prefix, name, ROLE_SEPARATOR, accessIndex), nil
-	}
-
-	return "", fmt.Errorf("no naming hint provided for access provider %q", ap.NamingHint)
-}
-
-func generateRoleNameFromAPName(name string) string {
-	generated := ""
-
-	for _, c := range name {
-		if c == '-' || c == '_' || c == ' ' {
-			generated += "_"
-		} else if checkAlphaNum(c) {
-			generated += strings.ToUpper(string(c))
-		}
-	}
-
-	return generated
-}
-
-func checkAlphaNum(charVariable rune) bool {
-	return (charVariable >= 'a' && charVariable <= 'z') || (charVariable >= 'A' && charVariable <= 'Z') || (charVariable >= '0' && charVariable <= '9')
 }
 
 // getAllSnowflakePermissions maps a Raito permission from the data access element to the list of permissions it corresponds to in Snowflake
