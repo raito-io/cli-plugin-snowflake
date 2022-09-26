@@ -493,13 +493,13 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 	// When exporting Access from Raito Cloud, prefix will be empty as the delete instructions are passed explicitly during export. For access-as-code the prefix should not be empty as it is used to detect Raito CLI managed roles
 	if prefix != "" {
 		for apIndex, ap := range apList {
-			roleNames, err2 := uniqueRoleNameGenerator.Generate(&apList[apIndex])
+			roleNames, err2 := uniqueRoleNameGenerator.GenerateOrdered(&apList[apIndex])
 			if err2 != nil {
 				return err2
 			}
 
-			for _, access := range ap.Access {
-				roleName := roleNames[access.Id]
+			for i, access := range ap.Access {
+				roleName := roleNames[i]
 
 				logger.Info(fmt.Sprintf("Generated rolename %q", roleName))
 				apMap[roleName] = EnrichedAccess{Access: access, AccessProvider: &apList[apIndex]}
