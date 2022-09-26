@@ -564,31 +564,35 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 		return err
 	}
 
-	fileCreator, err := importer.NewFeedbackFileCreator(config)
-	if err != nil {
-		return err
-	}
-	defer fileCreator.Close()
-
-	feedbackMap := make(map[string][]importer.AccessSyncFeedbackInformation)
-
-	for roleName, access := range apMap {
-		feedbackElement := importer.AccessSyncFeedbackInformation{AccessId: access.Access.Id, ActualName: roleName}
-		if feedbackObjects, found := feedbackMap[access.AccessProvider.Id]; found {
-			feedbackMap[access.AccessProvider.Id] = append(feedbackObjects, feedbackElement)
-		} else {
-			feedbackMap[access.AccessProvider.Id] = []importer.AccessSyncFeedbackInformation{feedbackElement}
+	if prefix == "" {
+		fileCreator, err2 := importer.NewFeedbackFileCreator(config)
+		if err2 != nil {
+			return err2
 		}
-	}
+		defer fileCreator.Close()
 
-	for apId, feedbackObjects := range feedbackMap {
-		err = fileCreator.AddAccessProviderFeedback(apId, feedbackObjects...)
-		if err != nil {
-			return err
+		feedbackMap := make(map[string][]importer.AccessSyncFeedbackInformation)
+
+		for roleName, access := range apMap {
+			feedbackElement := importer.AccessSyncFeedbackInformation{AccessId: access.Access.Id, ActualName: roleName}
+			if feedbackObjects, found := feedbackMap[access.AccessProvider.Id]; found {
+				feedbackMap[access.AccessProvider.Id] = append(feedbackObjects, feedbackElement)
+			} else {
+				feedbackMap[access.AccessProvider.Id] = []importer.AccessSyncFeedbackInformation{feedbackElement}
+			}
 		}
+
+		for apId, feedbackObjects := range feedbackMap {
+			err2 = fileCreator.AddAccessProviderFeedback(apId, feedbackObjects...)
+			if err2 != nil {
+				return err2
+			}
+		}
+
+		return err2
 	}
 
-	return err
+	return nil
 }
 
 // findRoles returns a map where the keys are all the roles that exist in Snowflake right now and the key indicates if it was found in apMap or not.
@@ -1157,7 +1161,7 @@ func executeGrant(conn *sql.DB, perm, on, role string) error {
 
 func executeRevoke(conn *sql.DB, perm, on, role string) error {
 	q := fmt.Sprintf("REVOKE %s ON %s FROM ROLE %s", perm, on, role)
-	logger.Debug("Executing revoke query: %s", q)
+	logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
 
 	_, err := QuerySnowflake(conn, q)
 	if err != nil {
