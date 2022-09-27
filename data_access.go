@@ -792,6 +792,8 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 			for _, grant := range grantsToRole {
 				if strings.EqualFold(grant.GrantedOn, "ACCOUNT") {
 					foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn})
+				} else if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
+					logger.Warn(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, rn))
 				} else {
 					foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn + " " + grant.Name})
 				}
@@ -1181,8 +1183,11 @@ func getAllSnowflakePermissions(what *importer.WhatItem) []string {
 	allPerms := make([]string, 0, len(what.Permissions))
 
 	for _, perm := range what.Permissions {
-		if perm == "USAGE" {
+		if strings.EqualFold(perm, "USAGE") {
 			logger.Debug("Skipping explicit USAGE permission as Raito handles this automatically")
+			continue
+		} else if strings.EqualFold(perm, "OWNERSHIP") {
+			logger.Debug("Skipping explicit OWNERSHIP permission as Raito does not manage this permission")
 			continue
 		}
 

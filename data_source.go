@@ -90,12 +90,14 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 
 		schemas, err := readSchemas(fileCreator, conn, doTypePrefix, database.Name, excludedSchemas)
 		if err != nil {
+			logger.Error(fmt.Sprintf("error while syncing schemas for database %q between Snowflake and Raito: %s", database.Name, err.Error()))
 			return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing schemas for database %q between Snowflake and Raito: %s", database.Name, err.Error()))}
 		}
 
 		for _, schema := range schemas {
 			tables, err := readTables(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name)
 			if err != nil {
+				logger.Error(fmt.Sprintf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))
 				return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
 			}
 
@@ -103,12 +105,14 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 				err = readColumns(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name+"."+table.Name)
 
 				if err != nil {
+					logger.Error(fmt.Sprintf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))
 					return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
 				}
 			}
 
 			views, err := readViews(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name)
 			if err != nil {
+				logger.Error(fmt.Sprintf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))
 				return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
 			}
 
@@ -116,6 +120,7 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 				err := readColumns(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name+"."+view.Name)
 
 				if err != nil {
+					logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))
 					return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))}
 				}
 			}
@@ -412,10 +417,6 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 						Permission:  "USAGE",
 						Description: "Enables using a virtual warehouse and, as a result, executing queries on the warehouse. If the warehouse is configured to auto-resume when a SQL statement (e.g. query) is submitted to it, the warehouse resumes automatically and executes the statement.",
 					},
-					{
-						Permission:  "OWNERSHIP",
-						Description: "Grants full control over a warehouse. Only a single role can hold this privilege on a specific object at a time.",
-					},
 				},
 				Children: []string{},
 			},
@@ -438,10 +439,6 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 					{
 						Permission:  "MONITOR",
 						Description: "Enables performing the DESCRIBE command on the database.",
-					},
-					{
-						Permission:  "OWNERSHIP",
-						Description: "Grants full control over the database. Only a single role can hold this privilege on a specific object at a time.",
 					},
 				},
 				Children: []string{ds.Schema},
@@ -530,10 +527,6 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 						Permission:  "ADD SEARCH OPTIMIZATION",
 						Description: "Enables adding search optimization to a table in a schema.",
 					},
-					{
-						Permission:  "OWNERSHIP",
-						Description: "Grants full control over the schema. Only a single role can hold this privilege on a specific object at a time.",
-					},
 				},
 				Children: []string{ds.Table, ds.View},
 			},
@@ -565,10 +558,6 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 						Permission:  "REFERENCES",
 						Description: "Enables referencing a table as the unique/primary key table for a foreign key constraint. Also enables viewing the structure of a table (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
 					},
-					{
-						Permission:  "OWNERSHIP",
-						Description: "Grants full control over the table. Required to alter most properties a table, with the exception of reclustering. Only a single role can hold this privilege on a specific object at a time.",
-					},
 				},
 				Children: []string{ds.Column},
 			},
@@ -583,10 +572,6 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 					{
 						Permission:  "REFERENCES",
 						Description: "Enables viewing the structure of a view (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
-					},
-					{
-						Permission:  "OWNERSHIP",
-						Description: "Grants full control over the view. Required to alter a view. Only a single role can hold this privilege on a specific object at a time.",
 					},
 				},
 				Children: []string{ds.Column},
