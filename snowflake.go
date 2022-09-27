@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	e "github.com/raito-io/cli/base/util/error"
@@ -52,6 +53,90 @@ func (s SnowflakeObject) getFullName(withQuotes bool) string {
 	fullName = fmt.Sprintf(formatString, fullName, *s.Column)
 
 	return fullName
+}
+
+func FormatQuery(query string, objects ...string) string {
+	newObjects := []interface{}{}
+	for ind, _ := range objects {
+		objects[ind] = strings.ReplaceAll(objects[ind], `"`, `""`)
+		objects[ind] = fmt.Sprintf(`"%s"`, objects[ind])
+		newObjects = append(newObjects, objects[ind])
+	}
+	return fmt.Sprintf(query, newObjects...)
+}
+
+// func FormatQueryFullName(query string, fullName string) string {
+// 	newObjects := []interface{}{}
+// 	for ind, _ := range objects {
+// 		objects[ind] = strings.ReplaceAll(objects[ind], `"`, `""`)
+// 		objects[ind] = fmt.Sprintf(`"%s"`, objects[ind])
+// 		newObjects = append(newObjects, objects[ind])
+// 	}
+// 	return fmt.Sprintf(query, newObjects...)
+// }
+
+func ConvertFullNameToDoubleQuotedName(objectName string) string {
+	parts := strings.Split(objectName, ".")
+	newParts := []string{}
+	for i := 0; i < len(parts); i++ {
+		partName := parts[i]
+		partName = strings.ReplaceAll(partName, `"`, `""`)
+		partName = fmt.Sprintf(`"%s"`, partName)
+		newParts = append(newParts, partName)
+	}
+	return strings.Join(newParts, ".")
+}
+
+func removeQuotesFromBeginningOrEnd(name string) string {
+	newName := name
+	if strings.HasPrefix(newName, `"`) {
+		newName = strings.TrimPrefix(newName, `"`)
+	}
+
+	if strings.HasSuffix(newName, `"`) {
+		newName = strings.TrimSuffix(newName, `"`)
+	}
+
+	return newName
+}
+
+func ParseFullName(fullName string) SnowflakeObject {
+	parts := strings.Split(fullName, ".")
+	// otherParts := strings.Split(fullName, `"."`)
+
+	re := regexp.MustCompile(`["]?\.["]?`)
+	split := re.Split(fullName, -1)
+	otherParts := []string{}
+	for i := range split {
+		otherParts = append(otherParts, split[i])
+	}
+
+	if len(otherParts) > 1 {
+		parts = otherParts
+	}
+	var database, schema, table, column *string
+
+	if len(parts) > 0 {
+		dbTemp := removeQuotesFromBeginningOrEnd(parts[0])
+		database = &dbTemp
+	}
+
+	if len(parts) > 1 {
+		schemaTemp := removeQuotesFromBeginningOrEnd(parts[1])
+		schema = &schemaTemp
+	}
+
+	if len(parts) > 2 {
+		tableTemp := removeQuotesFromBeginningOrEnd(parts[2])
+		table = &tableTemp
+	}
+
+	if len(parts) > 3 {
+		columnTemp := removeQuotesFromBeginningOrEnd(parts[3])
+		column = &columnTemp
+	}
+
+	return SnowflakeObject{database, schema, table, column}
 }
 
 func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, error) {
