@@ -120,8 +120,12 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 				err := readColumns(fileCreator, conn, doTypePrefix, database.Name+"."+schema.Name+"."+view.Name)
 
 				if err != nil {
-					logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))
-					return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))}
+					if strings.Contains(err.Error(), "Insufficient privileges to operate on table") {
+						logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito. The snowflake user should either have OWNERSHIP or SELECT permissions on the underlying table", view.Name))
+					} else {
+						logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))
+						return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))}
+					}
 				}
 			}
 		}
