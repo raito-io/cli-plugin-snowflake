@@ -4,12 +4,55 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strings"
 
 	e "github.com/raito-io/cli/base/util/error"
 	_ "github.com/snowflakedb/gosnowflake"
 )
 
 const SfLimit = 10000
+
+type SnowflakeObject struct {
+	Database *string `json:"database"`
+	Schema   *string `json:"schema"`
+	Table    *string `json:"table"`
+	Column   *string `json:"column"`
+}
+
+func (s SnowflakeObject) getFullName(withQuotes bool) string {
+	fullName := ""
+	formatString := "%s.%s"
+
+	if withQuotes {
+		formatString = `%s."%s"`
+	}
+
+	if s.Database == nil {
+		return fullName
+	}
+
+	fullName = fmt.Sprintf(strings.Split(formatString, ".")[1], *s.Database)
+
+	if s.Schema == nil {
+		return fullName
+	}
+
+	fullName = fmt.Sprintf(formatString, fullName, *s.Schema)
+
+	if s.Table == nil {
+		return fullName
+	}
+
+	fullName = fmt.Sprintf(formatString, fullName, *s.Table)
+
+	if s.Column == nil {
+		return fullName
+	}
+
+	fullName = fmt.Sprintf(formatString, fullName, *s.Column)
+
+	return fullName
+}
 
 func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, error) {
 	snowflakeUser := params[SfUser]
