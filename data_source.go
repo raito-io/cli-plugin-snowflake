@@ -45,10 +45,10 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 	if v, ok := config.Parameters[SfExcludedDatabases]; ok && v != nil {
 		excludedDatabases = v.(string)
 	}
-	excludedSchemas := ""
 
+	excludedSchemas := "INFORMATION_SCHEMA"
 	if v, ok := config.Parameters[SfExcludedSchemas]; ok && v != nil {
-		excludedSchemas = v.(string)
+		excludedSchemas += "," + v.(string)
 	}
 
 	_, err = readWarehouses(fileCreator, conn)
