@@ -648,7 +648,7 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 
 		for _, apWho := range da.Who.InheritFrom {
 			if strings.HasPrefix(apWho, "ID:") {
-				apId := strings.Replace(apWho, "ID:", "", 1)
+				apId := apWho[3:]
 				for rn2, ea2 := range apMap {
 					if strings.EqualFold(ea2.AccessProvider.Id, apId) {
 						roles = append(roles, rn2)
