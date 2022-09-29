@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/blockloop/scan"
+	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli/base/access_provider"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
@@ -151,7 +152,7 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncFromTarget
 	for _, roleEntity := range roleEntities {
 		logger.Info("Reading SnowFlake ROLE " + roleEntity.Name)
 		// get users granted OF role
-		q := FormatQuery(`SHOW GRANTS OF ROLE %s`, roleEntity.Name)
+		q := common.FormatQuery(`SHOW GRANTS OF ROLE %s`, roleEntity.Name)
 		rows, err := QuerySnowflake(conn, q)
 
 		if err != nil {
@@ -177,7 +178,7 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncFromTarget
 		}
 
 		// get objects granted TO role
-		q = FormatQuery(`SHOW GRANTS TO ROLE %s`, roleEntity.Name)
+		q = common.FormatQuery(`SHOW GRANTS TO ROLE %s`, roleEntity.Name)
 
 		rows, err = QuerySnowflake(conn, q)
 		if err != nil {
@@ -237,15 +238,8 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncFromTarget
 
 		for k, object := range grantToEntities {
 			if k == 0 {
-				// TODO: make parser still more robust
-				sfObject := ParseFullName(object.Name)
-				if !strings.EqualFold(sfObject.getFullName(false), strings.ReplaceAll(object.Name, `"`, ``)) {
-					logger.Info(object.Name)
-					fmt.Println(fmt.Sprintf("Difference between %s and %s", sfObject.getFullName(false), strings.ReplaceAll(object.Name, `"`, ``)))
-					logger.Info(fmt.Sprintf("Difference between %s and %s", sfObject.getFullName(false), strings.ReplaceAll(object.Name, `"`, ``)))
-				}
-				do = &ds.DataObjectReference{FullName: sfObject.getFullName(false), Type: object.GrantedOn}
-				logger.Info(object.Name)
+				sfObject := common.ParseFullName(object.Name)
+				do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: object.GrantedOn}
 			} else if do.FullName != object.Name {
 				if len(permissions) > 0 {
 					da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
@@ -253,14 +247,8 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncFromTarget
 						Permissions: permissions,
 					})
 				}
-				// TODO: make parser still more robust
-				sfObject := ParseFullName(object.Name)
-				if !strings.EqualFold(sfObject.getFullName(false), strings.ReplaceAll(object.Name, `"`, ``)) {
-					logger.Info(object.Name)
-					fmt.Println(fmt.Sprintf("Difference between %s and %s", sfObject.getFullName(false), strings.ReplaceAll(object.Name, `"`, ``)))
-					logger.Info(fmt.Sprintf("Difference between %s and %s", sfObject.getFullName(false), strings.ReplaceAll(object.Name, `"`, ``)))
-				}
-				do = &ds.DataObjectReference{FullName: sfObject.getFullName(false), Type: object.GrantedOn}
+				sfObject := common.ParseFullName(object.Name)
+				do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: object.GrantedOn}
 				permissions = make([]string, 0)
 			}
 
@@ -359,7 +347,7 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncFr
 		}
 
 		// get policy definition
-		q := FormatQuery("DESCRIBE "+policyType+" %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name)
+		q := common.FormatQuery("DESCRIBE "+policyType+" %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name)
 
 		rows, err := QuerySnowflake(conn, q)
 		if err != nil {
@@ -384,7 +372,7 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncFr
 		}
 
 		// get policy references
-		q = fmt.Sprintf(`select * from table(%s.information_schema.policy_references(policy_name => '%s'))`, policy.DatabaseName, FormatQuery(`%s.%s.%s`, policy.DatabaseName, policy.SchemaName, policy.Name))
+		q = fmt.Sprintf(`select * from table(%s.information_schema.policy_references(policy_name => '%s'))`, policy.DatabaseName, common.FormatQuery(`%s.%s.%s`, policy.DatabaseName, policy.SchemaName, policy.Name))
 
 		rows, err = QuerySnowflake(conn, q)
 		if err != nil {
@@ -412,12 +400,12 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncFr
 			if policyReference.REF_COLUMN_NAME.Valid {
 				dor = ds.DataObjectReference{
 					Type:     "COLUMN",
-					FullName: FormatQuery(`%s.%s.%s.%s`, policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME, policyReference.REF_COLUMN_NAME.String),
+					FullName: common.FormatQuery(`%s.%s.%s.%s`, policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME, policyReference.REF_COLUMN_NAME.String),
 				}
 			} else {
 				dor = ds.DataObjectReference{
 					Type:     "TABLE",
-					FullName: FormatQuery(`%s.%s.%s`, policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME),
+					FullName: common.FormatQuery(`%s.%s.%s`, policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME),
 				}
 			}
 
@@ -547,7 +535,7 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 		logger.Info(fmt.Sprintf("Removing old Raito roles in Snowflake: %s", rolesToRemove))
 
 		for _, roleToRemove := range rolesToRemove {
-			_, err = QuerySnowflake(conn, FormatQuery(`DROP ROLE %s`, roleToRemove))
+			_, err = QuerySnowflake(conn, common.FormatQuery(`DROP ROLE %s`, roleToRemove))
 			if err != nil && !strings.Contains(err.Error(), "does not exist") {
 				return fmt.Errorf("unable to drop role %q: %s", roleToRemove, err.Error())
 			}
@@ -758,19 +746,16 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 			// We assume nobody manually added others to this role manually.
 			for _, what := range da.What {
 				if what.DataObject.Type == "database" {
-					// TODO
-					e := executeRevoke(conn, "ALL", FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), rn)
+					e := executeRevoke(conn, "ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), rn)
 					if e != nil {
 						return fmt.Errorf("error while assigning future schema grants in database %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
 					}
 
-					// TODO
-					e = executeRevoke(conn, "ALL", FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), rn)
+					e = executeRevoke(conn, "ALL", common.FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), rn)
 					if e != nil {
 						return fmt.Errorf("error while assigning future table grants in database %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
 					}
 				} else if what.DataObject.Type == "schema" {
-					// TODO
 					e := executeRevoke(conn, "ALL", fmt.Sprintf("FUTURE TABLES IN SCHEMA %s", what.DataObject.FullName), rn)
 					if e != nil {
 						return fmt.Errorf("error while assigning future table grants in schema %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
@@ -798,7 +783,7 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 			logger.Info(fmt.Sprintf("Creating role %q", rn))
 
 			if _, f := roleCreated[rn]; !f {
-				_, err := QuerySnowflake(conn, FormatQuery(`CREATE OR REPLACE ROLE %s COMMENT=%s`, rn, createComment(ea.AccessProvider)))
+				_, err := QuerySnowflake(conn, common.FormatQuery(`CREATE OR REPLACE ROLE %s COMMENT=%s`, rn, createComment(ea.AccessProvider)))
 				if err != nil {
 					return fmt.Errorf("error while creating role %q: %s", rn, err.Error())
 				}
@@ -836,7 +821,7 @@ func (s *AccessSyncer) getGrantsToRole(rn string, conn *sql.DB) ([]grantToRole, 
 		return nil, fmt.Errorf("error while fetching permissions on role %q: %s", rn, e.Error())
 	}
 
-	q := FormatQuery(`SHOW GRANTS TO ROLE %s`, rn)
+	q := common.FormatQuery(`SHOW GRANTS TO ROLE %s`, rn)
 
 	rows, e := QuerySnowflake(conn, q)
 	if e != nil {
@@ -876,7 +861,7 @@ func (s *AccessSyncer) getGrantsToRole(rn string, conn *sql.DB) ([]grantToRole, 
 
 func (s *AccessSyncer) getGrantsOfRole(rn string, conn *sql.DB) ([]grantOfRole, error) {
 	// Merge the users for the role (= add the new and remove the old)
-	q := FormatQuery(`SHOW GRANTS OF ROLE %s`, rn)
+	q := common.FormatQuery(`SHOW GRANTS OF ROLE %s`, rn)
 
 	rows, e := QuerySnowflake(conn, q)
 	if e != nil {
@@ -906,11 +891,11 @@ func createGrantsForTable(permissions []string, fullName string) ([]interface{},
 
 	grants := make([]interface{}, 0, len(permissions)+2)
 	grants = append(grants,
-		Grant{"USAGE", FormatQuery(`DATABASE %s`, parts[0])},
-		Grant{"USAGE", FormatQuery(`SCHEMA %s.%s`, parts[0], parts[1])})
+		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, parts[0])},
+		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, parts[0], parts[1])})
 
 	for _, p := range permissions {
-		grants = append(grants, Grant{p, FormatQuery(`TABLE %s.%s.%s`, parts[0], parts[1], parts[2])})
+		grants = append(grants, Grant{p, common.FormatQuery(`TABLE %s.%s.%s`, parts[0], parts[1], parts[2])})
 	}
 
 	return grants, nil
@@ -925,11 +910,11 @@ func createGrantsForView(permissions []string, fullName string) ([]interface{}, 
 
 	grants := make([]interface{}, 0, len(permissions)+2)
 	grants = append(grants,
-		Grant{"USAGE", FormatQuery(`DATABASE %s`, parts[0])},
-		Grant{"USAGE", FormatQuery(`SCHEMA %s.%s`, parts[0], parts[1])})
+		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, parts[0])},
+		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, parts[0], parts[1])})
 
 	for _, p := range permissions {
-		grants = append(grants, Grant{p, FormatQuery(`VIEW %s.%s.%s`, parts[0], parts[1], parts[2])})
+		grants = append(grants, Grant{p, common.FormatQuery(`VIEW %s.%s.%s`, parts[0], parts[1], parts[2])})
 	}
 
 	return grants, nil
@@ -941,16 +926,16 @@ func createGrantsForSchema(conn *sql.DB, permissions []string, fullName string) 
 		return nil, fmt.Errorf("expected fullName %q to have 2 parts (database.schema)", fullName)
 	}
 
-	q := FormatQuery(`SHOW TABLES IN SCHEMA %s.%s`, parts[0], parts[1])
+	q := common.FormatQuery(`SHOW TABLES IN SCHEMA %s.%s`, parts[0], parts[1])
 	tables, _ := readDbEntities(conn, q)
 	grants := make([]interface{}, 0, (len(permissions)*len(tables))+2)
 	grants = append(grants,
-		Grant{"USAGE", FormatQuery(`DATABASE %s`, parts[0])},
-		Grant{"USAGE", FormatQuery(`SCHEMA %s.%s`, parts[0], parts[1])})
+		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, parts[0])},
+		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, parts[0], parts[1])})
 
 	for _, table := range tables {
 		for _, p := range permissions {
-			grants = append(grants, Grant{p, FormatQuery(`TABLE %s.%s.%s`, parts[0], parts[1], table.Name)})
+			grants = append(grants, Grant{p, common.FormatQuery(`TABLE %s.%s.%s`, parts[0], parts[1], table.Name)})
 		}
 	}
 
@@ -961,27 +946,27 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 	schemas, _ := readDbEntities(conn, getSchemasInDatabaseQuery(database))
 	grants := make([]interface{}, 0, (len(permissions)*len(schemas)*11)+1)
 
-	sfObject := SnowflakeObject{&database, nil, nil, nil}
+	sfObject := common.SnowflakeObject{Database: &database, Schema: nil, Table: nil, Column: nil}
 
-	grants = append(grants, Grant{"USAGE", fmt.Sprintf(`DATABASE %s`, sfObject.getFullName(true))})
+	grants = append(grants, Grant{"USAGE", fmt.Sprintf(`DATABASE %s`, sfObject.GetFullName(true))})
 
 	for _, p := range permissions {
-		grants = append(grants, Grant{p, fmt.Sprintf(`DATABASE %s`, sfObject.getFullName(true))})
+		grants = append(grants, Grant{p, fmt.Sprintf(`DATABASE %s`, sfObject.GetFullName(true))})
 	}
 
-	for _, schema := range schemas {
+	for i, schema := range schemas {
 		if schema.Name == "INFORMATION_SCHEMA" {
 			continue
 		}
 
-		sfObject.Schema = &schema.Name
-		grants = append(grants, Grant{"USAGE", fmt.Sprintf("SCHEMA %s", sfObject.getFullName(true))})
+		sfObject.Schema = &schemas[i].Name
+		grants = append(grants, Grant{"USAGE", fmt.Sprintf("SCHEMA %s", sfObject.GetFullName(true))})
 
 		tables, _ := readDbEntities(conn, getTablesInSchemaQuery(sfObject, "TABLES"))
-		for _, table := range tables {
+		for j := range tables {
 			for _, p := range permissions {
-				sfObject.Table = &table.Name
-				grants = append(grants, Grant{p, FormatQuery(`TABLE %s`, sfObject.getFullName(true))})
+				sfObject.Table = &tables[j].Name
+				grants = append(grants, Grant{p, common.FormatQuery(`TABLE %s`, sfObject.GetFullName(true))})
 			}
 		}
 	}
@@ -991,10 +976,10 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 
 func createGrantsForWarehouse(permissions []string, warehouse string) []interface{} {
 	grants := make([]interface{}, 0, len(permissions)+2)
-	grants = append(grants, Grant{"USAGE", FormatQuery(`WAREHOUSE %s`, warehouse)})
+	grants = append(grants, Grant{"USAGE", common.FormatQuery(`WAREHOUSE %s`, warehouse)})
 
 	for _, p := range permissions {
-		grants = append(grants, Grant{p, FormatQuery(`WAREHOUSE %s`, warehouse)})
+		grants = append(grants, Grant{p, common.FormatQuery(`WAREHOUSE %s`, warehouse)})
 	}
 
 	return grants
@@ -1042,7 +1027,7 @@ func revokeUsersFromRole(conn *sql.DB, role string, users []string) error {
 	userCount := len(users)
 
 	for i, user := range users {
-		q := FormatQuery(`REVOKE ROLE %s FROM USER %s`, role, user)
+		q := common.FormatQuery(`REVOKE ROLE %s FROM USER %s`, role, user)
 		statements = append(statements, q)
 
 		if len(statements) == 200 || i == userCount-1 {
@@ -1066,7 +1051,7 @@ func revokeRolesFromRole(conn *sql.DB, role string, roles []string) error {
 	roleCount := len(roles)
 
 	for i, otherRole := range roles {
-		q := FormatQuery(`REVOKE ROLE %s FROM ROLE %s`, role, otherRole)
+		q := common.FormatQuery(`REVOKE ROLE %s FROM ROLE %s`, role, otherRole)
 		statements = append(statements, q)
 
 		if len(statements) == 200 || i == roleCount-1 {
@@ -1090,7 +1075,7 @@ func grantUsersToRole(conn *sql.DB, role string, users []string) error {
 	userCount := len(users)
 
 	for i, user := range users {
-		q := FormatQuery(`GRANT ROLE %s TO USER %s`, role, user)
+		q := common.FormatQuery(`GRANT ROLE %s TO USER %s`, role, user)
 		statements = append(statements, q)
 
 		if len(statements) == 200 || i == userCount-1 {
@@ -1115,10 +1100,10 @@ func grantRolesToRole(conn *sql.DB, role string, roles []string) error {
 
 	for i, otherRole := range roles {
 		// execute a CREATE IF NOT EXISTS for the other Role as it could be that it does not exist and will be created after this one
-		q := FormatQuery(`CREATE ROLE IF NOT EXISTS %s`, otherRole)
+		q := common.FormatQuery(`CREATE ROLE IF NOT EXISTS %s`, otherRole)
 		statements = append(statements, q)
 
-		q = FormatQuery(`GRANT ROLE %s TO ROLE %s`, role, otherRole)
+		q = common.FormatQuery(`GRANT ROLE %s TO ROLE %s`, role, otherRole)
 		statements = append(statements, q)
 
 		if len(statements) == 200 || i == roleCount-1 {
@@ -1150,7 +1135,7 @@ func executeStatements(conn *sql.DB, statements []string) error {
 }
 
 func executeGrant(conn *sql.DB, perm, on, role string) error {
-	q := fmt.Sprintf(`GRANT %s %s`, perm, FormatQuery(`ON %s TO ROLE %s`, on, role))
+	q := fmt.Sprintf(`GRANT %s %s`, perm, common.FormatQuery(`ON %s TO ROLE %s`, on, role))
 	logger.Debug("Executing grant query", "query", q)
 
 	_, err := QuerySnowflake(conn, q)
@@ -1162,7 +1147,7 @@ func executeGrant(conn *sql.DB, perm, on, role string) error {
 }
 
 func executeRevoke(conn *sql.DB, perm, on, role string) error {
-	q := fmt.Sprintf(`REVOKE %s %s`, perm, FormatQuery(`ON %s FROM ROLE %s`, on, role))
+	q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
 	logger.Debug("Executing revoke query: %s", q)
 
 	_, err := QuerySnowflake(conn, q)

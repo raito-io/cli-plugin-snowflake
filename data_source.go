@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/blockloop/scan"
+	"github.com/raito-io/cli-plugin-snowflake/common"
 	ds "github.com/raito-io/cli/base/data_source"
 	e "github.com/raito-io/cli/base/util/error"
 )
@@ -94,26 +95,26 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 		}
 
 		for _, schema := range schemas {
-			tables, err := readTables(fileCreator, conn, doTypePrefix, SnowflakeObject{&database.Name, &schema.Name, nil, nil})
+			tables, err := readTables(fileCreator, conn, doTypePrefix, common.SnowflakeObject{Database: &database.Name, Schema: &schema.Name, Table: nil, Column: nil})
 			if err != nil {
 				return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
 			}
 
 			for _, table := range tables {
-				err = readColumns(fileCreator, conn, doTypePrefix, SnowflakeObject{&database.Name, &schema.Name, &table.Name, nil})
+				err = readColumns(fileCreator, conn, doTypePrefix, common.SnowflakeObject{Database: &database.Name, Schema: &schema.Name, Table: &table.Name, Column: nil})
 
 				if err != nil {
 					return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
 				}
 			}
 
-			views, err := readViews(fileCreator, conn, doTypePrefix, SnowflakeObject{&database.Name, &schema.Name, nil, nil})
+			views, err := readViews(fileCreator, conn, doTypePrefix, common.SnowflakeObject{Database: &database.Name, Schema: &schema.Name, Table: nil, Column: nil})
 			if err != nil {
 				return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
 			}
 
 			for _, view := range views {
-				err := readColumns(fileCreator, conn, doTypePrefix, SnowflakeObject{&database.Name, &schema.Name, &view.Name, nil})
+				err := readColumns(fileCreator, conn, doTypePrefix, common.SnowflakeObject{Database: &database.Name, Schema: &schema.Name, Table: &view.Name, Column: nil})
 
 				if err != nil {
 					return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))}
@@ -179,7 +180,7 @@ func addDbEntitiesToImporter(fileCreator ds.DataSourceFileCreator, conn *sql.DB,
 	dbEntities := make([]dbEntity, 0, 20)
 
 	for _, db := range dbs {
-		logger.Debug(fmt.Sprintf("Handling data object (type %s) %q", doType, db.Name))
+		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", doType, db.Name))
 
 		fullName := externalIdGenerator(db.Name)
 		if filter(db.Name, fullName) {
@@ -269,26 +270,26 @@ func readSchemas(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefi
 		})
 }
 
-func readTables(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, schemaFullName SnowflakeObject) ([]dbEntity, error) {
-	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Table, schemaFullName.getFullName(false), getTablesInSchemaQuery(schemaFullName, "TABLES"),
-		func(name string) string { return schemaFullName.getFullName(false) + "." + name },
+func readTables(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, schemaFullName common.SnowflakeObject) ([]dbEntity, error) {
+	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Table, schemaFullName.GetFullName(false), getTablesInSchemaQuery(schemaFullName, "TABLES"),
+		func(name string) string { return schemaFullName.GetFullName(false) + "." + name },
 		func(name, fullName string) bool { return true })
 }
 
-func readViews(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, schemaFullName SnowflakeObject) ([]dbEntity, error) {
-	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.View, schemaFullName.getFullName(false), getTablesInSchemaQuery(schemaFullName, "VIEWS"),
-		func(name string) string { return schemaFullName.getFullName(false) + "." + name },
+func readViews(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, schemaFullName common.SnowflakeObject) ([]dbEntity, error) {
+	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.View, schemaFullName.GetFullName(false), getTablesInSchemaQuery(schemaFullName, "VIEWS"),
+		func(name string) string { return schemaFullName.GetFullName(false) + "." + name },
 		func(name, fullName string) bool { return true })
 }
 
-func readColumns(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, table SnowflakeObject) error {
+func readColumns(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, table common.SnowflakeObject) error {
 	_, err := readDbEntities(conn, getColumnsInTableQuery(table))
 	if err != nil {
 		return err
 	}
 
-	_, err = addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Column, table.getFullName(false), "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))",
-		func(name string) string { return table.getFullName(false) + "." + name },
+	_, err = addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Column, table.GetFullName(false), "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))",
+		func(name string) string { return table.GetFullName(false) + "." + name },
 		func(name, fullName string) bool { return true })
 
 	return err
@@ -635,10 +636,10 @@ func getSchemasInDatabaseQuery(dbName string) string {
 	return fmt.Sprintf(`SHOW SCHEMAS IN DATABASE "%s"`, dbName)
 }
 
-func getTablesInSchemaQuery(sfObject SnowflakeObject, tableLevelObject string) string {
-	return fmt.Sprintf(`SHOW %s IN SCHEMA %s`, tableLevelObject, sfObject.getFullName(true))
+func getTablesInSchemaQuery(sfObject common.SnowflakeObject, tableLevelObject string) string {
+	return fmt.Sprintf(`SHOW %s IN SCHEMA %s`, tableLevelObject, sfObject.GetFullName(true))
 }
 
-func getColumnsInTableQuery(sfObject SnowflakeObject) string {
-	return fmt.Sprintf(`SHOW COLUMNS IN TABLE %s`, sfObject.getFullName(true))
+func getColumnsInTableQuery(sfObject common.SnowflakeObject) string {
+	return fmt.Sprintf(`SHOW COLUMNS IN TABLE %s`, sfObject.GetFullName(true))
 }
