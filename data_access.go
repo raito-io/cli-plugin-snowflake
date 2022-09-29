@@ -514,7 +514,12 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 
 			if ap.Delete {
 				for _, access := range ap.Access {
-					roleName := roleNames[access.Id]
+					if access.ActualName == nil {
+						logger.Warn("No actualname defined for deleted access %q. This will be ignored", access.Id)
+						continue
+					}
+
+					roleName := *access.ActualName
 
 					if !find(rolesToRemove, roleName) {
 						rolesToRemove = append(rolesToRemove, roleName)
