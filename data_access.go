@@ -12,6 +12,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
+	roleGenerator "github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	ds "github.com/raito-io/cli/base/data_source"
 	e "github.com/raito-io/cli/base/util/error"
 	"github.com/raito-io/cli/base/util/slice"
@@ -35,6 +36,15 @@ var ROLES_NOTINTERNALIZABLE = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMI
 var ACCEPTED_TYPES = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "COLUMN": {}, "SHARED-DATABASE": {}}
 
 const ROLE_SEPARATOR = "_"
+
+// https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
+var roleNameConstraints = roleGenerator.NamingConstraints{
+	UpperCaseLetters:  true,
+	LowerCaseLetters:  false,
+	Numbers:           true,
+	SpecialCharacters: "_$",
+	MaxLength:         255,
+}
 
 type AccessSyncer struct {
 }
@@ -216,7 +226,7 @@ func (s *AccessSyncer) importAccess(config *access_provider.AccessSyncFromTarget
 				Action:     exporter.Grant,
 				Access: []*exporter.Access{
 					{
-						NamingHint: roleEntity.Name,
+						ActualName: roleEntity.Name,
 						Who: &exporter.WhoItem{
 							Users:           users,
 							AccessProviders: accessProviders,
@@ -339,7 +349,7 @@ func (s *AccessSyncer) importPoliciesOfType(config *access_provider.AccessSyncFr
 			NotInternalizable: true,
 			Access: []*exporter.Access{
 				{
-					NamingHint: policy.Name,
+					ActualName: policy.Name,
 					Who:        nil,
 					What:       make([]exporter.WhatItem, 0),
 				},
@@ -458,6 +468,20 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 		return fmt.Errorf("error parsing acccess providers from %q: %s", config.SourceFile, err.Error())
 	}
 
+	prefix := config.Prefix
+	if prefix != "" {
+		logger.Info(fmt.Sprintf("Using prefix %q", prefix))
+
+		if !strings.HasSuffix(prefix, ROLE_SEPARATOR) {
+			prefix += ROLE_SEPARATOR
+		}
+	}
+
+	uniqueRoleNameGenerator, err := roleGenerator.NewUniqueNameGenerator(logger, prefix, &roleNameConstraints)
+	if err != nil {
+		return err
+	}
+
 	apList := dar.AccessProviders
 	apMap := make(map[string]EnrichedAccess)
 
@@ -470,21 +494,15 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 	rolesToRemove := make([]string, 0)
 
 	// When exporting Access from Raito Cloud, prefix will be empty as the delete instructions are passed explicitly during export. For access-as-code the prefix should not be empty as it is used to detect Raito CLI managed roles
-	prefix := config.Prefix
 	if prefix != "" {
-		prefix = strings.ToUpper(strings.TrimSpace(prefix))
-		if !strings.HasSuffix(prefix, ROLE_SEPARATOR) {
-			prefix += ROLE_SEPARATOR
-		}
-
-		logger.Info(fmt.Sprintf("Using prefix %q", prefix))
-
 		for apIndex, ap := range apList {
-			for accessIndex, access := range ap.Access {
-				roleName, err2 := generateUniqueRoleName(prefix, &apList[apIndex], accessIndex)
-				if err2 != nil {
-					return err2
-				}
+			roleNames, err2 := uniqueRoleNameGenerator.GenerateOrdered(&apList[apIndex])
+			if err2 != nil {
+				return err2
+			}
+
+			for i, access := range ap.Access {
+				roleName := roleNames[i]
 
 				logger.Info(fmt.Sprintf("Generated rolename %q", roleName))
 				apMap[roleName] = EnrichedAccess{Access: access, AccessProvider: &apList[apIndex]}
@@ -492,22 +510,27 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 		}
 	} else {
 		for apIndex, ap := range apList {
+			roleNames, err2 := uniqueRoleNameGenerator.Generate(&apList[apIndex])
+			if err2 != nil {
+				return err2
+			}
+
 			if ap.Delete {
-				for accessIndex := range ap.Access {
-					roleName, err2 := generateUniqueRoleName(prefix, &apList[apIndex], accessIndex)
-					if err2 != nil {
-						return err2
+				for _, access := range ap.Access {
+					if access.ActualName == nil {
+						logger.Warn("No actualname defined for deleted access %q. This will be ignored", access.Id)
+						continue
 					}
+
+					roleName := *access.ActualName
+
 					if !find(rolesToRemove, roleName) {
 						rolesToRemove = append(rolesToRemove, roleName)
 					}
 				}
 			} else {
-				for accessIndex, access := range ap.Access {
-					roleName, err2 := generateUniqueRoleName(prefix, &apList[apIndex], accessIndex)
-					if err2 != nil {
-						return err2
-					}
+				for _, access := range ap.Access {
+					roleName := roleNames[access.Id]
 					if _, f := apMap[roleName]; !f {
 						apMap[roleName] = EnrichedAccess{Access: access, AccessProvider: &apList[apIndex]}
 					}
@@ -549,31 +572,35 @@ func (s *AccessSyncer) exportAccess(config *access_provider.AccessSyncToTarget) 
 		return err
 	}
 
-	fileCreator, err := importer.NewFeedbackFileCreator(config)
-	if err != nil {
-		return err
-	}
-	defer fileCreator.Close()
-
-	feedbackMap := make(map[string][]importer.AccessSyncFeedbackInformation)
-
-	for roleName, access := range apMap {
-		feedbackElement := importer.AccessSyncFeedbackInformation{AccessId: access.Access.Id, ActualName: roleName}
-		if feedbackObjects, found := feedbackMap[access.AccessProvider.Id]; found {
-			feedbackMap[access.AccessProvider.Id] = append(feedbackObjects, feedbackElement)
-		} else {
-			feedbackMap[access.AccessProvider.Id] = []importer.AccessSyncFeedbackInformation{feedbackElement}
+	if prefix == "" {
+		fileCreator, err2 := importer.NewFeedbackFileCreator(config)
+		if err2 != nil {
+			return err2
 		}
-	}
+		defer fileCreator.Close()
 
-	for apId, feedbackObjects := range feedbackMap {
-		err = fileCreator.AddAccessProviderFeedback(apId, feedbackObjects...)
-		if err != nil {
-			return err
+		feedbackMap := make(map[string][]importer.AccessSyncFeedbackInformation)
+
+		for roleName, access := range apMap {
+			feedbackElement := importer.AccessSyncFeedbackInformation{AccessId: access.Access.Id, ActualName: roleName}
+			if feedbackObjects, found := feedbackMap[access.AccessProvider.Id]; found {
+				feedbackMap[access.AccessProvider.Id] = append(feedbackObjects, feedbackElement)
+			} else {
+				feedbackMap[access.AccessProvider.Id] = []importer.AccessSyncFeedbackInformation{feedbackElement}
+			}
 		}
+
+		for apId, feedbackObjects := range feedbackMap {
+			err2 = fileCreator.AddAccessProviderFeedback(apId, feedbackObjects...)
+			if err2 != nil {
+				return err2
+			}
+		}
+
+		return err2
 	}
 
-	return err
+	return nil
 }
 
 // findRoles returns a map where the keys are all the roles that exist in Snowflake right now and the key indicates if it was found in apMap or not.
@@ -628,11 +655,16 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 		roles := make([]string, 0)
 
 		for _, apWho := range da.Who.InheritFrom {
-			for rn2, ea2 := range apMap {
-				if strings.EqualFold(ea2.AccessProvider.Id, apWho) {
-					roles = append(roles, rn2)
-					break
+			if strings.HasPrefix(apWho, "ID:") {
+				apId := apWho[3:]
+				for rn2, ea2 := range apMap {
+					if strings.EqualFold(ea2.AccessProvider.Id, apId) {
+						roles = append(roles, rn2)
+						break
+					}
 				}
+			} else {
+				roles = append(roles, apWho)
 			}
 		}
 
@@ -773,6 +805,8 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 			for _, grant := range grantsToRole {
 				if strings.EqualFold(grant.GrantedOn, "ACCOUNT") {
 					foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn})
+				} else if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
+					logger.Warn(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, rn))
 				} else {
 					foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn + " " + grant.Name})
 				}
@@ -902,7 +936,7 @@ func createGrantsForTable(permissions []string, fullName string) ([]interface{},
 }
 
 func createGrantsForView(permissions []string, fullName string) ([]interface{}, error) {
-	// TODO. What if there's a dot in one of the data objects' names?
+	// TODO. What if there's a dot in one of the data objects' names? - use fullName parsing here as well
 	parts := strings.Split(fullName, ".")
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("expected fullName %q to have 3 parts (database.schema.view)", fullName)
@@ -1148,7 +1182,7 @@ func executeGrant(conn *sql.DB, perm, on, role string) error {
 
 func executeRevoke(conn *sql.DB, perm, on, role string) error {
 	q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
-	logger.Debug("Executing revoke query: %s", q)
+	logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
 
 	_, err := QuerySnowflake(conn, q)
 	if err != nil {
@@ -1162,49 +1196,17 @@ func createComment(ap *importer.AccessProvider) string {
 	return fmt.Sprintf("Created by Raito from access provider %q. %s", ap.Name, ap.Description)
 }
 
-func generateUniqueRoleName(prefix string, ap *importer.AccessProvider, accessIndex int) (string, error) {
-	access := ap.Access[accessIndex]
-	if access.NamingHint != "" {
-		return fmt.Sprintf("%s%s", prefix, access.NamingHint), nil
-	} else if ap.NamingHint != "" {
-		return fmt.Sprintf("%s%s%s%d", prefix, ap.NamingHint, ROLE_SEPARATOR, accessIndex), nil
-	} else if ap.Name != "" {
-		name := generateRoleNameFromAPName(ap.Name)
-		if len(name) < 10 {
-			return "", fmt.Errorf("generated role name %q needs to be at least 10 characters", name)
-		}
-		return fmt.Sprintf("%s%s%s%d", prefix, name, ROLE_SEPARATOR, accessIndex), nil
-	}
-
-	return "", fmt.Errorf("no naming hint provided for access provider %q", ap.NamingHint)
-}
-
-func generateRoleNameFromAPName(name string) string {
-	generated := ""
-
-	for _, c := range name {
-		if c == '-' || c == '_' || c == ' ' {
-			generated += "_"
-		} else if checkAlphaNum(c) {
-			generated += strings.ToUpper(string(c))
-		}
-	}
-
-	return generated
-}
-
-func checkAlphaNum(charVariable rune) bool {
-	return (charVariable >= 'a' && charVariable <= 'z') || (charVariable >= 'A' && charVariable <= 'Z') || (charVariable >= '0' && charVariable <= '9')
-}
-
 // getAllSnowflakePermissions maps a Raito permission from the data access element to the list of permissions it corresponds to in Snowflake
 // The result will be sorted alphabetically
 func getAllSnowflakePermissions(what *importer.WhatItem) []string {
 	allPerms := make([]string, 0, len(what.Permissions))
 
 	for _, perm := range what.Permissions {
-		if perm == "USAGE" {
+		if strings.EqualFold(perm, "USAGE") {
 			logger.Debug("Skipping explicit USAGE permission as Raito handles this automatically")
+			continue
+		} else if strings.EqualFold(perm, "OWNERSHIP") {
+			logger.Debug("Skipping explicit OWNERSHIP permission as Raito does not manage this permission")
 			continue
 		}
 
