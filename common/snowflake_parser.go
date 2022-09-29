@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 )
 
@@ -69,14 +68,15 @@ func trimCircumfix(name string, circumfix string) string {
 }
 
 func ParseFullName(fullName string) SnowflakeObject {
-	// TODO: add more difficult cases (see tests) where name contains quotes
-	re := regexp.MustCompile(`"?\."?`)
-	fullName = trimCircumfix(fullName, `"`)
-	split := re.Split(fullName, -1)
+	split, err := splitFullName(fullName, nil, nil)
+	if err != nil {
+		return SnowflakeObject{}
+	}
 	parts := []string{}
 
 	for i := range split {
 		newPart := split[i]
+		newPart = trimCircumfix(newPart, `"`)
 		newPart = strings.ReplaceAll(newPart, `""`, `"`)
 		parts = append(parts, newPart)
 	}
@@ -104,4 +104,76 @@ func ParseFullName(fullName string) SnowflakeObject {
 	}
 
 	return SnowflakeObject{database, schema, table, column}
+}
+
+func splitFullName(fullName string, currentResults []string, err error) ([]string, error) {
+	if err != nil {
+		return nil, err
+	}
+
+	if fullName == "" {
+		return currentResults, nil
+	}
+
+	startsWithDoubleQuote := strings.HasPrefix(fullName, `"`)
+
+	if !startsWithDoubleQuote {
+		i := strings.Index(fullName, `.`)
+		if i == -1 {
+			// no dot found, last entry in the list
+			return append(currentResults, fullName), nil
+		} else {
+			currentResults = append(currentResults, fullName[:i])
+			if i+1 < len(fullName) {
+				return splitFullName(fullName[i+1:], currentResults, nil)
+			} else {
+				// if the last char is a dot (malformed through)
+				return currentResults, fmt.Errorf("malformed fullName, last char can't be a dot if no double quote is used")
+			}
+		}
+	} else {
+		i_quote := findNextStandaloneChar(fullName[1:], `"`)
+		if i_quote == -1 {
+			// This actually points to a malformed fullName (every beginning " should have a corresponding ending one)
+			return append(currentResults, fullName), fmt.Errorf("no corresponding ending \" found for %s", fullName)
+		}
+		i_quote++
+		subStr := fullName[i_quote:]
+		i_dot := strings.Index(subStr, `.`)
+		if i_dot > -1 {
+			i_dot += i_quote
+		}
+		if i_dot == -1 && i_quote == len(fullName)-1 {
+			// no dot found -> last entry in the list
+			currentResults = append(currentResults, fullName)
+			return currentResults, nil
+		} else if i_dot == -1 {
+			return nil, fmt.Errorf("badly-formatted fullName, should end with \"")
+		} else if i_dot == i_quote+1 {
+			// dot should follow " to have a next entry
+			currentResults = append(currentResults, fullName[:i_quote+1])
+			return splitFullName(fullName[i_dot+1:], currentResults, nil)
+		} else {
+			// This actually points to a malformed fullName
+			return append(currentResults, fullName), fmt.Errorf("badly-formatted fullName, dot should follow \"")
+		}
+	}
+}
+
+func findNextStandaloneChar(fullName string, searchChar string) int {
+	for i := 0; i < len(fullName); i++ {
+		char := fullName[i]
+		if strings.EqualFold(fmt.Sprintf("%c", char), searchChar) {
+			if i+1 == len(fullName) {
+				return i
+			} else if i+1 < len(fullName) && strings.EqualFold(fmt.Sprintf("%c", fullName[i+1]), searchChar) {
+				i++
+				continue
+			} else {
+				return i
+			}
+		}
+	}
+
+	return -1
 }

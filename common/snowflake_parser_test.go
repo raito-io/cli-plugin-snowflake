@@ -74,7 +74,7 @@ func TestFullNameParser(t *testing.T) {
 
 	assert.EqualValues(t, SnowflakeObject{&databaseName, &schemaName, &tableName, &columnName}, ParseFullName(fullName))
 
-	fullName = `"db🫘"."🛟sche"ma"."ta🥹ble"."c🫶olumn"`
+	fullName = `"db🫘"."🛟sche""ma"."ta🥹ble"."c🫶olumn"`
 	databaseName = "db🫘"
 	schemaName = `🛟sche"ma`
 	tableName = "ta🥹ble"
@@ -109,22 +109,110 @@ func TestFullNameParser(t *testing.T) {
 
 	// TODO, more difficult cases
 
-	// fullName = `"EXTERNAL_TEST🩻".PUBLIC_DATASETS."C1.""C2"".C3"".""END."`
-	// databaseName = "EXTERNAL_TEST🩻"
-	// schemaName = `PUBLIC_DATASETS`
-	// tableName = `C1."C2".C3"."END.`
-	// assert.EqualValues(t, SnowflakeObject{&databaseName, &schemaName, &tableName, nil}, ParseFullName(fullName))
+	fullName = `"EXTERNAL_TEST🩻".PUBLIC_DATASETS."C1.""C2"".C3"".""END."`
+	databaseName = "EXTERNAL_TEST🩻"
+	schemaName = `PUBLIC_DATASETS`
+	tableName = `C1."C2".C3"."END.`
+	assert.EqualValues(t, SnowflakeObject{&databaseName, &schemaName, &tableName, nil}, ParseFullName(fullName))
 
-	// fullName = `"EXTERNAL_TEST🩻".PUBLIC_DATASETS."ADULT"".""_TABLE"`
-	// databaseName = "EXTERNAL_TEST🩻"
-	// schemaName = `PUBLIC_DATASETS`
-	// tableName = `ADULT"."_TABLE`
-	// assert.EqualValues(t, SnowflakeObject{&databaseName, &schemaName, &tableName, nil}, ParseFullName(fullName))
+	fullName = `"EXTERNAL_TEST🩻".PUBLIC_DATASETS."ADULT"".""_TABLE"`
+	databaseName = "EXTERNAL_TEST🩻"
+	schemaName = `PUBLIC_DATASETS`
+	tableName = `ADULT"."_TABLE`
+	assert.EqualValues(t, SnowflakeObject{&databaseName, &schemaName, &tableName, nil}, ParseFullName(fullName))
 
-	// databaseName = "d``''b🫘"
-	// schemaName = `🛟sc"he"ma`
-	// tableName = "ta🥹b...le"
-	// columnName = `c🫶o,?lu"mn`
-	// assert.EqualValues(t, SnowflakeObject{&databaseName, &schemaName, &tableName, &columnName}, ParseFullName("\"d``''b🫘\".\"🛟sc\"he\"ma\".\"ta🥹b...le\".\"c🫶o,?lu\"mn\""))
+	fullName = "\"d``''b🫘\".\"🛟sc\"\"he\"\"ma\".\"ta🥹b...le\".\"c🫶o,?lu\"\"mn\""
+	databaseName = "d``''b🫘"
+	schemaName = `🛟sc"he"ma`
+	tableName = "ta🥹b...le"
+	columnName = `c🫶o,?lu"mn`
+	assert.EqualValues(t, SnowflakeObject{&databaseName, &schemaName, &tableName, &columnName}, ParseFullName(fullName))
 
+}
+
+func TestSplit(t *testing.T) {
+
+	var test string
+	var expected, res []string
+	var err error
+
+	test = "A.B.C.D.E.F"
+	expected = []string{"A", "B", "C", "D", "E", "F"}
+	res, err = splitFullName(test, nil, nil)
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, expected, res)
+
+	test = `ONE."TWO".THREE."FOUR".FIVE`
+	expected = []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, "FIVE"}
+	res, err = splitFullName(test, nil, nil)
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, expected, res)
+
+	test = `ONE."TWO".THREE."FOUR".FIVE."""SIX"."SEVEN""""EIGHT"""`
+	expected = []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, "FIVE", `"""SIX"`, `"SEVEN""""EIGHT"""`}
+	res, err = splitFullName(test, nil, nil)
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, expected, res)
+
+	test = `ONE."TWO".THREE."FOUR"."""...""""."".""."""""".".FIVE."""SIX"."SEVEN""""EIGHT"""`
+	expected = []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, `"""..."""".""."".""""""."`, "FIVE", `"""SIX"`, `"SEVEN""""EIGHT"""`}
+	res, err = splitFullName(test, nil, nil)
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, expected, res)
+
+	test = `ONE."TWO".THREE."FOUR".""".,.""|""."".""."""""".".FIVE."""SIX"."SEVEN""""EIGHT"""`
+	expected = []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, `""".,.""|"".""."".""""""."`, "FIVE", `"""SIX"`, `"SEVEN""""EIGHT"""`}
+	res, err = splitFullName(test, nil, nil)
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, expected, res)
+
+	test = `"db🫘"."🛟schema"."ta🥹ble"."c🫶olumn"`
+	expected = []string{`"db🫘"`, `"🛟schema"`, `"ta🥹ble"`, `"c🫶olumn"`}
+	res, err = splitFullName(test, nil, nil)
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, expected, res)
+
+	// Badly formatted Snowflake strings
+
+	test = "A.B.C.D.E.F."
+	expected = []string{"A", "B", "C", "D", "E", "F"}
+	res, err = splitFullName(test, nil, nil)
+	assert.NotNil(t, err)
+
+	test = "A.B.C.D.E.\"F"
+	expected = []string{"A", "B", "C", "D", "E", "F"}
+	res, err = splitFullName(test, nil, nil)
+	assert.NotNil(t, err)
+
+	test = `A.B.C.D.E."LAST"aaa`
+	expected = []string{"A", "B", "C", "D", "E", `"LAST"aaa`}
+	res, err = splitFullName(test, nil, nil)
+	assert.NotNil(t, err)
+
+	test = `A.B.C.D.E."LAST"aaa.a`
+	expected = []string{"A", "B", "C", "D", "E", `"LAST"aaa.a`}
+	res, err = splitFullName(test, nil, nil)
+	assert.NotNil(t, err)
+
+}
+
+func TestFindNextQuote(t *testing.T) {
+
+	res := findNextStandaloneChar(`dkdkd"""."ADULT"`, `"`)
+	assert.Equal(t, 7, res)
+
+	res = findNextStandaloneChar(`dkdkd"""""."ADULT"`, `"`)
+	assert.Equal(t, 9, res)
+
+	res = findNextStandaloneChar(`d ""kdkd"""."ADULT"`, `"`)
+	assert.Equal(t, 10, res)
+
+	res = findNextStandaloneChar(`d ""kdkddf"."ADULT"`, `"`)
+	assert.Equal(t, 10, res)
+
+	res = findNextStandaloneChar(`d ""kdkddf.`, `"`)
+	assert.Equal(t, -1, res)
+
+	res = findNextStandaloneChar(`d ""kdkddf."`, `"`)
+	assert.Equal(t, 11, res)
 }
