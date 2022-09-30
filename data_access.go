@@ -720,6 +720,11 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 		if keep, f := existingRoles[rn]; f && keep {
 			logger.Info(fmt.Sprintf("Merging role %q", rn))
 
+			_, err := QuerySnowflake(conn, fmt.Sprintf(`COMMENT IF EXISTS ON ROLE %s IS '%s'`, rn, createComment(ea.AccessProvider, true)))
+			if err != nil {
+				return fmt.Errorf("error while updating comment on role %q: %s", rn, err.Error())
+			}
+
 			grantsOfRole, err := s.getGrantsOfRole(rn, conn)
 			if err != nil {
 				return err
@@ -817,7 +822,7 @@ func (s *AccessSyncer) generateAccessControls(apMap map[string]EnrichedAccess, e
 			logger.Info(fmt.Sprintf("Creating role %q", rn))
 
 			if _, f := roleCreated[rn]; !f {
-				_, err := QuerySnowflake(conn, common.FormatQuery(`CREATE OR REPLACE ROLE %s COMMENT=%s`, rn, createComment(ea.AccessProvider)))
+				_, err := QuerySnowflake(conn, common.FormatQuery(`CREATE OR REPLACE ROLE %s COMMENT=%s`, rn, createComment(ea.AccessProvider, false)))
 				if err != nil {
 					return fmt.Errorf("error while creating role %q: %s", rn, err.Error())
 				}
@@ -1196,8 +1201,12 @@ func executeRevoke(conn *sql.DB, perm, on, role string) error {
 	return nil
 }
 
-func createComment(ap *importer.AccessProvider) string {
-	return fmt.Sprintf("Created by Raito from access provider %q. %s", ap.Name, ap.Description)
+func createComment(ap *importer.AccessProvider, update bool) string {
+	action := "Created"
+	if update {
+		action = "Updated"
+	}
+	return fmt.Sprintf("%s by Raito from access provider %s. %s", action, ap.Name, ap.Description)
 }
 
 // getAllSnowflakePermissions maps a Raito permission from the data access element to the list of permissions it corresponds to in Snowflake
