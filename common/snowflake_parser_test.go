@@ -15,19 +15,24 @@ func TestFullNameWithoutSpecialChars(t *testing.T) {
 
 	object := SnowflakeObject{&databaseName, nil, nil, nil}
 	assert.Equal(t, "db", object.GetFullName(false))
-	assert.Equal(t, `"db"`, object.GetFullName(true))
+	assert.Equal(t, `db`, object.GetFullName(true))
 
 	object.Schema = &schemaName
 	assert.Equal(t, "db.schema", object.GetFullName(false))
-	assert.Equal(t, `"db"."schema"`, object.GetFullName(true))
+	assert.Equal(t, `db.schema`, object.GetFullName(true))
 
 	object.Table = &tableName
 	assert.Equal(t, "db.schema.table", object.GetFullName(false))
-	assert.Equal(t, `"db"."schema"."table"`, object.GetFullName(true))
+	assert.Equal(t, `db.schema.table`, object.GetFullName(true))
 
 	object.Column = &columnName
 	assert.Equal(t, "db.schema.table.column", object.GetFullName(false))
-	assert.Equal(t, `"db"."schema"."table"."column"`, object.GetFullName(true))
+	assert.Equal(t, `db.schema.table.column`, object.GetFullName(true))
+
+	columnName = `column"_$123`
+	object.Column = &columnName
+	assert.Equal(t, `db.schema.table.column"_$123`, object.GetFullName(false))
+	assert.Equal(t, `db.schema.table."column""_$123"`, object.GetFullName(true))
 }
 
 func TestFullNameWithSpecialChars(t *testing.T) {
