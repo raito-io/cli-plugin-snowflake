@@ -1193,6 +1193,7 @@ func getAllSnowflakePermissions(what *importer.WhatItem) []string {
 	allPerms := make([]string, 0, len(what.Permissions))
 
 	for _, perm := range what.Permissions {
+		perm = strings.ToUpper(perm)
 		if strings.EqualFold(perm, "USAGE") {
 			logger.Debug("Skipping explicit USAGE permission as Raito handles this automatically")
 			continue
