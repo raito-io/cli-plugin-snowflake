@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// SnowflakeObject represents (parsed) Snowflake objects
 type SnowflakeObject struct {
 	Database *string `json:"database"`
 	Schema   *string `json:"schema"`
@@ -12,6 +13,9 @@ type SnowflakeObject struct {
 	Column   *string `json:"column"`
 }
 
+// Retrieve the 'full name' of the Snowflake object (i.e. database.schema.table). In some cases
+// they need to be quoted, e.g. Snowflake queries, but in other cases they never need the outer
+// double quotes, e.g. Raito Cloud. `withQuotes` controls this.
 func (s SnowflakeObject) GetFullName(withQuotes bool) string {
 	fullName := ""
 	formatString := "%s.%s"
@@ -47,6 +51,7 @@ func (s SnowflakeObject) GetFullName(withQuotes bool) string {
 	return fullName
 }
 
+// Wrapper around fmt.Sprintf to properly format queries for Snowflake
 func FormatQuery(query string, objects ...string) string {
 	newObjects := []interface{}{}
 
@@ -67,6 +72,7 @@ func trimCircumfix(name string, circumfix string) string {
 	return name
 }
 
+// Parse the fully-qualitied Snowflake resource name in a SnowflakeObject: https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html
 func ParseFullName(fullName string) SnowflakeObject {
 	split, err := splitFullName(fullName, nil, nil)
 	if err != nil {
@@ -106,6 +112,12 @@ func ParseFullName(fullName string) SnowflakeObject {
 	return SnowflakeObject{database, schema, table, column}
 }
 
+// Split a fully-qualitied Snowflake resource object into individual objects.
+// Single data objects (database, schema, table, ...) can be double quoted or not.
+// If not double quoted, no special characters allowed. Keep in mind you can have a `fullName` with some fields quoted, others not
+// If double quoted, all unicode characters are allowed. A double quote in the name (`"`) is encoded as a double double quote (`""`),
+// therefore, double quotes are allowed at the beginning and end, but otherwise they always need to come in pairs (`""`).
+// Dots are ignored as a data object/field separator until the field-delimiting double quote has passed.
 func splitFullName(fullName string, currentResults []string, err error) ([]string, error) {
 	if err != nil {
 		return nil, err
@@ -117,6 +129,7 @@ func splitFullName(fullName string, currentResults []string, err error) ([]strin
 
 	startsWithDoubleQuote := strings.HasPrefix(fullName, `"`)
 
+	// the simple case where the data object is not double-quoted
 	if !startsWithDoubleQuote {
 		i := strings.Index(fullName, `.`)
 		if i == -1 {
@@ -131,7 +144,7 @@ func splitFullName(fullName string, currentResults []string, err error) ([]strin
 				return currentResults, fmt.Errorf("malformed fullName, last char can't be a dot if no double quote is used")
 			}
 		}
-	} else {
+	} else { // the more complicated case where the data object is double-quoted
 		i_quote := findNextStandaloneChar(fullName[1:], `"`)
 		if i_quote == -1 {
 			// This actually points to a malformed fullName (every beginning " should have a corresponding ending one)
@@ -160,6 +173,8 @@ func splitFullName(fullName string, currentResults []string, err error) ([]strin
 	}
 }
 
+// Function similar to `strings.Index()`, but it only returns a hit for a single instance of `searchChar`.
+// E.g. findNextStandaloneChar(`ngaaba`, `a`) will return `5` versuses `2` for strings.Index()
 func findNextStandaloneChar(fullName string, searchChar string) int {
 	for i := 0; i < len(fullName); i++ {
 		char := fullName[i]
