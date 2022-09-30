@@ -1169,7 +1169,9 @@ func executeStatements(conn *sql.DB, statements []string) error {
 }
 
 func executeGrant(conn *sql.DB, perm, on, role string) error {
-	q := fmt.Sprintf(`GRANT %s %s`, perm, common.FormatQuery(`ON %s TO ROLE %s`, on, role))
+	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
+	// q := fmt.Sprintf(`GRANT %s %s`, perm, common.FormatQuery(`ON %s TO ROLE %s`, on, role))
+	q := fmt.Sprintf(`GRANT %s ON %s TO ROLE %s`, perm, on, role)
 	logger.Debug("Executing grant query", "query", q)
 
 	_, err := QuerySnowflake(conn, q)
@@ -1181,7 +1183,9 @@ func executeGrant(conn *sql.DB, perm, on, role string) error {
 }
 
 func executeRevoke(conn *sql.DB, perm, on, role string) error {
-	q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
+	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
+	// q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
+	q := fmt.Sprintf(`REVOKE %s ON %s FROM ROLE %s`, perm, on, role)
 	logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
 
 	_, err := QuerySnowflake(conn, q)
