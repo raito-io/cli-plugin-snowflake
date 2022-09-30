@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -20,35 +21,63 @@ func (s SnowflakeObject) GetFullName(withQuotes bool) string {
 	fullName := ""
 	formatString := "%s.%s"
 
-	if withQuotes {
-		formatString = `%s."%s"`
-	}
-
 	if s.Database == nil {
 		return fullName
 	}
 
-	fullName = fmt.Sprintf(strings.Split(formatString, ".")[1], *s.Database)
+	fullName = fmt.Sprintf(convertToValidSnowflakeResource(*s.Database, withQuotes))
 
 	if s.Schema == nil {
 		return fullName
 	}
 
-	fullName = fmt.Sprintf(formatString, fullName, *s.Schema)
+	fullName = fmt.Sprintf(formatString, fullName, convertToValidSnowflakeResource(*s.Schema, withQuotes))
 
 	if s.Table == nil {
 		return fullName
 	}
 
-	fullName = fmt.Sprintf(formatString, fullName, *s.Table)
+	fullName = fmt.Sprintf(formatString, fullName, convertToValidSnowflakeResource(*s.Table, withQuotes))
 
 	if s.Column == nil {
 		return fullName
 	}
 
-	fullName = fmt.Sprintf(formatString, fullName, *s.Column)
+	fullName = fmt.Sprintf(formatString, fullName, convertToValidSnowflakeResource(*s.Column, withQuotes))
 
 	return fullName
+}
+
+func convertToValidSnowflakeResource(name string, withQuotes bool) string {
+	if isSimpleSnowflakeName(name) {
+		return name
+	}
+
+	if withQuotes {
+		name = strings.ReplaceAll(name, `"`, `""`)
+		name = fmt.Sprintf(`"%s"`, name)
+	}
+
+	return name
+}
+
+// Check if the resource name needs to be quoted, from: https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html. Simple names are
+// - Start with a letter (A-Z, a-z) or an underscore (“_”).
+// - Contain only letters, underscores, decimal digits (0-9), and dollar signs (“$”).
+// - Are stored and resolved as uppercase characters (e.g. id is stored and resolved as ID).
+func isSimpleSnowflakeName(name string) bool {
+	startRegex := regexp.MustCompile("[a-zA-Z_]")
+	contentRegex := regexp.MustCompile("[a-zA-Z0-9_$]")
+
+	if len(startRegex.ReplaceAllString(fmt.Sprintf("%c", name[0]), "")) != 0 {
+		return false
+	}
+
+	if len(contentRegex.ReplaceAllString(name, "")) > 0 {
+		return false
+	}
+
+	return true
 }
 
 // Wrapper around fmt.Sprintf to properly format queries for Snowflake
