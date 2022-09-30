@@ -1206,6 +1206,7 @@ func createComment(ap *importer.AccessProvider, update bool) string {
 	if update {
 		action = "Updated"
 	}
+
 	return fmt.Sprintf("%s by Raito from access provider %s. %s", action, ap.Name, ap.Description)
 }
 

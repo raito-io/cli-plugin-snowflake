@@ -25,7 +25,7 @@ func (s SnowflakeObject) GetFullName(withQuotes bool) string {
 		return fullName
 	}
 
-	fullName = fmt.Sprintf(convertToValidSnowflakeResource(*s.Database, withQuotes))
+	fullName = convertToValidSnowflakeResource(*s.Database, withQuotes)
 
 	if s.Schema == nil {
 		return fullName
@@ -55,6 +55,7 @@ func convertToValidSnowflakeResource(name string, withQuotes bool) string {
 
 	if withQuotes {
 		name = strings.ReplaceAll(name, `"`, `""`)
+		//nolint // %q would break correct formatting for Unicode characters
 		name = fmt.Sprintf(`"%s"`, name)
 	}
 
@@ -69,7 +70,7 @@ func isSimpleSnowflakeName(name string) bool {
 	startRegex := regexp.MustCompile("[a-zA-Z_]")
 	contentRegex := regexp.MustCompile("[a-zA-Z0-9_$]")
 
-	if len(startRegex.ReplaceAllString(fmt.Sprintf("%c", name[0]), "")) != 0 {
+	if startRegex.ReplaceAllString(fmt.Sprintf("%c", name[0]), "") != "" {
 		return false
 	}
 
