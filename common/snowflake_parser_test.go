@@ -226,7 +226,7 @@ func TestSimpleSnowflakeName(t *testing.T) {
 	}
 
 	// non-simple names
-	test = []string{"12AAA_ab_cd", "AAAA!", "test-this", `"tst_something`}
+	test = []string{"12AAA_ab_cd", "AAAA!", "test-this", `"tst_something`, `testRole"."Yes!`}
 
 	for _, testName := range test {
 		assert.False(t, isSimpleSnowflakeName(testName))

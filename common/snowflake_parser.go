@@ -74,7 +74,7 @@ func isSimpleSnowflakeName(name string) bool {
 		return false
 	}
 
-	if len(contentRegex.ReplaceAllString(name, "")) > 0 {
+	if contentRegex.ReplaceAllString(name, "") != "" {
 		return false
 	}
 
@@ -85,13 +85,12 @@ func isSimpleSnowflakeName(name string) bool {
 func FormatQuery(query string, objects ...string) string {
 	newObjects := []interface{}{}
 
-	for ind := range objects {
-		formattedObject := objects[ind]
+	for _, obj := range objects {
+		formattedObject := obj
 		if !isSimpleSnowflakeName(formattedObject) {
-			objects[ind] = fmt.Sprintf(`"%s"`, strings.ReplaceAll(objects[ind], `"`, `""`))
+			formattedObject = fmt.Sprintf(`"%s"`, strings.ReplaceAll(formattedObject, `"`, `""`))
 		}
-		objects[ind] = formattedObject
-		newObjects = append(newObjects, objects[ind])
+		newObjects = append(newObjects, formattedObject)
 	}
 
 	return fmt.Sprintf(query, newObjects...)
