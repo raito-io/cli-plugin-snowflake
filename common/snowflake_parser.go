@@ -88,8 +88,10 @@ func FormatQuery(query string, objects ...string) string {
 	for _, obj := range objects {
 		formattedObject := obj
 		if !isSimpleSnowflakeName(formattedObject) {
+			//nolint // Using %q would interfere with the required formatting
 			formattedObject = fmt.Sprintf(`"%s"`, strings.ReplaceAll(formattedObject, `"`, `""`))
 		}
+
 		newObjects = append(newObjects, formattedObject)
 	}
 

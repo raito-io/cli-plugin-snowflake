@@ -922,6 +922,7 @@ func (s *AccessSyncer) getGrantsOfRole(rn string, conn *sql.DB) ([]grantOfRole, 
 }
 
 func createGrantsForTable(permissions []string, fullName string) ([]interface{}, error) {
+	// TODO: this does not work for Raito full names
 	sfObject := common.ParseFullName(fullName)
 	if sfObject.Database == nil || sfObject.Schema == nil || sfObject.Table == nil {
 		return nil, fmt.Errorf("expected fullName %q to have 3 parts (database.schema.table)", fullName)
@@ -940,6 +941,7 @@ func createGrantsForTable(permissions []string, fullName string) ([]interface{},
 }
 
 func createGrantsForView(permissions []string, fullName string) ([]interface{}, error) {
+	// TODO: this does not work for Raito full names
 	sfObject := common.ParseFullName(fullName)
 	if sfObject.Database == nil || sfObject.Schema == nil || sfObject.Table == nil {
 		return nil, fmt.Errorf("expected fullName %q to have 3 parts (database.schema.view)", fullName)
@@ -958,6 +960,7 @@ func createGrantsForView(permissions []string, fullName string) ([]interface{}, 
 }
 
 func createGrantsForSchema(conn *sql.DB, permissions []string, fullName string) ([]interface{}, error) {
+	// TODO: this does not work for Raito full names
 	sfObject := common.ParseFullName(fullName)
 	if sfObject.Database == nil || sfObject.Schema == nil {
 		return nil, fmt.Errorf("expected fullName %q to have 2 parts (database.schema)", fullName)

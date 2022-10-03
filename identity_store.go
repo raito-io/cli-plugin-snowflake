@@ -64,15 +64,15 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(config *is.IdentityStoreSyncConf
 	users := make([]is.User, 0, 20)
 
 	for _, userRow := range userRows {
-		logger.Debug(fmt.Sprintf("Handling user %q", userRow.UserName))
+		logger.Debug(fmt.Sprintf("Handling user %q", userRow.Name))
 
 		if _, f := ownerExclusions[userRow.Owner]; f {
 			logger.Debug("Skipping user as it's owned by an excluded owner")
 			continue
 		}
 		user := is.User{
-			ExternalId: userRow.UserName,
-			UserName:   userRow.UserName,
+			ExternalId: userRow.LoginName,
+			UserName:   userRow.Name,
 			Name:       userRow.DisplayName,
 			Email:      userRow.Email,
 		}
@@ -94,7 +94,8 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(config *is.IdentityStoreSyncConf
 }
 
 type userEntity struct {
-	UserName    string `db:"login_name"`
+	Name        string `db:"name"`
+	LoginName   string `db:"login_name"`
 	DisplayName string `db:"display_name"`
 	Email       string `db:"email"`
 	Owner       string `db:"owner"`
