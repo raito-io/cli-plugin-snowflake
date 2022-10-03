@@ -86,9 +86,11 @@ func FormatQuery(query string, objects ...string) string {
 	newObjects := []interface{}{}
 
 	for ind := range objects {
-		objects[ind] = strings.ReplaceAll(objects[ind], `"`, `""`)
-		//nolint // this interferes with proper formatting
-		objects[ind] = fmt.Sprintf(`"%s"`, objects[ind])
+		formattedObject := objects[ind]
+		if !isSimpleSnowflakeName(formattedObject) {
+			objects[ind] = fmt.Sprintf(`"%s"`, strings.ReplaceAll(objects[ind], `"`, `""`))
+		}
+		objects[ind] = formattedObject
 		newObjects = append(newObjects, objects[ind])
 	}
 
