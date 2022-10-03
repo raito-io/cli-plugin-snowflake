@@ -15,19 +15,24 @@ func TestFullNameWithoutSpecialChars(t *testing.T) {
 
 	object := SnowflakeObject{&databaseName, nil, nil, nil}
 	assert.Equal(t, "db", object.GetFullName(false))
-	assert.Equal(t, `"db"`, object.GetFullName(true))
+	assert.Equal(t, `db`, object.GetFullName(true))
 
 	object.Schema = &schemaName
 	assert.Equal(t, "db.schema", object.GetFullName(false))
-	assert.Equal(t, `"db"."schema"`, object.GetFullName(true))
+	assert.Equal(t, `db.schema`, object.GetFullName(true))
 
 	object.Table = &tableName
 	assert.Equal(t, "db.schema.table", object.GetFullName(false))
-	assert.Equal(t, `"db"."schema"."table"`, object.GetFullName(true))
+	assert.Equal(t, `db.schema.table`, object.GetFullName(true))
 
 	object.Column = &columnName
 	assert.Equal(t, "db.schema.table.column", object.GetFullName(false))
-	assert.Equal(t, `"db"."schema"."table"."column"`, object.GetFullName(true))
+	assert.Equal(t, `db.schema.table.column`, object.GetFullName(true))
+
+	columnName = `column"_$123`
+	object.Column = &columnName
+	assert.Equal(t, `db.schema.table.column"_$123`, object.GetFullName(false))
+	assert.Equal(t, `db.schema.table."column""_$123"`, object.GetFullName(true))
 }
 
 func TestFullNameWithSpecialChars(t *testing.T) {
@@ -208,4 +213,22 @@ func TestFindNextQuote(t *testing.T) {
 
 	res = findNextStandaloneChar(`d ""kdkddf."`, `"`)
 	assert.Equal(t, 11, res)
+}
+
+func TestSimpleSnowflakeName(t *testing.T) {
+	var test []string
+
+	// simple names
+	test = []string{"abcd", "_ab_cd", "AAA_ab_cd"}
+
+	for _, testName := range test {
+		assert.True(t, isSimpleSnowflakeName(testName))
+	}
+
+	// non-simple names
+	test = []string{"12AAA_ab_cd", "AAAA!", "test-this", `"tst_something`}
+
+	for _, testName := range test {
+		assert.False(t, isSimpleSnowflakeName(testName))
+	}
 }

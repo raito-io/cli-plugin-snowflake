@@ -193,12 +193,16 @@ func addDbEntitiesToImporter(fileCreator ds.DataSourceFileCreator, conn *sql.DB,
 
 		fullName := externalIdGenerator(db.Name)
 		if filter(db.Name, fullName) {
+			comment := ""
+			if db.Comment != nil {
+				comment = *db.Comment
+			}
 			do := ds.DataObject{
 				ExternalId:       fullName,
 				Name:             db.Name,
 				FullName:         fullName,
 				Type:             doType,
-				Description:      "",
+				Description:      comment,
 				ParentExternalId: parent,
 			}
 			dataObjects = append(dataObjects, do)
@@ -305,7 +309,8 @@ func readColumns(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefi
 }
 
 type dbEntity struct {
-	Name string `db:"name"`
+	Name    string  `db:"name"`
+	Comment *string `db:"comment"`
 }
 
 func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
