@@ -922,59 +922,60 @@ func (s *AccessSyncer) getGrantsOfRole(rn string, conn *sql.DB) ([]grantOfRole, 
 }
 
 func createGrantsForTable(permissions []string, fullName string) ([]interface{}, error) {
-	// TODO. What if there's a dot in one of the data objects' names?
-	parts := strings.Split(fullName, ".")
-	if len(parts) != 3 {
+	// TODO: this does not work for Raito full names
+	sfObject := common.ParseFullName(fullName)
+	if sfObject.Database == nil || sfObject.Schema == nil || sfObject.Table == nil {
 		return nil, fmt.Errorf("expected fullName %q to have 3 parts (database.schema.table)", fullName)
 	}
 
 	grants := make([]interface{}, 0, len(permissions)+2)
 	grants = append(grants,
-		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, parts[0])},
-		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, parts[0], parts[1])})
+		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, *sfObject.Database)},
+		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
 
 	for _, p := range permissions {
-		grants = append(grants, Grant{p, common.FormatQuery(`TABLE %s.%s.%s`, parts[0], parts[1], parts[2])})
+		grants = append(grants, Grant{p, common.FormatQuery(`TABLE %s.%s.%s`, *sfObject.Database, *sfObject.Schema, *sfObject.Table)})
 	}
 
 	return grants, nil
 }
 
 func createGrantsForView(permissions []string, fullName string) ([]interface{}, error) {
-	// TODO. What if there's a dot in one of the data objects' names? - use fullName parsing here as well
-	parts := strings.Split(fullName, ".")
-	if len(parts) != 3 {
+	// TODO: this does not work for Raito full names
+	sfObject := common.ParseFullName(fullName)
+	if sfObject.Database == nil || sfObject.Schema == nil || sfObject.Table == nil {
 		return nil, fmt.Errorf("expected fullName %q to have 3 parts (database.schema.view)", fullName)
 	}
 
 	grants := make([]interface{}, 0, len(permissions)+2)
 	grants = append(grants,
-		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, parts[0])},
-		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, parts[0], parts[1])})
+		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, *sfObject.Database)},
+		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
 
 	for _, p := range permissions {
-		grants = append(grants, Grant{p, common.FormatQuery(`VIEW %s.%s.%s`, parts[0], parts[1], parts[2])})
+		grants = append(grants, Grant{p, common.FormatQuery(`VIEW %s.%s.%s`, *sfObject.Database, *sfObject.Schema, *sfObject.Table)})
 	}
 
 	return grants, nil
 }
 
 func createGrantsForSchema(conn *sql.DB, permissions []string, fullName string) ([]interface{}, error) {
-	parts := strings.Split(fullName, ".")
-	if len(parts) != 2 {
+	// TODO: this does not work for Raito full names
+	sfObject := common.ParseFullName(fullName)
+	if sfObject.Database == nil || sfObject.Schema == nil {
 		return nil, fmt.Errorf("expected fullName %q to have 2 parts (database.schema)", fullName)
 	}
 
-	q := common.FormatQuery(`SHOW TABLES IN SCHEMA %s.%s`, parts[0], parts[1])
+	q := common.FormatQuery(`SHOW TABLES IN SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)
 	tables, _ := readDbEntities(conn, q)
 	grants := make([]interface{}, 0, (len(permissions)*len(tables))+2)
 	grants = append(grants,
-		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, parts[0])},
-		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, parts[0], parts[1])})
+		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, *sfObject.Database)},
+		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
 
 	for _, table := range tables {
 		for _, p := range permissions {
-			grants = append(grants, Grant{p, common.FormatQuery(`TABLE %s.%s.%s`, parts[0], parts[1], table.Name)})
+			grants = append(grants, Grant{p, common.FormatQuery(`TABLE %s.%s.%s`, *sfObject.Database, *sfObject.Schema, table.Name)})
 		}
 	}
 
