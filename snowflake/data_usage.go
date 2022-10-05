@@ -40,6 +40,7 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
 		repo.Close()
@@ -60,6 +61,7 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	}
 
 	logger.Info(fmt.Sprintf("using start date %s", startDate.Format(time.RFC3339)))
+
 	minTime, maxTime, numRows, err := repo.BatchingInformation(&startDate, queryHistoryTable)
 	if err != nil {
 		return err
@@ -70,6 +72,7 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	columns := s.getColumnNames("db", "useColumnName")
 
 	currentBatch := 0
+
 	accessHistoryAvailable, err := repo.checkAccessHistoryAvailability("SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY")
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error accessing access history table: %s", err.Error()))

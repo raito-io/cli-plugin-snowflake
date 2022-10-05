@@ -86,6 +86,7 @@ func (repo *SnowflakeRepository) DataUsage(columns []string, limit int, offset i
 	paginationClause := fmt.Sprintf("LIMIT %d OFFSET %d", limit, offset)
 
 	var query string
+
 	if accessHistoryAvailable {
 		logger.Info("Using access history table in combination with history table")
 		query = fmt.Sprintf(`SELECT %s, QID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM (SELECT %s FROM %s %s) as QUERIES LEFT JOIN (SELECT QUERY_ID as QID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY) as ACCESS on QUERIES.QUERY_ID = ACCESS.QID ORDER BY START_TIME, QUERIES.QUERY_ID DESC %s`,
@@ -115,6 +116,7 @@ func (repo *SnowflakeRepository) DataUsage(columns []string, limit int, offset i
 
 func (repo *SnowflakeRepository) checkAccessHistoryAvailability(historyTable string) (bool, error) {
 	checkAccessHistoryAvailabilityQuery := fmt.Sprintf("SELECT QUERY_ID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM %s LIMIT 10", historyTable)
+
 	result, _, err := repo.query(checkAccessHistoryAvailabilityQuery)
 	if err != nil {
 		return false, err
@@ -131,7 +133,6 @@ func (repo *SnowflakeRepository) checkAccessHistoryAvailability(historyTable str
 	}
 
 	return false, nil
-
 }
 
 func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, error) {
@@ -140,5 +141,6 @@ func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, 
 	result, err := QuerySnowflake(repo.conn, query)
 	sec := time.Since(startQuery).Round(time.Millisecond)
 	repo.queryTime += sec
+
 	return result, sec, err
 }
