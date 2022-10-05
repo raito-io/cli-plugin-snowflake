@@ -1,4 +1,4 @@
-package main
+package snowflake
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/blockloop/scan"
-	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli/base/access_provider"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
@@ -17,6 +16,8 @@ import (
 	e "github.com/raito-io/cli/base/util/error"
 	"github.com/raito-io/cli/base/util/slice"
 	sf "github.com/snowflakedb/gosnowflake"
+
+	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
 // PermissionTarget is used as value for the PermissionMap to map a Raito permission to a list of snowflake permissions

@@ -25,3 +25,5 @@ cli-plugin-snowflake*
 local*.sh
 raito*.yml
 *raito*.json
+.idea
+coverage.*

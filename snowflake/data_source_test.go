@@ -1,10 +1,11 @@
-package main
+package snowflake
 
 import (
 	"testing"
 
-	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
 func TestSchemaQuery(t *testing.T) {

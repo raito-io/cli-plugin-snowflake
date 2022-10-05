@@ -1,14 +1,12 @@
-package main
+package snowflake
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
 
-	"github.com/blockloop/scan"
 	du "github.com/raito-io/cli/base/data_usage"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
@@ -16,33 +14,36 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
+//go:generate go run github.com/vektra/mockery/v2 --name=dataUsageRepository --with-expecter --exported
+type dataUsageRepository interface {
+	Close() error
+	TotalQueryTime() time.Duration
+	BatchingInformation(startDate *time.Time, historyTable string) (*string, *string, int, error)
+	DataUsage(columns []string, limit int, offset int, historyTable string, minTime, maxTime *string, accessHistoryAvailable bool) ([]QueryDbEntities, error)
+	checkAccessHistoryAvailability(historyTable string) (bool, error)
+}
+
 type DataUsageSyncer struct {
+	repoProvider func(params map[string]interface{}, role string) (dataUsageRepository, error)
 }
 
-// Implementation of Scanner interface for NullString
-type NullString sql.NullString
-
-func (nullString *NullString) Scan(value interface{}) error {
-	var ns sql.NullString
-	if err := ns.Scan(value); err != nil {
-		return err
-	}
-	// if nil the make Valid false
-	if reflect.TypeOf(value) == nil {
-		*nullString = NullString{ns.String, false}
-	} else {
-		*nullString = NullString{ns.String, true}
-	}
-
-	return nil
+func NewDataUsageSyncer() *DataUsageSyncer {
+	return &DataUsageSyncer{repoProvider: newSnowflakeRepo}
 }
 
-func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrappers.DataUsageStatementHandler, configParams config.ConfigMap) error {
-	conn, err := ConnectToSnowflake(configParams.Parameters, "")
+func newSnowflakeRepo(params map[string]interface{}, role string) (dataUsageRepository, error) {
+	return NewSnowflakeRepository(params, role)
+}
+
+func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrappers.DataUsageStatementHandler, configParams *config.ConfigMap) error {
+	repo, err := s.repoProvider(configParams.Parameters, "")
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
+		repo.Close()
+	}()
 
 	const numRowsPerBatch = 10000
 	queryHistoryTable := "SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY"
@@ -59,79 +60,26 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	}
 
 	logger.Info(fmt.Sprintf("using start date %s", startDate.Format(time.RFC3339)))
-	filterClause := fmt.Sprintf("WHERE start_time > '%s'", startDate.Format(time.RFC3339))
-
-	fetchBatchingInfoQuery := fmt.Sprintf("SELECT min(START_TIME) as minTime, max(START_TIME) as maxTime, COUNT(START_TIME) as numRows FROM %s %s", queryHistoryTable, filterClause)
-	startQuery := time.Now()
-	snowflakeQueryTime := time.Duration(0)
-
-	logger.Info(fmt.Sprintf("Send query: %s", fetchBatchingInfoQuery))
-
-	batchingInfoResult, err := QuerySnowflake(conn, fetchBatchingInfoQuery)
-
+	minTime, maxTime, numRows, err := repo.BatchingInformation(&startDate, queryHistoryTable)
 	if err != nil {
 		return err
 	}
-	snowflakeQueryTime += time.Since(startQuery).Round(time.Millisecond)
 
-	var minTime *string
-	var maxTime *string
-	numRows := 0
-
-	for batchingInfoResult.Next() {
-		err := batchingInfoResult.Scan(&minTime, &maxTime, &numRows)
-		if err != nil {
-			return err
-		}
-
-		if numRows == 0 || minTime == nil || maxTime == nil {
-			errorMessage := fmt.Sprintf("no usage information available with query: %s => result: numRows: %d, minTime: %v, maxtime: %v",
-				fetchBatchingInfoQuery, numRows, minTime, maxTime)
-			return fmt.Errorf("%s", errorMessage)
-		}
-
-		logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", *minTime, *maxTime, numRows))
-	}
+	logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", *minTime, *maxTime, numRows))
 
 	columns := s.getColumnNames("db", "useColumnName")
 
-	filterClause = fmt.Sprintf("WHERE START_TIME >= '%s' and START_TIME <= '%s'", *minTime, *maxTime)
-
 	currentBatch := 0
-	accessHistoryAvailable := s.checkAccessHistoryAvailability(conn)
+	accessHistoryAvailable, err := repo.checkAccessHistoryAvailability("SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY")
+	if err != nil {
+		logger.Warn(fmt.Sprintf("Error accessing access history table: %s", err.Error()))
+	}
 
 	for currentBatch*numRowsPerBatch < numRows {
-		paginationClause := fmt.Sprintf("LIMIT %d OFFSET %d", numRowsPerBatch, currentBatch*numRowsPerBatch)
-		if numRows < numRowsPerBatch {
-			paginationClause = ""
-		}
-		dataUsageQuery := fmt.Sprintf("SELECT %s FROM %s %s ORDER BY START_TIME, QUERY_ID DESC %s", strings.Join(columns, ", "), queryHistoryTable, filterClause, paginationClause)
-
-		if accessHistoryAvailable {
-			logger.Info("Using access history table in combination with history table")
-			dataUsageQuery = fmt.Sprintf(`SELECT %s, QID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM (SELECT %s FROM %s %s) as QUERIES LEFT JOIN (SELECT QUERY_ID as QID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY) as ACCESS on QUERIES.QUERY_ID = ACCESS.QID ORDER BY START_TIME, QUERIES.QUERY_ID DESC %s`,
-				strings.Join(columns, ", "), strings.Join(columns, ", "), queryHistoryTable, filterClause, paginationClause)
-		}
-
-		logger.Debug(fmt.Sprintf("Retrieving paginated query log from Snowflake with query: %s, batch %d", dataUsageQuery, currentBatch))
-		startQuery = time.Now()
-		rows, err := QuerySnowflake(conn, dataUsageQuery)
-		snowflakeQueryTime += time.Since(startQuery).Round(time.Millisecond)
-
+		returnedRows, err := repo.DataUsage(columns, numRowsPerBatch, currentBatch*numRowsPerBatch, queryHistoryTable, minTime, maxTime, accessHistoryAvailable)
 		if err != nil {
 			return err
 		}
-
-		logger.Info(fmt.Sprintf("Scanning query results for batch %d", currentBatch))
-		var returnedRows []QueryDbEntities
-		err = scan.Rows(&returnedRows, rows)
-
-		if err != nil {
-			return err
-		}
-
-		sec := time.Since(startQuery).Round(time.Millisecond)
-		logger.Info(fmt.Sprintf("Fetched %d rows from Snowflake in %s for batch %d", len(returnedRows), sec, currentBatch))
 
 		timeFormat := "2006-01-02T15:04:05.999999-07:00"
 		executedStatements := make([]du.Statement, 0, 20)
@@ -204,30 +152,6 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	}
 
 	return nil
-}
-
-func (s *DataUsageSyncer) checkAccessHistoryAvailability(conn *sql.DB) bool {
-	accessHistoryTable := "SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY"
-	checkAccessHistoryAvailabilityQuery := fmt.Sprintf("SELECT QUERY_ID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM %s LIMIT 10", accessHistoryTable)
-	logger.Debug(fmt.Sprintf("Sending query: %s", checkAccessHistoryAvailabilityQuery))
-	accessHistoryInfoResult, err := QuerySnowflake(conn, checkAccessHistoryAvailabilityQuery)
-
-	if err != nil {
-		logger.Debug(fmt.Sprintf("Error accessing access history table: %s", err.Error()))
-		return false
-	}
-
-	numRows := 0
-	for accessHistoryInfoResult.Next() {
-		numRows++
-	}
-
-	if numRows > 0 {
-		logger.Debug(fmt.Sprintf("Access history query returned %d rows", numRows))
-		return true
-	}
-
-	return false
 }
 
 func (s *DataUsageSyncer) getColumnNames(tag string, includeTag string) []string {

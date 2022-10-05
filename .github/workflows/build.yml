@@ -28,7 +28,14 @@ jobs:
         with:
           version: v1.48.0
 
-      - run: go test -coverpkg=./... -covermode=atomic -coverprofile=coverage.txt ./...
+      - name: Test
+        run: make test
+        env:
+          SF_ACCOUNT: { { secrets.sf_account } }
+          SF_USER: { { secrets.sf_user } }
+          SF_PASSWORD: { { secrets.sf_password } }
+          SF_ROLE: { { secrets.sf_role } }
+
       - uses: codecov/codecov-action@v2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

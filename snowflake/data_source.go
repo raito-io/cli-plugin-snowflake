@@ -1,4 +1,4 @@
-package main
+package snowflake
 
 import (
 	"database/sql"
@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/blockloop/scan"
-	"github.com/raito-io/cli-plugin-snowflake/common"
 	ds "github.com/raito-io/cli/base/data_source"
 	e "github.com/raito-io/cli/base/util/error"
+
+	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
 type DataSourceSyncer struct {
