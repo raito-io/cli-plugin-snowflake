@@ -7,6 +7,7 @@ import (
 	"github.com/raito-io/cli/base"
 	"github.com/raito-io/cli/base/info"
 	"github.com/raito-io/cli/base/util/plugin"
+	"github.com/raito-io/cli/base/wrappers"
 )
 
 var version = "0.0.0"
@@ -17,7 +18,7 @@ func main() {
 	logger = base.Logger()
 	logger.SetLevel(hclog.Debug)
 
-	err := base.RegisterPlugins(&IdentityStoreSyncer{}, &DataSourceSyncer{}, &AccessSyncer{}, &DataUsageSyncer{}, &info.InfoImpl{
+	err := base.RegisterPlugins(&IdentityStoreSyncer{}, &DataSourceSyncer{}, &AccessSyncer{}, wrappers.DataUsageSync(&DataUsageSyncer{}), &info.InfoImpl{
 		Info: plugin.PluginInfo{
 			Name:    "Snowflake",
 			Version: plugin.ParseVersion(version),

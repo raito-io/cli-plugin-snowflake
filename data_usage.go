@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"reflect"
@@ -8,9 +9,11 @@ import (
 	"time"
 
 	"github.com/blockloop/scan"
-	"github.com/raito-io/cli-plugin-snowflake/common"
 	du "github.com/raito-io/cli/base/data_usage"
-	e "github.com/raito-io/cli/base/util/error"
+	"github.com/raito-io/cli/base/util/config"
+	"github.com/raito-io/cli/base/wrappers"
+
+	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
 type DataUsageSyncer struct {
@@ -34,21 +37,10 @@ func (nullString *NullString) Scan(value interface{}) error {
 	return nil
 }
 
-func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataUsageSyncResult {
-	logger.Info("Starting data usage synchronisation")
-	logger.Debug("Creating file for storing data usage")
-	fileCreator, err := du.NewDataUsageFileCreator(config)
-
+func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrappers.DataUsageStatementHandler, configParams config.ConfigMap) error {
+	conn, err := ConnectToSnowflake(configParams.Parameters, "")
 	if err != nil {
-		logger.Info(err.Error())
-		return du.DataUsageSyncResult{Error: e.ToErrorResult(err)}
-	}
-	defer fileCreator.Close()
-
-	conn, err := ConnectToSnowflake(config.Parameters, "")
-	if err != nil {
-		logger.Info(err.Error())
-		return du.DataUsageSyncResult{Error: e.ToErrorResult(err)}
+		return err
 	}
 	defer conn.Close()
 
@@ -59,8 +51,8 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 	numberOfDays := 14
 	startDate := time.Now().Truncate(24*time.Hour).AddDate(0, 0, -numberOfDays)
 
-	if config != nil && config.ConfigMap.Parameters["lastUsed"] != nil {
-		startDateRaw, errLocal := time.Parse(time.RFC3339, config.ConfigMap.Parameters["lastUsed"].(string))
+	if configParams.Parameters["lastUsed"] != nil {
+		startDateRaw, errLocal := time.Parse(time.RFC3339, configParams.Parameters["lastUsed"].(string))
 		if errLocal == nil && startDateRaw.After(startDate) {
 			startDate = startDateRaw
 		}
@@ -70,7 +62,6 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 	filterClause := fmt.Sprintf("WHERE start_time > '%s'", startDate.Format(time.RFC3339))
 
 	fetchBatchingInfoQuery := fmt.Sprintf("SELECT min(START_TIME) as minTime, max(START_TIME) as maxTime, COUNT(START_TIME) as numRows FROM %s %s", queryHistoryTable, filterClause)
-	start := time.Now()
 	startQuery := time.Now()
 	snowflakeQueryTime := time.Duration(0)
 
@@ -79,7 +70,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 	batchingInfoResult, err := QuerySnowflake(conn, fetchBatchingInfoQuery)
 
 	if err != nil {
-		return du.DataUsageSyncResult{Error: e.ToErrorResult(err)}
+		return err
 	}
 	snowflakeQueryTime += time.Since(startQuery).Round(time.Millisecond)
 
@@ -90,16 +81,13 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 	for batchingInfoResult.Next() {
 		err := batchingInfoResult.Scan(&minTime, &maxTime, &numRows)
 		if err != nil {
-			logger.Info(fmt.Sprintf("%v", batchingInfoResult))
-			return du.DataUsageSyncResult{Error: e.ToErrorResult(err)}
+			return err
 		}
 
 		if numRows == 0 || minTime == nil || maxTime == nil {
 			errorMessage := fmt.Sprintf("no usage information available with query: %s => result: numRows: %d, minTime: %v, maxtime: %v",
 				fetchBatchingInfoQuery, numRows, minTime, maxTime)
-			logger.Info(errorMessage)
-
-			return du.DataUsageSyncResult{Error: e.ToErrorResult(fmt.Errorf("%s", errorMessage))}
+			return fmt.Errorf("%s", errorMessage)
 		}
 
 		logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", *minTime, *maxTime, numRows))
@@ -131,7 +119,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 		snowflakeQueryTime += time.Since(startQuery).Round(time.Millisecond)
 
 		if err != nil {
-			return du.DataUsageSyncResult{Error: e.ToErrorResult(err)}
+			return err
 		}
 
 		logger.Info(fmt.Sprintf("Scanning query results for batch %d", currentBatch))
@@ -139,8 +127,7 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 		err = scan.Rows(&returnedRows, rows)
 
 		if err != nil {
-			logger.Error(fmt.Sprintf("Error scanning results into objects during batch %d, %s", currentBatch, err.Error()))
-			return du.DataUsageSyncResult{Error: e.ToErrorResult(err)}
+			return err
 		}
 
 		sec := time.Since(startQuery).Round(time.Millisecond)
@@ -156,12 +143,12 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 			startTime, e := time.Parse(timeFormat, returnedRow.StartTime)
 
 			if e != nil {
-				logger.Error(fmt.Sprintf("Error parsing start time of '%s', expected format is: '%s'", returnedRow.StartTime, timeFormat))
+				logger.Warn(fmt.Sprintf("Error parsing start time of '%s', expected format is: '%s'", returnedRow.StartTime, timeFormat))
 			}
 			endTime, e := time.Parse(timeFormat, returnedRow.EndTime)
 
 			if e != nil {
-				logger.Error(fmt.Sprintf("Error parsing end time of '%s', expected format is: '%s'", returnedRow.StartTime, timeFormat))
+				logger.Warn(fmt.Sprintf("Error parsing end time of '%s', expected format is: '%s'", returnedRow.StartTime, timeFormat))
 			}
 
 			databaseName := ""
@@ -204,25 +191,19 @@ func (s *DataUsageSyncer) SyncDataUsage(config *du.DataUsageSyncConfig) du.DataU
 			}
 		}
 
-		currentStatements := fileCreator.GetStatementCount()
-
 		logger.Debug(fmt.Sprintf("Writing data usage export log to file for batch %d", currentBatch))
 
 		err = fileCreator.AddStatements(executedStatements)
 
 		if err != nil {
-			return du.DataUsageSyncResult{Error: e.ToErrorResult(err)}
+			return err
 		}
 
-		logger.Info(fmt.Sprintf("Written %d statements to file for batch %d", fileCreator.GetStatementCount()-currentStatements, currentBatch))
+		logger.Info(fmt.Sprintf("Written %d statements to file for batch %d", len(executedStatements), currentBatch))
 		currentBatch++
 	}
 
-	sec := time.Since(start).Round(time.Millisecond)
-	logger.Info(fmt.Sprintf("Retrieved %d rows from Snowflake (in %s) and written them to file in %d batch(es), for a total time of %s",
-		fileCreator.GetStatementCount(), snowflakeQueryTime, currentBatch, sec))
-
-	return du.DataUsageSyncResult{}
+	return nil
 }
 
 func (s *DataUsageSyncer) checkAccessHistoryAvailability(conn *sql.DB) bool {
