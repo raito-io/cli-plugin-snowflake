@@ -114,7 +114,7 @@ func (repo *SnowflakeRepository) DataUsage(columns []string, limit int, offset i
 	return returnedRows, nil
 }
 
-func (repo *SnowflakeRepository) checkAccessHistoryAvailability(historyTable string) (bool, error) {
+func (repo *SnowflakeRepository) CheckAccessHistoryAvailability(historyTable string) (bool, error) {
 	checkAccessHistoryAvailabilityQuery := fmt.Sprintf("SELECT QUERY_ID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM %s LIMIT 10", historyTable)
 
 	result, _, err := repo.query(checkAccessHistoryAvailabilityQuery)
@@ -133,6 +133,28 @@ func (repo *SnowflakeRepository) checkAccessHistoryAvailability(historyTable str
 	}
 
 	return false, nil
+}
+
+func (repo *SnowflakeRepository) GetUsers() ([]userEntity, error) {
+	q := "SHOW USERS"
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	var userRows []userEntity
+
+	err = scan.Rows(&userRows, rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = CheckSFLimitExceeded(q, len(userRows)); err != nil {
+		return nil, fmt.Errorf("error while fetching users: %s", err.Error())
+	}
+
+	return userRows, nil
 }
 
 func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, error) {
