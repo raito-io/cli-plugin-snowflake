@@ -84,6 +84,50 @@ func (_c *mockDataUsageRepository_BatchingInformation_Call) Return(_a0 *string, 
 	return _c
 }
 
+// CheckAccessHistoryAvailability provides a mock function with given fields: historyTable
+func (_m *mockDataUsageRepository) CheckAccessHistoryAvailability(historyTable string) (bool, error) {
+	ret := _m.Called(historyTable)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(string) bool); ok {
+		r0 = rf(historyTable)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(historyTable)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataUsageRepository_CheckAccessHistoryAvailability_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckAccessHistoryAvailability'
+type mockDataUsageRepository_CheckAccessHistoryAvailability_Call struct {
+	*mock.Call
+}
+
+// CheckAccessHistoryAvailability is a helper method to define mock.On call
+//   - historyTable string
+func (_e *mockDataUsageRepository_Expecter) CheckAccessHistoryAvailability(historyTable interface{}) *mockDataUsageRepository_CheckAccessHistoryAvailability_Call {
+	return &mockDataUsageRepository_CheckAccessHistoryAvailability_Call{Call: _e.mock.On("CheckAccessHistoryAvailability", historyTable)}
+}
+
+func (_c *mockDataUsageRepository_CheckAccessHistoryAvailability_Call) Run(run func(historyTable string)) *mockDataUsageRepository_CheckAccessHistoryAvailability_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataUsageRepository_CheckAccessHistoryAvailability_Call) Return(_a0 bool, _a1 error) *mockDataUsageRepository_CheckAccessHistoryAvailability_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
 // Close provides a mock function with given fields:
 func (_m *mockDataUsageRepository) Close() error {
 	ret := _m.Called()
@@ -205,50 +249,6 @@ func (_c *mockDataUsageRepository_TotalQueryTime_Call) Run(run func()) *mockData
 
 func (_c *mockDataUsageRepository_TotalQueryTime_Call) Return(_a0 time.Duration) *mockDataUsageRepository_TotalQueryTime_Call {
 	_c.Call.Return(_a0)
-	return _c
-}
-
-// checkAccessHistoryAvailability provides a mock function with given fields: historyTable
-func (_m *mockDataUsageRepository) checkAccessHistoryAvailability(historyTable string) (bool, error) {
-	ret := _m.Called(historyTable)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(string) bool); ok {
-		r0 = rf(historyTable)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(historyTable)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockDataUsageRepository_checkAccessHistoryAvailability_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'checkAccessHistoryAvailability'
-type mockDataUsageRepository_checkAccessHistoryAvailability_Call struct {
-	*mock.Call
-}
-
-// checkAccessHistoryAvailability is a helper method to define mock.On call
-//   - historyTable string
-func (_e *mockDataUsageRepository_Expecter) checkAccessHistoryAvailability(historyTable interface{}) *mockDataUsageRepository_checkAccessHistoryAvailability_Call {
-	return &mockDataUsageRepository_checkAccessHistoryAvailability_Call{Call: _e.mock.On("checkAccessHistoryAvailability", historyTable)}
-}
-
-func (_c *mockDataUsageRepository_checkAccessHistoryAvailability_Call) Run(run func(historyTable string)) *mockDataUsageRepository_checkAccessHistoryAvailability_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
-	})
-	return _c
-}
-
-func (_c *mockDataUsageRepository_checkAccessHistoryAvailability_Call) Return(_a0 bool, _a1 error) *mockDataUsageRepository_checkAccessHistoryAvailability_Call {
-	_c.Call.Return(_a0, _a1)
 	return _c
 }
 

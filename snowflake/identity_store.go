@@ -1,39 +1,48 @@
 package snowflake
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/blockloop/scan"
 	is "github.com/raito-io/cli/base/identity_store"
-	e "github.com/raito-io/cli/base/util/error"
+	"github.com/raito-io/cli/base/util/config"
+	"github.com/raito-io/cli/base/wrappers"
 )
 
-type IdentityStoreSyncer struct {
+//go:generate go run github.com/vektra/mockery/v2 --name=identityStoreRepository --with-expecter --inpackage
+type identityStoreRepository interface {
+	Close() error
+	TotalQueryTime() time.Duration
+	GetUsers() ([]userEntity, error)
 }
 
-func (s *IdentityStoreSyncer) SyncIdentityStore(config *is.IdentityStoreSyncConfig) is.IdentityStoreSyncResult {
-	fileCreator, err := is.NewIdentityStoreFileCreator(config)
-	if err != nil {
-		return is.IdentityStoreSyncResult{
-			Error: e.ToErrorResult(err),
-		}
-	}
-	defer fileCreator.Close()
+type IdentityStoreSyncer struct {
+	repoProvider func(params map[string]interface{}, role string) (identityStoreRepository, error)
+}
 
-	start := time.Now()
-	q := "SHOW USERS"
+func NewIdentityStoreSyncer() *IdentityStoreSyncer {
+	return &IdentityStoreSyncer{repoProvider: newIdentityStoreSnowflakeRepo}
+}
 
-	rows, err := ConnectAndQuery(config.Parameters, "", q)
+func newIdentityStoreSnowflakeRepo(params map[string]interface{}, role string) (identityStoreRepository, error) {
+	return NewSnowflakeRepository(params, role)
+}
+
+func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHandler wrappers.IdentityStoreIdentityHandler, configMap *config.ConfigMap) error {
+	repo, err := s.repoProvider(configMap.Parameters, "")
 	if err != nil {
-		return is.IdentityStoreSyncResult{
-			Error: e.ToErrorResult(err),
-		}
+		return err
 	}
+
+	defer func() {
+		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
+		repo.Close()
+	}()
 
 	excludedOwners := ""
-	if v, ok := config.Parameters[SfExcludedOwners]; ok && v != nil {
+	if v, ok := configMap.Parameters[SfExcludedOwners]; ok && v != nil {
 		excludedOwners = v.(string)
 	}
 
@@ -45,23 +54,10 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(config *is.IdentityStoreSyncConf
 		}
 	}
 
-	var userRows []userEntity
-
-	err = scan.Rows(&userRows, rows)
+	userRows, err := repo.GetUsers()
 	if err != nil {
-		return is.IdentityStoreSyncResult{
-			Error: e.ToErrorResult(fmt.Errorf("error while parsing result from users query: %s", err.Error())),
-		}
+		return err
 	}
-
-	err = CheckSFLimitExceeded(q, len(userRows))
-	if err != nil {
-		return is.IdentityStoreSyncResult{
-			Error: e.ToErrorResult(fmt.Errorf("error while fetching users: %s", err.Error())),
-		}
-	}
-
-	users := make([]is.User, 0, 20)
 
 	for _, userRow := range userRows {
 		logger.Debug(fmt.Sprintf("Handling user %q", userRow.Name))
@@ -76,27 +72,12 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(config *is.IdentityStoreSyncConf
 			Name:       userRow.DisplayName,
 			Email:      userRow.Email,
 		}
-		users = append(users, user)
-	}
 
-	err = fileCreator.AddUsers(users)
-	if err != nil {
-		return is.IdentityStoreSyncResult{
-			Error: e.ToErrorResult(err),
+		err = identityHandler.AddUsers(&user)
+		if err != nil {
+			return err
 		}
 	}
 
-	sec := time.Since(start).Round(time.Millisecond)
-
-	logger.Info(fmt.Sprintf("Fetched %d users from Snowflake in %s", fileCreator.GetUserCount(), sec))
-
-	return is.IdentityStoreSyncResult{}
-}
-
-type userEntity struct {
-	Name        string `db:"name"`
-	LoginName   string `db:"login_name"`
-	DisplayName string `db:"display_name"`
-	Email       string `db:"email"`
-	Owner       string `db:"owner"`
+	return nil
 }

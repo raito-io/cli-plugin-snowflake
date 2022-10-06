@@ -27,7 +27,7 @@ func TestDataUsageSyncer_SyncDataUsage(t *testing.T) {
 	repoMock.EXPECT().Close().Return(nil)
 	repoMock.EXPECT().TotalQueryTime().Return(time.Minute)
 	repoMock.EXPECT().BatchingInformation(mock.AnythingOfType("*time.Time"), mock.AnythingOfType("string")).Return(&minTime, &maxtime, numRows, nil)
-	repoMock.EXPECT().checkAccessHistoryAvailability(mock.AnythingOfType("string")).Return(false, nil)
+	repoMock.EXPECT().CheckAccessHistoryAvailability(mock.AnythingOfType("string")).Return(false, nil)
 	repoMock.EXPECT().DataUsage(mock.AnythingOfType("[]string"), mock.AnythingOfType("int"), 0, mock.AnythingOfType("string"),
 		mock.AnythingOfType("*string"), mock.AnythingOfType("*string"), false).Return([]QueryDbEntities{
 		{
@@ -66,8 +66,4 @@ func TestDataUsageSyncer_SyncDataUsage(t *testing.T) {
 	//Then
 	assert.NoError(t, err)
 	assert.Len(t, fileCreator.Statements, 3)
-}
-
-func TestDataUsageSyncer_SyncDataUsage_(t *testing.T) {
-
 }
