@@ -1,68 +1,280 @@
 package snowflake
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/blockloop/scan"
 	ds "github.com/raito-io/cli/base/data_source"
-	e "github.com/raito-io/cli/base/util/error"
+	"github.com/raito-io/cli/base/util/config"
+	"github.com/raito-io/cli/base/wrappers"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
-type DataSourceSyncer struct {
+type dataSourceRepository interface {
+	Close() error
+	TotalQueryTime() time.Duration
+	GetSnowFlakeAccountName() (string, error)
+	GetWarehouses() ([]dbEntity, error)
+	GetShares() ([]dbEntity, error)
+	GetDataBases() ([]dbEntity, error)
+	GetSchemaInDatabase(databaseName string) ([]dbEntity, error)
+	GetTablesInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error)
+	GetViewsInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error)
+	GetColumnsInTable(sfObject *common.SnowflakeObject) ([]dbEntity, error)
 }
 
-func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.DataSourceSyncResult {
-	logger.Debug("Start syncing data source meta data for snowflake")
-	fileCreator, err := ds.NewDataSourceFileCreator(config)
+type DataSourceSyncer struct {
+	repoProvider func(params map[string]interface{}, role string) (dataSourceRepository, error)
+}
 
-	if err != nil {
-		return ds.DataSourceSyncResult{Error: e.ToErrorResult(err)}
+func NewDataSourceSyncer() *DataSourceSyncer {
+	return &DataSourceSyncer{
+		repoProvider: newDataSourceSnowflakeRepo,
 	}
-	defer fileCreator.Close()
+}
 
-	start := time.Now()
+func newDataSourceSnowflakeRepo(params map[string]interface{}, role string) (dataSourceRepository, error) {
+	return NewSnowflakeRepository(params, role)
+}
 
-	conn, err := ConnectToSnowflake(config.Parameters, "")
+func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler wrappers.DataSourceObjectHandler, configParams *config.ConfigMap) error {
+	repo, err := s.repoProvider(configParams.Parameters, "")
 	if err != nil {
-		return ds.DataSourceSyncResult{Error: e.ToErrorResult(err)}
+		return err
 	}
-	defer conn.Close()
+
+	defer func() {
+		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
+		repo.Close()
+	}()
 
 	// for data source level access import & export convenience we retrieve the snowflake account and use it as datasource name
-	sfAccount, err := getSnowflakeAccountName(conn)
-
+	sfAccount, err := repo.GetSnowFlakeAccountName()
 	if err != nil {
-		return ds.DataSourceSyncResult{Error: e.ToErrorResult(err)}
+		return err
 	}
 
-	fileCreator.GetDataSourceDetails().SetName(sfAccount)
-	fileCreator.GetDataSourceDetails().SetFullname(sfAccount)
+	dataSourceHandler.SetDataSourceName(sfAccount)
+	dataSourceHandler.SetDataSourceFullname(sfAccount)
 
 	excludedDatabases := ""
-	if v, ok := config.Parameters[SfExcludedDatabases]; ok && v != nil {
+	if v, ok := configParams.Parameters[SfExcludedDatabases]; ok && v != nil {
 		excludedDatabases = v.(string)
 	}
 
 	excludedSchemas := "INFORMATION_SCHEMA"
-	if v, ok := config.Parameters[SfExcludedSchemas]; ok && v != nil {
+	if v, ok := configParams.Parameters[SfExcludedSchemas]; ok && v != nil {
 		excludedSchemas += "," + v.(string)
 	}
 
-	_, err = readWarehouses(fileCreator, conn)
+	err = s.readWarehouses(repo, dataSourceHandler)
 	if err != nil {
-		return ds.DataSourceSyncResult{Error: e.ToErrorResult(err)}
+		return err
 	}
 
+	shares, sharesMap, err := s.readShares(repo, excludedDatabases, dataSourceHandler)
+	if err != nil {
+		return err
+	}
+
+	databases, err := s.readDatabases(repo, excludedDatabases, dataSourceHandler)
+	if err != nil {
+		return err
+	}
+
+	// add shares to the list again to fetch their descendants
+	databases = append(databases, shares...)
+
+	for _, database := range databases {
+		doTypePrefix := ""
+		if _, f := sharesMap[database.Name]; f {
+			doTypePrefix = "shared-"
+		}
+
+		schemas, err := s.readSchemaInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix)
+		if err != nil {
+			return err
+		}
+
+		for _, schema := range schemas {
+			sfObject := common.SnowflakeObject{Database: &database.Name, Schema: &schema.Name, Table: nil, Column: nil}
+
+			tables, err := s.readTablesInSchema(repo, &sfObject, dataSourceHandler, doTypePrefix)
+			if err != nil {
+				return err
+			}
+
+			for _, table := range tables {
+				sfObjectTable := sfObject
+				sfObjectTable.Table = &table.Name
+
+				err = s.readColumnsOfSfObject(repo, &sfObjectTable, dataSourceHandler, doTypePrefix)
+				if err != nil {
+					return err
+				}
+			}
+
+			views, err := s.readViewsInSchema(repo, &sfObject, dataSourceHandler, doTypePrefix)
+			if err != nil {
+				return err
+			}
+
+			for _, view := range views {
+				sfObjectView := sfObject
+				sfObjectView.Table = &view.Name
+
+				err = s.readColumnsOfSfObject(repo, &sfObjectView, dataSourceHandler, doTypePrefix)
+				if err != nil {
+					if strings.Contains(err.Error(), "Insufficient privileges to operate on table") {
+						logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito. The snowflake user should either have OWNERSHIP or SELECT permissions on the underlying table", view.Name))
+					} else {
+						logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))
+						return fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error())
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *DataSourceSyncer) readViewsInSchema(repo dataSourceRepository, sfObject *common.SnowflakeObject, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]dbEntity, error) {
+	views, err := repo.GetViewsInSchema(sfObject)
+	if err != nil {
+		return nil, err
+	}
+
+	views, err = s.addDbEntitiesToImporter(dataSourceHandler, views, doTypePrefix+ds.View, sfObject.GetFullName(false),
+		func(name string) string { return sfObject.GetFullName(false) + "." + name },
+		func(name, fullName string) bool { return true })
+
+	if err != nil {
+		logger.Error(fmt.Sprintf("error while syncing tables for schema %q between Snowflake and Raito: %s", *sfObject.Schema, err.Error()))
+		return nil, fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", *sfObject.Schema, err.Error())
+	}
+
+	return views, nil
+}
+
+func (s *DataSourceSyncer) readColumnsOfSfObject(repo dataSourceRepository, sfObjectTable *common.SnowflakeObject, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) error {
+	columns, err := repo.GetColumnsInTable(sfObjectTable)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.addDbEntitiesToImporter(dataSourceHandler, columns, doTypePrefix+ds.Column, sfObjectTable.GetFullName(false),
+		func(name string) string { return sfObjectTable.GetFullName(false) + "." + name },
+		func(name, fullName string) bool { return true },
+	)
+	if err != nil {
+		logger.Error(fmt.Sprintf("error while syncing columns for table %q between Snowflake and Raito: %s", *sfObjectTable.Table, err.Error()))
+		return fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", *sfObjectTable.Table, err.Error())
+	}
+	return nil
+}
+
+func (s *DataSourceSyncer) readTablesInSchema(repo dataSourceRepository, sfObject *common.SnowflakeObject, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]dbEntity, error) {
+	tables, err := repo.GetTablesInSchema(sfObject)
+	if err != nil {
+		return nil, err
+	}
+
+	tables, err = s.addDbEntitiesToImporter(dataSourceHandler, tables, doTypePrefix+ds.Table, sfObject.GetFullName(false),
+		func(name string) string { return sfObject.GetFullName(false) + "." + name },
+		func(name, fullName string) bool { return true })
+
+	if err != nil {
+		logger.Error(fmt.Sprintf("error while syncing tables for schema %q between Snowflake and Raito: %s", *sfObject.Schema, err.Error()))
+		return nil, fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", *sfObject.Schema, err.Error())
+	}
+
+	return tables, nil
+}
+
+func (s *DataSourceSyncer) readSchemaInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas string, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]dbEntity, error) {
+	schemas, err := repo.GetSchemaInDatabase(databaseName)
+	if err != nil {
+		return nil, err
+	}
+
+	excludes := make(map[string]struct{})
+
+	if excludedSchemas != "" {
+		for _, e := range strings.Split(excludedSchemas, ",") {
+			excludes[e] = struct{}{}
+		}
+	}
+
+	schemas, err = s.addDbEntitiesToImporter(dataSourceHandler, schemas, doTypePrefix+ds.Schema, databaseName,
+		func(name string) string { return databaseName + "." + name },
+		func(name, fullName string) bool {
+			_, f := excludes[fullName]
+			if f {
+				return !f
+			}
+			_, f = excludes[name]
+			return !f
+		})
+	if err != nil {
+		return nil, err
+	}
+	return schemas, nil
+}
+
+func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler) ([]dbEntity, error) {
+	databases, err := repo.GetDataBases()
+	if err != nil {
+		return nil, err
+	}
+
+	excludes := make(map[string]struct{})
+
+	if excludedDatabases != "" {
+		for _, e := range strings.Split(excludedDatabases, ",") {
+			excludes[e] = struct{}{}
+		}
+	}
+
+	databases, err = s.addDbEntitiesToImporter(dataSourceHandler, databases, ds.Database, "",
+		func(name string) string { return name },
+		func(name, fullName string) bool {
+			_, f := excludes[fullName]
+			return !f
+		})
+	if err != nil {
+		return nil, err
+	}
+	return databases, nil
+}
+
+func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler) ([]dbEntity, map[string]struct{}, error) {
 	// main reason is that for export they can only have "IMPORTED PRIVILEGES" granted on the shared db level and nothing else.
 	// for now we can just exclude them but they need to be treated later on
-	shares, err := readShares(fileCreator, conn, excludedDatabases)
+	shares, err := repo.GetShares()
 	if err != nil {
-		return ds.DataSourceSyncResult{Error: e.ToErrorResult(err)}
+		return nil, nil, err
+	}
+
+	excludes := make(map[string]struct{})
+
+	if excludedDatabases != "" {
+		for _, e := range strings.Split(excludedDatabases, ",") {
+			excludes[e] = struct{}{}
+		}
+	}
+
+	shares, err = s.addDbEntitiesToImporter(dataSourceHandler, shares, "shared-database", "",
+		func(name string) string { return name },
+		func(name, fullName string) bool {
+			_, f := excludes[fullName]
+			return !f
+		})
+	if err != nil {
+		return nil, nil, err
 	}
 
 	sharesMap := make(map[string]struct{}, 0)
@@ -75,121 +287,27 @@ func (s *DataSourceSyncer) SyncDataSource(config *ds.DataSourceSyncConfig) ds.Da
 		excludedDatabases += share.Name
 		sharesMap[share.Name] = struct{}{}
 	}
-
-	databases, err := readDatabases(fileCreator, conn, excludedDatabases)
-	if err != nil {
-		return ds.DataSourceSyncResult{Error: e.ToErrorResult(err)}
-	}
-
-	// add shares to the list again to fetch their descendants
-	databases = append(databases, shares...)
-
-	for _, database := range databases {
-		doTypePrefix := ""
-		if _, f := sharesMap[database.Name]; f {
-			doTypePrefix = "shared-"
-		}
-
-		schemas, err := readSchemas(fileCreator, conn, doTypePrefix, database.Name, excludedSchemas)
-		if err != nil {
-			logger.Error(fmt.Sprintf("error while syncing schemas for database %q between Snowflake and Raito: %s", database.Name, err.Error()))
-			return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing schemas for database %q between Snowflake and Raito: %s", database.Name, err.Error()))}
-		}
-
-		for _, schema := range schemas {
-			tables, err := readTables(fileCreator, conn, doTypePrefix, common.SnowflakeObject{Database: &database.Name, Schema: &schema.Name, Table: nil, Column: nil})
-			if err != nil {
-				logger.Error(fmt.Sprintf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))
-				return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
-			}
-
-			for _, table := range tables {
-				err = readColumns(fileCreator, conn, doTypePrefix, common.SnowflakeObject{Database: &database.Name, Schema: &schema.Name, Table: &table.Name, Column: nil})
-
-				if err != nil {
-					logger.Error(fmt.Sprintf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))
-					return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", table.Name, err.Error()))}
-				}
-			}
-
-			views, err := readViews(fileCreator, conn, doTypePrefix, common.SnowflakeObject{Database: &database.Name, Schema: &schema.Name, Table: nil, Column: nil})
-			if err != nil {
-				logger.Error(fmt.Sprintf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))
-				return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", schema.Name, err.Error()))}
-			}
-
-			for _, view := range views {
-				err := readColumns(fileCreator, conn, doTypePrefix, common.SnowflakeObject{Database: &database.Name, Schema: &schema.Name, Table: &view.Name, Column: nil})
-
-				if err != nil {
-					if strings.Contains(err.Error(), "Insufficient privileges to operate on table") {
-						logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito. The snowflake user should either have OWNERSHIP or SELECT permissions on the underlying table", view.Name))
-					} else {
-						logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))
-						return ds.DataSourceSyncResult{Error: e.ToErrorResult(fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))}
-					}
-				}
-			}
-		}
-	}
-
-	sec := time.Since(start).Round(time.Millisecond)
-
-	logger.Info(fmt.Sprintf("Fetched %d data objects from Snowflake in %s", fileCreator.GetDataObjectCount(), sec))
-
-	return ds.DataSourceSyncResult{}
+	return shares, sharesMap, nil
 }
 
-func readDbEntities(conn *sql.DB, query string) ([]dbEntity, error) {
-	rows, err := conn.Query(query)
+func (s *DataSourceSyncer) readWarehouses(repo dataSourceRepository, dataSourceHandler wrappers.DataSourceObjectHandler) error {
+	dbWarehouses, err := repo.GetWarehouses()
 	if err != nil {
-		return nil, fmt.Errorf("error while querying Snowflake: %s", err.Error())
-	}
-	var dbs []dbEntity
-	err = scan.Rows(&dbs, rows)
-
-	if err != nil {
-		return nil, fmt.Errorf("error while querying Snowflake: %s", err.Error())
-	}
-	err = CheckSFLimitExceeded(query, len(dbs))
-
-	if err != nil {
-		return nil, fmt.Errorf("error while querying Snowflake: %s", err.Error())
+		return err
 	}
 
-	return dbs, nil
+	_, err = s.addDbEntitiesToImporter(dataSourceHandler, dbWarehouses, "warehouse", "",
+		func(name string) string { return name },
+		func(name, fullName string) bool { return true })
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func getSnowflakeAccountName(conn *sql.DB) (string, error) {
-	rows, err := conn.Query("select current_account()")
-	if err != nil {
-		return "", fmt.Errorf("error while querying Snowflake: %s", err.Error())
-	}
-	var r []string
-	err = scan.Rows(&r, rows)
-
-	if err != nil {
-		return "", fmt.Errorf("error while querying Snowflake: %s", err.Error())
-	}
-
-	if len(r) != 1 {
-		return "", fmt.Errorf("error retrieving account information from snowflake")
-	}
-
-	return r[0], nil
-}
-
-func addDbEntitiesToImporter(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doType string, parent string, query string, externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]dbEntity, error) {
-	dbs, err := readDbEntities(conn, query)
-
-	if err != nil {
-		return nil, err
-	}
-
-	dataObjects := make([]ds.DataObject, 0, 20)
+func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.DataSourceObjectHandler, entities []dbEntity, doType string, parent string, externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]dbEntity, error) {
 	dbEntities := make([]dbEntity, 0, 20)
-
-	for _, db := range dbs {
+	for _, db := range entities {
 		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", doType, db.Name))
 
 		fullName := externalIdGenerator(db.Name)
@@ -206,112 +324,17 @@ func addDbEntitiesToImporter(fileCreator ds.DataSourceFileCreator, conn *sql.DB,
 				Description:      comment,
 				ParentExternalId: parent,
 			}
-			dataObjects = append(dataObjects, do)
+
+			err := dataObjectHandler.AddDataObjects(&do)
+			if err != nil {
+				return nil, err
+			}
+
 			dbEntities = append(dbEntities, db)
 		}
 	}
 
-	err = fileCreator.AddDataObjects(dataObjects)
-	if err != nil {
-		return nil, err
-	}
-
 	return dbEntities, nil
-}
-
-func readShares(fileCreator ds.DataSourceFileCreator, conn *sql.DB, excludedDatabases string) ([]dbEntity, error) {
-	_, err := readDbEntities(conn, "SHOW SHARES")
-	if err != nil {
-		return nil, err
-	}
-
-	excludes := make(map[string]struct{})
-
-	if excludedDatabases != "" {
-		for _, e := range strings.Split(excludedDatabases, ",") {
-			excludes[e] = struct{}{}
-		}
-	}
-
-	return addDbEntitiesToImporter(fileCreator, conn, "shared-database", "", "select \"database_name\" as \"name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'",
-		func(name string) string { return name },
-		func(name, fullName string) bool {
-			_, f := excludes[fullName]
-			return !f
-		})
-}
-
-func readWarehouses(fileCreator ds.DataSourceFileCreator, conn *sql.DB) ([]dbEntity, error) {
-	return addDbEntitiesToImporter(fileCreator, conn, "warehouse", "", "SHOW WAREHOUSES",
-		func(name string) string { return name },
-		func(name, fullName string) bool { return true })
-}
-
-func readDatabases(fileCreator ds.DataSourceFileCreator, conn *sql.DB, excludedDatabases string) ([]dbEntity, error) {
-	excludes := make(map[string]struct{})
-
-	if excludedDatabases != "" {
-		for _, e := range strings.Split(excludedDatabases, ",") {
-			excludes[e] = struct{}{}
-		}
-	}
-
-	return addDbEntitiesToImporter(fileCreator, conn, ds.Database, "", "SHOW DATABASES IN ACCOUNT",
-		func(name string) string { return name },
-		func(name, fullName string) bool {
-			_, f := excludes[fullName]
-			return !f
-		})
-}
-func readSchemas(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, dbName string, excludedSchemas string) ([]dbEntity, error) {
-	excludes := make(map[string]struct{})
-
-	if excludedSchemas != "" {
-		for _, e := range strings.Split(excludedSchemas, ",") {
-			excludes[e] = struct{}{}
-		}
-	}
-
-	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Schema, dbName, getSchemasInDatabaseQuery(dbName),
-		func(name string) string { return dbName + "." + name },
-		func(name, fullName string) bool {
-			_, f := excludes[fullName]
-			if f {
-				return !f
-			}
-			_, f = excludes[name]
-			return !f
-		})
-}
-
-func readTables(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, schemaFullName common.SnowflakeObject) ([]dbEntity, error) {
-	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Table, schemaFullName.GetFullName(false), getTablesInSchemaQuery(schemaFullName, "TABLES"),
-		func(name string) string { return schemaFullName.GetFullName(false) + "." + name },
-		func(name, fullName string) bool { return true })
-}
-
-func readViews(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, schemaFullName common.SnowflakeObject) ([]dbEntity, error) {
-	return addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.View, schemaFullName.GetFullName(false), getTablesInSchemaQuery(schemaFullName, "VIEWS"),
-		func(name string) string { return schemaFullName.GetFullName(false) + "." + name },
-		func(name, fullName string) bool { return true })
-}
-
-func readColumns(fileCreator ds.DataSourceFileCreator, conn *sql.DB, doTypePrefix string, table common.SnowflakeObject) error {
-	_, err := readDbEntities(conn, getColumnsInTableQuery(table))
-	if err != nil {
-		return err
-	}
-
-	_, err = addDbEntitiesToImporter(fileCreator, conn, doTypePrefix+ds.Column, table.GetFullName(false), "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))",
-		func(name string) string { return table.GetFullName(false) + "." + name },
-		func(name, fullName string) bool { return true })
-
-	return err
-}
-
-type dbEntity struct {
-	Name    string  `db:"name"`
-	Comment *string `db:"comment"`
 }
 
 func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
