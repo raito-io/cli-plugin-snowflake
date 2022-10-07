@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/blockloop/scan"
+
+	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
 // Implementation of Scanner interface for NullString
@@ -157,6 +159,98 @@ func (repo *SnowflakeRepository) GetUsers() ([]userEntity, error) {
 	return userRows, nil
 }
 
+func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
+	rows, _, err := repo.query("select current_account()")
+	if err != nil {
+		return "", err
+	}
+
+	var r []string
+	err = scan.Rows(&r, rows)
+
+	if err != nil {
+		return "", fmt.Errorf("error while querying Snowflake: %s", err.Error())
+	}
+
+	if len(r) != 1 {
+		return "", fmt.Errorf("error retrieving account information from snowflake")
+	}
+
+	return r[0], nil
+}
+
+func (repo *SnowflakeRepository) GetWarehouses() ([]dbEntity, error) {
+	q := "SHOW WAREHOUSES"
+	return repo.getDbEntities(q)
+}
+
+func (repo *SnowflakeRepository) GetShares() ([]dbEntity, error) {
+	q := "SHOW SHARES"
+	_, err := repo.getDbEntities(q)
+
+	if err != nil {
+		return nil, err
+	}
+
+	q = "select \"database_name\" as \"name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'"
+
+	return repo.getDbEntities(q)
+}
+
+func (repo *SnowflakeRepository) GetDataBases() ([]dbEntity, error) {
+	q := "SHOW DATABASES IN ACCOUNT"
+	return repo.getDbEntities(q)
+}
+
+func (repo *SnowflakeRepository) GetSchemaInDatabase(databaseName string) ([]dbEntity, error) {
+	q := getSchemasInDatabaseQuery(databaseName)
+	return repo.getDbEntities(q)
+}
+
+func (repo *SnowflakeRepository) GetTablesInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
+	q := getTablesInSchemaQuery(sfObject, "TABLES")
+	return repo.getDbEntities(q)
+}
+
+func (repo *SnowflakeRepository) GetViewsInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
+	q := getTablesInSchemaQuery(sfObject, "VIEWS")
+	return repo.getDbEntities(q)
+}
+
+func (repo *SnowflakeRepository) GetColumnsInTable(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
+	q := getColumnsInTableQuery(sfObject)
+	_, err := repo.getDbEntities(q)
+
+	if err != nil {
+		return nil, err
+	}
+
+	q = "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))"
+
+	return repo.getDbEntities(q)
+}
+
+func (repo *SnowflakeRepository) getDbEntities(query string) ([]dbEntity, error) {
+	rows, _, err := repo.query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	var dbs []dbEntity
+	err = scan.Rows(&dbs, rows)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = CheckSFLimitExceeded(query, len(dbs))
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching db entitities: %s", err.Error())
+	}
+
+	return dbs, nil
+}
+
 func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, error) {
 	logger.Debug(fmt.Sprintf("Sending query: %s", query))
 	startQuery := time.Now()
@@ -165,4 +259,17 @@ func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, 
 	repo.queryTime += sec
 
 	return result, sec, err
+}
+
+func getSchemasInDatabaseQuery(dbName string) string {
+	//nolint // %q does not yield expected results
+	return fmt.Sprintf(`SHOW SCHEMAS IN DATABASE "%s"`, dbName)
+}
+
+func getTablesInSchemaQuery(sfObject *common.SnowflakeObject, tableLevelObject string) string {
+	return fmt.Sprintf(`SHOW %s IN SCHEMA %s`, tableLevelObject, sfObject.GetFullName(true))
+}
+
+func getColumnsInTableQuery(sfObject *common.SnowflakeObject) string {
+	return fmt.Sprintf(`SHOW COLUMNS IN TABLE %s`, sfObject.GetFullName(true))
 }

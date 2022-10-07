@@ -2,6 +2,12 @@ package snowflake
 
 import "fmt"
 
+// Data Source
+type dbEntity struct {
+	Name    string  `db:"name"`
+	Comment *string `db:"comment"`
+}
+
 // Identity Store
 type userEntity struct {
 	Name        string `db:"name"`
