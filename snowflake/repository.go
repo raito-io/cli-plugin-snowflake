@@ -193,6 +193,7 @@ func (repo *SnowflakeRepository) GetShares() ([]dbEntity, error) {
 	}
 
 	q = "select \"database_name\" as \"name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'"
+
 	return repo.getDbEntities(q)
 }
 
@@ -225,6 +226,7 @@ func (repo *SnowflakeRepository) GetColumnsInTable(sfObject *common.SnowflakeObj
 	}
 
 	q = "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))"
+
 	return repo.getDbEntities(q)
 }
 

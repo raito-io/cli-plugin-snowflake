@@ -176,6 +176,7 @@ func (s *DataSourceSyncer) readColumnsOfSfObject(repo dataSourceRepository, sfOb
 		logger.Error(fmt.Sprintf("error while syncing columns for table %q between Snowflake and Raito: %s", *sfObjectTable.Table, err.Error()))
 		return fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", *sfObjectTable.Table, err.Error())
 	}
+
 	return nil
 }
 
@@ -224,6 +225,7 @@ func (s *DataSourceSyncer) readSchemaInDatabase(repo dataSourceRepository, datab
 	if err != nil {
 		return nil, err
 	}
+
 	return schemas, nil
 }
 
@@ -250,6 +252,7 @@ func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedData
 	if err != nil {
 		return nil, err
 	}
+
 	return databases, nil
 }
 
@@ -289,6 +292,7 @@ func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludedDatabas
 		excludedDatabases += share.Name
 		sharesMap[share.Name] = struct{}{}
 	}
+
 	return shares, sharesMap, nil
 }
 
@@ -304,11 +308,13 @@ func (s *DataSourceSyncer) readWarehouses(repo dataSourceRepository, dataSourceH
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.DataSourceObjectHandler, entities []dbEntity, doType string, parent string, externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]dbEntity, error) {
 	dbEntities := make([]dbEntity, 0, 20)
+
 	for _, db := range entities {
 		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", doType, db.Name))
 
