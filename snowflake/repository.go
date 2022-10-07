@@ -202,22 +202,22 @@ func (repo *SnowflakeRepository) GetDataBases() ([]dbEntity, error) {
 }
 
 func (repo *SnowflakeRepository) GetSchemaInDatabase(databaseName string) ([]dbEntity, error) {
-	q := fmt.Sprintf(`SHOW SCHEMAS IN DATABASE "%s"`, databaseName)
+	q := getSchemasInDatabaseQuery(databaseName)
 	return repo.getDbEntities(q)
 }
 
 func (repo *SnowflakeRepository) GetTablesInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
-	q := fmt.Sprintf("SHOW SCHEMA IN SCHEMA %s", sfObject.GetFullName(true))
+	q := getTablesInSchemaQuery(sfObject, "TABLES")
 	return repo.getDbEntities(q)
 }
 
 func (repo *SnowflakeRepository) GetViewsInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
-	q := fmt.Sprintf("SHOW VIEWS IN SCHEMA %s", sfObject.GetFullName(true))
+	q := getTablesInSchemaQuery(sfObject, "VIEWS")
 	return repo.getDbEntities(q)
 }
 
 func (repo *SnowflakeRepository) GetColumnsInTable(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
-	q := fmt.Sprintf(`SHOW COLUMNS IN TABLE %s`, sfObject.GetFullName(true))
+	q := getColumnsInTableQuery(sfObject)
 	_, err := repo.getDbEntities(q)
 
 	if err != nil {
@@ -257,4 +257,17 @@ func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, 
 	repo.queryTime += sec
 
 	return result, sec, err
+}
+
+func getSchemasInDatabaseQuery(dbName string) string {
+	//nolint // %q does not yield expected results
+	return fmt.Sprintf(`SHOW SCHEMAS IN DATABASE "%s"`, dbName)
+}
+
+func getTablesInSchemaQuery(sfObject *common.SnowflakeObject, tableLevelObject string) string {
+	return fmt.Sprintf(`SHOW %s IN SCHEMA %s`, tableLevelObject, sfObject.GetFullName(true))
+}
+
+func getColumnsInTableQuery(sfObject *common.SnowflakeObject) string {
+	return fmt.Sprintf(`SHOW COLUMNS IN TABLE %s`, sfObject.GetFullName(true))
 }

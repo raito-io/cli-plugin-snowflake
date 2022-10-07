@@ -1003,7 +1003,7 @@ func createGrantsForDatabase(conn *sql.DB, permissions []string, database string
 		sfObject.Schema = &schemas[i].Name
 		grants = append(grants, Grant{"USAGE", fmt.Sprintf("SCHEMA %s", sfObject.GetFullName(true))})
 
-		tables, _ := readDbEntities(conn, getTablesInSchemaQuery(sfObject, "TABLES"))
+		tables, _ := readDbEntities(conn, getTablesInSchemaQuery(&sfObject, "TABLES"))
 		for j := range tables {
 			for _, p := range permissions {
 				sfObject.Table = &tables[j].Name
@@ -1245,6 +1245,26 @@ func getSnowflakePermissions(permission string) []string {
 	logger.Warn(fmt.Sprintf("Unknown raito permission %q found. Mapping as is", permission))
 
 	return []string{permission}
+}
+
+func readDbEntities(conn *sql.DB, query string) ([]dbEntity, error) {
+	rows, err := conn.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("error while querying Snowflake: %s", err.Error())
+	}
+	var dbs []dbEntity
+	err = scan.Rows(&dbs, rows)
+
+	if err != nil {
+		return nil, fmt.Errorf("error while querying Snowflake: %s", err.Error())
+	}
+	err = CheckSFLimitExceeded(query, len(dbs))
+
+	if err != nil {
+		return nil, fmt.Errorf("error while querying Snowflake: %s", err.Error())
+	}
+
+	return dbs, nil
 }
 
 type roleEntity struct {

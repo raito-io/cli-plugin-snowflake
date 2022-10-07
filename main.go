@@ -21,7 +21,8 @@ func main() {
 	logger.SetLevel(hclog.Debug)
 
 	err := base.RegisterPlugins(wrappers.IdentityStoreSync(snowflake.NewIdentityStoreSyncer()),
-		&snowflake.DataSourceSyncer{}, &snowflake.AccessSyncer{},
+		wrappers.DataSourceSync(snowflake.NewDataSourceSyncer()),
+		&snowflake.AccessSyncer{},
 		wrappers.DataUsageSync(snowflake.NewDataUsageSyncer()), &info.InfoImpl{
 			Info: plugin.PluginInfo{
 				Name:    "Snowflake",

@@ -13,6 +13,7 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
+//go:generate go run github.com/vektra/mockery/v2 --name=dataSourceRepository --with-expecter --inpackage
 type dataSourceRepository interface {
 	Close() error
 	TotalQueryTime() time.Duration
@@ -129,7 +130,8 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 				err = s.readColumnsOfSfObject(repo, &sfObjectView, dataSourceHandler, doTypePrefix)
 				if err != nil {
 					if strings.Contains(err.Error(), "Insufficient privileges to operate on table") {
-						logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito. The snowflake user should either have OWNERSHIP or SELECT permissions on the underlying table", view.Name))
+						logger.Warn(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito. The snowflake user should either have OWNERSHIP or SELECT permissions on the underlying table", view.Name))
+						logger.Debug(fmt.Sprintf("Privileges error: %s", err.Error()))
 					} else {
 						logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))
 						return fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error())
@@ -647,17 +649,4 @@ func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
 			},
 		},
 	}
-}
-
-func getSchemasInDatabaseQuery(dbName string) string {
-	//nolint // %q does not yield expected results
-	return fmt.Sprintf(`SHOW SCHEMAS IN DATABASE "%s"`, dbName)
-}
-
-func getTablesInSchemaQuery(sfObject common.SnowflakeObject, tableLevelObject string) string {
-	return fmt.Sprintf(`SHOW %s IN SCHEMA %s`, tableLevelObject, sfObject.GetFullName(true))
-}
-
-func getColumnsInTableQuery(sfObject common.SnowflakeObject) string {
-	return fmt.Sprintf(`SHOW COLUMNS IN TABLE %s`, sfObject.GetFullName(true))
 }
