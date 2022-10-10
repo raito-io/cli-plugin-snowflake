@@ -1,6 +1,12 @@
 package snowflake
 
-import "fmt"
+import (
+	"database/sql"
+	"fmt"
+)
+
+// Implementation of Scanner interface for NullString
+type NullString sql.NullString
 
 // Data Source
 type dbEntity struct {
@@ -41,4 +47,59 @@ type QueryDbEntities struct {
 func (entity QueryDbEntities) String() string {
 	return fmt.Sprintf("ID: %s, Status: %s, SQL Query: %s, DatabaseName: %s, SchemaName: %s, UserName: %s, RoleName: %s, StartTime: %s, EndTime: %s, DirectObjectsAccessed: %v, BaseObjectsAccess: %v",
 		entity.ExternalId, entity.Status, entity.Query, entity.DatabaseName.String, entity.SchemaName.String, entity.User, entity.Role, entity.StartTime, entity.EndTime, entity.DirectObjectsAccessed, entity.BaseObjectsAccessed)
+}
+
+// Data Access
+type roleEntity struct {
+	Name            string `db:"name"`
+	AssignedToUsers int    `db:"assigned_to_users"`
+	GrantedToRoles  int    `db:"granted_to_roles"`
+	GrantedRoles    int    `db:"granted_roles"`
+	Owner           string `db:"owner"`
+}
+
+type grantOfRole struct {
+	GrantedTo   string `db:"granted_to"`
+	GranteeName string `db:"grantee_name"`
+}
+
+type grantToRole struct {
+	Privilege string `db:"privilege"`
+	GrantedOn string `db:"granted_on"`
+	Name      string `db:"name"`
+}
+
+type Grant struct {
+	Permissions string
+	On          string
+}
+
+type policyEntity struct {
+	Name         string `db:"name"`
+	DatabaseName string `db:"database_name"`
+	SchemaName   string `db:"schema_name"`
+	Kind         string `db:"kind"`
+	Owner        string `db:"owner"`
+}
+
+type desribePolicyEntity struct {
+	Name string `db:"name"`
+	Body string `db:"body"`
+}
+
+type policyReferenceEntity struct {
+	POLICY_DB            string     `db:"POLICY_DB"`
+	POLICY_SCHEMA        string     `db:"POLICY_SCHEMA"`
+	POLICY_NAME          string     `db:"POLICY_NAME"`
+	POLICY_KIND          string     `db:"POLICY_KIND"`
+	REF_DATABASE_NAME    string     `db:"REF_DATABASE_NAME"`
+	REF_SCHEMA_NAME      string     `db:"REF_SCHEMA_NAME"`
+	REF_ENTITY_NAME      string     `db:"REF_ENTITY_NAME"`
+	REF_ENTITY_DOMAIN    string     `db:"REF_ENTITY_DOMAIN"`
+	REF_COLUMN_NAME      NullString `db:"REF_COLUMN_NAME"`
+	REF_ARG_COLUMN_NAMES NullString `db:"REF_ARG_COLUMN_NAMES"`
+	TAG_DATABASE         NullString `db:"TAG_DATABASE"`
+	TAG_SCHEMA           NullString `db:"TAG_SCHEMA"`
+	TAG_NAME             NullString `db:"TAG_NAME"`
+	POLICY_STATUS        string     `db:"POLICY_STATUS"`
 }
