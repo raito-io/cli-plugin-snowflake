@@ -85,21 +85,21 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 
 	logger.Info("Reading roles from Snowflake")
 
-	err = s.importAccess(ctx, accessProviderHandler, configMap, repo)
+	err = s.importAccess(accessProviderHandler, configMap, repo)
 	if err != nil {
 		return err
 	}
 
 	logger.Info("Reading masking policies from")
 
-	err = s.importMaskingPolicies(ctx, accessProviderHandler, configMap, repo)
+	err = s.importMaskingPolicies(accessProviderHandler, repo)
 	if err != nil {
 		return err
 	}
 
 	logger.Info("Reading row access policies from Snowflake")
 
-	err = s.importRowAccessPolicies(ctx, accessProviderHandler, configMap, repo)
+	err = s.importRowAccessPolicies(accessProviderHandler, repo)
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func getShareNames(repo dataAccessRepository) (map[string]struct{}, error) {
 	return shares, nil
 }
 
-func (s *AccessSyncer) importAccess(ctx context.Context, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
+func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
 	ownersToExclude := ""
 	if v, ok := configMap.Parameters[SfExcludedOwners]; ok && v != nil {
 		ownersToExclude = v.(string)
@@ -244,134 +244,140 @@ func (s *AccessSyncer) importAccess(ctx context.Context, accessProviderHandler w
 	accessProviderMap := make(map[string]*exporter.AccessProvider)
 
 	for _, roleEntity := range roleEntities {
-		logger.Info("Reading SnowFlake ROLE " + roleEntity.Name)
-		// get users granted OF role
-
-		// check if Role Owner is part of the ones that should be notInternalizable
-		for _, i := range strings.Split(ownersToExclude, ",") {
-			if strings.EqualFold(i, roleEntity.Owner) {
-				ROLES_NOTINTERNALIZABLE = append(ROLES_NOTINTERNALIZABLE, roleEntity.Name)
-			}
-		}
-
-		grantOfEntities, err := repo.GetGrantsOfRole(roleEntity.Name)
+		err = s.importAccessForRole(roleEntity, ownersToExclude, repo, accessProviderMap, shares, accessProviderHandler)
 		if err != nil {
 			return err
-		}
-
-		// get objects granted TO role
-		grantToEntities, err := repo.GetGrantsToRole(roleEntity.Name)
-		if err != nil {
-			return err
-		}
-
-		users := make([]string, 0)
-		accessProviders := make([]string, 0)
-
-		for _, grantee := range grantOfEntities {
-			if grantee.GrantedTo == "USER" {
-				users = append(users, grantee.GranteeName)
-			} else if grantee.GrantedTo == "ROLE" {
-				accessProviders = append(accessProviders, grantee.GranteeName)
-			}
-		}
-
-		da, f := accessProviderMap[roleEntity.Name]
-		if !f {
-			accessProviderMap[roleEntity.Name] = &exporter.AccessProvider{
-				ExternalId: roleEntity.Name,
-				Name:       roleEntity.Name,
-				NamingHint: roleEntity.Name,
-				Action:     exporter.Grant,
-				Access: []*exporter.Access{
-					{
-						ActualName: roleEntity.Name,
-						Who: &exporter.WhoItem{
-							Users:           users,
-							AccessProviders: accessProviders,
-							Groups:          []string{},
-						},
-						What: make([]exporter.WhatItem, 0),
-					},
-				},
-			}
-			da = accessProviderMap[roleEntity.Name]
-		} else {
-			da.Access[0].Who.Users = users
-		}
-
-		var do *ds.DataObjectReference
-		permissions := make([]string, 0)
-
-		sharesApplied := make(map[string]struct{}, 0)
-
-		for k, object := range grantToEntities {
-			if k == 0 {
-				sfObject := common.ParseFullName(object.Name)
-				do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: object.GrantedOn}
-			} else if do.FullName != object.Name {
-				if len(permissions) > 0 {
-					da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
-						DataObject:  do,
-						Permissions: permissions,
-					})
-				}
-				sfObject := common.ParseFullName(object.Name)
-				do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: object.GrantedOn}
-				permissions = make([]string, 0)
-			}
-
-			if do.Type == "ACCOUNT" {
-				do.Type = "DATASOURCE"
-			}
-
-			// We do not import USAGE as this is handled separately in the data access export
-			if !strings.EqualFold("USAGE", object.Privilege) {
-				if _, f := ACCEPTED_TYPES[strings.ToUpper(object.GrantedOn)]; f {
-					permissions = append(permissions, object.Privilege)
-				}
-
-				database_name := strings.Split(object.Name, ".")[0]
-				if _, f := shares[database_name]; f {
-					if _, f := sharesApplied[database_name]; strings.EqualFold(object.GrantedOn, "TABLE") && !f {
-						da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
-							DataObject:  &ds.DataObjectReference{FullName: database_name, Type: "shared-" + ds.Database},
-							Permissions: []string{"IMPORTED PRIVILEGES"},
-						})
-						sharesApplied[database_name] = struct{}{}
-					}
-
-					if !strings.HasPrefix(do.Type, "SHARED") {
-						do.Type = "SHARED-" + do.Type
-					}
-				}
-			}
-
-			if k == len(grantToEntities)-1 && len(permissions) > 0 {
-				da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
-					DataObject:  do,
-					Permissions: permissions,
-				})
-			}
-		}
-	}
-
-	for _, da := range accessProviderMap {
-		if isNotInternizableRole(da.Name) {
-			logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", da.Name))
-			da.NotInternalizable = true
-		}
-
-		err = accessProviderHandler.AddAccessProviders(da)
-		if err != nil {
-			fmt.Errorf("error adding access provider to import file: %s", err.Error())
 		}
 	}
 
 	return nil
 }
 
-func (s *AccessSyncer) importPoliciesOfType(ctx context.Context, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap, repo dataAccessRepository, policyType string, action exporter.Action) error {
+func (s *AccessSyncer) importAccessForRole(roleEntity roleEntity, ownersToExclude string, repo dataAccessRepository, accessProviderMap map[string]*exporter.AccessProvider, shares map[string]struct{}, accessProviderHandler wrappers.AccessProviderHandler) error {
+	logger.Info("Reading SnowFlake ROLE " + roleEntity.Name)
+	// get users granted OF role
+
+	// check if Role Owner is part of the ones that should be notInternalizable
+	for _, i := range strings.Split(ownersToExclude, ",") {
+		if strings.EqualFold(i, roleEntity.Owner) {
+			ROLES_NOTINTERNALIZABLE = append(ROLES_NOTINTERNALIZABLE, roleEntity.Name)
+		}
+	}
+
+	grantOfEntities, err := repo.GetGrantsOfRole(roleEntity.Name)
+	if err != nil {
+		return err
+	}
+
+	// get objects granted TO role
+	grantToEntities, err := repo.GetGrantsToRole(roleEntity.Name)
+	if err != nil {
+		return err
+	}
+
+	users := make([]string, 0)
+	accessProviders := make([]string, 0)
+
+	for _, grantee := range grantOfEntities {
+		if grantee.GrantedTo == "USER" {
+			users = append(users, grantee.GranteeName)
+		} else if grantee.GrantedTo == "ROLE" {
+			accessProviders = append(accessProviders, grantee.GranteeName)
+		}
+	}
+
+	da, f := accessProviderMap[roleEntity.Name]
+	if !f {
+		accessProviderMap[roleEntity.Name] = &exporter.AccessProvider{
+			ExternalId: roleEntity.Name,
+			Name:       roleEntity.Name,
+			NamingHint: roleEntity.Name,
+			Action:     exporter.Grant,
+			Access: []*exporter.Access{
+				{
+					ActualName: roleEntity.Name,
+					Who: &exporter.WhoItem{
+						Users:           users,
+						AccessProviders: accessProviders,
+						Groups:          []string{},
+					},
+					What: make([]exporter.WhatItem, 0),
+				},
+			},
+		}
+		da = accessProviderMap[roleEntity.Name]
+	} else {
+		da.Access[0].Who.Users = users
+	}
+
+	var do *ds.DataObjectReference
+	permissions := make([]string, 0)
+
+	sharesApplied := make(map[string]struct{}, 0)
+
+	for k, object := range grantToEntities {
+		if k == 0 {
+			sfObject := common.ParseFullName(object.Name)
+			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: object.GrantedOn}
+		} else if do.FullName != object.Name {
+			if len(permissions) > 0 {
+				da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
+					DataObject:  do,
+					Permissions: permissions,
+				})
+			}
+			sfObject := common.ParseFullName(object.Name)
+			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: object.GrantedOn}
+			permissions = make([]string, 0)
+		}
+
+		if do.Type == "ACCOUNT" {
+			do.Type = "DATASOURCE"
+		}
+
+		// We do not import USAGE as this is handled separately in the data access export
+		if !strings.EqualFold("USAGE", object.Privilege) {
+			if _, f := ACCEPTED_TYPES[strings.ToUpper(object.GrantedOn)]; f {
+				permissions = append(permissions, object.Privilege)
+			}
+
+			database_name := strings.Split(object.Name, ".")[0]
+			if _, f := shares[database_name]; f {
+				if _, f := sharesApplied[database_name]; strings.EqualFold(object.GrantedOn, "TABLE") && !f {
+					da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
+						DataObject:  &ds.DataObjectReference{FullName: database_name, Type: "shared-" + ds.Database},
+						Permissions: []string{"IMPORTED PRIVILEGES"},
+					})
+					sharesApplied[database_name] = struct{}{}
+				}
+
+				if !strings.HasPrefix(do.Type, "SHARED") {
+					do.Type = "SHARED-" + do.Type
+				}
+			}
+		}
+
+		if k == len(grantToEntities)-1 && len(permissions) > 0 {
+			da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
+				DataObject:  do,
+				Permissions: permissions,
+			})
+		}
+	}
+
+	if isNotInternizableRole(da.Name) {
+		logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", da.Name))
+		da.NotInternalizable = true
+	}
+
+	err = accessProviderHandler.AddAccessProviders(da)
+	if err != nil {
+		fmt.Errorf("error adding access provider to import file: %s", err.Error())
+	}
+	return nil
+}
+
+func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, policyType string, action exporter.Action) error {
 	policyEntities, err := repo.GetPolicies(policyType)
 	if err != nil {
 		return fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())
@@ -408,10 +414,13 @@ func (s *AccessSyncer) importPoliciesOfType(ctx context.Context, accessProviderH
 		}
 
 		if len(desribeMaskingPolicyEntities) != 1 {
-			logger.Error(fmt.Sprintf("Found %d definitions for %s policy %s.%s.%s, only expecting one", len(desribeMaskingPolicyEntities), policyType, policy.DatabaseName, policy.SchemaName, policy.Name))
-		} else {
-			ap.Policy = desribeMaskingPolicyEntities[0].Body
+			err = fmt.Errorf("found %d definitions for %s policy %s.%s.%s, only expecting one", len(desribeMaskingPolicyEntities), policyType, policy.DatabaseName, policy.SchemaName, policy.Name)
+			logger.Error(err.Error())
+
+			return err
 		}
+
+		ap.Policy = desribeMaskingPolicyEntities[0].Body
 
 		// get policy references
 		policyReferenceEntities, err := repo.GetPolicyReferences(policy.DatabaseName, policy.SchemaName, policy.Name)
@@ -455,12 +464,12 @@ func (s *AccessSyncer) importPoliciesOfType(ctx context.Context, accessProviderH
 	return nil
 }
 
-func (s *AccessSyncer) importMaskingPolicies(ctx context.Context, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
-	return s.importPoliciesOfType(ctx, accessProviderHandler, configMap, repo, "MASKING", exporter.Mask)
+func (s *AccessSyncer) importMaskingPolicies(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository) error {
+	return s.importPoliciesOfType(accessProviderHandler, repo, "MASKING", exporter.Mask)
 }
 
-func (s *AccessSyncer) importRowAccessPolicies(ctx context.Context, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
-	return s.importPoliciesOfType(ctx, accessProviderHandler, configMap, repo, "ROW ACCESS", exporter.Filtered)
+func (s *AccessSyncer) importRowAccessPolicies(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository) error {
+	return s.importPoliciesOfType(accessProviderHandler, repo, "ROW ACCESS", exporter.Filtered)
 }
 
 func isNotInternizableRole(role string) bool {
