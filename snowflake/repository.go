@@ -1,6 +1,7 @@
 package snowflake
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"reflect"
@@ -8,12 +9,11 @@ import (
 	"time"
 
 	"github.com/blockloop/scan"
+	"github.com/hashicorp/go-multierror"
+	sf "github.com/snowflakedb/gosnowflake"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
-
-// Implementation of Scanner interface for NullString
-type NullString sql.NullString
 
 func (nullString *NullString) Scan(value interface{}) error {
 	var ns sql.NullString
@@ -137,6 +137,176 @@ func (repo *SnowflakeRepository) CheckAccessHistoryAvailability(historyTable str
 	return false, nil
 }
 
+func (repo *SnowflakeRepository) GetRoles() ([]roleEntity, error) {
+	return repo.GetRolesWithPrefix("")
+}
+
+func (repo *SnowflakeRepository) GetRolesWithPrefix(prefix string) ([]roleEntity, error) {
+	q := "SHOW ROLES"
+
+	if prefix != "" {
+		q += " LIKE '" + prefix + "%'"
+	}
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	var roleEntities []roleEntity
+
+	err = scan.Rows(&roleEntities, rows)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching all roles: %s", err.Error())
+	}
+
+	err = CheckSFLimitExceeded(q, len(roleEntities))
+	if err != nil {
+		return nil, fmt.Errorf("error while finding existing roles: %s", err.Error())
+	}
+
+	return roleEntities, nil
+}
+
+func (repo *SnowflakeRepository) CreateRole(roleName string, comment string) error {
+	q := common.FormatQuery(`CREATE OR REPLACE ROLE %s COMMENT=%s`, roleName, comment)
+
+	_, _, err := repo.query(q)
+
+	return err
+}
+
+func (repo *SnowflakeRepository) DropRole(roleName string) error {
+	q := common.FormatQuery(`DROP ROLE %s`, roleName)
+
+	_, _, err := repo.query(q)
+
+	return err
+}
+
+func (repo *SnowflakeRepository) GetGrantsOfRole(roleName string) ([]grantOfRole, error) {
+	q := common.FormatQuery(`SHOW GRANTS OF ROLE %s`, roleName)
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	grantOfEntities := make([]grantOfRole, 0)
+
+	err = scan.Rows(&grantOfEntities, rows)
+	if err != nil {
+		logger.Error(err.Error())
+
+		return nil, fmt.Errorf("error fetching grants of role: %s", err.Error())
+	}
+
+	return grantOfEntities, nil
+}
+
+func (repo *SnowflakeRepository) GetGrantsToRole(roleName string) ([]grantToRole, error) {
+	q := common.FormatQuery(`SHOW GRANTS TO ROLE %s`, roleName)
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	grantToEntities := make([]grantToRole, 0)
+
+	err = scan.Rows(&grantToEntities, rows)
+	if err != nil {
+		logger.Error(err.Error())
+
+		return nil, fmt.Errorf("error fetching grants of role: %s", err.Error())
+	}
+
+	return grantToEntities, nil
+}
+
+func (repo *SnowflakeRepository) GrantRolesToRole(ctx context.Context, role string, roles ...string) error {
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, otherRole := range roles {
+		q := common.FormatQuery(`CREATE ROLE IF NOT EXISTS %s`, otherRole)
+		statementChan <- q
+
+		q = common.FormatQuery(`GRANT ROLE %s TO ROLE %s`, role, otherRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) RevokeRolesFromRole(ctx context.Context, role string, roles ...string) error {
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, otherRole := range roles {
+		q := common.FormatQuery(`REVOKE ROLE %s FROM ROLE %s`, role, otherRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) GrantUsersToRole(ctx context.Context, role string, users ...string) error {
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, user := range users {
+		q := common.FormatQuery(`GRANT ROLE %s TO USER %s`, role, user)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) RevokeUsersFromRole(ctx context.Context, role string, users ...string) error {
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, user := range users {
+		q := common.FormatQuery(`REVOKE ROLE %s FROM USER %s`, role, user)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) ExecuteGrant(perm, on, role string) error {
+	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
+	q := fmt.Sprintf(`GRANT %s ON %s TO ROLE %s`, perm, on, role)
+	logger.Debug("Executing grant query", "query", q)
+
+	_, _, err := repo.query(q)
+
+	if err != nil {
+		return fmt.Errorf("error while executing grant query on Snowflake for role %q: %s", role, err.Error())
+	}
+
+	return nil
+}
+
+func (repo *SnowflakeRepository) ExecuteRevoke(perm, on, role string) error {
+	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
+	// q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
+	q := fmt.Sprintf(`REVOKE %s ON %s FROM ROLE %s`, perm, on, role)
+	logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
+
+	_, _, err := repo.query(q)
+	if err != nil {
+		return fmt.Errorf("error while executing revoke query on Snowflake for role %q: %s", role, err.Error())
+	}
+
+	return nil
+}
+
 func (repo *SnowflakeRepository) GetUsers() ([]userEntity, error) {
 	q := "SHOW USERS"
 
@@ -157,6 +327,60 @@ func (repo *SnowflakeRepository) GetUsers() ([]userEntity, error) {
 	}
 
 	return userRows, nil
+}
+
+func (repo *SnowflakeRepository) GetPolicies(policy string) ([]policyEntity, error) {
+	q := fmt.Sprintf("SHOW %s POLICIES", policy)
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	var policyEntities []policyEntity
+
+	err = scan.Rows(&policyEntities, rows)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching all masking policies: %s", err.Error())
+	}
+
+	return policyEntities, nil
+}
+
+func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, policyName string) ([]desribePolicyEntity, error) {
+	q := common.FormatQuery("DESCRIBE "+policyType+" POLICY %s.%s.%s", dbName, schema, policyName)
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	var desribeMaskingPolicyEntities []desribePolicyEntity
+
+	err = scan.Rows(&desribeMaskingPolicyEntities, rows)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())
+	}
+
+	return desribeMaskingPolicyEntities, nil
+}
+
+func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error) {
+	q := fmt.Sprintf(`select * from table(%s.information_schema.policy_references(policy_name => '%s'))`, dbName, common.FormatQuery(`%s.%s.%s`, dbName, schema, policyName))
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	var policyReferenceEntities []policyReferenceEntity
+
+	err = scan.Rows(&policyReferenceEntities, rows)
+	if err != nil {
+		return nil, err
+	}
+
+	return policyReferenceEntities, nil
 }
 
 func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
@@ -230,6 +454,14 @@ func (repo *SnowflakeRepository) GetColumnsInTable(sfObject *common.SnowflakeObj
 	return repo.getDbEntities(q)
 }
 
+func (repo *SnowflakeRepository) CommentIfExists(comment, objectType, objectName string) error {
+	q := fmt.Sprintf(`COMMENT IF EXISTS ON %s %s IS '%s'`, objectType, objectName, comment)
+
+	_, _, err := repo.query(q)
+
+	return err
+}
+
 func (repo *SnowflakeRepository) getDbEntities(query string) ([]dbEntity, error) {
 	rows, _, err := repo.query(query)
 	if err != nil {
@@ -259,6 +491,69 @@ func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, 
 	repo.queryTime += sec
 
 	return result, sec, err
+}
+
+func (repo *SnowflakeRepository) execMultiStatements(ctx context.Context) (chan string, chan error) {
+	maxStatementsPerTransaction := 200
+
+	statementChannel := make(chan string, maxStatementsPerTransaction)
+	done := make(chan error)
+
+	go func() {
+		statements := make([]string, 0, maxStatementsPerTransaction)
+
+		var statementError error
+
+		var totalDuration time.Duration
+		totalStatements := 0
+
+		for {
+			statement, more := <-statementChannel
+			if more {
+				statements = append(statements, statement)
+				if len(statements) == maxStatementsPerTransaction {
+					sec, err := repo.execContext(ctx, statements)
+					if err != nil {
+						statementError = multierror.Append(statementError, err)
+					}
+
+					totalDuration += sec
+					totalStatements += maxStatementsPerTransaction
+					statements = make([]string, 0, maxStatementsPerTransaction)
+				}
+			} else {
+				if len(statements) > 0 {
+					sec, err := repo.execContext(ctx, statements)
+					if err != nil {
+						statementError = multierror.Append(statementError, err)
+					}
+
+					totalDuration += sec
+					totalStatements += len(statements)
+				}
+				done <- statementError
+				break
+			}
+		}
+
+		logger.Debug(fmt.Sprintf("executed %d statements in %s", totalStatements, totalDuration))
+	}()
+
+	return statementChannel, done
+}
+
+func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []string) (time.Duration, error) {
+	multiContext, _ := sf.WithMultiStatement(ctx, len(statements))
+
+	query := strings.Join(statements, "; ")
+	logger.Debug(fmt.Sprintf("Sending queries: %s", query))
+
+	startQuery := time.Now()
+	_, err := repo.conn.ExecContext(multiContext, query)
+	sec := time.Since(startQuery).Round(time.Millisecond)
+	repo.queryTime += sec
+
+	return sec, err
 }
 
 func getSchemasInDatabaseQuery(dbName string) string {

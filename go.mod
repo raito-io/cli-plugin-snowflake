@@ -5,7 +5,8 @@ go 1.18
 require (
 	github.com/blockloop/scan v1.3.0
 	github.com/hashicorp/go-hclog v1.2.0
-	github.com/raito-io/cli v0.23.5
+	github.com/hashicorp/go-multierror v1.1.1
+	github.com/raito-io/cli v0.23.6
 	github.com/sirupsen/logrus v1.8.1
 	github.com/snowflakedb/gosnowflake v1.6.10
 	github.com/stretchr/testify v1.8.0
@@ -36,6 +37,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/flatbuffers v2.0.0+incompatible // indirect
 	github.com/google/uuid v1.3.0 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-plugin v1.4.3 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
