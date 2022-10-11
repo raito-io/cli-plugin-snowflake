@@ -532,7 +532,7 @@ func (repo *SnowflakeRepository) execMultiStatements(ctx context.Context) (chan 
 	return statementChannel, done
 }
 
-func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []string) (time.Duration, error) {
+func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []string) (time.Duration, error) { //nolint:unparam
 	multiContext, _ := sf.WithMultiStatement(ctx, len(statements))
 
 	query := strings.Join(statements, "; ")

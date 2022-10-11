@@ -208,6 +208,7 @@ func (s *AccessSyncer) removeRolesToRemove(rolesToRemove []string, repo dataAcce
 	} else {
 		logger.Info("No old Raito roles to remove in Snowflake")
 	}
+
 	return nil
 }
 
@@ -372,8 +373,9 @@ func (s *AccessSyncer) importAccessForRole(roleEntity roleEntity, ownersToExclud
 
 	err = accessProviderHandler.AddAccessProviders(da)
 	if err != nil {
-		fmt.Errorf("error adding access provider to import file: %s", err.Error())
+		return fmt.Errorf("error adding access provider to import file: %s", err.Error())
 	}
+
 	return nil
 }
 
