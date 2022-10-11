@@ -504,35 +504,45 @@ func (repo *SnowflakeRepository) execMultiStatements(ctx context.Context) (chan 
 
 		var statementError error
 
+		var totalDuration time.Duration
+		totalStatements := 0
+
 		for {
 			statement, more := <-statementChannel
 			if more {
 				statements = append(statements, statement)
 				if len(statements) == maxStatementsPerTransaction {
-					_, err := repo.execContext(ctx, statements)
+					sec, err := repo.execContext(ctx, statements)
 					if err != nil {
 						statementError = multierror.Append(statementError, err)
 					}
 
+					totalDuration += sec
+					totalStatements += maxStatementsPerTransaction
 					statements = make([]string, 0, maxStatementsPerTransaction)
 				}
 			} else {
 				if len(statements) > 0 {
-					_, err := repo.execContext(ctx, statements)
+					sec, err := repo.execContext(ctx, statements)
 					if err != nil {
 						statementError = multierror.Append(statementError, err)
 					}
+
+					totalDuration += sec
+					totalStatements += len(statements)
 				}
 				done <- statementError
-				return
+				break
 			}
 		}
+
+		logger.Debug(fmt.Sprintf("executed %d statements in %s", totalStatements, totalDuration))
 	}()
 
 	return statementChannel, done
 }
 
-func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []string) (time.Duration, error) { //nolint:unparam
+func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []string) (time.Duration, error) {
 	multiContext, _ := sf.WithMultiStatement(ctx, len(statements))
 
 	query := strings.Join(statements, "; ")
