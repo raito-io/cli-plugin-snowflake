@@ -37,19 +37,19 @@ var ACCEPTED_TYPES = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABA
 type dataAccessRepository interface {
 	Close() error
 	TotalQueryTime() time.Duration
-	GetShares() ([]dbEntity, error)
-	GetRoles() ([]roleEntity, error)
-	GetRolesWithPrefix(prefix string) ([]roleEntity, error)
-	GetGrantsOfRole(roleName string) ([]grantOfRole, error)
-	GetGrantsToRole(roleName string) ([]grantToRole, error)
+	GetShares() ([]DbEntity, error)
+	GetRoles() ([]RoleEntity, error)
+	GetRolesWithPrefix(prefix string) ([]RoleEntity, error)
+	GetGrantsOfRole(roleName string) ([]GrantOfRole, error)
+	GetGrantsToRole(roleName string) ([]GrantToRole, error)
 	GetPolicies(policy string) ([]policyEntity, error)
 	DescribePolicy(policyType, dbName, schema, policyName string) ([]desribePolicyEntity, error)
 	GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error)
 	DropRole(roleName string) error
 	ExecuteGrant(perm, on, role string) error
 	ExecuteRevoke(perm, on, role string) error
-	GetTablesInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error)
-	GetSchemaInDatabase(databaseName string) ([]dbEntity, error)
+	GetTablesInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error)
+	GetSchemaInDatabase(databaseName string) ([]DbEntity, error)
 	CommentIfExists(comment, objectType, objectName string) error
 	GrantUsersToRole(ctx context.Context, role string, users ...string) error
 	RevokeUsersFromRole(ctx context.Context, role string, users ...string) error
@@ -90,18 +90,20 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 		return err
 	}
 
-	logger.Info("Reading masking policies from")
+	if v, f := configMap.Parameters[SfStandardEdition]; !f || !(v.(bool)) {
+		logger.Info("Reading masking policies from Snowflake")
 
-	err = s.importMaskingPolicies(accessProviderHandler, repo)
-	if err != nil {
-		return err
-	}
+		err = s.importMaskingPolicies(accessProviderHandler, repo)
+		if err != nil {
+			return err
+		}
 
-	logger.Info("Reading row access policies from Snowflake")
+		logger.Info("Reading row access policies from Snowflake")
 
-	err = s.importRowAccessPolicies(accessProviderHandler, repo)
-	if err != nil {
-		return err
+		err = s.importRowAccessPolicies(accessProviderHandler, repo)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -254,7 +256,7 @@ func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProvide
 	return nil
 }
 
-func (s *AccessSyncer) importAccessForRole(roleEntity roleEntity, ownersToExclude string, repo dataAccessRepository, accessProviderMap map[string]*exporter.AccessProvider, shares map[string]struct{}, accessProviderHandler wrappers.AccessProviderHandler) error {
+func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, ownersToExclude string, repo dataAccessRepository, accessProviderMap map[string]*exporter.AccessProvider, shares map[string]struct{}, accessProviderHandler wrappers.AccessProviderHandler) error {
 	logger.Info("Reading SnowFlake ROLE " + roleEntity.Name)
 	// get users granted OF role
 

@@ -60,16 +60,6 @@ func QuerySnowflake(conn *sql.DB, query string) (*sql.Rows, error) {
 	return rows, nil
 }
 
-func ConnectAndQuery(params map[string]interface{}, role, query string) (*sql.Rows, error) {
-	conn, err := ConnectToSnowflake(params, role)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	return QuerySnowflake(conn, query)
-}
-
 func CheckSFLimitExceeded(query string, size int) error {
 	if size >= SfLimit {
 		return fmt.Errorf("query (%s) exceeded the maximum of %d elements supported by Snowflake. This will lead to unexpected and faulty behavior. You may need to use another integration method or this is simply currently not supported", query, size)

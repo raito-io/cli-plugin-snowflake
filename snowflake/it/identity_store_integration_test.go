@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/raito-io/cli/base/identity_store"
 	"github.com/raito-io/cli/base/wrappers/mocks"
 	"github.com/stretchr/testify/suite"
 
@@ -31,6 +32,24 @@ func (s *IdentityStoreTestSuite) TestIdentityStoreSync() {
 
 	//Then
 	s.NoError(err)
-	s.True(len(identityHandler.Users) > 0)
+
+	s.True(len(identityHandler.Users) >= 3)
+	s.Contains(identityHandler.Users, identity_store.User{
+		ExternalId:       "SNOWFLAKE",
+		Name:             "SNOWFLAKE",
+		UserName:         "SNOWFLAKE",
+		Email:            "",
+		GroupExternalIds: nil,
+		Tags:             nil,
+	})
+	s.Contains(identityHandler.Users, identity_store.User{
+		ExternalId:       snowflakeUserName,
+		Name:             snowflakeUserName,
+		UserName:         snowflakeUserName,
+		Email:            "",
+		GroupExternalIds: nil,
+		Tags:             nil,
+	})
+
 	s.Empty(identityHandler.Groups)
 }

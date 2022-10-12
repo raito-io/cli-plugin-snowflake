@@ -9,13 +9,13 @@ import (
 type NullString sql.NullString
 
 // Data Source
-type dbEntity struct {
+type DbEntity struct {
 	Name    string  `db:"name"`
 	Comment *string `db:"comment"`
 }
 
 // Identity Store
-type userEntity struct {
+type UserEntity struct {
 	Name        string `db:"name"`
 	LoginName   string `db:"login_name"`
 	DisplayName string `db:"display_name"`
@@ -50,7 +50,7 @@ func (entity QueryDbEntities) String() string {
 }
 
 // Data Access
-type roleEntity struct {
+type RoleEntity struct {
 	Name            string `db:"name"`
 	AssignedToUsers int    `db:"assigned_to_users"`
 	GrantedToRoles  int    `db:"granted_to_roles"`
@@ -58,12 +58,12 @@ type roleEntity struct {
 	Owner           string `db:"owner"`
 }
 
-type grantOfRole struct {
+type GrantOfRole struct {
 	GrantedTo   string `db:"granted_to"`
 	GranteeName string `db:"grantee_name"`
 }
 
-type grantToRole struct {
+type GrantToRole struct {
 	Privilege string `db:"privilege"`
 	GrantedOn string `db:"granted_on"`
 	Name      string `db:"name"`

@@ -69,7 +69,7 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 
 	logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", *minTime, *maxTime, numRows))
 
-	columns := s.getColumnNames("db", "useColumnName")
+	columns := GetQueryDbEntitiesColumnNames("db", "useColumnName")
 
 	currentBatch := 0
 
@@ -157,7 +157,7 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	return nil
 }
 
-func (s *DataUsageSyncer) getColumnNames(tag string, includeTag string) []string {
+func GetQueryDbEntitiesColumnNames(tag string, includeTag string) []string {
 	columNames := []string{}
 	val := reflect.ValueOf(QueryDbEntities{})
 

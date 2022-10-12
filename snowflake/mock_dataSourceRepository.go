@@ -59,15 +59,15 @@ func (_c *mockDataSourceRepository_Close_Call) Return(_a0 error) *mockDataSource
 }
 
 // GetColumnsInTable provides a mock function with given fields: sfObject
-func (_m *mockDataSourceRepository) GetColumnsInTable(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
+func (_m *mockDataSourceRepository) GetColumnsInTable(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
 	ret := _m.Called(sfObject)
 
-	var r0 []dbEntity
-	if rf, ok := ret.Get(0).(func(*common.SnowflakeObject) []dbEntity); ok {
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func(*common.SnowflakeObject) []DbEntity); ok {
 		r0 = rf(sfObject)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dbEntity)
+			r0 = ret.Get(0).([]DbEntity)
 		}
 	}
 
@@ -99,21 +99,21 @@ func (_c *mockDataSourceRepository_GetColumnsInTable_Call) Run(run func(sfObject
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetColumnsInTable_Call) Return(_a0 []dbEntity, _a1 error) *mockDataSourceRepository_GetColumnsInTable_Call {
+func (_c *mockDataSourceRepository_GetColumnsInTable_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetColumnsInTable_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
 // GetDataBases provides a mock function with given fields:
-func (_m *mockDataSourceRepository) GetDataBases() ([]dbEntity, error) {
+func (_m *mockDataSourceRepository) GetDataBases() ([]DbEntity, error) {
 	ret := _m.Called()
 
-	var r0 []dbEntity
-	if rf, ok := ret.Get(0).(func() []dbEntity); ok {
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dbEntity)
+			r0 = ret.Get(0).([]DbEntity)
 		}
 	}
 
@@ -144,21 +144,21 @@ func (_c *mockDataSourceRepository_GetDataBases_Call) Run(run func()) *mockDataS
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetDataBases_Call) Return(_a0 []dbEntity, _a1 error) *mockDataSourceRepository_GetDataBases_Call {
+func (_c *mockDataSourceRepository_GetDataBases_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetDataBases_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
 // GetSchemaInDatabase provides a mock function with given fields: databaseName
-func (_m *mockDataSourceRepository) GetSchemaInDatabase(databaseName string) ([]dbEntity, error) {
+func (_m *mockDataSourceRepository) GetSchemaInDatabase(databaseName string) ([]DbEntity, error) {
 	ret := _m.Called(databaseName)
 
-	var r0 []dbEntity
-	if rf, ok := ret.Get(0).(func(string) []dbEntity); ok {
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func(string) []DbEntity); ok {
 		r0 = rf(databaseName)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dbEntity)
+			r0 = ret.Get(0).([]DbEntity)
 		}
 	}
 
@@ -190,21 +190,21 @@ func (_c *mockDataSourceRepository_GetSchemaInDatabase_Call) Run(run func(databa
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetSchemaInDatabase_Call) Return(_a0 []dbEntity, _a1 error) *mockDataSourceRepository_GetSchemaInDatabase_Call {
+func (_c *mockDataSourceRepository_GetSchemaInDatabase_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetSchemaInDatabase_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
 // GetShares provides a mock function with given fields:
-func (_m *mockDataSourceRepository) GetShares() ([]dbEntity, error) {
+func (_m *mockDataSourceRepository) GetShares() ([]DbEntity, error) {
 	ret := _m.Called()
 
-	var r0 []dbEntity
-	if rf, ok := ret.Get(0).(func() []dbEntity); ok {
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dbEntity)
+			r0 = ret.Get(0).([]DbEntity)
 		}
 	}
 
@@ -235,7 +235,7 @@ func (_c *mockDataSourceRepository_GetShares_Call) Run(run func()) *mockDataSour
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetShares_Call) Return(_a0 []dbEntity, _a1 error) *mockDataSourceRepository_GetShares_Call {
+func (_c *mockDataSourceRepository_GetShares_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetShares_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
@@ -284,15 +284,15 @@ func (_c *mockDataSourceRepository_GetSnowFlakeAccountName_Call) Return(_a0 stri
 }
 
 // GetTablesInSchema provides a mock function with given fields: sfObject
-func (_m *mockDataSourceRepository) GetTablesInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
+func (_m *mockDataSourceRepository) GetTablesInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
 	ret := _m.Called(sfObject)
 
-	var r0 []dbEntity
-	if rf, ok := ret.Get(0).(func(*common.SnowflakeObject) []dbEntity); ok {
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func(*common.SnowflakeObject) []DbEntity); ok {
 		r0 = rf(sfObject)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dbEntity)
+			r0 = ret.Get(0).([]DbEntity)
 		}
 	}
 
@@ -324,21 +324,21 @@ func (_c *mockDataSourceRepository_GetTablesInSchema_Call) Run(run func(sfObject
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetTablesInSchema_Call) Return(_a0 []dbEntity, _a1 error) *mockDataSourceRepository_GetTablesInSchema_Call {
+func (_c *mockDataSourceRepository_GetTablesInSchema_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetTablesInSchema_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
 // GetViewsInSchema provides a mock function with given fields: sfObject
-func (_m *mockDataSourceRepository) GetViewsInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
+func (_m *mockDataSourceRepository) GetViewsInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
 	ret := _m.Called(sfObject)
 
-	var r0 []dbEntity
-	if rf, ok := ret.Get(0).(func(*common.SnowflakeObject) []dbEntity); ok {
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func(*common.SnowflakeObject) []DbEntity); ok {
 		r0 = rf(sfObject)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dbEntity)
+			r0 = ret.Get(0).([]DbEntity)
 		}
 	}
 
@@ -370,21 +370,21 @@ func (_c *mockDataSourceRepository_GetViewsInSchema_Call) Run(run func(sfObject 
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetViewsInSchema_Call) Return(_a0 []dbEntity, _a1 error) *mockDataSourceRepository_GetViewsInSchema_Call {
+func (_c *mockDataSourceRepository_GetViewsInSchema_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetViewsInSchema_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
 // GetWarehouses provides a mock function with given fields:
-func (_m *mockDataSourceRepository) GetWarehouses() ([]dbEntity, error) {
+func (_m *mockDataSourceRepository) GetWarehouses() ([]DbEntity, error) {
 	ret := _m.Called()
 
-	var r0 []dbEntity
-	if rf, ok := ret.Get(0).(func() []dbEntity); ok {
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dbEntity)
+			r0 = ret.Get(0).([]DbEntity)
 		}
 	}
 
@@ -415,7 +415,7 @@ func (_c *mockDataSourceRepository_GetWarehouses_Call) Run(run func()) *mockData
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetWarehouses_Call) Return(_a0 []dbEntity, _a1 error) *mockDataSourceRepository_GetWarehouses_Call {
+func (_c *mockDataSourceRepository_GetWarehouses_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetWarehouses_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }

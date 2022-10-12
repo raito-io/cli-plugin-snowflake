@@ -18,13 +18,13 @@ type dataSourceRepository interface {
 	Close() error
 	TotalQueryTime() time.Duration
 	GetSnowFlakeAccountName() (string, error)
-	GetWarehouses() ([]dbEntity, error)
-	GetShares() ([]dbEntity, error)
-	GetDataBases() ([]dbEntity, error)
-	GetSchemaInDatabase(databaseName string) ([]dbEntity, error)
-	GetTablesInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error)
-	GetViewsInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error)
-	GetColumnsInTable(sfObject *common.SnowflakeObject) ([]dbEntity, error)
+	GetWarehouses() ([]DbEntity, error)
+	GetShares() ([]DbEntity, error)
+	GetDataBases() ([]DbEntity, error)
+	GetSchemaInDatabase(databaseName string) ([]DbEntity, error)
+	GetTablesInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error)
+	GetViewsInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error)
+	GetColumnsInTable(sfObject *common.SnowflakeObject) ([]DbEntity, error)
 }
 
 type DataSourceSyncer struct {
@@ -144,7 +144,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	return nil
 }
 
-func (s *DataSourceSyncer) readViewsInSchema(repo dataSourceRepository, sfObject *common.SnowflakeObject, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]dbEntity, error) {
+func (s *DataSourceSyncer) readViewsInSchema(repo dataSourceRepository, sfObject *common.SnowflakeObject, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]DbEntity, error) {
 	views, err := repo.GetViewsInSchema(sfObject)
 	if err != nil {
 		return nil, err
@@ -180,7 +180,7 @@ func (s *DataSourceSyncer) readColumnsOfSfObject(repo dataSourceRepository, sfOb
 	return nil
 }
 
-func (s *DataSourceSyncer) readTablesInSchema(repo dataSourceRepository, sfObject *common.SnowflakeObject, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]dbEntity, error) {
+func (s *DataSourceSyncer) readTablesInSchema(repo dataSourceRepository, sfObject *common.SnowflakeObject, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]DbEntity, error) {
 	tables, err := repo.GetTablesInSchema(sfObject)
 	if err != nil {
 		return nil, err
@@ -198,7 +198,7 @@ func (s *DataSourceSyncer) readTablesInSchema(repo dataSourceRepository, sfObjec
 	return tables, nil
 }
 
-func (s *DataSourceSyncer) readSchemaInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas string, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]dbEntity, error) {
+func (s *DataSourceSyncer) readSchemaInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas string, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]DbEntity, error) {
 	schemas, err := repo.GetSchemaInDatabase(databaseName)
 	if err != nil {
 		return nil, err
@@ -229,7 +229,7 @@ func (s *DataSourceSyncer) readSchemaInDatabase(repo dataSourceRepository, datab
 	return schemas, nil
 }
 
-func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler) ([]dbEntity, error) {
+func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler) ([]DbEntity, error) {
 	databases, err := repo.GetDataBases()
 	if err != nil {
 		return nil, err
@@ -256,7 +256,7 @@ func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedData
 	return databases, nil
 }
 
-func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler) ([]dbEntity, map[string]struct{}, error) {
+func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler) ([]DbEntity, map[string]struct{}, error) {
 	// main reason is that for export they can only have "IMPORTED PRIVILEGES" granted on the shared db level and nothing else.
 	// for now we can just exclude them but they need to be treated later on
 	shares, err := repo.GetShares()
@@ -312,8 +312,8 @@ func (s *DataSourceSyncer) readWarehouses(repo dataSourceRepository, dataSourceH
 	return nil
 }
 
-func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.DataSourceObjectHandler, entities []dbEntity, doType string, parent string, externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]dbEntity, error) {
-	dbEntities := make([]dbEntity, 0, 20)
+func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.DataSourceObjectHandler, entities []DbEntity, doType string, parent string, externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]DbEntity, error) {
+	dbEntities := make([]DbEntity, 0, 20)
 
 	for _, db := range entities {
 		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", doType, db.Name))

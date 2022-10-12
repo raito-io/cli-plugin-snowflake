@@ -58,15 +58,15 @@ func (_c *mockIdentityStoreRepository_Close_Call) Return(_a0 error) *mockIdentit
 }
 
 // GetUsers provides a mock function with given fields:
-func (_m *mockIdentityStoreRepository) GetUsers() ([]userEntity, error) {
+func (_m *mockIdentityStoreRepository) GetUsers() ([]UserEntity, error) {
 	ret := _m.Called()
 
-	var r0 []userEntity
-	if rf, ok := ret.Get(0).(func() []userEntity); ok {
+	var r0 []UserEntity
+	if rf, ok := ret.Get(0).(func() []UserEntity); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]userEntity)
+			r0 = ret.Get(0).([]UserEntity)
 		}
 	}
 
@@ -97,7 +97,7 @@ func (_c *mockIdentityStoreRepository_GetUsers_Call) Run(run func()) *mockIdenti
 	return _c
 }
 
-func (_c *mockIdentityStoreRepository_GetUsers_Call) Return(_a0 []userEntity, _a1 error) *mockIdentityStoreRepository_GetUsers_Call {
+func (_c *mockIdentityStoreRepository_GetUsers_Call) Return(_a0 []UserEntity, _a1 error) *mockIdentityStoreRepository_GetUsers_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }

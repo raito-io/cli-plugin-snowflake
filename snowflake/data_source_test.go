@@ -41,38 +41,38 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	repoMock.EXPECT().Close().Return(nil).Once()
 	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
 	repoMock.EXPECT().GetSnowFlakeAccountName().Return("SnowflakeAccountName", nil).Once()
-	repoMock.EXPECT().GetWarehouses().Return([]dbEntity{
+	repoMock.EXPECT().GetWarehouses().Return([]DbEntity{
 		{Name: "Warehouse1"},
 		{Name: "Warehouse2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetShares().Return([]dbEntity{
+	repoMock.EXPECT().GetShares().Return([]DbEntity{
 		{Name: "Share1"}, {Name: "Share2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetDataBases().Return([]dbEntity{
+	repoMock.EXPECT().GetDataBases().Return([]DbEntity{
 		{Name: "Database1"}, {Name: "Database2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetSchemaInDatabase("Database1").Return([]dbEntity{
+	repoMock.EXPECT().GetSchemaInDatabase("Database1").Return([]DbEntity{
 		{Name: "schema1"},
 	}, nil).Once()
-	repoMock.EXPECT().GetSchemaInDatabase("Database2").Return([]dbEntity{}, nil).Once()
+	repoMock.EXPECT().GetSchemaInDatabase("Database2").Return([]DbEntity{}, nil).Once()
 
-	repoMock.EXPECT().GetSchemaInDatabase("Share1").Return([]dbEntity{}, nil).Once()
-	repoMock.EXPECT().GetSchemaInDatabase("Share2").Return([]dbEntity{
+	repoMock.EXPECT().GetSchemaInDatabase("Share1").Return([]DbEntity{}, nil).Once()
+	repoMock.EXPECT().GetSchemaInDatabase("Share2").Return([]DbEntity{
 		{Name: "schema2"},
 	}, nil).Once()
 
 	repoMock.EXPECT().GetTablesInSchema(mock.MatchedBy(func(sfObject *common.SnowflakeObject) bool {
 		return *sfObject.Schema == "schema1"
-	})).Return([]dbEntity{{Name: "Table1"}, {Name: "Table2"}}, nil).Once()
+	})).Return([]DbEntity{{Name: "Table1"}, {Name: "Table2"}}, nil).Once()
 	repoMock.EXPECT().GetTablesInSchema(mock.MatchedBy(func(sfObject *common.SnowflakeObject) bool {
 		return *sfObject.Schema == "schema2"
-	})).Return([]dbEntity{{Name: "Table3"}}, nil).Once()
+	})).Return([]DbEntity{{Name: "Table3"}}, nil).Once()
 
-	repoMock.EXPECT().GetColumnsInTable(mock.Anything).Return([]dbEntity{{Name: "IDColumn"}}, nil).Times(4)
+	repoMock.EXPECT().GetColumnsInTable(mock.Anything).Return([]DbEntity{{Name: "IDColumn"}}, nil).Times(4)
 	repoMock.EXPECT().GetViewsInSchema(mock.MatchedBy(func(sfObject *common.SnowflakeObject) bool {
 		return *sfObject.Schema == "schema1"
-	})).Return([]dbEntity{{Name: " View1"}}, nil).Once()
-	repoMock.EXPECT().GetViewsInSchema(mock.Anything).Return([]dbEntity{}, nil).Once()
+	})).Return([]DbEntity{{Name: " View1"}}, nil).Once()
+	repoMock.EXPECT().GetViewsInSchema(mock.Anything).Return([]DbEntity{}, nil).Once()
 
 	syncer := createSyncer(repoMock)
 
@@ -117,7 +117,7 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter(t *testing.T) {
 
 	comment := "Comment"
 
-	entities := []dbEntity{{Name: "Object1", Comment: &comment}, {Name: "Object2"}, {Name: "ObjectToFilter"}, {Name: "FilterByFullName"}}
+	entities := []DbEntity{{Name: "Object1", Comment: &comment}, {Name: "Object2"}, {Name: "ObjectToFilter"}, {Name: "FilterByFullName"}}
 	doType := "doType"
 	parent := "DB1.Schema1"
 	filter := func(name string, fullName string) bool {
@@ -157,7 +157,7 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter(t *testing.T) {
 		ExternalId:       "external-Object2",
 	})
 
-	assert.Equal(t, []dbEntity{{Name: "Object1", Comment: &comment}, {Name: "Object2"}}, returnedEntities)
+	assert.Equal(t, []DbEntity{{Name: "Object1", Comment: &comment}, {Name: "Object2"}}, returnedEntities)
 }
 
 func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter_ErrorOnAddDataObjects(t *testing.T) {
@@ -165,7 +165,7 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter_ErrorOnAddDataO
 	dataSourceObjectHandlerMock := mocks.NewDataSourceObjectHandler(t)
 	dataSourceObjectHandlerMock.EXPECT().AddDataObjects(mock.Anything).Return(fmt.Errorf("boom"))
 
-	entities := []dbEntity{{Name: "Object1"}, {Name: "Object2"}, {Name: "ObjectToFilter"}, {Name: "FilterByFullName"}}
+	entities := []DbEntity{{Name: "Object1"}, {Name: "Object2"}, {Name: "ObjectToFilter"}, {Name: "FilterByFullName"}}
 	doType := "doType"
 	parent := "DB1.Schema1"
 	filter := func(name string, fullName string) bool {
@@ -195,7 +195,7 @@ func TestDataSourceSyncer_SyncDataSource_readWarehouses(t *testing.T) {
 	repoMock := newMockDataSourceRepository(t)
 	dataSourceObjectHandlerMock := mocks.NewSimpleDataSourceObjectHandler(t, 1)
 
-	repoMock.EXPECT().GetWarehouses().Return([]dbEntity{
+	repoMock.EXPECT().GetWarehouses().Return([]DbEntity{
 		{Name: "Warehouse1"},
 		{Name: "Warehouse2"},
 	}, nil).Once()
@@ -229,7 +229,7 @@ func TestDataSourceSyncer_SyncDataSource_readShares(t *testing.T) {
 
 	excludedDatabases := "ExcludeShare1,ExcludeShare2"
 
-	repoMock.EXPECT().GetShares().Return([]dbEntity{
+	repoMock.EXPECT().GetShares().Return([]DbEntity{
 		{Name: "Share1"}, {Name: "ExcludeShare1"}, {Name: "Share2"}, {Name: "ExcludeShare2"},
 	}, nil).Once()
 
@@ -254,7 +254,7 @@ func TestDataSourceSyncer_SyncDataSource_readShares(t *testing.T) {
 		ExternalId: "Share2",
 	})
 
-	assert.Equal(t, []dbEntity{{Name: "Share1"}, {Name: "Share2"}}, shares)
+	assert.Equal(t, []DbEntity{{Name: "Share1"}, {Name: "Share2"}}, shares)
 	assert.Equal(t, map[string]struct{}{"Share1": {}, "Share2": {}}, shareMap)
 }
 
@@ -265,7 +265,7 @@ func TestDataSourceSyncer_SyncDataSource_readDatabases(t *testing.T) {
 
 	excludedDatabases := "ExcludeDatabase1,ExcludeDatabase2"
 
-	repoMock.EXPECT().GetDataBases().Return([]dbEntity{
+	repoMock.EXPECT().GetDataBases().Return([]DbEntity{
 		{Name: "DB1"}, {Name: "ExcludeDatabase1"}, {Name: "DB2"}, {Name: "ExcludeDatabase2"},
 	}, nil).Once()
 
@@ -291,7 +291,7 @@ func TestDataSourceSyncer_SyncDataSource_readDatabases(t *testing.T) {
 		ExternalId: "DB2",
 	})
 
-	assert.Equal(t, []dbEntity{{Name: "DB1"}, {Name: "DB2"}}, entities)
+	assert.Equal(t, []DbEntity{{Name: "DB1"}, {Name: "DB2"}}, entities)
 }
 
 func TestDataSourceSyncer_SyncDataSource_readSchemaInDatabase(t *testing.T) {
@@ -303,7 +303,7 @@ func TestDataSourceSyncer_SyncDataSource_readSchemaInDatabase(t *testing.T) {
 	excludeSchemas := "ExcludeSchema1,DB1.ExcludeSchema2"
 
 	repoMock.EXPECT().GetSchemaInDatabase(databaseName).Return(
-		[]dbEntity{{Name: "Schema1"}, {Name: "ExcludeSchema1"}, {Name: "ExcludeSchema2"}, {Name: "Schema2"}}, nil).Once()
+		[]DbEntity{{Name: "Schema1"}, {Name: "ExcludeSchema1"}, {Name: "ExcludeSchema2"}, {Name: "Schema2"}}, nil).Once()
 
 	syncer := createSyncer(nil)
 
@@ -328,7 +328,7 @@ func TestDataSourceSyncer_SyncDataSource_readSchemaInDatabase(t *testing.T) {
 		ParentExternalId: "DB1",
 	})
 
-	assert.Equal(t, []dbEntity{{Name: "Schema1"}, {Name: "Schema2"}}, entities)
+	assert.Equal(t, []DbEntity{{Name: "Schema1"}, {Name: "Schema2"}}, entities)
 }
 
 func TestDataSourceSyncer_SyncDataSource_readTablesInSchema(t *testing.T) {
@@ -341,7 +341,7 @@ func TestDataSourceSyncer_SyncDataSource_readTablesInSchema(t *testing.T) {
 
 	sfObject := common.SnowflakeObject{Database: &database, Schema: &schema}
 
-	repoMock.EXPECT().GetTablesInSchema(&sfObject).Return([]dbEntity{
+	repoMock.EXPECT().GetTablesInSchema(&sfObject).Return([]DbEntity{
 		{
 			Name: "Table1",
 		},
@@ -373,7 +373,7 @@ func TestDataSourceSyncer_SyncDataSource_readTablesInSchema(t *testing.T) {
 		ParentExternalId: "DB1.Schema1",
 	})
 
-	assert.Equal(t, []dbEntity{{Name: "Table1"}, {Name: "Table2"}}, entities)
+	assert.Equal(t, []DbEntity{{Name: "Table1"}, {Name: "Table2"}}, entities)
 }
 
 func TestDataSourceSyncer_SyncDataSource_readColumnsOfSfObject(t *testing.T) {
@@ -387,7 +387,7 @@ func TestDataSourceSyncer_SyncDataSource_readColumnsOfSfObject(t *testing.T) {
 
 	sfObject := common.SnowflakeObject{Database: &database, Schema: &schema, Table: &table}
 
-	repoMock.EXPECT().GetColumnsInTable(&sfObject).Return([]dbEntity{
+	repoMock.EXPECT().GetColumnsInTable(&sfObject).Return([]DbEntity{
 		{Name: "Column1"},
 		{Name: "Column2"},
 	}, nil).Once()
@@ -426,7 +426,7 @@ func TestDataSourceSyncer_SyncDataSource_readViewsInSchema(t *testing.T) {
 	schema := "Schema1"
 	sfObject := common.SnowflakeObject{Database: &database, Schema: &schema}
 
-	repoMock.EXPECT().GetViewsInSchema(&sfObject).Return([]dbEntity{
+	repoMock.EXPECT().GetViewsInSchema(&sfObject).Return([]DbEntity{
 		{Name: "View1"}, {Name: "View2"},
 	}, nil).Once()
 
@@ -453,7 +453,7 @@ func TestDataSourceSyncer_SyncDataSource_readViewsInSchema(t *testing.T) {
 		ParentExternalId: "DB1.Schema1",
 	})
 
-	assert.Equal(t, []dbEntity{{Name: "View1"}, {Name: "View2"}}, entities)
+	assert.Equal(t, []DbEntity{{Name: "View1"}, {Name: "View2"}}, entities)
 }
 
 func createSyncer(repo dataSourceRepository) *DataSourceSyncer {

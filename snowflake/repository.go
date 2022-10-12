@@ -137,11 +137,11 @@ func (repo *SnowflakeRepository) CheckAccessHistoryAvailability(historyTable str
 	return false, nil
 }
 
-func (repo *SnowflakeRepository) GetRoles() ([]roleEntity, error) {
+func (repo *SnowflakeRepository) GetRoles() ([]RoleEntity, error) {
 	return repo.GetRolesWithPrefix("")
 }
 
-func (repo *SnowflakeRepository) GetRolesWithPrefix(prefix string) ([]roleEntity, error) {
+func (repo *SnowflakeRepository) GetRolesWithPrefix(prefix string) ([]RoleEntity, error) {
 	q := "SHOW ROLES"
 
 	if prefix != "" {
@@ -153,7 +153,7 @@ func (repo *SnowflakeRepository) GetRolesWithPrefix(prefix string) ([]roleEntity
 		return nil, err
 	}
 
-	var roleEntities []roleEntity
+	var roleEntities []RoleEntity
 
 	err = scan.Rows(&roleEntities, rows)
 	if err != nil {
@@ -184,7 +184,7 @@ func (repo *SnowflakeRepository) DropRole(roleName string) error {
 	return err
 }
 
-func (repo *SnowflakeRepository) GetGrantsOfRole(roleName string) ([]grantOfRole, error) {
+func (repo *SnowflakeRepository) GetGrantsOfRole(roleName string) ([]GrantOfRole, error) {
 	q := common.FormatQuery(`SHOW GRANTS OF ROLE %s`, roleName)
 
 	rows, _, err := repo.query(q)
@@ -192,7 +192,7 @@ func (repo *SnowflakeRepository) GetGrantsOfRole(roleName string) ([]grantOfRole
 		return nil, err
 	}
 
-	grantOfEntities := make([]grantOfRole, 0)
+	grantOfEntities := make([]GrantOfRole, 0)
 
 	err = scan.Rows(&grantOfEntities, rows)
 	if err != nil {
@@ -204,7 +204,7 @@ func (repo *SnowflakeRepository) GetGrantsOfRole(roleName string) ([]grantOfRole
 	return grantOfEntities, nil
 }
 
-func (repo *SnowflakeRepository) GetGrantsToRole(roleName string) ([]grantToRole, error) {
+func (repo *SnowflakeRepository) GetGrantsToRole(roleName string) ([]GrantToRole, error) {
 	q := common.FormatQuery(`SHOW GRANTS TO ROLE %s`, roleName)
 
 	rows, _, err := repo.query(q)
@@ -212,7 +212,7 @@ func (repo *SnowflakeRepository) GetGrantsToRole(roleName string) ([]grantToRole
 		return nil, err
 	}
 
-	grantToEntities := make([]grantToRole, 0)
+	grantToEntities := make([]GrantToRole, 0)
 
 	err = scan.Rows(&grantToEntities, rows)
 	if err != nil {
@@ -307,7 +307,7 @@ func (repo *SnowflakeRepository) ExecuteRevoke(perm, on, role string) error {
 	return nil
 }
 
-func (repo *SnowflakeRepository) GetUsers() ([]userEntity, error) {
+func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 	q := "SHOW USERS"
 
 	rows, _, err := repo.query(q)
@@ -315,7 +315,7 @@ func (repo *SnowflakeRepository) GetUsers() ([]userEntity, error) {
 		return nil, err
 	}
 
-	var userRows []userEntity
+	var userRows []UserEntity
 
 	err = scan.Rows(&userRows, rows)
 	if err != nil {
@@ -403,12 +403,12 @@ func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
 	return r[0], nil
 }
 
-func (repo *SnowflakeRepository) GetWarehouses() ([]dbEntity, error) {
+func (repo *SnowflakeRepository) GetWarehouses() ([]DbEntity, error) {
 	q := "SHOW WAREHOUSES"
 	return repo.getDbEntities(q)
 }
 
-func (repo *SnowflakeRepository) GetShares() ([]dbEntity, error) {
+func (repo *SnowflakeRepository) GetShares() ([]DbEntity, error) {
 	q := "SHOW SHARES"
 	_, err := repo.getDbEntities(q)
 
@@ -421,27 +421,27 @@ func (repo *SnowflakeRepository) GetShares() ([]dbEntity, error) {
 	return repo.getDbEntities(q)
 }
 
-func (repo *SnowflakeRepository) GetDataBases() ([]dbEntity, error) {
+func (repo *SnowflakeRepository) GetDataBases() ([]DbEntity, error) {
 	q := "SHOW DATABASES IN ACCOUNT"
 	return repo.getDbEntities(q)
 }
 
-func (repo *SnowflakeRepository) GetSchemaInDatabase(databaseName string) ([]dbEntity, error) {
+func (repo *SnowflakeRepository) GetSchemaInDatabase(databaseName string) ([]DbEntity, error) {
 	q := getSchemasInDatabaseQuery(databaseName)
 	return repo.getDbEntities(q)
 }
 
-func (repo *SnowflakeRepository) GetTablesInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
+func (repo *SnowflakeRepository) GetTablesInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
 	q := getTablesInSchemaQuery(sfObject, "TABLES")
 	return repo.getDbEntities(q)
 }
 
-func (repo *SnowflakeRepository) GetViewsInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
+func (repo *SnowflakeRepository) GetViewsInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
 	q := getTablesInSchemaQuery(sfObject, "VIEWS")
 	return repo.getDbEntities(q)
 }
 
-func (repo *SnowflakeRepository) GetColumnsInTable(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
+func (repo *SnowflakeRepository) GetColumnsInTable(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
 	q := getColumnsInTableQuery(sfObject)
 	_, err := repo.getDbEntities(q)
 
@@ -462,13 +462,13 @@ func (repo *SnowflakeRepository) CommentIfExists(comment, objectType, objectName
 	return err
 }
 
-func (repo *SnowflakeRepository) getDbEntities(query string) ([]dbEntity, error) {
+func (repo *SnowflakeRepository) getDbEntities(query string) ([]DbEntity, error) {
 	rows, _, err := repo.query(query)
 	if err != nil {
 		return nil, err
 	}
 
-	var dbs []dbEntity
+	var dbs []DbEntity
 	err = scan.Rows(&dbs, rows)
 
 	if err != nil {

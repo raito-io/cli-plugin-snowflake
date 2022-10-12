@@ -4,6 +4,8 @@ package it
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
@@ -16,10 +18,21 @@ import (
 
 type DataAccessTestSuite struct {
 	SnowflakeTestSuite
+	sfRepo *snowflake.SnowflakeRepository
 }
 
 func TestDataAccessTestSuite(t *testing.T) {
 	ts := DataAccessTestSuite{}
+
+	var err error
+	ts.sfRepo, err = snowflake.NewSnowflakeRepository(ts.getConfig().Parameters, "")
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer ts.sfRepo.Close()
+
 	suite.Run(t, &ts)
 }
 
@@ -35,7 +48,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersFromTarget() {
 
 	//Then
 	s.NoError(err)
-	s.True(len(dataAccessProviderHandler.AccessProviders) > 0)
+	s.True(len(dataAccessProviderHandler.AccessProviders) >= 6)
 
 	externalIds := make([]string, len(dataAccessProviderHandler.AccessProviders))
 
@@ -60,31 +73,33 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 
 	access1 := &sync_to_target.Access{
 		Who: sync_to_target.WhoItem{
-			Users: []string{"DIETER@RAITO.IO"},
+			Users: []string{snowflakeUserName},
 		},
 		What: []sync_to_target.WhatItem{
 			{
 				DataObject: &data_source.DataObjectReference{
-					FullName: "ANALYTICS.ANALYTICS.MY_FIRST_DBT_MODEL",
+					FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
 					Type:     "table",
 				},
 				Permissions: []string{"SELECT"},
 			},
 		},
-		Id: "AccessRole1",
+		Id: fmt.Sprintf("%s_AccessRole1", testId),
 	}
 
+	actualRoleName := generateRole("TESTROLE1", "")
+
 	access := map[string]sync_to_target.EnrichedAccess{
-		"TESTROLE1": {
+		actualRoleName: {
 			Access: access1,
 			AccessProvider: &sync_to_target.AccessProvider{
-				Id:          "AccessProvider1",
+				Id:          fmt.Sprintf("%s_ap_id1", testId),
 				Access:      []*sync_to_target.Access{access1},
-				Name:        "AccessProvider1",
+				Name:        fmt.Sprintf("%s_ap1", testId),
 				Action:      sync_to_target.Grant,
-				NamingHint:  "TESTROLE1",
+				NamingHint:  actualRoleName,
 				Delete:      false,
-				Description: "Integration testing",
+				Description: fmt.Sprintf("Integration testing for test %s", testId),
 			},
 		},
 	}
@@ -98,17 +113,31 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 
 	//Then
 	s.NoError(err)
-	s.Len(dataAccessFeedbackHandler.AccessProviderFeedback, 1)
+	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 1)
+
+	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+	s.Len(accessProviderFeedback, 1)
 	s.Equal(map[string][]sync_to_target.AccessSyncFeedbackInformation{
-		"AccessProvider1": {{
-			ActualName: "TESTROLE1",
-			AccessId:   "AccessRole1",
+		fmt.Sprintf("%s_ap_id1", testId): {{
+			ActualName: actualRoleName,
+			AccessId:   fmt.Sprintf("%s_AccessRole1", testId),
 		}},
-	}, dataAccessFeedbackHandler.AccessProviderFeedback)
+	}, accessProviderFeedback)
+
+	roles, err := s.sfRepo.GetRoles()
+	s.NoError(err)
+	s.Contains(roles, snowflake.RoleEntity{
+		Name:            actualRoleName,
+		AssignedToUsers: 1,
+		GrantedToRoles:  0,
+		GrantedRoles:    0,
+		Owner:           "ACCOUNTADMIN",
+	})
 
 	//Given
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T(), 1)
-	rolesToRemove = append(rolesToRemove, "TESTROLE1")
+	rolesToRemove = append(rolesToRemove, actualRoleName)
 	access = make(map[string]sync_to_target.EnrichedAccess)
 
 	//When
@@ -117,39 +146,51 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	//Then
 	s.NoError(err)
 	s.Empty(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+	roles, err = s.sfRepo.GetRoles()
+	s.NoError(err)
+	s.NotContains(roles, snowflake.RoleEntity{
+		Name:            actualRoleName,
+		AssignedToUsers: 1,
+		GrantedToRoles:  0,
+		GrantedRoles:    0,
+		Owner:           "ACCOUNTADMIN",
+	})
 }
 
 func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	//Given
-	prefix := "IT_"
+	prefix := fmt.Sprintf("%s$AAC_", testId)
 
 	access1 := &sync_to_target.Access{
 		Who: sync_to_target.WhoItem{
-			Users: []string{"DIETER@RAITO.IO"},
+			Users: []string{snowflakeUserName},
 		},
 		What: []sync_to_target.WhatItem{
 			{
 				DataObject: &data_source.DataObjectReference{
-					FullName: "ANALYTICS.ANALYTICS.MY_FIRST_DBT_MODEL",
+					FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
 					Type:     "table",
 				},
 				Permissions: []string{"SELECT"},
 			},
 		},
-		Id: "AccessRole1",
+		Id: fmt.Sprintf("%s_AccessRole1", testId),
 	}
 
+	actualRoleName := generateRole("TESTROLE1", prefix)
+
 	access := map[string]sync_to_target.EnrichedAccess{
-		"IT_TESTROLE1": {
+		actualRoleName: {
 			Access: access1,
 			AccessProvider: &sync_to_target.AccessProvider{
-				Id:          "AccessProvider1",
+				Id:          fmt.Sprintf("%s_ap_id1", testId),
 				Access:      []*sync_to_target.Access{access1},
-				Name:        "AccessProvider1",
+				Name:        fmt.Sprintf("%s_ap1", testId),
 				Action:      sync_to_target.Grant,
-				NamingHint:  "TESTROLE1",
+				NamingHint:  actualRoleName,
 				Delete:      false,
-				Description: "Integration testing",
+				Description: fmt.Sprintf("Integration testing for test %s", testId),
 			},
 		},
 	}
@@ -164,6 +205,16 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	//Then
 	s.NoError(err)
 
+	roles, err := s.sfRepo.GetRoles()
+	s.NoError(err)
+	s.Contains(roles, snowflake.RoleEntity{
+		Name:            actualRoleName,
+		AssignedToUsers: 1,
+		GrantedToRoles:  0,
+		GrantedRoles:    0,
+		Owner:           "ACCOUNTADMIN",
+	})
+
 	//Given
 	access = make(map[string]sync_to_target.EnrichedAccess)
 
@@ -172,4 +223,33 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 
 	//Then
 	s.NoError(err)
+
+	roles, err = s.sfRepo.GetRoles()
+	s.NoError(err)
+	s.NotContains(roles, snowflake.RoleEntity{
+		Name:            actualRoleName,
+		AssignedToUsers: 1,
+		GrantedToRoles:  0,
+		GrantedRoles:    0,
+		Owner:           "ACCOUNTADMIN",
+	})
+}
+
+func generateRole(username string, prefix string) string {
+	if prefix == "" {
+		prefix = fmt.Sprintf("%s_", testId)
+	}
+	return strings.ToUpper(fmt.Sprintf("%s_%s", prefix, username))
+}
+
+func filterFeedbackInformation(feedbackInformation map[string][]sync_to_target.AccessSyncFeedbackInformation) map[string][]sync_to_target.AccessSyncFeedbackInformation {
+	result := make(map[string][]sync_to_target.AccessSyncFeedbackInformation)
+
+	for key, feedbackList := range feedbackInformation {
+		if strings.HasPrefix(key, testId) {
+			result[key] = feedbackList
+		}
+	}
+
+	return result
 }
