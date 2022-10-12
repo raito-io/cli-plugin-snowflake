@@ -4,6 +4,7 @@ package it
 
 import (
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/raito-io/cli/base/util/config"
@@ -17,7 +18,7 @@ var (
 	sfUser            string
 	sfPassword        string
 	sfRole            string
-	sfStandardEdition string
+	sfStandardEdition bool
 	lock              = &sync.Mutex{}
 )
 
@@ -30,7 +31,15 @@ func readDatabaseConfig() *config.ConfigMap {
 		sfUser = os.Getenv("SF_USER")
 		sfPassword = os.Getenv("SF_PASSWORD")
 		sfRole = os.Getenv("SF_ROLE")
-		sfStandardEdition = os.Getenv("SF_STANDARD_EDITION")
+
+		if sfStandardStr, sfStandardSet := os.LookupEnv("SF_STANDARD_EDITION"); sfStandardSet {
+			var err error
+			sfStandardEdition, err = strconv.ParseBool(sfStandardStr)
+
+			if err != nil {
+				panic(err)
+			}
+		}
 	}
 
 	return &config.ConfigMap{

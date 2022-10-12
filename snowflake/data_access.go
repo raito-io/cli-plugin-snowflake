@@ -90,8 +90,8 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 		return err
 	}
 
-	if v, f := configMap.Parameters[SfStandardEdition]; !f || !strings.EqualFold(v.(string), "true") {
-		logger.Info("Reading masking policies from")
+	if v, f := configMap.Parameters[SfStandardEdition]; !f || !(v.(bool)) {
+		logger.Info("Reading masking policies from Snowflake")
 
 		err = s.importMaskingPolicies(accessProviderHandler, repo)
 		if err != nil {
