@@ -8,4 +8,5 @@ const (
 	SfExcludedDatabases = "sf-excluded-databases"
 	SfExcludedSchemas   = "sf-excluded-schemas"
 	SfExcludedOwners    = "sf-excluded-owners"
+	SfStandardEdition   = "sf-standard-edition"
 )

@@ -28,34 +28,34 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 
 	repoMock.EXPECT().Close().Return(nil).Once()
 	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-	repoMock.EXPECT().GetShares().Return([]dbEntity{
+	repoMock.EXPECT().GetShares().Return([]DbEntity{
 		{Name: "Share1"}, {Name: "Share2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetRoles().Return([]roleEntity{
+	repoMock.EXPECT().GetRoles().Return([]RoleEntity{
 		{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
 		{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
 		{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "OwnerToExclude2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfRole("Role1").Return([]grantOfRole{
+	repoMock.EXPECT().GetGrantsOfRole("Role1").Return([]GrantOfRole{
 		{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
 		{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToRole("Role1").Return([]grantToRole{
+	repoMock.EXPECT().GetGrantsToRole("Role1").Return([]GrantToRole{
 		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
 		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
 		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
 		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
 	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfRole("Role2").Return([]grantOfRole{
+	repoMock.EXPECT().GetGrantsOfRole("Role2").Return([]GrantOfRole{
 		{GrantedTo: "USER", GranteeName: "GranteeRole2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToRole("Role2").Return([]grantToRole{
+	repoMock.EXPECT().GetGrantsToRole("Role2").Return([]GrantToRole{
 		{GrantedOn: "GrandOnRole2Number1", Name: "GranteeRole2", Privilege: "USAGE"},
 	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfRole("Role3").Return([]grantOfRole{
+	repoMock.EXPECT().GetGrantsOfRole("Role3").Return([]GrantOfRole{
 		{GrantedTo: "ROLE", GranteeName: "GranteeRole3"},
 	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToRole("Role3").Return([]grantToRole{
+	repoMock.EXPECT().GetGrantsToRole("Role3").Return([]GrantToRole{
 		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
 	}, nil).Once()
 	repoMock.EXPECT().GetPolicies("MASKING").Return([]policyEntity{
@@ -206,7 +206,7 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
 	repoMock.EXPECT().DropRole("ToRemove1").Return(nil).Once()
 	repoMock.EXPECT().DropRole("ToRemove2").Return(nil).Once()
-	repoMock.EXPECT().GetRolesWithPrefix("").Return([]roleEntity{
+	repoMock.EXPECT().GetRolesWithPrefix("").Return([]RoleEntity{
 		{Name: "ExistingRole1", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 		{Name: "ExistingRole2", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 	}, nil).Once()
@@ -220,8 +220,8 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName3").Return(nil).Once()
 
-	repoMock.EXPECT().GetGrantsOfRole("ExistingRole1").Return([]grantOfRole{}, nil).Once()
-	repoMock.EXPECT().GetGrantsToRole("ExistingRole1").Return([]grantToRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsOfRole("ExistingRole1").Return([]GrantOfRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToRole("ExistingRole1").Return([]GrantToRole{}, nil).Once()
 
 	repoMock.EXPECT().CommentIfExists(mock.Anything, "ROLE", "ExistingRole1").Return(nil).Once()
 
@@ -363,7 +363,7 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
 	repoMock.EXPECT().DropRole("R_ToRemove1").Return(nil).Once()
 	repoMock.EXPECT().DropRole("R_ToRemove2").Return(nil).Once()
-	repoMock.EXPECT().GetRolesWithPrefix("R_").Return([]roleEntity{
+	repoMock.EXPECT().GetRolesWithPrefix("R_").Return([]RoleEntity{
 		{Name: "R_ToRemove1", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 		{Name: "R_ToRemove2", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 	}, nil).Once()
@@ -793,7 +793,7 @@ func generateAccessControls_schema(t *testing.T) {
 	repoMock.EXPECT().GetTablesInSchema(&common.SnowflakeObject{
 		Database: &database,
 		Schema:   &schema,
-	}).Return([]dbEntity{
+	}).Return([]DbEntity{
 		{Name: "Table3"},
 	}, nil).Once()
 
@@ -837,8 +837,8 @@ func generateAccessControls_existing_schema(t *testing.T) {
 
 	repoMock.EXPECT().CommentIfExists(mock.AnythingOfType("string"), "ROLE", "RoleName1").Return(nil).Once()
 
-	repoMock.EXPECT().GetGrantsOfRole(mock.Anything).Return([]grantOfRole{}, nil)
-	repoMock.EXPECT().GetGrantsToRole(mock.Anything).Return([]grantToRole{}, nil)
+	repoMock.EXPECT().GetGrantsOfRole(mock.Anything).Return([]GrantOfRole{}, nil)
+	repoMock.EXPECT().GetGrantsToRole(mock.Anything).Return([]GrantToRole{}, nil)
 
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 
@@ -853,7 +853,7 @@ func generateAccessControls_existing_schema(t *testing.T) {
 	repoMock.EXPECT().GetTablesInSchema(&common.SnowflakeObject{
 		Database: &database,
 		Schema:   &schema,
-	}).Return([]dbEntity{
+	}).Return([]DbEntity{
 		{Name: "Table3"},
 	}, nil).Once()
 
@@ -950,11 +950,11 @@ func generateAccessControls_database(t *testing.T) {
 	repoMock.EXPECT().GetTablesInSchema(&common.SnowflakeObject{
 		Database: &database,
 		Schema:   &schema,
-	}).Return([]dbEntity{
+	}).Return([]DbEntity{
 		{Name: "Table3"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetSchemaInDatabase("DB1").Return([]dbEntity{
+	repoMock.EXPECT().GetSchemaInDatabase("DB1").Return([]DbEntity{
 		{Name: "Schema2"},
 	}, nil).Once()
 
@@ -1003,8 +1003,8 @@ func generateAccessControls_existing_database(t *testing.T) {
 
 	repoMock.EXPECT().CommentIfExists(mock.AnythingOfType("string"), "ROLE", "RoleName1").Return(nil).Once()
 
-	repoMock.EXPECT().GetGrantsOfRole(mock.Anything).Return([]grantOfRole{}, nil)
-	repoMock.EXPECT().GetGrantsToRole(mock.Anything).Return([]grantToRole{}, nil)
+	repoMock.EXPECT().GetGrantsOfRole(mock.Anything).Return([]GrantOfRole{}, nil)
+	repoMock.EXPECT().GetGrantsToRole(mock.Anything).Return([]GrantToRole{}, nil)
 
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 
@@ -1013,11 +1013,11 @@ func generateAccessControls_existing_database(t *testing.T) {
 	repoMock.EXPECT().GetTablesInSchema(&common.SnowflakeObject{
 		Database: &database,
 		Schema:   &schema,
-	}).Return([]dbEntity{
+	}).Return([]DbEntity{
 		{Name: "Table3"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetSchemaInDatabase("DB1").Return([]dbEntity{
+	repoMock.EXPECT().GetSchemaInDatabase("DB1").Return([]DbEntity{
 		{Name: "Schema2"},
 	}, nil).Once()
 
@@ -1169,14 +1169,14 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CommentIfExists(mock.AnythingOfType("string"), "ROLE", "existingRole1").Return(nil).Once()
-	repoMock.EXPECT().GetGrantsOfRole("existingRole1").Return([]grantOfRole{
+	repoMock.EXPECT().GetGrantsOfRole("existingRole1").Return([]GrantOfRole{
 		{GrantedTo: "USER", GranteeName: "User1"},
 		{GrantedTo: "USER", GranteeName: "User3"},
 		{GrantedTo: "Role", GranteeName: "Role1"},
 		{GrantedTo: "Role", GranteeName: "Role3"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetGrantsToRole("existingRole1").Return([]grantToRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToRole("existingRole1").Return([]GrantToRole{}, nil).Once()
 
 	expectGrantUsersToRole(repoMock, "existingRole1", "User2")
 

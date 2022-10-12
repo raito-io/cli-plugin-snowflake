@@ -303,15 +303,15 @@ func (_c *mockDataAccessRepository_ExecuteRevoke_Call) Return(_a0 error) *mockDa
 }
 
 // GetGrantsOfRole provides a mock function with given fields: roleName
-func (_m *mockDataAccessRepository) GetGrantsOfRole(roleName string) ([]grantOfRole, error) {
+func (_m *mockDataAccessRepository) GetGrantsOfRole(roleName string) ([]GrantOfRole, error) {
 	ret := _m.Called(roleName)
 
-	var r0 []grantOfRole
-	if rf, ok := ret.Get(0).(func(string) []grantOfRole); ok {
+	var r0 []GrantOfRole
+	if rf, ok := ret.Get(0).(func(string) []GrantOfRole); ok {
 		r0 = rf(roleName)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]grantOfRole)
+			r0 = ret.Get(0).([]GrantOfRole)
 		}
 	}
 
@@ -343,21 +343,21 @@ func (_c *mockDataAccessRepository_GetGrantsOfRole_Call) Run(run func(roleName s
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetGrantsOfRole_Call) Return(_a0 []grantOfRole, _a1 error) *mockDataAccessRepository_GetGrantsOfRole_Call {
+func (_c *mockDataAccessRepository_GetGrantsOfRole_Call) Return(_a0 []GrantOfRole, _a1 error) *mockDataAccessRepository_GetGrantsOfRole_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
 // GetGrantsToRole provides a mock function with given fields: roleName
-func (_m *mockDataAccessRepository) GetGrantsToRole(roleName string) ([]grantToRole, error) {
+func (_m *mockDataAccessRepository) GetGrantsToRole(roleName string) ([]GrantToRole, error) {
 	ret := _m.Called(roleName)
 
-	var r0 []grantToRole
-	if rf, ok := ret.Get(0).(func(string) []grantToRole); ok {
+	var r0 []GrantToRole
+	if rf, ok := ret.Get(0).(func(string) []GrantToRole); ok {
 		r0 = rf(roleName)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]grantToRole)
+			r0 = ret.Get(0).([]GrantToRole)
 		}
 	}
 
@@ -389,7 +389,7 @@ func (_c *mockDataAccessRepository_GetGrantsToRole_Call) Run(run func(roleName s
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetGrantsToRole_Call) Return(_a0 []grantToRole, _a1 error) *mockDataAccessRepository_GetGrantsToRole_Call {
+func (_c *mockDataAccessRepository_GetGrantsToRole_Call) Return(_a0 []GrantToRole, _a1 error) *mockDataAccessRepository_GetGrantsToRole_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
@@ -489,15 +489,15 @@ func (_c *mockDataAccessRepository_GetPolicyReferences_Call) Return(_a0 []policy
 }
 
 // GetRoles provides a mock function with given fields:
-func (_m *mockDataAccessRepository) GetRoles() ([]roleEntity, error) {
+func (_m *mockDataAccessRepository) GetRoles() ([]RoleEntity, error) {
 	ret := _m.Called()
 
-	var r0 []roleEntity
-	if rf, ok := ret.Get(0).(func() []roleEntity); ok {
+	var r0 []RoleEntity
+	if rf, ok := ret.Get(0).(func() []RoleEntity); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]roleEntity)
+			r0 = ret.Get(0).([]RoleEntity)
 		}
 	}
 
@@ -528,21 +528,21 @@ func (_c *mockDataAccessRepository_GetRoles_Call) Run(run func()) *mockDataAcces
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetRoles_Call) Return(_a0 []roleEntity, _a1 error) *mockDataAccessRepository_GetRoles_Call {
+func (_c *mockDataAccessRepository_GetRoles_Call) Return(_a0 []RoleEntity, _a1 error) *mockDataAccessRepository_GetRoles_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
 // GetRolesWithPrefix provides a mock function with given fields: prefix
-func (_m *mockDataAccessRepository) GetRolesWithPrefix(prefix string) ([]roleEntity, error) {
+func (_m *mockDataAccessRepository) GetRolesWithPrefix(prefix string) ([]RoleEntity, error) {
 	ret := _m.Called(prefix)
 
-	var r0 []roleEntity
-	if rf, ok := ret.Get(0).(func(string) []roleEntity); ok {
+	var r0 []RoleEntity
+	if rf, ok := ret.Get(0).(func(string) []RoleEntity); ok {
 		r0 = rf(prefix)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]roleEntity)
+			r0 = ret.Get(0).([]RoleEntity)
 		}
 	}
 
@@ -574,21 +574,21 @@ func (_c *mockDataAccessRepository_GetRolesWithPrefix_Call) Run(run func(prefix 
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetRolesWithPrefix_Call) Return(_a0 []roleEntity, _a1 error) *mockDataAccessRepository_GetRolesWithPrefix_Call {
+func (_c *mockDataAccessRepository_GetRolesWithPrefix_Call) Return(_a0 []RoleEntity, _a1 error) *mockDataAccessRepository_GetRolesWithPrefix_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
 // GetSchemaInDatabase provides a mock function with given fields: databaseName
-func (_m *mockDataAccessRepository) GetSchemaInDatabase(databaseName string) ([]dbEntity, error) {
+func (_m *mockDataAccessRepository) GetSchemaInDatabase(databaseName string) ([]DbEntity, error) {
 	ret := _m.Called(databaseName)
 
-	var r0 []dbEntity
-	if rf, ok := ret.Get(0).(func(string) []dbEntity); ok {
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func(string) []DbEntity); ok {
 		r0 = rf(databaseName)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dbEntity)
+			r0 = ret.Get(0).([]DbEntity)
 		}
 	}
 
@@ -620,21 +620,21 @@ func (_c *mockDataAccessRepository_GetSchemaInDatabase_Call) Run(run func(databa
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetSchemaInDatabase_Call) Return(_a0 []dbEntity, _a1 error) *mockDataAccessRepository_GetSchemaInDatabase_Call {
+func (_c *mockDataAccessRepository_GetSchemaInDatabase_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetSchemaInDatabase_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
 // GetShares provides a mock function with given fields:
-func (_m *mockDataAccessRepository) GetShares() ([]dbEntity, error) {
+func (_m *mockDataAccessRepository) GetShares() ([]DbEntity, error) {
 	ret := _m.Called()
 
-	var r0 []dbEntity
-	if rf, ok := ret.Get(0).(func() []dbEntity); ok {
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dbEntity)
+			r0 = ret.Get(0).([]DbEntity)
 		}
 	}
 
@@ -665,21 +665,21 @@ func (_c *mockDataAccessRepository_GetShares_Call) Run(run func()) *mockDataAcce
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetShares_Call) Return(_a0 []dbEntity, _a1 error) *mockDataAccessRepository_GetShares_Call {
+func (_c *mockDataAccessRepository_GetShares_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetShares_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
 // GetTablesInSchema provides a mock function with given fields: sfObject
-func (_m *mockDataAccessRepository) GetTablesInSchema(sfObject *common.SnowflakeObject) ([]dbEntity, error) {
+func (_m *mockDataAccessRepository) GetTablesInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
 	ret := _m.Called(sfObject)
 
-	var r0 []dbEntity
-	if rf, ok := ret.Get(0).(func(*common.SnowflakeObject) []dbEntity); ok {
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func(*common.SnowflakeObject) []DbEntity); ok {
 		r0 = rf(sfObject)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dbEntity)
+			r0 = ret.Get(0).([]DbEntity)
 		}
 	}
 
@@ -711,7 +711,7 @@ func (_c *mockDataAccessRepository_GetTablesInSchema_Call) Run(run func(sfObject
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetTablesInSchema_Call) Return(_a0 []dbEntity, _a1 error) *mockDataAccessRepository_GetTablesInSchema_Call {
+func (_c *mockDataAccessRepository_GetTablesInSchema_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetTablesInSchema_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }

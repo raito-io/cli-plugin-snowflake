@@ -15,7 +15,7 @@ import (
 type identityStoreRepository interface {
 	Close() error
 	TotalQueryTime() time.Duration
-	GetUsers() ([]userEntity, error)
+	GetUsers() ([]UserEntity, error)
 }
 
 type IdentityStoreSyncer struct {

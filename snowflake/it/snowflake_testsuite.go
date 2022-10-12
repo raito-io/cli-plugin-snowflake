@@ -4,6 +4,7 @@ package it
 
 import (
 	"os"
+	"sync"
 
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/stretchr/testify/suite"
@@ -11,29 +12,42 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
 )
 
-type SnowflakeTestSuite struct {
-	suite.Suite
-	sfAccount  string
-	sfUser     string
-	sfPassword string
-	sfRole     string
-	sfDataBase string
+var (
+	sfAccount         string
+	sfUser            string
+	sfPassword        string
+	sfRole            string
+	sfStandardEdition string
+	lock              = &sync.Mutex{}
+)
+
+func readDatabaseConfig() *config.ConfigMap {
+	lock.Lock()
+	defer lock.Unlock()
+
+	if sfAccount == "" {
+		sfAccount = os.Getenv("SF_ACCOUNT")
+		sfUser = os.Getenv("SF_USER")
+		sfPassword = os.Getenv("SF_PASSWORD")
+		sfRole = os.Getenv("SF_ROLE")
+		sfStandardEdition = os.Getenv("SF_STANDARD_EDITION")
+	}
+
+	return &config.ConfigMap{
+		Parameters: map[string]interface{}{
+			snowflake.SfAccount:         sfAccount,
+			snowflake.SfUser:            sfUser,
+			snowflake.SfPassword:        sfPassword,
+			snowflake.SfRole:            sfRole,
+			snowflake.SfStandardEdition: sfStandardEdition,
+		},
+	}
 }
 
-func (s *SnowflakeTestSuite) SetupSuite() {
-	s.sfAccount = os.Getenv("SF_ACCOUNT")
-	s.sfUser = os.Getenv("SF_USER")
-	s.sfPassword = os.Getenv("SF_PASSWORD")
-	s.sfRole = os.Getenv("SF_ROLE")
+type SnowflakeTestSuite struct {
+	suite.Suite
 }
 
 func (s *SnowflakeTestSuite) getConfig() *config.ConfigMap {
-	return &config.ConfigMap{
-		Parameters: map[string]interface{}{
-			snowflake.SfAccount:  s.sfAccount,
-			snowflake.SfUser:     s.sfUser,
-			snowflake.SfPassword: s.sfPassword,
-			snowflake.SfRole:     s.sfRole,
-		},
-	}
+	return readDatabaseConfig()
 }

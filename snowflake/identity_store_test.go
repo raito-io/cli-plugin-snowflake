@@ -23,7 +23,7 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 
 	repoMock.EXPECT().Close().Return(nil)
 	repoMock.EXPECT().TotalQueryTime().Return(time.Second)
-	repoMock.EXPECT().GetUsers().Return([]userEntity{
+	repoMock.EXPECT().GetUsers().Return([]UserEntity{
 		{
 			Name:        "UserName1",
 			DisplayName: "user1",
@@ -100,7 +100,7 @@ func TestNewIdentityStoreSyncer_AddUserError(t *testing.T) {
 
 	repoMock.EXPECT().Close().Return(nil)
 	repoMock.EXPECT().TotalQueryTime().Return(time.Second)
-	repoMock.EXPECT().GetUsers().Return([]userEntity{
+	repoMock.EXPECT().GetUsers().Return([]UserEntity{
 		{
 			Name:        "UserName1",
 			DisplayName: "user1",

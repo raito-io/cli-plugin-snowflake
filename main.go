@@ -46,6 +46,7 @@ func main() {
 					{Name: "sf-excluded-databases", Description: "The optional comma-separated list of databases that should be skipped.", Mandatory: false},
 					{Name: "sf-excluded-schemas", Description: "The optional comma-separated list of schemas that should be skipped. This can either be in a specific database (as <database>.<schema>) or a just a schema name that should be skipped in all databases. By default INFORMATION_SCHEMA is skipped since there are no access controls to manage", Mandatory: false},
 					{Name: "sf-excluded-owners", Description: "The optional comma-separated list of owners that need to be skipped when syncing users or marked as read-only when importing roles as Access Providers. This is typically  used to not synchronize the users that were imported from an external Identity Store (like Okta, Active Directory, ...).", Mandatory: false},
+					{Name: "sf-standard-edition", Description: "If set enterprise features will be disabled", Mandatory: false},
 				},
 			},
 		})
