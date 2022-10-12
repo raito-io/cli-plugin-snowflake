@@ -170,6 +170,138 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 	}, fileCreator.AccessProviders)
 }
 
+func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T) {
+	//Given
+	configParams := config.ConfigMap{
+		Parameters: map[string]interface{}{"key": "value", SfExcludedOwners: "OwnerToExclude1,OwnerToExclude2",
+			SfStandardEdition: true},
+	}
+
+	repoMock := newMockDataAccessRepository(t)
+	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
+
+	repoMock.EXPECT().Close().Return(nil).Once()
+	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+	repoMock.EXPECT().GetShares().Return([]DbEntity{
+		{Name: "Share1"}, {Name: "Share2"},
+	}, nil).Once()
+	repoMock.EXPECT().GetRoles().Return([]RoleEntity{
+		{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
+		{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
+		{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "OwnerToExclude2"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsOfRole("Role1").Return([]GrantOfRole{
+		{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
+		{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsToRole("Role1").Return([]GrantToRole{
+		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
+		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
+		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
+		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsOfRole("Role2").Return([]GrantOfRole{
+		{GrantedTo: "USER", GranteeName: "GranteeRole2"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsToRole("Role2").Return([]GrantToRole{
+		{GrantedOn: "GrandOnRole2Number1", Name: "GranteeRole2", Privilege: "USAGE"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsOfRole("Role3").Return([]GrantOfRole{
+		{GrantedTo: "ROLE", GranteeName: "GranteeRole3"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsToRole("Role3").Return([]GrantToRole{
+		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
+	}, nil).Once()
+
+	syncer := &AccessSyncer{
+		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+			return repoMock, nil
+		},
+	}
+
+	//When
+	err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &configParams)
+
+	//Then
+	assert.NoError(t, err)
+	assert.Equal(t, []sync_from_target.AccessProvider{
+		{
+			ExternalId:        "Role1",
+			NotInternalizable: false,
+			Name:              "Role1",
+			NamingHint:        "Role1",
+			Access: []*sync_from_target.Access{
+				{
+					ActualName: "Role1",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{"GranteeRole1Number1"},
+						Groups:          []string{},
+						AccessProviders: []string{"GranteeRole1Number2"},
+					},
+					What: []sync_from_target.WhatItem{
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "Share2.GranteeRole1Schema",
+								Type:     "SHARED-SCHEMA",
+							},
+							Permissions: []string{"READ"},
+						},
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "DB1.GranteeRole1Table",
+								Type:     "TABLE",
+							},
+							Permissions: []string{"SELECT"},
+						},
+					},
+				},
+			},
+			Action: 1,
+			Policy: "",
+		}, {
+			ExternalId:        "Role2",
+			NotInternalizable: false,
+			Name:              "Role2",
+			NamingHint:        "Role2",
+			Access: []*sync_from_target.Access{
+				{
+					ActualName: "Role2",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{"GranteeRole2"},
+						Groups:          []string{},
+						AccessProviders: []string{},
+					},
+					What: []sync_from_target.WhatItem{},
+				},
+			},
+			Action: 1,
+			Policy: "",
+		}, {
+			ExternalId:        "Role3",
+			NotInternalizable: true,
+			Name:              "Role3",
+			NamingHint:        "Role3",
+			Access: []*sync_from_target.Access{
+				{
+					ActualName: "Role3",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{"GranteeRole3"},
+					},
+					What: []sync_from_target.WhatItem{},
+				},
+			},
+			Action: 1,
+			Policy: "",
+		},
+	}, fileCreator.AccessProviders)
+	repoMock.AssertNotCalled(t, "GetPolicies", "MASKING")
+	repoMock.AssertNotCalled(t, "GetPolicies", "ROW ACCESS")
+	repoMock.AssertNotCalled(t, "DescribePolicy", "MASKING", mock.Anything, mock.Anything, mock.Anything)
+	repoMock.AssertNotCalled(t, "GetPolicyReferences", mock.Anything, mock.Anything, mock.Anything)
+}
+
 func TestAccessSyncer_SyncAccessProvidersFromTarget_ErrorOnConnectingToRepo(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
