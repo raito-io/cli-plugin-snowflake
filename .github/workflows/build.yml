@@ -35,6 +35,7 @@ jobs:
           SF_USER: ${{ secrets.sf_user }}
           SF_PASSWORD: ${{ secrets.sf_password }}
           SF_ROLE: ${{ secrets.sf_role }}
+          SF_STANDARD_EDITION: true
 
       - uses: codecov/codecov-action@v2
         with:
