@@ -402,7 +402,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetPolicies_Masking() {
-	if sfStandardEdition == "true" {
+	if strings.EqualFold(sfStandardEdition, "true") {
 		s.T().Skip("Standard edition do not support masking policies")
 	}
 
@@ -416,7 +416,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetPolicies_Masking() {
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetPolicies_RowAccess() {
-	if sfStandardEdition == "true" {
+	if strings.EqualFold(sfStandardEdition, "true") {
 		s.T().Skip("Standard edition do not support row access policies")
 	}
 
@@ -430,7 +430,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetPolicies_RowAccess() {
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_DescribePolicy_Masking() {
-	if sfStandardEdition == "true" {
+	if strings.EqualFold(sfStandardEdition, "true") {
 		s.T().Skip("Standard edition do not support masking policies")
 	}
 
@@ -438,7 +438,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_DescribePolicy_Masking() {
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_DescribePolicy_RowAccess() {
-	if sfStandardEdition == "true" {
+	if strings.EqualFold(sfStandardEdition, "true") {
 		s.T().Skip("Standard edition do not support row access policies")
 	}
 
@@ -446,7 +446,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_DescribePolicy_RowAccess()
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetPolicyReferences() {
-	if sfStandardEdition == "true" {
+	if strings.EqualFold(sfStandardEdition, "true") {
 		s.T().Skip("Standard edition do not support policy references")
 	}
 
