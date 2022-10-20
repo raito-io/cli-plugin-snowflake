@@ -388,7 +388,8 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 	}
 
 	for _, policy := range policyEntities {
-		if !strings.EqualFold(strings.Replace(policyType, " ", "_", -1), policy.Kind) {
+		if !strings.HasPrefix(strings.Replace(policy.Kind, "_", " ", -1), policyType) {
+			logger.Warn(fmt.Sprintf("Skipping policy %s of kind %s, expected: %s", policy.Name, policyType, policy.Kind))
 			continue
 		}
 

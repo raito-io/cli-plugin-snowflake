@@ -344,6 +344,8 @@ func (repo *SnowflakeRepository) GetPolicies(policy string) ([]policyEntity, err
 		return nil, fmt.Errorf("error fetching all masking policies: %s", err.Error())
 	}
 
+	logger.Info(fmt.Sprintf("Found %d %s policies", len(policyEntities), policy))
+
 	return policyEntities, nil
 }
 
