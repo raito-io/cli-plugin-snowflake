@@ -349,7 +349,7 @@ func (repo *SnowflakeRepository) GetPolicies(policy string) ([]policyEntity, err
 	return policyEntities, nil
 }
 
-func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, policyName string) ([]desribePolicyEntity, error) {
+func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, policyName string) ([]describePolicyEntity, error) {
 	q := common.FormatQuery("DESCRIBE "+policyType+" POLICY %s.%s.%s", dbName, schema, policyName)
 
 	rows, _, err := repo.query(q)
@@ -357,7 +357,7 @@ func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, poli
 		return nil, err
 	}
 
-	var desribeMaskingPolicyEntities []desribePolicyEntity
+	var desribeMaskingPolicyEntities []describePolicyEntity
 
 	err = scan.Rows(&desribeMaskingPolicyEntities, rows)
 	if err != nil {

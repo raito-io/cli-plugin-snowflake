@@ -59,15 +59,21 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
 	}, nil).Once()
 	repoMock.EXPECT().GetPolicies("MASKING").Return([]policyEntity{
-		{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING"},
+		{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING_POLICY"},
 	}, nil).Once()
 	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]policyEntity{
-		{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW ACCESS"},
+		{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
 	}, nil).Once()
-	repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]desribePolicyEntity{
+	repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
 		{Name: "DescribePolicy1", Body: "PolicyBody 1"},
 	}, nil).Once()
+	repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
+		{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
+	}, nil).Once()
 	repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
+		{POLICY_DB: "PolicyDB"},
+	}, nil).Once()
+	repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
 		{POLICY_DB: "PolicyDB"},
 	}, nil).Once()
 
@@ -152,7 +158,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			Action: 1,
 			Policy: "",
-		}, {
+		},
+		{
 			ExternalId:        "DB-schema1-MaskingPolicy1",
 			NotInternalizable: true,
 			Name:              "DB-schema1-MaskingPolicy1",
@@ -166,6 +173,21 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			Action: 3,
 			Policy: "PolicyBody 1",
+		},
+		{
+			ExternalId:        "DB-schema2-RowAccess1",
+			NotInternalizable: true,
+			Name:              "DB-schema2-RowAccess1",
+			NamingHint:        "RowAccess1",
+			Access: []*sync_from_target.Access{
+				{
+					ActualName: "RowAccess1",
+					Who:        nil,
+					What:       []sync_from_target.WhatItem{},
+				},
+			},
+			Action: 4,
+			Policy: "Row Access Policy Body",
 		},
 	}, fileCreator.AccessProviders)
 }
@@ -678,14 +700,14 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 		},
 	}, nil).Once()
 
-	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema1", "Policy1").Return([]desribePolicyEntity{
+	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema1", "Policy1").Return([]describePolicyEntity{
 		{
 			Name: "Policy1",
 			Body: "PolicyBody1",
 		},
 	}, nil).Once()
 
-	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema2", "Policy2").Return([]desribePolicyEntity{
+	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema2", "Policy2").Return([]describePolicyEntity{
 		{
 			Name: "Policy2",
 			Body: "PolicyBody2",
@@ -791,7 +813,7 @@ func TestAccessSyncer_importPoliciesOfType_ErrorOnDescribePolicy(t *testing.T) {
 		},
 	}, nil).Once()
 
-	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema1", "Policy1").Return([]desribePolicyEntity{
+	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema1", "Policy1").Return([]describePolicyEntity{
 		{
 			Name: "Policy1",
 			Body: "PolicyBody1",

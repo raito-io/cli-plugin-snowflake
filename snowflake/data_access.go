@@ -43,7 +43,7 @@ type dataAccessRepository interface {
 	GetGrantsOfRole(roleName string) ([]GrantOfRole, error)
 	GetGrantsToRole(roleName string) ([]GrantToRole, error)
 	GetPolicies(policy string) ([]policyEntity, error)
-	DescribePolicy(policyType, dbName, schema, policyName string) ([]desribePolicyEntity, error)
+	DescribePolicy(policyType, dbName, schema, policyName string) ([]describePolicyEntity, error)
 	GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error)
 	DropRole(roleName string) error
 	ExecuteGrant(perm, on, role string) error

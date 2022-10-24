@@ -82,7 +82,7 @@ type policyEntity struct {
 	Owner        string `db:"owner"`
 }
 
-type desribePolicyEntity struct {
+type describePolicyEntity struct {
 	Name string `db:"name"`
 	Body string `db:"body"`
 }
