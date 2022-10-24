@@ -26,4 +26,4 @@ local*.sh
 raito*.yml
 *raito*.json
 .idea
-coverage.*
+*coverage.*

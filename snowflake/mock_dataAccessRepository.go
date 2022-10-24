@@ -139,15 +139,15 @@ func (_c *mockDataAccessRepository_CreateRole_Call) Return(_a0 error) *mockDataA
 }
 
 // DescribePolicy provides a mock function with given fields: policyType, dbName, schema, policyName
-func (_m *mockDataAccessRepository) DescribePolicy(policyType string, dbName string, schema string, policyName string) ([]desribePolicyEntity, error) {
+func (_m *mockDataAccessRepository) DescribePolicy(policyType string, dbName string, schema string, policyName string) ([]describePolicyEntity, error) {
 	ret := _m.Called(policyType, dbName, schema, policyName)
 
-	var r0 []desribePolicyEntity
-	if rf, ok := ret.Get(0).(func(string, string, string, string) []desribePolicyEntity); ok {
+	var r0 []describePolicyEntity
+	if rf, ok := ret.Get(0).(func(string, string, string, string) []describePolicyEntity); ok {
 		r0 = rf(policyType, dbName, schema, policyName)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]desribePolicyEntity)
+			r0 = ret.Get(0).([]describePolicyEntity)
 		}
 	}
 
@@ -182,7 +182,7 @@ func (_c *mockDataAccessRepository_DescribePolicy_Call) Run(run func(policyType 
 	return _c
 }
 
-func (_c *mockDataAccessRepository_DescribePolicy_Call) Return(_a0 []desribePolicyEntity, _a1 error) *mockDataAccessRepository_DescribePolicy_Call {
+func (_c *mockDataAccessRepository_DescribePolicy_Call) Return(_a0 []describePolicyEntity, _a1 error) *mockDataAccessRepository_DescribePolicy_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
