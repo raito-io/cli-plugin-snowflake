@@ -345,8 +345,8 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.Da
 	return dbEntities, nil
 }
 
-func (s *DataSourceSyncer) GetMetaData() ds.MetaData {
-	logger.Debug("Returning meta data for Snowflake")
+func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
+	logger.Debug("Returning meta data for Snowflake data source")
 
 	return ds.MetaData{
 		Type:              "snowflake",

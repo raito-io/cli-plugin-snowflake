@@ -30,6 +30,14 @@ func newIdentityStoreSnowflakeRepo(params map[string]interface{}, role string) (
 	return NewSnowflakeRepository(params, role)
 }
 
+func (s *IdentityStoreSyncer) GetIdentityStoreMetaData() is.MetaData {
+	logger.Debug("Returning meta data for Snowflake identity store")
+
+	return is.MetaData{
+		Type: "snowflake",
+	}
+}
+
 func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHandler wrappers.IdentityStoreIdentityHandler, configMap *config.ConfigMap) error {
 	repo, err := s.repoProvider(configMap.Parameters, "")
 	if err != nil {

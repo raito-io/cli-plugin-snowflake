@@ -22,7 +22,7 @@ func TestDataSourceSyncer_GetMetaData(t *testing.T) {
 	}}
 
 	//When
-	result := syncer.GetMetaData()
+	result := syncer.GetDataSourceMetaData()
 
 	//Then
 	assert.Equal(t, "snowflake", result.Type)
