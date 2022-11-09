@@ -234,7 +234,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 	repoMock.EXPECT().GetGrantsToRole("Role3").Return([]GrantToRole{
 		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
 	}, nil).Once()
-	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return(nil, fmt.Errorf("error: 000002 (0A000): Unsupported feature 'ROW ACCESS POLICY'.")).Once()
 
 	syncer := &AccessSyncer{
 		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
