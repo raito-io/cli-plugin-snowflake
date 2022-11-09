@@ -384,7 +384,13 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, ownersToExclud
 func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, policyType string, action exporter.Action) error {
 	policyEntities, err := repo.GetPolicies(policyType)
 	if err != nil {
-		return fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())
+		// For standard edition, row access policies are not supported.
+		// You can see you Snowflake edition in the UI, or through the 'show organization accounts;' query (ORGADMIN role needed).
+		if strings.Contains(err.Error(), "Unsupported feature") {
+			logger.Warn(fmt.Sprintf("Could not fetch policies of type %s; unsupported feature.", policyType))
+		} else {
+			return fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())
+		}
 	}
 
 	for _, policy := range policyEntities {
