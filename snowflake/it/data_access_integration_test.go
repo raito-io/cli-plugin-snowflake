@@ -72,9 +72,6 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	rolesToRemove := []string{}
 
 	access1 := &sync_to_target.Access{
-		Who: sync_to_target.WhoItem{
-			Users: []string{snowflakeUserName},
-		},
 		What: []sync_to_target.WhatItem{
 			{
 				DataObject: &data_source.DataObjectReference{
@@ -100,6 +97,9 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 				NamingHint:  actualRoleName,
 				Delete:      false,
 				Description: fmt.Sprintf("Integration testing for test %s", testId),
+				Who: sync_to_target.WhoItem{
+					Users: []string{snowflakeUserName},
+				},
 			},
 		},
 	}
@@ -163,9 +163,6 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	prefix := fmt.Sprintf("%s$AAC_", testId)
 
 	access1 := &sync_to_target.Access{
-		Who: sync_to_target.WhoItem{
-			Users: []string{snowflakeUserName},
-		},
 		What: []sync_to_target.WhatItem{
 			{
 				DataObject: &data_source.DataObjectReference{
@@ -191,6 +188,9 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 				NamingHint:  actualRoleName,
 				Delete:      false,
 				Description: fmt.Sprintf("Integration testing for test %s", testId),
+				Who: sync_to_target.WhoItem{
+					Users: []string{snowflakeUserName},
+				},
 			},
 		},
 	}

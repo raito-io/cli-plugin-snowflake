@@ -296,21 +296,21 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, ownersToExclud
 			Name:       roleEntity.Name,
 			NamingHint: roleEntity.Name,
 			Action:     exporter.Grant,
+			Who: &exporter.WhoItem{
+				Users:           users,
+				AccessProviders: accessProviders,
+				Groups:          []string{},
+			},
 			Access: []*exporter.Access{
 				{
 					ActualName: roleEntity.Name,
-					Who: &exporter.WhoItem{
-						Users:           users,
-						AccessProviders: accessProviders,
-						Groups:          []string{},
-					},
-					What: make([]exporter.WhatItem, 0),
+					What:       make([]exporter.WhatItem, 0),
 				},
 			},
 		}
 		da = accessProviderMap[roleEntity.Name]
 	} else {
-		da.Access[0].Who.Users = users
+		da.Who.Users = users
 	}
 
 	var do *ds.DataObjectReference
@@ -407,10 +407,10 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 			NamingHint:        policy.Name,
 			Action:            action,
 			NotInternalizable: true,
+			Who:               nil,
 			Access: []*exporter.Access{
 				{
 					ActualName: policy.Name,
-					Who:        nil,
 					What:       make([]exporter.WhatItem, 0),
 				},
 			},
@@ -518,12 +518,12 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 
 		// Merge the users that are specified separately and from the expanded groups.
 		// Note: we don't expand groups ourselves here, because Snowflake doesn't have the concept of groups.
-		users := slice.StringSliceMerge(da.Who.Users, da.Who.UsersInGroups)
+		users := slice.StringSliceMerge(ea.AccessProvider.Who.Users, ea.AccessProvider.Who.UsersInGroups)
 
 		// Extract RoleNames from Access Providers that are among the whoList of this one
 		roles := make([]string, 0)
 
-		for _, apWho := range da.Who.InheritFrom {
+		for _, apWho := range ea.AccessProvider.Who.InheritFrom {
 			if strings.HasPrefix(apWho, "ID:") {
 				apId := apWho[3:]
 				for rn2, ea2 := range apMap {
