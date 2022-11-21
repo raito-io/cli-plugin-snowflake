@@ -2,13 +2,11 @@ module github.com/raito-io/cli-plugin-snowflake
 
 go 1.18
 
-replace github.com/raito-io/cli => ../cli
-
 require (
 	github.com/blockloop/scan v1.3.0
 	github.com/hashicorp/go-hclog v1.2.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/raito-io/cli v0.24.0
+	github.com/raito-io/cli v0.25.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/snowflakedb/gosnowflake v1.6.10
 	github.com/stretchr/testify v1.8.0
