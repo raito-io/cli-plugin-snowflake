@@ -10,6 +10,7 @@ import (
 )
 
 const SfLimit = 10000
+const ConnectionStringIdentifier = "Raito_CLI"
 
 func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, error) {
 	snowflakeUser := params[SfUser]
@@ -39,7 +40,7 @@ func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, er
 
 	urlUser := url.UserPassword(snowflakeUser.(string), snowflakePassword.(string))
 
-	connectionString := fmt.Sprintf("%s@%s?role=%s", urlUser, snowflakeAccount, role)
+	connectionString := fmt.Sprintf("%s@%s?role=%s,application=%s", urlUser, snowflakeAccount, role, ConnectionStringIdentifier)
 	censoredConnectionString := fmt.Sprintf("%s:%s@%s?role=%s", snowflakeUser, "**censured**", snowflakeAccount, role)
 	logger.Debug(fmt.Sprintf("Using connection string: %s", censoredConnectionString))
 	conn, err := sql.Open("snowflake", connectionString)
