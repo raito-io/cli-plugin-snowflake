@@ -40,7 +40,7 @@ func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, er
 
 	urlUser := url.UserPassword(snowflakeUser.(string), snowflakePassword.(string))
 
-	connectionString := fmt.Sprintf("%s@%s?role=%s,application=%s", urlUser, snowflakeAccount, role, ConnectionStringIdentifier)
+	connectionString := fmt.Sprintf("%s@%s?role=%s&application=%s", urlUser, snowflakeAccount, role, ConnectionStringIdentifier)
 	censoredConnectionString := fmt.Sprintf("%s:%s@%s?role=%s", snowflakeUser, "**censured**", snowflakeAccount, role)
 	logger.Debug(fmt.Sprintf("Using connection string: %s", censoredConnectionString))
 	conn, err := sql.Open("snowflake", connectionString)
