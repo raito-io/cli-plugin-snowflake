@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
+	conv "github.com/cstockton/go-conv"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -30,8 +32,14 @@ var PermissionMap = map[string]PermissionTarget{
 	"WRITE": {snowflakePermissions: []string{"UPDATE", "INSERT", "DELETE"}, roleName: "W"},
 }
 
-var ROLES_NOTINTERNALIZABLE = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
-var ACCEPTED_TYPES = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "COLUMN": {}, "SHARED-DATABASE": {}}
+var RolesNotinternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
+var AcceptedTypes = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "COLUMN": {}, "SHARED-DATABASE": {}}
+
+const (
+	whoLockedReason    = "The 'who' for this Snowflake role cannot be changed because it was imported from an external identity store"
+	nameLockedReason   = "This Snowflake role cannot be renamed because it was imported from an external identity store"
+	deleteLockedReason = "This Snowflake role cannot be deleted because it was imported from an external identity store"
+)
 
 //go:generate go run github.com/vektra/mockery/v2 --name=dataAccessRepository --with-expecter --inpackage
 type dataAccessRepository interface {
@@ -229,9 +237,14 @@ func getShareNames(repo dataAccessRepository) (map[string]struct{}, error) {
 }
 
 func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
-	ownersToExclude := ""
-	if v, ok := configMap.Parameters[SfExcludedOwners]; ok && v != nil {
-		ownersToExclude = v.(string)
+	externalGroupOwners := ""
+	if v, ok := configMap.Parameters[SfExternalIdentityStoreOwners]; ok && v != nil {
+		externalGroupOwners = v.(string)
+	}
+
+	linkToExternalIdentityStoreGroups := false
+	if v, ok := configMap.Parameters[SfLinkToExternalIdentityStoreGroups]; ok && v != nil {
+		linkToExternalIdentityStoreGroups, _ = conv.Bool(v)
 	}
 
 	shares, err := getShareNames(repo)
@@ -247,7 +260,7 @@ func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProvide
 	accessProviderMap := make(map[string]*exporter.AccessProvider)
 
 	for _, roleEntity := range roleEntities {
-		err = s.importAccessForRole(roleEntity, ownersToExclude, repo, accessProviderMap, shares, accessProviderHandler)
+		err = s.importAccessForRole(roleEntity, externalGroupOwners, linkToExternalIdentityStoreGroups, repo, accessProviderMap, shares, accessProviderHandler)
 		if err != nil {
 			return err
 		}
@@ -256,20 +269,37 @@ func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProvide
 	return nil
 }
 
-func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, ownersToExclude string, repo dataAccessRepository, accessProviderMap map[string]*exporter.AccessProvider, shares map[string]struct{}, accessProviderHandler wrappers.AccessProviderHandler) error {
+func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupOwners string, linkToExternalIdentityStoreGroups bool, repo dataAccessRepository, accessProviderMap map[string]*exporter.AccessProvider, shares map[string]struct{}, accessProviderHandler wrappers.AccessProviderHandler) error {
 	logger.Info("Reading SnowFlake ROLE " + roleEntity.Name)
-	// get users granted OF role
 
-	// check if Role Owner is part of the ones that should be notInternalizable
-	for _, i := range strings.Split(ownersToExclude, ",") {
+	fromExternalIS := false
+
+	// check if Role Owner is part of the ones that should be (partially) locked
+	for _, i := range strings.Split(externalGroupOwners, ",") {
 		if strings.EqualFold(i, roleEntity.Owner) {
-			ROLES_NOTINTERNALIZABLE = append(ROLES_NOTINTERNALIZABLE, roleEntity.Name)
+			fromExternalIS = true
 		}
 	}
 
-	grantOfEntities, err := repo.GetGrantsOfRole(roleEntity.Name)
-	if err != nil {
-		return err
+	users := make([]string, 0)
+	accessProviders := make([]string, 0)
+	groups := make([]string, 0)
+
+	if fromExternalIS && linkToExternalIdentityStoreGroups {
+		groups = append(groups, roleEntity.Name)
+	} else {
+		grantOfEntities, err := repo.GetGrantsOfRole(roleEntity.Name)
+		if err != nil {
+			return err
+		}
+
+		for _, grantee := range grantOfEntities {
+			if grantee.GrantedTo == "USER" {
+				users = append(users, grantee.GranteeName)
+			} else if grantee.GrantedTo == "ROLE" {
+				accessProviders = append(accessProviders, grantee.GranteeName)
+			}
+		}
 	}
 
 	// get objects granted TO role
@@ -278,18 +308,7 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, ownersToExclud
 		return err
 	}
 
-	users := make([]string, 0)
-	accessProviders := make([]string, 0)
-
-	for _, grantee := range grantOfEntities {
-		if grantee.GrantedTo == "USER" {
-			users = append(users, grantee.GranteeName)
-		} else if grantee.GrantedTo == "ROLE" {
-			accessProviders = append(accessProviders, grantee.GranteeName)
-		}
-	}
-
-	da, f := accessProviderMap[roleEntity.Name]
+	ap, f := accessProviderMap[roleEntity.Name]
 	if !f {
 		accessProviderMap[roleEntity.Name] = &exporter.AccessProvider{
 			ExternalId: roleEntity.Name,
@@ -299,7 +318,7 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, ownersToExclud
 			Who: &exporter.WhoItem{
 				Users:           users,
 				AccessProviders: accessProviders,
-				Groups:          []string{},
+				Groups:          groups,
 			},
 			Access: []*exporter.Access{
 				{
@@ -308,9 +327,18 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, ownersToExclud
 				},
 			},
 		}
-		da = accessProviderMap[roleEntity.Name]
+		ap = accessProviderMap[roleEntity.Name]
+
+		if fromExternalIS {
+			ap.NameLocked = ptr.Bool(true)
+			ap.NameLockedReason = ptr.String(nameLockedReason)
+			ap.DeleteLocked = ptr.Bool(true)
+			ap.DeleteLockedReason = ptr.String(deleteLockedReason)
+			ap.WhoLocked = ptr.Bool(true)
+			ap.WhoLockedReason = ptr.String(whoLockedReason)
+		}
 	} else {
-		da.Who.Users = users
+		ap.Who.Users = users
 	}
 
 	var do *ds.DataObjectReference
@@ -324,7 +352,7 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, ownersToExclud
 			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: object.GrantedOn}
 		} else if do.FullName != object.Name {
 			if len(permissions) > 0 {
-				da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
+				ap.Access[0].What = append(ap.Access[0].What, exporter.WhatItem{
 					DataObject:  do,
 					Permissions: permissions,
 				})
@@ -340,18 +368,18 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, ownersToExclud
 
 		// We do not import USAGE as this is handled separately in the data access export
 		if !strings.EqualFold("USAGE", object.Privilege) {
-			if _, f := ACCEPTED_TYPES[strings.ToUpper(object.GrantedOn)]; f {
+			if _, f := AcceptedTypes[strings.ToUpper(object.GrantedOn)]; f {
 				permissions = append(permissions, object.Privilege)
 			}
 
-			database_name := strings.Split(object.Name, ".")[0]
-			if _, f := shares[database_name]; f {
-				if _, f := sharesApplied[database_name]; strings.EqualFold(object.GrantedOn, "TABLE") && !f {
-					da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
-						DataObject:  &ds.DataObjectReference{FullName: database_name, Type: "shared-" + ds.Database},
+			databaseName := strings.Split(object.Name, ".")[0]
+			if _, f := shares[databaseName]; f {
+				if _, f := sharesApplied[databaseName]; strings.EqualFold(object.GrantedOn, "TABLE") && !f {
+					ap.Access[0].What = append(ap.Access[0].What, exporter.WhatItem{
+						DataObject:  &ds.DataObjectReference{FullName: databaseName, Type: "shared-" + ds.Database},
 						Permissions: []string{"IMPORTED PRIVILEGES"},
 					})
-					sharesApplied[database_name] = struct{}{}
+					sharesApplied[databaseName] = struct{}{}
 				}
 
 				if !strings.HasPrefix(do.Type, "SHARED") {
@@ -361,19 +389,19 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, ownersToExclud
 		}
 
 		if k == len(grantToEntities)-1 && len(permissions) > 0 {
-			da.Access[0].What = append(da.Access[0].What, exporter.WhatItem{
+			ap.Access[0].What = append(ap.Access[0].What, exporter.WhatItem{
 				DataObject:  do,
 				Permissions: permissions,
 			})
 		}
 	}
 
-	if isNotInternizableRole(da.Name) {
-		logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", da.Name))
-		da.NotInternalizable = true
+	if isNotInternizableRole(ap.Name) {
+		logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", ap.Name))
+		ap.NotInternalizable = true
 	}
 
-	err = accessProviderHandler.AddAccessProviders(da)
+	err = accessProviderHandler.AddAccessProviders(ap)
 	if err != nil {
 		return fmt.Errorf("error adding access provider to import file: %s", err.Error())
 	}
@@ -484,7 +512,7 @@ func (s *AccessSyncer) importRowAccessPolicies(accessProviderHandler wrappers.Ac
 }
 
 func isNotInternizableRole(role string) bool {
-	for _, r := range ROLES_NOTINTERNALIZABLE {
+	for _, r := range RolesNotinternalizable {
 		if strings.EqualFold(r, role) {
 			return true
 		}
@@ -510,6 +538,7 @@ func (s *AccessSyncer) findRoles(prefix string, apMap map[string]importer.Enrich
 	return foundRoles, nil
 }
 
+//nolint:gocyclo
 func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]importer.EnrichedAccess, existingRoles map[string]bool, repo dataAccessRepository) error {
 	roleCreated := make(map[string]interface{})
 

@@ -15,7 +15,7 @@ import (
 func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 	//Given
 	configMap := &config.ConfigMap{
-		Parameters: map[string]interface{}{SfExcludedOwners: "excludeOwner"},
+		Parameters: map[string]interface{}{},
 	}
 
 	repoMock := newMockIdentityStoreRepository(t)
@@ -27,11 +27,6 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 		{
 			Name:        "UserName1",
 			DisplayName: "user1",
-		},
-		{
-			Name:        "Owned Excluded User",
-			DisplayName: "ownedUser",
-			Owner:       "excludeOwner",
 		},
 		{
 			Name:        "UserName2",
@@ -60,7 +55,7 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 func TestNewIdentityStoreSyncer_RepoError(t *testing.T) {
 	//Given
 	configMap := &config.ConfigMap{
-		Parameters: map[string]interface{}{SfExcludedOwners: "excludeOwner"},
+		Parameters: map[string]interface{}{},
 	}
 
 	repoMock := newMockIdentityStoreRepository(t)
@@ -91,7 +86,7 @@ func TestNewIdentityStoreSyncer_RepoError(t *testing.T) {
 func TestNewIdentityStoreSyncer_AddUserError(t *testing.T) {
 	//Given
 	configMap := &config.ConfigMap{
-		Parameters: map[string]interface{}{SfExcludedOwners: "excludeOwner"},
+		Parameters: map[string]interface{}{},
 	}
 
 	repoMock := newMockIdentityStoreRepository(t)
@@ -104,11 +99,6 @@ func TestNewIdentityStoreSyncer_AddUserError(t *testing.T) {
 		{
 			Name:        "UserName1",
 			DisplayName: "user1",
-		},
-		{
-			Name:        "Owned Excluded User",
-			DisplayName: "ownedUser",
-			Owner:       "excludeOwner",
 		},
 		{
 			Name:        "UserName2",
