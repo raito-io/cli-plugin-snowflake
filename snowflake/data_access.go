@@ -3,11 +3,11 @@ package snowflake
 import (
 	"context"
 	"fmt"
+	"github.com/aws/smithy-go/ptr"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	conv "github.com/cstockton/go-conv"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
@@ -330,12 +330,19 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 		ap = accessProviderMap[roleEntity.Name]
 
 		if fromExternalIS {
-			ap.NameLocked = ptr.Bool(true)
-			ap.NameLockedReason = ptr.String(nameLockedReason)
-			ap.DeleteLocked = ptr.Bool(true)
-			ap.DeleteLockedReason = ptr.String(deleteLockedReason)
-			ap.WhoLocked = ptr.Bool(true)
-			ap.WhoLockedReason = ptr.String(whoLockedReason)
+			if !linkToExternalIdentityStoreGroups {
+				// If we link to groups in the external identity store, we can just partially lock
+				ap.NameLocked = ptr.Bool(true)
+				ap.NameLockedReason = ptr.String(nameLockedReason)
+				ap.DeleteLocked = ptr.Bool(true)
+				ap.DeleteLockedReason = ptr.String(deleteLockedReason)
+				ap.WhoLocked = ptr.Bool(true)
+				ap.WhoLockedReason = ptr.String(whoLockedReason)
+			} else {
+				// Otherwise we have to do a full lock
+				ap.NotInternalizable = true
+			}
+
 		}
 	} else {
 		ap.Who.Users = users
