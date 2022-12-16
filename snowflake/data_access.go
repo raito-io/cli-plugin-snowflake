@@ -3,12 +3,13 @@ package snowflake
 import (
 	"context"
 	"fmt"
-	"github.com/aws/smithy-go/ptr"
 	"sort"
 	"strings"
 	"time"
 
-	conv "github.com/cstockton/go-conv"
+	"github.com/aws/smithy-go/ptr"
+
+	"github.com/cstockton/go-conv"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -342,10 +343,11 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 				// Otherwise we have to do a full lock
 				ap.NotInternalizable = true
 			}
-
 		}
 	} else {
 		ap.Who.Users = users
+		ap.Who.AccessProviders = accessProviders
+		ap.Who.Groups = groups
 	}
 
 	var do *ds.DataObjectReference
