@@ -331,7 +331,7 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 		ap = accessProviderMap[roleEntity.Name]
 
 		if fromExternalIS {
-			if !linkToExternalIdentityStoreGroups {
+			if linkToExternalIdentityStoreGroups {
 				// If we link to groups in the external identity store, we can just partially lock
 				ap.NameLocked = ptr.Bool(true)
 				ap.NameLockedReason = ptr.String(nameLockedReason)
