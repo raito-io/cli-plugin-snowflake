@@ -3,7 +3,6 @@ package snowflake
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	is "github.com/raito-io/cli/base/identity_store"
@@ -49,19 +48,6 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 		repo.Close()
 	}()
 
-	excludedOwners := ""
-	if v, ok := configMap.Parameters[SfExcludedOwners]; ok && v != nil {
-		excludedOwners = v.(string)
-	}
-
-	ownerExclusions := make(map[string]struct{})
-
-	if excludedOwners != "" {
-		for _, o := range strings.Split(excludedOwners, ",") {
-			ownerExclusions[strings.TrimSpace(o)] = struct{}{}
-		}
-	}
-
 	userRows, err := repo.GetUsers()
 	if err != nil {
 		return err
@@ -70,10 +56,6 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 	for _, userRow := range userRows {
 		logger.Debug(fmt.Sprintf("Handling user %q", userRow.Name))
 
-		if _, f := ownerExclusions[userRow.Owner]; f {
-			logger.Debug("Skipping user as it's owned by an excluded owner")
-			continue
-		}
 		user := is.User{
 			ExternalId: userRow.LoginName,
 			UserName:   userRow.Name,
