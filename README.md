@@ -11,7 +11,7 @@
 
 <p align="center">
     <a href="/LICENSE.md" target="_blank"><img src="https://img.shields.io/badge/license-Apache%202-brightgreen.svg" alt="Software License" /></a>
-    <a href="https://github.com/raito-io/cli-plugin-snowflake/actions/workflows/build.yml" target="_blank"><img src="https://img.shields.io/github/workflow/status/raito-io/cli-plugin-snowflake/Raito%20CLI%20-%20Snowflake%20Plugin%20-%20Build/main" alt="Build status" /></a>
+    <a href="https://github.com/raito-io/cli-plugin-snowflake/actions/workflows/build.yml" target="_blank"><img src="https://img.shields.io/github/actions/workflow/status/raito-io/cli-plugin-snowflake/build.yml?branch=main" alt="Build status" /></a>
     <a href="https://codecov.io/gh/raito-io/cli-plugin-snowflake" target="_blank"><img src="https://img.shields.io/codecov/c/github/raito-io/cli-plugin-snowflake" alt="Code Coverage" /></a>
 </p>
 
