@@ -51,13 +51,13 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	repoMock.EXPECT().GetDataBases().Return([]DbEntity{
 		{Name: "Database1"}, {Name: "Database2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetSchemaInDatabase("Database1").Return([]DbEntity{
+	repoMock.EXPECT().GetSchemasInDatabase("Database1").Return([]DbEntity{
 		{Name: "schema1"},
 	}, nil).Once()
-	repoMock.EXPECT().GetSchemaInDatabase("Database2").Return([]DbEntity{}, nil).Once()
+	repoMock.EXPECT().GetSchemasInDatabase("Database2").Return([]DbEntity{}, nil).Once()
 
-	repoMock.EXPECT().GetSchemaInDatabase("Share1").Return([]DbEntity{}, nil).Once()
-	repoMock.EXPECT().GetSchemaInDatabase("Share2").Return([]DbEntity{
+	repoMock.EXPECT().GetSchemasInDatabase("Share1").Return([]DbEntity{}, nil).Once()
+	repoMock.EXPECT().GetSchemasInDatabase("Share2").Return([]DbEntity{
 		{Name: "schema2"},
 	}, nil).Once()
 
@@ -302,7 +302,7 @@ func TestDataSourceSyncer_SyncDataSource_readSchemaInDatabase(t *testing.T) {
 	databaseName := "DB1"
 	excludeSchemas := "ExcludeSchema1,DB1.ExcludeSchema2"
 
-	repoMock.EXPECT().GetSchemaInDatabase(databaseName).Return(
+	repoMock.EXPECT().GetSchemasInDatabase(databaseName).Return(
 		[]DbEntity{{Name: "Schema1"}, {Name: "ExcludeSchema1"}, {Name: "ExcludeSchema2"}, {Name: "Schema2"}}, nil).Once()
 
 	syncer := createSyncer(nil)

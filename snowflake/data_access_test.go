@@ -1038,7 +1038,7 @@ func generateAccessControls_table(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -1084,7 +1084,7 @@ func generateAccessControls_view(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -1101,6 +1101,7 @@ func generateAccessControls_schema(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB1", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrant("USAGE", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE DB1.Schema2.Table3", "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("SELECT", "VIEW DB1.Schema2.View3", "RoleName1").Return(nil).Once()
 
 	database := "DB1"
 	schema := "Schema2"
@@ -1109,6 +1110,13 @@ func generateAccessControls_schema(t *testing.T) {
 		Schema:   &schema,
 	}).Return([]DbEntity{
 		{Name: "Table3"},
+	}, nil).Once()
+
+	repoMock.EXPECT().GetViewsInSchema(&common.SnowflakeObject{
+		Database: &database,
+		Schema:   &schema,
+	}).Return([]DbEntity{
+		{Name: "View3"},
 	}, nil).Once()
 
 	syncer := AccessSyncer{
@@ -1139,7 +1147,7 @@ func generateAccessControls_schema(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -1161,6 +1169,7 @@ func generateAccessControls_existing_schema(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB1", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrant("USAGE", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE DB1.Schema2.Table3", "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("SELECT", "VIEW DB1.Schema2.View3", "RoleName1").Return(nil).Once()
 
 	database := "DB1"
 	schema := "Schema2"
@@ -1169,6 +1178,12 @@ func generateAccessControls_existing_schema(t *testing.T) {
 		Schema:   &schema,
 	}).Return([]DbEntity{
 		{Name: "Table3"},
+	}, nil).Once()
+	repoMock.EXPECT().GetViewsInSchema(&common.SnowflakeObject{
+		Database: &database,
+		Schema:   &schema,
+	}).Return([]DbEntity{
+		{Name: "View3"},
 	}, nil).Once()
 
 	syncer := AccessSyncer{
@@ -1199,7 +1214,7 @@ func generateAccessControls_existing_schema(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"RoleName1": true}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"RoleName1": true}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -1245,7 +1260,7 @@ func generateAccessControls_sharedDatabase(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -1267,15 +1282,21 @@ func generateAccessControls_database(t *testing.T) {
 	}).Return([]DbEntity{
 		{Name: "Table3"},
 	}, nil).Once()
+	repoMock.EXPECT().GetViewsInSchema(&common.SnowflakeObject{
+		Database: &database,
+		Schema:   &schema,
+	}).Return([]DbEntity{
+		{Name: "View3"},
+	}, nil).Once()
 
-	repoMock.EXPECT().GetSchemaInDatabase("DB1").Return([]DbEntity{
+	repoMock.EXPECT().GetSchemasInDatabase("DB1").Return([]DbEntity{
 		{Name: "Schema2"},
 	}, nil).Once()
 
 	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB1", "RoleName1").Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrant("SELECT", "DATABASE DB1", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrant("USAGE", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE \"DB1.Schema2.Table3\"", "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE DB1.Schema2.Table3", "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("SELECT", "VIEW DB1.Schema2.View3", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
@@ -1305,7 +1326,7 @@ func generateAccessControls_database(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -1330,8 +1351,14 @@ func generateAccessControls_existing_database(t *testing.T) {
 	}).Return([]DbEntity{
 		{Name: "Table3"},
 	}, nil).Once()
+	repoMock.EXPECT().GetViewsInSchema(&common.SnowflakeObject{
+		Database: &database,
+		Schema:   &schema,
+	}).Return([]DbEntity{
+		{Name: "View3"},
+	}, nil).Once()
 
-	repoMock.EXPECT().GetSchemaInDatabase("DB1").Return([]DbEntity{
+	repoMock.EXPECT().GetSchemasInDatabase("DB1").Return([]DbEntity{
 		{Name: "Schema2"},
 	}, nil).Once()
 
@@ -1339,9 +1366,9 @@ func generateAccessControls_existing_database(t *testing.T) {
 	repoMock.EXPECT().ExecuteRevoke("ALL", "FUTURE TABLES IN DATABASE DB1", "RoleName1").Return(nil).Once()
 
 	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB1", "RoleName1").Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrant("SELECT", "DATABASE DB1", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrant("USAGE", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE \"DB1.Schema2.Table3\"", "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE DB1.Schema2.Table3", "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("SELECT", "VIEW DB1.Schema2.View3", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
@@ -1371,7 +1398,7 @@ func generateAccessControls_existing_database(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"RoleName1": true}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"RoleName1": true}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -1386,7 +1413,6 @@ func generateAccessControls_warehouse(t *testing.T) {
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
 	repoMock.EXPECT().ExecuteGrant("USAGE", "WAREHOUSE WH1", "RoleName1").Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrant("SELECT", "WAREHOUSE WH1", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
@@ -1416,7 +1442,7 @@ func generateAccessControls_warehouse(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -1429,8 +1455,6 @@ func generateAccessControls_datasource(t *testing.T) {
 	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
-
-	repoMock.EXPECT().ExecuteGrant("SELECT", "ACCOUNT", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
@@ -1460,7 +1484,7 @@ func generateAccessControls_datasource(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -1531,7 +1555,7 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"existingRole1": true}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"existingRole1": true}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -1627,7 +1651,7 @@ func TestAccessSyncer_generateAccessControls_inheritance(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, true)
 
 	//Then
 	assert.NoError(t, err)

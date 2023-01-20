@@ -149,8 +149,8 @@ func (_c *mockDataSourceRepository_GetDataBases_Call) Return(_a0 []DbEntity, _a1
 	return _c
 }
 
-// GetSchemaInDatabase provides a mock function with given fields: databaseName
-func (_m *mockDataSourceRepository) GetSchemaInDatabase(databaseName string) ([]DbEntity, error) {
+// GetSchemasInDatabase provides a mock function with given fields: databaseName
+func (_m *mockDataSourceRepository) GetSchemasInDatabase(databaseName string) ([]DbEntity, error) {
 	ret := _m.Called(databaseName)
 
 	var r0 []DbEntity
@@ -172,25 +172,25 @@ func (_m *mockDataSourceRepository) GetSchemaInDatabase(databaseName string) ([]
 	return r0, r1
 }
 
-// mockDataSourceRepository_GetSchemaInDatabase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSchemaInDatabase'
-type mockDataSourceRepository_GetSchemaInDatabase_Call struct {
+// mockDataSourceRepository_GetSchemasInDatabase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSchemasInDatabase'
+type mockDataSourceRepository_GetSchemasInDatabase_Call struct {
 	*mock.Call
 }
 
-// GetSchemaInDatabase is a helper method to define mock.On call
+// GetSchemasInDatabase is a helper method to define mock.On call
 //   - databaseName string
-func (_e *mockDataSourceRepository_Expecter) GetSchemaInDatabase(databaseName interface{}) *mockDataSourceRepository_GetSchemaInDatabase_Call {
-	return &mockDataSourceRepository_GetSchemaInDatabase_Call{Call: _e.mock.On("GetSchemaInDatabase", databaseName)}
+func (_e *mockDataSourceRepository_Expecter) GetSchemasInDatabase(databaseName interface{}) *mockDataSourceRepository_GetSchemasInDatabase_Call {
+	return &mockDataSourceRepository_GetSchemasInDatabase_Call{Call: _e.mock.On("GetSchemasInDatabase", databaseName)}
 }
 
-func (_c *mockDataSourceRepository_GetSchemaInDatabase_Call) Run(run func(databaseName string)) *mockDataSourceRepository_GetSchemaInDatabase_Call {
+func (_c *mockDataSourceRepository_GetSchemasInDatabase_Call) Run(run func(databaseName string)) *mockDataSourceRepository_GetSchemasInDatabase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string))
 	})
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetSchemaInDatabase_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetSchemaInDatabase_Call {
+func (_c *mockDataSourceRepository_GetSchemasInDatabase_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetSchemasInDatabase_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }

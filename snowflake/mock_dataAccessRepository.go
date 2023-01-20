@@ -579,8 +579,8 @@ func (_c *mockDataAccessRepository_GetRolesWithPrefix_Call) Return(_a0 []RoleEnt
 	return _c
 }
 
-// GetSchemaInDatabase provides a mock function with given fields: databaseName
-func (_m *mockDataAccessRepository) GetSchemaInDatabase(databaseName string) ([]DbEntity, error) {
+// GetSchemasInDatabase provides a mock function with given fields: databaseName
+func (_m *mockDataAccessRepository) GetSchemasInDatabase(databaseName string) ([]DbEntity, error) {
 	ret := _m.Called(databaseName)
 
 	var r0 []DbEntity
@@ -602,25 +602,25 @@ func (_m *mockDataAccessRepository) GetSchemaInDatabase(databaseName string) ([]
 	return r0, r1
 }
 
-// mockDataAccessRepository_GetSchemaInDatabase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSchemaInDatabase'
-type mockDataAccessRepository_GetSchemaInDatabase_Call struct {
+// mockDataAccessRepository_GetSchemasInDatabase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSchemasInDatabase'
+type mockDataAccessRepository_GetSchemasInDatabase_Call struct {
 	*mock.Call
 }
 
-// GetSchemaInDatabase is a helper method to define mock.On call
+// GetSchemasInDatabase is a helper method to define mock.On call
 //   - databaseName string
-func (_e *mockDataAccessRepository_Expecter) GetSchemaInDatabase(databaseName interface{}) *mockDataAccessRepository_GetSchemaInDatabase_Call {
-	return &mockDataAccessRepository_GetSchemaInDatabase_Call{Call: _e.mock.On("GetSchemaInDatabase", databaseName)}
+func (_e *mockDataAccessRepository_Expecter) GetSchemasInDatabase(databaseName interface{}) *mockDataAccessRepository_GetSchemasInDatabase_Call {
+	return &mockDataAccessRepository_GetSchemasInDatabase_Call{Call: _e.mock.On("GetSchemasInDatabase", databaseName)}
 }
 
-func (_c *mockDataAccessRepository_GetSchemaInDatabase_Call) Run(run func(databaseName string)) *mockDataAccessRepository_GetSchemaInDatabase_Call {
+func (_c *mockDataAccessRepository_GetSchemasInDatabase_Call) Run(run func(databaseName string)) *mockDataAccessRepository_GetSchemasInDatabase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string))
 	})
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetSchemaInDatabase_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetSchemaInDatabase_Call {
+func (_c *mockDataAccessRepository_GetSchemasInDatabase_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetSchemasInDatabase_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
@@ -712,6 +712,52 @@ func (_c *mockDataAccessRepository_GetTablesInSchema_Call) Run(run func(sfObject
 }
 
 func (_c *mockDataAccessRepository_GetTablesInSchema_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetTablesInSchema_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+// GetViewsInSchema provides a mock function with given fields: sfObject
+func (_m *mockDataAccessRepository) GetViewsInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
+	ret := _m.Called(sfObject)
+
+	var r0 []DbEntity
+	if rf, ok := ret.Get(0).(func(*common.SnowflakeObject) []DbEntity); ok {
+		r0 = rf(sfObject)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]DbEntity)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*common.SnowflakeObject) error); ok {
+		r1 = rf(sfObject)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataAccessRepository_GetViewsInSchema_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetViewsInSchema'
+type mockDataAccessRepository_GetViewsInSchema_Call struct {
+	*mock.Call
+}
+
+// GetViewsInSchema is a helper method to define mock.On call
+//   - sfObject *common.SnowflakeObject
+func (_e *mockDataAccessRepository_Expecter) GetViewsInSchema(sfObject interface{}) *mockDataAccessRepository_GetViewsInSchema_Call {
+	return &mockDataAccessRepository_GetViewsInSchema_Call{Call: _e.mock.On("GetViewsInSchema", sfObject)}
+}
+
+func (_c *mockDataAccessRepository_GetViewsInSchema_Call) Run(run func(sfObject *common.SnowflakeObject)) *mockDataAccessRepository_GetViewsInSchema_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*common.SnowflakeObject))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetViewsInSchema_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetViewsInSchema_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }

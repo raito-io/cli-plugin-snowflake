@@ -21,7 +21,7 @@ type dataSourceRepository interface {
 	GetWarehouses() ([]DbEntity, error)
 	GetShares() ([]DbEntity, error)
 	GetDataBases() ([]DbEntity, error)
-	GetSchemaInDatabase(databaseName string) ([]DbEntity, error)
+	GetSchemasInDatabase(databaseName string) ([]DbEntity, error)
 	GetTablesInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error)
 	GetViewsInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error)
 	GetColumnsInTable(sfObject *common.SnowflakeObject) ([]DbEntity, error)
@@ -199,7 +199,7 @@ func (s *DataSourceSyncer) readTablesInSchema(repo dataSourceRepository, sfObjec
 }
 
 func (s *DataSourceSyncer) readSchemaInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas string, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]DbEntity, error) {
-	schemas, err := repo.GetSchemaInDatabase(databaseName)
+	schemas, err := repo.GetSchemasInDatabase(databaseName)
 	if err != nil {
 		return nil, err
 	}

@@ -525,12 +525,12 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDataBases() {
 	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemaInDatabase() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemasInDatabase() {
 	//Given
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 
 	//When
-	schemas, err := s.repo.GetSchemaInDatabase(database)
+	schemas, err := s.repo.GetSchemasInDatabase(database)
 
 	//Then
 	s.NoError(err)
