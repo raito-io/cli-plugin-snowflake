@@ -842,24 +842,17 @@ func createGrantsForSchema(repo dataAccessRepository, permissions []string, full
 		if _, f := metaData[ds.Schema][strings.ToUpper(p)]; len(metaData) == 0 || f {
 			grants = append(grants, Grant{p, common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
 		} else {
-			if tables == nil {
-				tables, err = repo.GetTablesInSchema(&sfObject)
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			if views == nil {
-				views, err = repo.GetViewsInSchema(&sfObject)
-				if err != nil {
-					return nil, err
-				}
-			}
-
 			matchFound := false
 
 			// Check if the permission is applicable on the tables in the schema
 			if _, f := metaData[ds.Table][strings.ToUpper(p)]; f {
+				if tables == nil {
+					tables, err = repo.GetTablesInSchema(&sfObject)
+					if err != nil {
+						return nil, err
+					}
+				}
+
 				matchFound = true
 
 				for _, table := range tables {
@@ -869,6 +862,13 @@ func createGrantsForSchema(repo dataAccessRepository, permissions []string, full
 
 			// Check if the permission is applicable on the views in the schema
 			if _, f := metaData[ds.View][strings.ToUpper(p)]; f {
+				if views == nil {
+					views, err = repo.GetViewsInSchema(&sfObject)
+					if err != nil {
+						return nil, err
+					}
+				}
+
 				matchFound = true
 
 				for _, view := range views {
@@ -924,26 +924,16 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 					matchFound = true
 					grants = append(grants, Grant{p, common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
 				} else {
-					tables, f := tablesPerSchema[schema.Name]
-					if !f {
-						tables, err = repo.GetTablesInSchema(&sfObject)
-						if err != nil {
-							return nil, err
-						}
-						tablesPerSchema[schema.Name] = tables
-					}
-
-					views, f := viewsPerSchema[schema.Name]
-					if !f {
-						views, err = repo.GetViewsInSchema(&sfObject)
-						if err != nil {
-							return nil, err
-						}
-						viewsPerSchema[schema.Name] = views
-					}
-
 					// Check if the permission is applicable on the tables in the schema
 					if _, f := metaData[ds.Table][strings.ToUpper(p)]; f {
+						tables, f := tablesPerSchema[schema.Name]
+						if !f {
+							tables, err = repo.GetTablesInSchema(&sfObject)
+							if err != nil {
+								return nil, err
+							}
+							tablesPerSchema[schema.Name] = tables
+						}
 						matchFound = true
 						for _, table := range tables {
 							grants = append(grants, Grant{p, common.FormatQuery(`TABLE %s.%s.%s`, *sfObject.Database, *sfObject.Schema, table.Name)})
@@ -952,6 +942,15 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 
 					// Check if the permission is applicable on the views in the schema
 					if _, f := metaData[ds.View][strings.ToUpper(p)]; f {
+						views, f := viewsPerSchema[schema.Name]
+						if !f {
+							views, err = repo.GetViewsInSchema(&sfObject)
+							if err != nil {
+								return nil, err
+							}
+							viewsPerSchema[schema.Name] = views
+						}
+
 						matchFound = true
 						for _, view := range views {
 							grants = append(grants, Grant{p, common.FormatQuery(`VIEW %s.%s.%s`, *sfObject.Database, *sfObject.Schema, view.Name)})
