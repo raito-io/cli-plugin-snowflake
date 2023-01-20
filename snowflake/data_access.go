@@ -833,19 +833,27 @@ func createGrantsForSchema(repo dataAccessRepository, permissions []string, full
 		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, *sfObject.Database)},
 		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
 
+	var tables []DbEntity
+	var views []DbEntity
+	var err error
+
 	for _, p := range permissions {
 		// Check if the permission is applicable on the schema itself
 		if _, f := metaData[ds.Schema][strings.ToUpper(p)]; len(metaData) == 0 || f {
 			grants = append(grants, Grant{p, common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
 		} else {
-			tables, err := repo.GetTablesInSchema(&sfObject)
-			if err != nil {
-				return nil, err
+			if tables == nil {
+				tables, err = repo.GetTablesInSchema(&sfObject)
+				if err != nil {
+					return nil, err
+				}
 			}
 
-			views, err := repo.GetViewsInSchema(&sfObject)
-			if err != nil {
-				return nil, err
+			if views == nil {
+				views, err = repo.GetViewsInSchema(&sfObject)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			matchFound := false
@@ -885,6 +893,8 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 	grants = append(grants, Grant{"USAGE", fmt.Sprintf(`DATABASE %s`, sfObject.GetFullName(true))})
 
 	var schemas []DbEntity
+	tablesPerSchema := make(map[string][]DbEntity)
+	viewsPerSchema := make(map[string][]DbEntity)
 	var err error
 
 	for _, p := range permissions {
@@ -914,15 +924,22 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 					matchFound = true
 					grants = append(grants, Grant{p, common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
 				} else {
-					// TODO We will fetch this again for each permission. Need to cache this
-					tables, err := repo.GetTablesInSchema(&sfObject)
-					if err != nil {
-						return nil, err
+					tables, f := tablesPerSchema[schema.Name]
+					if !f {
+						tables, err = repo.GetTablesInSchema(&sfObject)
+						if err != nil {
+							return nil, err
+						}
+						tablesPerSchema[schema.Name] = tables
 					}
 
-					views, err := repo.GetViewsInSchema(&sfObject)
-					if err != nil {
-						return nil, err
+					views, f := viewsPerSchema[schema.Name]
+					if !f {
+						views, err = repo.GetViewsInSchema(&sfObject)
+						if err != nil {
+							return nil, err
+						}
+						viewsPerSchema[schema.Name] = views
 					}
 
 					// Check if the permission is applicable on the tables in the schema
@@ -957,11 +974,9 @@ func createGrantsForWarehouse(permissions []string, warehouse string, metaData m
 	grants = append(grants, Grant{"USAGE", common.FormatQuery(`WAREHOUSE %s`, warehouse)})
 
 	for _, p := range permissions {
-		if metaData != nil {
-			if _, f := metaData["warehouse"][strings.ToUpper(p)]; len(metaData) != 0 && !f {
-				logger.Warn("Permission %q does not apply to type WAREHOUSE. Skipping", p)
-				continue
-			}
+		if _, f := metaData["warehouse"][strings.ToUpper(p)]; len(metaData) != 0 && !f {
+			logger.Warn("Permission %q does not apply to type WAREHOUSE. Skipping", p)
+			continue
 		}
 
 		grants = append(grants, Grant{p, common.FormatQuery(`WAREHOUSE %s`, warehouse)})
@@ -974,11 +989,9 @@ func createGrantsForAccount(permissions []string, metaData map[string]map[string
 	grants := make([]Grant, 0, len(permissions))
 
 	for _, p := range permissions {
-		if metaData != nil {
-			if _, f := metaData[ds.Datasource][strings.ToUpper(p)]; len(metaData) != 0 && !f {
-				logger.Warn("Permission %q does not apply to type ACCOUNT (datasource). Skipping", p)
-				continue
-			}
+		if _, f := metaData[ds.Datasource][strings.ToUpper(p)]; len(metaData) != 0 && !f {
+			logger.Warn("Permission %q does not apply to type ACCOUNT (datasource). Skipping", p)
+			continue
 		}
 
 		grants = append(grants, Grant{p, "ACCOUNT"})
