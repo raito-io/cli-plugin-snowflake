@@ -1153,6 +1153,52 @@ func generateAccessControls_schema(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func generateAccessControls_schema_noverify(t *testing.T) {
+	//Given
+	repoMock := newMockDataAccessRepository(t)
+
+	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
+	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
+	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
+
+	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB1", "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("USAGE", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("CREATE TABLE", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
+
+	syncer := AccessSyncer{
+		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+			return nil, nil
+		},
+	}
+
+	access1 := &importer.Access{
+		Id: "Access1",
+		What: []importer.WhatItem{
+			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"CREATE TABLE"}},
+		},
+	}
+
+	access := map[string]importer.EnrichedAccess{
+		"RoleName1": {
+			AccessProvider: &importer.AccessProvider{
+				Id:   "AccessProviderId1",
+				Name: "AccessProvider1",
+				Who: importer.WhoItem{
+					Users: []string{"User1", "User2"},
+				},
+				Access: []*importer.Access{access1},
+			},
+			Access: access1,
+		},
+	}
+
+	//When
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, false)
+
+	//Then
+	assert.NoError(t, err)
+}
+
 func generateAccessControls_existing_schema(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
@@ -1412,6 +1458,7 @@ func generateAccessControls_warehouse(t *testing.T) {
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
+	repoMock.EXPECT().ExecuteGrant("MONITOR", "WAREHOUSE WH1", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrant("USAGE", "WAREHOUSE WH1", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
@@ -1423,7 +1470,7 @@ func generateAccessControls_warehouse(t *testing.T) {
 	access1 := &importer.Access{
 		Id: "Access1",
 		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "WH1", Type: "warehouse"}, Permissions: []string{"READ"}},
+			{DataObject: &data_source.DataObjectReference{FullName: "WH1", Type: "warehouse"}, Permissions: []string{"MONITOR"}},
 		},
 	}
 
@@ -1494,6 +1541,7 @@ func TestAccessSyncer_generateAccessControls(t *testing.T) {
 	t.Run("Table", generateAccessControls_table)
 	t.Run("View", generateAccessControls_view)
 	t.Run("Schema", generateAccessControls_schema)
+	t.Run("Schema no verify", generateAccessControls_schema_noverify)
 	t.Run("Existing Schema", generateAccessControls_existing_schema)
 	t.Run("Shared-database", generateAccessControls_sharedDatabase)
 	t.Run("Database", generateAccessControls_database)
