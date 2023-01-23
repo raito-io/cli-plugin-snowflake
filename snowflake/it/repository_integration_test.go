@@ -525,12 +525,12 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDataBases() {
 	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemaInDatabase() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemasInDatabase() {
 	//Given
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 
 	//When
-	schemas, err := s.repo.GetSchemaInDatabase(database)
+	schemas, err := s.repo.GetSchemasInDatabase(database)
 
 	//Then
 	s.NoError(err)
@@ -596,7 +596,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetViewsInSchema() {
 
 	//Then
 	s.NoError(err)
-	s.Len(views, 54)
+	s.Len(views, 56)
 
 	comment := ""
 

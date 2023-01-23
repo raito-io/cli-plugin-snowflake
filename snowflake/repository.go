@@ -428,7 +428,7 @@ func (repo *SnowflakeRepository) GetDataBases() ([]DbEntity, error) {
 	return repo.getDbEntities(q)
 }
 
-func (repo *SnowflakeRepository) GetSchemaInDatabase(databaseName string) ([]DbEntity, error) {
+func (repo *SnowflakeRepository) GetSchemasInDatabase(databaseName string) ([]DbEntity, error) {
 	q := getSchemasInDatabaseQuery(databaseName)
 	return repo.getDbEntities(q)
 }
