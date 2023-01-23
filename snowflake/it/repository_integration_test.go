@@ -154,7 +154,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateRole() {
 	roleName := fmt.Sprintf("%s_REPO_TEST_CREATE_ROLE_TEST", testId)
 
 	//When
-	err := s.repo.CreateRole(roleName, "TEST REPOSITORY")
+	err := s.repo.CreateRole(roleName)
 
 	//Then
 	s.NoError(err)
@@ -173,7 +173,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateRole() {
 func (s *RepositoryTestSuite) TestSnowflakeRepository_DropRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_CREATE_ROLE_TEST", testId)
-	err := s.repo.CreateRole(roleName, "TEST REPOSITORY")
+	err := s.repo.CreateRole(roleName)
 	s.NoError(err)
 
 	//When
@@ -239,7 +239,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantRolesToRole() {
 		rolesToGrants = append(rolesToGrants, fmt.Sprintf("%s_REPO_TEST_GRANT_R2R_%d", testId, i))
 	}
 
-	err := s.repo.CreateRole(originalRoleName, "Integration testing")
+	err := s.repo.CreateRole(originalRoleName)
 	s.NoError(err)
 
 	//When
@@ -272,7 +272,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeRolesFromRole() {
 		rolesToGrants = append(rolesToGrants, fmt.Sprintf("%s_REPO_TEST_REVOKE_R2R_%d", testId, i))
 	}
 
-	err := s.repo.CreateRole(originalRoleName, "Integration testing")
+	err := s.repo.CreateRole(originalRoleName)
 	s.NoError(err)
 
 	err = s.repo.GrantRolesToRole(context.Background(), originalRoleName, rolesToGrants...)
@@ -292,7 +292,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeRolesFromRole() {
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantUsersToRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_GRANT_USER_TEST", testId)
-	err := s.repo.CreateRole(roleName, "Integration test")
+	err := s.repo.CreateRole(roleName)
 
 	s.NoError(err)
 
@@ -316,7 +316,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantUsersToRole() {
 func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeUsersFromRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_GRANT_USER_TEST", testId)
-	err := s.repo.CreateRole(roleName, "Integration test")
+	err := s.repo.CreateRole(roleName)
 	s.NoError(err)
 
 	err = s.repo.GrantUsersToRole(context.Background(), roleName, snowflakeUserName)
@@ -336,7 +336,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeUsersFromRole() {
 func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrant() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_GRANT_TEST", testId)
-	err := s.repo.CreateRole(roleName, "Integration test execute grant")
+	err := s.repo.CreateRole(roleName)
 	s.NoError(err)
 
 	//When
@@ -360,7 +360,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrant() {
 func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevoke() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_REVOKE_TEST", testId)
-	err := s.repo.CreateRole(roleName, "Integration test execute grant")
+	err := s.repo.CreateRole(roleName)
 	s.NoError(err)
 	err = s.repo.ExecuteGrant("SELECT", "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS", roleName)
 	s.NoError(err)
@@ -669,7 +669,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_NonExistin
 func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_Role() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_COMMENT_EXISTING_ROLE", testId)
-	err := s.repo.CreateRole(roleName, "Integration testing comment if exists")
+	err := s.repo.CreateRole(roleName)
 
 	comment := "Some comment"
 
