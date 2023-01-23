@@ -519,8 +519,10 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 		{Name: "ExistingRole2", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 	}, nil).Once()
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
-	repoMock.EXPECT().CreateRole("RoleName3", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName3").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName3").Return(nil).Once()
 
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	expectGrantUsersToRole(repoMock, "RoleName3")
@@ -682,7 +684,8 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 		{Name: "R_ToRemove2", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 	}, nil).Once()
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
@@ -1002,7 +1005,8 @@ func generateAccessControls_table(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
@@ -1048,7 +1052,8 @@ func generateAccessControls_view(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
@@ -1094,7 +1099,8 @@ func generateAccessControls_schema(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
@@ -1157,7 +1163,8 @@ func generateAccessControls_schema_noverify(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
@@ -1270,7 +1277,8 @@ func generateAccessControls_sharedDatabase(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
@@ -1316,7 +1324,8 @@ func generateAccessControls_database(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
@@ -1454,7 +1463,8 @@ func generateAccessControls_warehouse(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
@@ -1499,7 +1509,8 @@ func generateAccessControls_datasource(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
@@ -1613,9 +1624,12 @@ func TestAccessSyncer_generateAccessControls_inheritance(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
 
-	repoMock.EXPECT().CreateRole("RoleName1", mock.Anything).Return(nil).Once()
-	repoMock.EXPECT().CreateRole("RoleName2", mock.Anything).Return(nil).Once()
-	repoMock.EXPECT().CreateRole("RoleName3", mock.Anything).Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName2").Return(nil).Once()
+	repoMock.EXPECT().CreateRole("RoleName3").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName2").Return(nil).Once()
+	repoMock.EXPECT().CommentIfExists(mock.Anything, mock.Anything, "RoleName3").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1")
 	expectGrantUsersToRole(repoMock, "RoleName2")
 	expectGrantUsersToRole(repoMock, "RoleName3", "User1")

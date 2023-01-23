@@ -100,13 +100,13 @@ func (_c *mockDataAccessRepository_CommentIfExists_Call) Return(_a0 error) *mock
 	return _c
 }
 
-// CreateRole provides a mock function with given fields: roleName, comment
-func (_m *mockDataAccessRepository) CreateRole(roleName string, comment string) error {
-	ret := _m.Called(roleName, comment)
+// CreateRole provides a mock function with given fields: roleName
+func (_m *mockDataAccessRepository) CreateRole(roleName string) error {
+	ret := _m.Called(roleName)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(roleName, comment)
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(roleName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -121,14 +121,13 @@ type mockDataAccessRepository_CreateRole_Call struct {
 
 // CreateRole is a helper method to define mock.On call
 //   - roleName string
-//   - comment string
-func (_e *mockDataAccessRepository_Expecter) CreateRole(roleName interface{}, comment interface{}) *mockDataAccessRepository_CreateRole_Call {
-	return &mockDataAccessRepository_CreateRole_Call{Call: _e.mock.On("CreateRole", roleName, comment)}
+func (_e *mockDataAccessRepository_Expecter) CreateRole(roleName interface{}) *mockDataAccessRepository_CreateRole_Call {
+	return &mockDataAccessRepository_CreateRole_Call{Call: _e.mock.On("CreateRole", roleName)}
 }
 
-func (_c *mockDataAccessRepository_CreateRole_Call) Run(run func(roleName string, comment string)) *mockDataAccessRepository_CreateRole_Call {
+func (_c *mockDataAccessRepository_CreateRole_Call) Run(run func(roleName string)) *mockDataAccessRepository_CreateRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(string))
 	})
 	return _c
 }
