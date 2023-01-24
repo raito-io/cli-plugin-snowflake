@@ -65,7 +65,7 @@ type dataAccessRepository interface {
 	RevokeUsersFromRole(ctx context.Context, role string, users ...string) error
 	GrantRolesToRole(ctx context.Context, role string, roles ...string) error
 	RevokeRolesFromRole(ctx context.Context, role string, roles ...string) error
-	CreateRole(roleName string, comment string) error
+	CreateRole(roleName string) error
 }
 
 type AccessSyncer struct {
@@ -531,7 +531,7 @@ func isNotInternizableRole(role string) bool {
 	return false
 }
 
-// findRoles returns a map where the keys are all the roles that exist in Snowflake right now and the key indicates if it was found in apMap or not.
+// findRoles returns a map where the keys are all the roles that exist in Snowflake right now and the value indicates if it was found in apMap or not.
 func (s *AccessSyncer) findRoles(prefix string, apMap map[string]importer.EnrichedAccess, repo dataAccessRepository) (map[string]bool, error) {
 	foundRoles := make(map[string]bool)
 
@@ -599,9 +599,6 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 			}
 		}
 
-		// TODO for now we suppose the permissions on the database and schema level are only USAGE.
-		//      Later we should support to have specific permissions on these levels as well.
-
 		// Build the expected expectedGrants
 		var expectedGrants []Grant
 
@@ -653,7 +650,8 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 
 		var foundGrants []Grant
 
-		if keep, f := existingRoles[rn]; f && keep {
+		// If the role already exists in the system
+		if _, f := existingRoles[rn]; f {
 			logger.Info(fmt.Sprintf("Merging role %q", rn))
 
 			err := repo.CommentIfExists(createComment(ea.AccessProvider, true), "ROLE", rn)
@@ -670,7 +668,6 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 			rolesOfRole := make([]string, 0, len(grantsOfRole))
 
 			for _, gor := range grantsOfRole {
-				// TODO we ignore other roles that have been granted this role. What should we do with it?
 				if strings.EqualFold(gor.GrantedTo, "USER") {
 					usersOfRole = append(usersOfRole, gor.GranteeName)
 				} else if strings.EqualFold(gor.GrantedTo, "ROLE") {
@@ -748,6 +745,8 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 					foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn})
 				} else if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
 					logger.Warn(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, rn))
+				} else if strings.EqualFold(grant.Privilege, "USAGE") && strings.EqualFold(grant.GrantedOn, "ROLE") {
+					logger.Debug(fmt.Sprintf("Ignoring USAGE permission on ROLE %q", grant.Name))
 				} else {
 					foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn + " " + grant.Name})
 				}
@@ -758,9 +757,16 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 			logger.Info(fmt.Sprintf("Creating role %q", rn))
 
 			if _, f := roleCreated[rn]; !f {
-				err := repo.CreateRole(rn, createComment(ea.AccessProvider, false))
+				// Create the role if not exists
+				err := repo.CreateRole(rn)
 				if err != nil {
 					return fmt.Errorf("error while creating role %q: %s", rn, err.Error())
+				}
+
+				// Updating the comment (independent of creation)
+				err = repo.CommentIfExists(createComment(ea.AccessProvider, false), "ROLE", rn)
+				if err != nil {
+					return fmt.Errorf("error while updating comment on role %q: %s", rn, err.Error())
 				}
 				roleCreated[rn] = struct{}{}
 			}

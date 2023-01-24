@@ -168,8 +168,8 @@ func (repo *SnowflakeRepository) GetRolesWithPrefix(prefix string) ([]RoleEntity
 	return roleEntities, nil
 }
 
-func (repo *SnowflakeRepository) CreateRole(roleName string, comment string) error {
-	q := common.FormatQuery(`CREATE OR REPLACE ROLE %s COMMENT=%s`, roleName, comment)
+func (repo *SnowflakeRepository) CreateRole(roleName string) error {
+	q := common.FormatQuery(`CREATE ROLE IF NOT EXISTS %s`, roleName)
 
 	_, _, err := repo.query(q)
 
