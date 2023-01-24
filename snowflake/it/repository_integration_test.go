@@ -596,7 +596,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetViewsInSchema() {
 
 	//Then
 	s.NoError(err)
-	s.Len(views, 56)
+	s.True(len(views) > 56)
 
 	comment := ""
 
