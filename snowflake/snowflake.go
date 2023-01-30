@@ -12,20 +12,20 @@ import (
 const SfLimit = 10000
 const ConnectionStringIdentifier = "Raito_CLI"
 
-func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, error) {
+func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, string, error) {
 	snowflakeUser := params[SfUser]
 	if snowflakeUser == nil {
-		return nil, e.CreateMissingInputParameterError(SfUser)
+		return nil, "", e.CreateMissingInputParameterError(SfUser)
 	}
 
 	snowflakePassword := params[SfPassword]
 	if snowflakePassword == nil {
-		return nil, e.CreateMissingInputParameterError(SfPassword)
+		return nil, "", e.CreateMissingInputParameterError(SfPassword)
 	}
 
 	snowflakeAccount := params[SfAccount]
 	if snowflakeAccount == nil {
-		return nil, e.CreateMissingInputParameterError(SfAccount)
+		return nil, "", e.CreateMissingInputParameterError(SfAccount)
 	}
 
 	if role == "" {
@@ -46,10 +46,10 @@ func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, er
 	conn, err := sql.Open("snowflake", connectionString)
 
 	if err != nil {
-		return nil, e.CreateSourceConnectionError(censoredConnectionString, err.Error())
+		return nil, "", e.CreateSourceConnectionError(censoredConnectionString, err.Error())
 	}
 
-	return conn, nil
+	return conn, role, nil
 }
 
 func QuerySnowflake(conn *sql.DB, query string) (*sql.Rows, error) {
