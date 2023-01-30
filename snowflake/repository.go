@@ -33,16 +33,18 @@ func (nullString *NullString) Scan(value interface{}) error {
 type SnowflakeRepository struct {
 	conn      *sql.DB
 	queryTime time.Duration
+	role      string
 }
 
 func NewSnowflakeRepository(params map[string]interface{}, role string) (*SnowflakeRepository, error) {
-	conn, err := ConnectToSnowflake(params, role)
+	conn, role, err := ConnectToSnowflake(params, role)
 	if err != nil {
 		return nil, err
 	}
 
 	return &SnowflakeRepository{
 		conn: conn,
+		role: role,
 	}, nil
 }
 
@@ -177,9 +179,15 @@ func (repo *SnowflakeRepository) CreateRole(roleName string) error {
 }
 
 func (repo *SnowflakeRepository) DropRole(roleName string) error {
-	q := common.FormatQuery(`DROP ROLE %s`, roleName)
-
+	q := common.FormatQuery(`GRANT OWNERSHIP ON ROLE %s TO ROLE %s`, roleName, repo.role)
 	_, _, err := repo.query(q)
+
+	if err != nil {
+		return err
+	}
+
+	q = common.FormatQuery(`DROP ROLE %s`, roleName)
+	_, _, err = repo.query(q)
 
 	return err
 }
