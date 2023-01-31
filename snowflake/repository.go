@@ -376,6 +376,21 @@ func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, poli
 }
 
 func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error) {
+	// to fetch policy references we need to have USAGE on dbName and schema
+	if !strings.EqualFold(repo.role, "ACCOUNTADMIN") && repo.role != "" {
+		err := repo.ExecuteGrant("USAGE", fmt.Sprintf("DATABASE %s", dbName), repo.role)
+
+		if err != nil {
+			return nil, err
+		}
+
+		err = repo.ExecuteGrant("USAGE", fmt.Sprintf("SCHEMA %s.%s", dbName, schema), repo.role)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	q := fmt.Sprintf(`select * from table(%s.information_schema.policy_references(policy_name => '%s'))`, dbName, common.FormatQuery(`%s.%s.%s`, dbName, schema, policyName))
 
 	rows, _, err := repo.query(q)
