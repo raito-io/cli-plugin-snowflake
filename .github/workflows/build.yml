@@ -37,7 +37,7 @@ jobs:
           SF_ROLE: ${{ secrets.sf_role }}
           SF_STANDARD_EDITION: true
 
-      - uses: codecov/codecov-action@v2
+      - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.txt
+          files: ./coverage.txt
