@@ -56,6 +56,11 @@ func (repo *SnowflakeRepository) TotalQueryTime() time.Duration {
 	return repo.queryTime
 }
 
+func (repo *SnowflakeRepository) isProtectedRoleName(rn string) bool {
+	// if sync role is not account admin, we protect this role both on import & export
+	return !strings.EqualFold(repo.role, "ACCOUNTADMIN") && strings.EqualFold(repo.role, rn)
+}
+
 func (repo *SnowflakeRepository) BatchingInformation(startDate *time.Time, historyTable string) (*string, *string, int, error) {
 	filterClause := fmt.Sprintf("WHERE start_time > '%s'", startDate.Format(time.RFC3339))
 	fetchBatchingInfoQuery := fmt.Sprintf("SELECT min(START_TIME) as minTime, max(START_TIME) as maxTime, COUNT(START_TIME) as numRows FROM %s %s", historyTable, filterClause)
@@ -167,10 +172,23 @@ func (repo *SnowflakeRepository) GetRolesWithPrefix(prefix string) ([]RoleEntity
 		return nil, fmt.Errorf("error while finding existing roles: %s", err.Error())
 	}
 
+	// filter out role used to sync snowflake to raito
+	for i, roleEntity := range roleEntities {
+		if repo.isProtectedRoleName(roleEntity.Name) {
+			roleEntities[i] = roleEntities[len(roleEntities)-1]
+			return roleEntities[:len(roleEntities)-1], nil
+		}
+	}
+
 	return roleEntities, nil
 }
 
 func (repo *SnowflakeRepository) CreateRole(roleName string) error {
+	if repo.isProtectedRoleName(roleName) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", roleName))
+		return nil
+	}
+
 	q := common.FormatQuery(`CREATE ROLE IF NOT EXISTS %s`, roleName)
 
 	_, _, err := repo.query(q)
@@ -179,6 +197,11 @@ func (repo *SnowflakeRepository) CreateRole(roleName string) error {
 }
 
 func (repo *SnowflakeRepository) DropRole(roleName string) error {
+	if repo.isProtectedRoleName(roleName) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", roleName))
+		return nil
+	}
+
 	q := common.FormatQuery(`GRANT OWNERSHIP ON ROLE %s TO ROLE %s`, roleName, repo.role)
 	_, _, err := repo.query(q)
 
@@ -249,6 +272,11 @@ func (repo *SnowflakeRepository) GrantRolesToRole(ctx context.Context, role stri
 }
 
 func (repo *SnowflakeRepository) RevokeRolesFromRole(ctx context.Context, role string, roles ...string) error {
+	if repo.isProtectedRoleName(role) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
+		return nil
+	}
+
 	statementChan, done := repo.execMultiStatements(ctx)
 
 	for _, otherRole := range roles {
@@ -275,6 +303,11 @@ func (repo *SnowflakeRepository) GrantUsersToRole(ctx context.Context, role stri
 }
 
 func (repo *SnowflakeRepository) RevokeUsersFromRole(ctx context.Context, role string, users ...string) error {
+	if repo.isProtectedRoleName(role) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
+		return nil
+	}
+
 	statementChan, done := repo.execMultiStatements(ctx)
 
 	for _, user := range users {
@@ -288,6 +321,11 @@ func (repo *SnowflakeRepository) RevokeUsersFromRole(ctx context.Context, role s
 }
 
 func (repo *SnowflakeRepository) ExecuteGrant(perm, on, role string) error {
+	if repo.isProtectedRoleName(role) && !strings.EqualFold(perm, "USAGE") {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
+		return nil
+	}
+
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
 	q := fmt.Sprintf(`GRANT %s ON %s TO ROLE %s`, perm, on, role)
 	logger.Debug("Executing grant query", "query", q)
@@ -302,6 +340,11 @@ func (repo *SnowflakeRepository) ExecuteGrant(perm, on, role string) error {
 }
 
 func (repo *SnowflakeRepository) ExecuteRevoke(perm, on, role string) error {
+	if repo.isProtectedRoleName(role) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
+		return nil
+	}
+
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
 	// q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
 	q := fmt.Sprintf(`REVOKE %s ON %s FROM ROLE %s`, perm, on, role)
@@ -376,6 +419,21 @@ func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, poli
 }
 
 func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error) {
+	// to fetch policy references we need to have USAGE on dbName and schema
+	if !strings.EqualFold(repo.role, "ACCOUNTADMIN") && repo.role != "" {
+		err := repo.ExecuteGrant("USAGE", fmt.Sprintf("DATABASE %s", dbName), repo.role)
+
+		if err != nil {
+			return nil, err
+		}
+
+		err = repo.ExecuteGrant("USAGE", fmt.Sprintf("SCHEMA %s.%s", dbName, schema), repo.role)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	q := fmt.Sprintf(`select * from table(%s.information_schema.policy_references(policy_name => '%s'))`, dbName, common.FormatQuery(`%s.%s.%s`, dbName, schema, policyName))
 
 	rows, _, err := repo.query(q)
