@@ -56,10 +56,15 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 	for _, userRow := range userRows {
 		logger.Debug(fmt.Sprintf("Handling user %q", userRow.Name))
 
+		displayName := userRow.DisplayName
+		if displayName == "" {
+			displayName = userRow.Name
+		}
+
 		user := is.User{
 			ExternalId: userRow.LoginName,
 			UserName:   userRow.Name,
-			Name:       userRow.DisplayName,
+			Name:       displayName,
 			Email:      userRow.Email,
 		}
 
