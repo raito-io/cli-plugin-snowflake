@@ -595,7 +595,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 					{
 						Permission:        "TRUNCATE",
 						Description:       "Enables executing a TRUNCATE TABLE command on a table.",
-						GlobalPermissions: ds.TruncateGlobalPermission(),
+						GlobalPermissions: ds.DeleteGlobalPermission(),
 					},
 					{
 						Permission:        "DELETE",
