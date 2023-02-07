@@ -421,8 +421,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 						Description: "Grants ability to run tasks owned by the role. For serverless tasks to run, the role that has the OWNERSHIP privilege on the task must also have the global EXECUTE MANAGED TASK privilege.",
 					},
 					{
-						Permission:  "IMPORT SHARE",
-						Description: "Enables a data consumer to view shares shared with their account. Also grants the ability to create databases from shares; requires the global CREATE DATABASE privilege.",
+						Permission:        "IMPORT SHARE",
+						Description:       "Enables a data consumer to view shares shared with their account. Also grants the ability to create databases from shares; requires the global CREATE DATABASE privilege.",
+						GlobalPermissions: ds.ReadGlobalPermission(),
 					},
 					{
 						Permission:  "MONITOR EXECUTION",
@@ -577,24 +578,29 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 				Type: ds.Table,
 				Permissions: []ds.DataObjectTypePermission{
 					{
-						Permission:  "SELECT",
-						Description: "Enables executing a SELECT statement on a table.",
+						Permission:        "SELECT",
+						Description:       "Enables executing a SELECT statement on a table.",
+						GlobalPermissions: ds.ReadGlobalPermission(),
 					},
 					{
-						Permission:  "INSERT",
-						Description: "Enables executing an INSERT command on a table. Also enables using the ALTER TABLE command with a RECLUSTER clause to manually recluster a table with a clustering key.",
+						Permission:        "INSERT",
+						Description:       "Enables executing an INSERT command on a table. Also enables using the ALTER TABLE command with a RECLUSTER clause to manually recluster a table with a clustering key.",
+						GlobalPermissions: ds.InsertGlobalPermission(),
 					},
 					{
-						Permission:  "UPDATE",
-						Description: "Enables executing an UPDATE command on a table.",
+						Permission:        "UPDATE",
+						Description:       "Enables executing an UPDATE command on a table.",
+						GlobalPermissions: ds.UpdateGlobalPermission(),
 					},
 					{
-						Permission:  "TRUNCATE",
-						Description: "Enables executing a TRUNCATE TABLE command on a table.",
+						Permission:        "TRUNCATE",
+						Description:       "Enables executing a TRUNCATE TABLE command on a table.",
+						GlobalPermissions: ds.TruncateGlobalPermission(),
 					},
 					{
-						Permission:  "DELETE",
-						Description: "Enables executing a DELETE command on a table.",
+						Permission:        "DELETE",
+						Description:       "Enables executing a DELETE command on a table.",
+						GlobalPermissions: ds.DeleteGlobalPermission(),
 					},
 					{
 						Permission:  "REFERENCES",
@@ -608,8 +614,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 				Type: ds.View,
 				Permissions: []ds.DataObjectTypePermission{
 					{
-						Permission:  "SELECT",
-						Description: "Enables executing a SELECT statement on a view.",
+						Permission:        "SELECT",
+						Description:       "Enables executing a SELECT statement on a view.",
+						GlobalPermissions: ds.ReadGlobalPermission(),
 					},
 					{
 						Permission:  "REFERENCES",
@@ -627,8 +634,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 				Type: ds.Database,
 				Permissions: []ds.DataObjectTypePermission{
 					{
-						Permission:  "IMPORTED PRIVILEGES",
-						Description: "Enables roles other than the owning role to access a shared database; applies only to shared databases.",
+						Permission:        "IMPORTED PRIVILEGES",
+						Description:       "Enables roles other than the owning role to access a shared database; applies only to shared databases.",
+						GlobalPermissions: ds.ReadGlobalPermission(),
 					},
 				},
 				Children: []string{"shared-" + ds.Schema},
