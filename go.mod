@@ -12,13 +12,14 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/snowflakedb/gosnowflake v1.6.10
 	github.com/stretchr/testify v1.8.1
-	github.com/vektra/mockery/v2 v2.18.0
+	github.com/vektra/mockery/v2 v2.20.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 )
 
 require (
 	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
 	github.com/Azure/azure-storage-blob-go v0.14.0 // indirect
+	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.17.4 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.0.0 // indirect

@@ -28,7 +28,7 @@ type dataSourceRepository interface {
 }
 
 type DataSourceSyncer struct {
-	repoProvider func(params map[string]interface{}, role string) (dataSourceRepository, error)
+	repoProvider func(params map[string]string, role string) (dataSourceRepository, error)
 }
 
 func NewDataSourceSyncer() *DataSourceSyncer {
@@ -37,7 +37,7 @@ func NewDataSourceSyncer() *DataSourceSyncer {
 	}
 }
 
-func newDataSourceSnowflakeRepo(params map[string]interface{}, role string) (dataSourceRepository, error) {
+func newDataSourceSnowflakeRepo(params map[string]string, role string) (dataSourceRepository, error) {
 	return NewSnowflakeRepository(params, role)
 }
 
@@ -62,13 +62,13 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	dataSourceHandler.SetDataSourceFullname(sfAccount)
 
 	excludedDatabases := ""
-	if v, ok := configParams.Parameters[SfExcludedDatabases]; ok && v != nil {
-		excludedDatabases = v.(string)
+	if v, ok := configParams.Parameters[SfExcludedDatabases]; ok {
+		excludedDatabases = v
 	}
 
 	excludedSchemas := "INFORMATION_SCHEMA"
-	if v, ok := configParams.Parameters[SfExcludedSchemas]; ok && v != nil {
-		excludedSchemas += "," + v.(string)
+	if v, ok := configParams.Parameters[SfExcludedSchemas]; ok {
+		excludedSchemas += "," + v
 	}
 
 	err = s.readWarehouses(repo, dataSourceHandler)
@@ -345,17 +345,17 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.Da
 	return dbEntities, nil
 }
 
-func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
+func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaData, error) {
 	logger.Debug("Returning meta data for Snowflake data source")
 
-	return ds.MetaData{
+	return &ds.MetaData{
 		Type:              "snowflake",
 		SupportedFeatures: []string{ds.RowFiltering, ds.ColumnMasking},
-		DataObjectTypes: []ds.DataObjectType{
+		DataObjectTypes: []*ds.DataObjectType{
 			{
 				Name: ds.Datasource,
 				Type: ds.Datasource,
-				Permissions: []ds.DataObjectTypePermission{
+				Permissions: []*ds.DataObjectTypePermission{
 					{
 						Permission:  "APPLY MASKING POLICY",
 						Description: "Grants ability to set a Column-level Security masking policy on a table or view column and to set a masking policy on a tag. This global privilege also allows executing the DESCRIBE operation on tables and views.",
@@ -423,7 +423,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 					{
 						Permission:        "IMPORT SHARE",
 						Description:       "Enables a data consumer to view shares shared with their account. Also grants the ability to create databases from shares; requires the global CREATE DATABASE privilege.",
-						GlobalPermissions: ds.ReadGlobalPermission(),
+						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
 					{
 						Permission:  "MONITOR EXECUTION",
@@ -443,7 +443,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 			{
 				Name: "warehouse",
 				Type: "warehouse",
-				Permissions: []ds.DataObjectTypePermission{
+				Permissions: []*ds.DataObjectTypePermission{
 					{
 						Permission:  "MODIFY",
 						Description: "Enables altering any properties of a warehouse, including changing its size. ",
@@ -466,7 +466,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 			{
 				Name: ds.Database,
 				Type: ds.Database,
-				Permissions: []ds.DataObjectTypePermission{
+				Permissions: []*ds.DataObjectTypePermission{
 					{
 						Permission:  "CREATE SCHEMA",
 						Description: "Enables creating a new schema in a database, including cloning a schema.",
@@ -489,7 +489,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 			{
 				Name: ds.Schema,
 				Type: ds.Schema,
-				Permissions: []ds.DataObjectTypePermission{
+				Permissions: []*ds.DataObjectTypePermission{
 					{
 						Permission:  "MODIFY",
 						Description: "Enables altering any settings of a schema.",
@@ -576,31 +576,31 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 			{
 				Name: ds.Table,
 				Type: ds.Table,
-				Permissions: []ds.DataObjectTypePermission{
+				Permissions: []*ds.DataObjectTypePermission{
 					{
 						Permission:        "SELECT",
 						Description:       "Enables executing a SELECT statement on a table.",
-						GlobalPermissions: ds.ReadGlobalPermission(),
+						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
 					{
 						Permission:        "INSERT",
 						Description:       "Enables executing an INSERT command on a table. Also enables using the ALTER TABLE command with a RECLUSTER clause to manually recluster a table with a clustering key.",
-						GlobalPermissions: ds.InsertGlobalPermission(),
+						GlobalPermissions: ds.InsertGlobalPermission().StringValues(),
 					},
 					{
 						Permission:        "UPDATE",
 						Description:       "Enables executing an UPDATE command on a table.",
-						GlobalPermissions: ds.UpdateGlobalPermission(),
+						GlobalPermissions: ds.UpdateGlobalPermission().StringValues(),
 					},
 					{
 						Permission:        "TRUNCATE",
 						Description:       "Enables executing a TRUNCATE TABLE command on a table.",
-						GlobalPermissions: ds.DeleteGlobalPermission(),
+						GlobalPermissions: ds.DeleteGlobalPermission().StringValues(),
 					},
 					{
 						Permission:        "DELETE",
 						Description:       "Enables executing a DELETE command on a table.",
-						GlobalPermissions: ds.DeleteGlobalPermission(),
+						GlobalPermissions: ds.DeleteGlobalPermission().StringValues(),
 					},
 					{
 						Permission:  "REFERENCES",
@@ -612,11 +612,11 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 			{
 				Name: ds.View,
 				Type: ds.View,
-				Permissions: []ds.DataObjectTypePermission{
+				Permissions: []*ds.DataObjectTypePermission{
 					{
 						Permission:        "SELECT",
 						Description:       "Enables executing a SELECT statement on a view.",
-						GlobalPermissions: ds.ReadGlobalPermission(),
+						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
 					{
 						Permission:  "REFERENCES",
@@ -632,11 +632,11 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 			{
 				Name: "shared-" + ds.Database,
 				Type: ds.Database,
-				Permissions: []ds.DataObjectTypePermission{
+				Permissions: []*ds.DataObjectTypePermission{
 					{
 						Permission:        "IMPORTED PRIVILEGES",
 						Description:       "Enables roles other than the owning role to access a shared database; applies only to shared databases.",
-						GlobalPermissions: ds.ReadGlobalPermission(),
+						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
 				},
 				Children: []string{"shared-" + ds.Schema},
@@ -654,7 +654,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 			{
 				Name:        "shared-" + ds.View,
 				Type:        ds.View,
-				Permissions: []ds.DataObjectTypePermission{},
+				Permissions: []*ds.DataObjectTypePermission{},
 				Children:    []string{"shared-" + ds.Column},
 			},
 			{
@@ -662,5 +662,5 @@ func (s *DataSourceSyncer) GetDataSourceMetaData() ds.MetaData {
 				Type: ds.Column,
 			},
 		},
-	}
+	}, nil
 }
