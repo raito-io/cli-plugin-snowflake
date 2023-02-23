@@ -7,7 +7,7 @@ require (
 	github.com/blockloop/scan v1.3.0
 	github.com/hashicorp/go-hclog v1.4.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/raito-io/cli v0.32.0-dev0
+	github.com/raito-io/cli v0.32.0-dev1
 	github.com/raito-io/golang-set v0.0.4
 	github.com/sirupsen/logrus v1.8.1
 	github.com/snowflakedb/gosnowflake v1.6.10
@@ -19,6 +19,7 @@ require (
 require (
 	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
 	github.com/Azure/azure-storage-blob-go v0.14.0 // indirect
+	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.17.4 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.0.0 // indirect
