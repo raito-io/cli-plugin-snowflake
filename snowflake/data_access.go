@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 
-	"github.com/cstockton/go-conv"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -100,7 +99,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 		return err
 	}
 
-	if configMap.GetBoolWithDefault(SfStandardEdition, false) {
+	if !configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		logger.Info("Reading masking policies from Snowflake")
 
 		err = s.importMaskingPolicies(accessProviderHandler, repo)
@@ -239,15 +238,9 @@ func getShareNames(repo dataAccessRepository) (map[string]struct{}, error) {
 }
 
 func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
-	externalGroupOwners := ""
-	if v, ok := configMap.Parameters[SfExternalIdentityStoreOwners]; ok {
-		externalGroupOwners = v
-	}
+	externalGroupOwners := configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
 
-	linkToExternalIdentityStoreGroups := false
-	if v, ok := configMap.Parameters[SfLinkToExternalIdentityStoreGroups]; ok {
-		linkToExternalIdentityStoreGroups, _ = conv.Bool(v)
-	}
+	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
 
 	shares, err := getShareNames(repo)
 	if err != nil {

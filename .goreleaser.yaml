@@ -22,3 +22,5 @@ archives:
   -
     format: 'tar.gz'
     name_template: '{{ .ProjectName }}-{{ .Version }}-{{ .Os }}_{{ .Arch }}'
+release:
+  prerelease: auto

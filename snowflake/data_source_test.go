@@ -17,14 +17,15 @@ import (
 
 func TestDataSourceSyncer_GetMetaData(t *testing.T) {
 	//Given
-	syncer := DataSourceSyncer{repoProvider: func(params map[string]interface{}, role string) (dataSourceRepository, error) {
+	syncer := DataSourceSyncer{repoProvider: func(params map[string]string, role string) (dataSourceRepository, error) {
 		return nil, nil
 	}}
 
 	//When
-	result := syncer.GetDataSourceMetaData()
+	result, err := syncer.GetDataSourceMetaData(context.Background())
 
 	//Then
+	assert.NoError(t, err)
 	assert.Equal(t, "snowflake", result.Type)
 	assert.NotEmpty(t, result.DataObjectTypes)
 }
@@ -32,7 +33,7 @@ func TestDataSourceSyncer_GetMetaData(t *testing.T) {
 func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value"},
+		Parameters: map[string]string{"key": "value"},
 	}
 
 	repoMock := newMockDataSourceRepository(t)
@@ -89,7 +90,7 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 func TestDataSourceSyncer_SyncDataSource_ErrorOnSnowflakeAccount(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value"},
+		Parameters: map[string]string{"key": "value"},
 	}
 
 	repoMock := newMockDataSourceRepository(t)
@@ -458,7 +459,7 @@ func TestDataSourceSyncer_SyncDataSource_readViewsInSchema(t *testing.T) {
 
 func createSyncer(repo dataSourceRepository) *DataSourceSyncer {
 	return &DataSourceSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataSourceRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataSourceRepository, error) {
 			return repo, nil
 		},
 	}
