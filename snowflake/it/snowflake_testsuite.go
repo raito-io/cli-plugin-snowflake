@@ -43,12 +43,12 @@ func readDatabaseConfig() *config.ConfigMap {
 	}
 
 	return &config.ConfigMap{
-		Parameters: map[string]interface{}{
+		Parameters: map[string]string{
 			snowflake.SfAccount:         sfAccount,
 			snowflake.SfUser:            sfUser,
 			snowflake.SfPassword:        sfPassword,
 			snowflake.SfRole:            sfRole,
-			snowflake.SfStandardEdition: sfStandardEdition,
+			snowflake.SfStandardEdition: strconv.FormatBool(sfStandardEdition),
 		},
 	}
 }

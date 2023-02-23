@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 
-	"github.com/cstockton/go-conv"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -69,7 +68,7 @@ type dataAccessRepository interface {
 }
 
 type AccessSyncer struct {
-	repoProvider func(params map[string]interface{}, role string) (dataAccessRepository, error)
+	repoProvider func(params map[string]string, role string) (dataAccessRepository, error)
 }
 
 func NewDataAccessSyncer() *AccessSyncer {
@@ -78,7 +77,7 @@ func NewDataAccessSyncer() *AccessSyncer {
 	}
 }
 
-func newDataAccessSnowflakeRepo(params map[string]interface{}, role string) (dataAccessRepository, error) {
+func newDataAccessSnowflakeRepo(params map[string]string, role string) (dataAccessRepository, error) {
 	return NewSnowflakeRepository(params, role)
 }
 
@@ -100,7 +99,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 		return err
 	}
 
-	if v, f := configMap.Parameters[SfStandardEdition]; !f || !(v.(bool)) {
+	if !configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		logger.Info("Reading masking policies from Snowflake")
 
 		err = s.importMaskingPolicies(accessProviderHandler, repo)
@@ -239,15 +238,9 @@ func getShareNames(repo dataAccessRepository) (map[string]struct{}, error) {
 }
 
 func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
-	externalGroupOwners := ""
-	if v, ok := configMap.Parameters[SfExternalIdentityStoreOwners]; ok && v != nil {
-		externalGroupOwners = v.(string)
-	}
+	externalGroupOwners := configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
 
-	linkToExternalIdentityStoreGroups := false
-	if v, ok := configMap.Parameters[SfLinkToExternalIdentityStoreGroups]; ok && v != nil {
-		linkToExternalIdentityStoreGroups, _ = conv.Bool(v)
-	}
+	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
 
 	shares, err := getShareNames(repo)
 	if err != nil {
@@ -548,7 +541,7 @@ func (s *AccessSyncer) findRoles(prefix string, apMap map[string]importer.Enrich
 	return foundRoles, nil
 }
 
-func buildMetaDataMap(metaData ds.MetaData) map[string]map[string]struct{} {
+func buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
 	metaDataMap := make(map[string]map[string]struct{})
 
 	for _, dot := range metaData.DataObjectTypes {
@@ -570,7 +563,13 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 
 	if verifyAndPropagate {
 		syncer := DataSourceSyncer{}
-		metaData = buildMetaDataMap(syncer.GetDataSourceMetaData())
+
+		md, err := syncer.GetDataSourceMetaData(ctx)
+		if err != nil {
+			return err
+		}
+
+		metaData = buildMetaDataMap(md)
 	}
 
 	roleCreated := make(map[string]interface{})

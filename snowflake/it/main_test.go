@@ -106,7 +106,7 @@ func TestMain(m *testing.M) {
 	os.Exit(testResult)
 }
 
-func connectAndQuery(params map[string]interface{}, role, query string) (*sql.Rows, error) {
+func connectAndQuery(params map[string]string, role, query string) (*sql.Rows, error) {
 	conn, _, err := snowflake.ConnectToSnowflake(params, role)
 	if err != nil {
 		return nil, err

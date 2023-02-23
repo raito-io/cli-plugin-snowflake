@@ -12,25 +12,25 @@ import (
 const SfLimit = 10000
 const ConnectionStringIdentifier = "Raito_CLI"
 
-func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, string, error) {
-	snowflakeUser := params[SfUser]
-	if snowflakeUser == nil {
+func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string, error) {
+	snowflakeUser, found := params[SfUser]
+	if !found {
 		return nil, "", e.CreateMissingInputParameterError(SfUser)
 	}
 
-	snowflakePassword := params[SfPassword]
-	if snowflakePassword == nil {
+	snowflakePassword, found := params[SfPassword]
+	if !found {
 		return nil, "", e.CreateMissingInputParameterError(SfPassword)
 	}
 
-	snowflakeAccount := params[SfAccount]
-	if snowflakeAccount == nil {
+	snowflakeAccount, found := params[SfAccount]
+	if !found {
 		return nil, "", e.CreateMissingInputParameterError(SfAccount)
 	}
 
 	if role == "" {
-		if v, ok := params[SfRole]; ok && v != nil {
-			role = v.(string)
+		if v, ok := params[SfRole]; ok {
+			role = v
 		}
 	}
 
@@ -38,7 +38,7 @@ func ConnectToSnowflake(params map[string]interface{}, role string) (*sql.DB, st
 		role = "ACCOUNTADMIN"
 	}
 
-	urlUser := url.UserPassword(snowflakeUser.(string), snowflakePassword.(string))
+	urlUser := url.UserPassword(snowflakeUser, snowflakePassword)
 
 	connectionString := fmt.Sprintf("%s@%s?role=%s&application=%s", urlUser, snowflakeAccount, role, ConnectionStringIdentifier)
 	censoredConnectionString := fmt.Sprintf("%s:%s@%s?role=%s", snowflakeUser, "**censured**", snowflakeAccount, role)

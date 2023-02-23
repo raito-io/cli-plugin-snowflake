@@ -15,7 +15,7 @@ import (
 func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 	//Given
 	configMap := &config.ConfigMap{
-		Parameters: map[string]interface{}{},
+		Parameters: map[string]string{},
 	}
 
 	repoMock := newMockIdentityStoreRepository(t)
@@ -35,7 +35,7 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 	}, nil)
 
 	syncer := IdentityStoreSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (identityStoreRepository, error) {
+		repoProvider: func(params map[string]string, role string) (identityStoreRepository, error) {
 			return repoMock, nil
 		},
 	}
@@ -55,7 +55,7 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 func TestNewIdentityStoreSyncer_RepoError(t *testing.T) {
 	//Given
 	configMap := &config.ConfigMap{
-		Parameters: map[string]interface{}{},
+		Parameters: map[string]string{},
 	}
 
 	repoMock := newMockIdentityStoreRepository(t)
@@ -66,7 +66,7 @@ func TestNewIdentityStoreSyncer_RepoError(t *testing.T) {
 	repoMock.EXPECT().GetUsers().Return(nil, fmt.Errorf("boom"))
 
 	syncer := IdentityStoreSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (identityStoreRepository, error) {
+		repoProvider: func(params map[string]string, role string) (identityStoreRepository, error) {
 			return repoMock, nil
 		},
 	}
@@ -86,7 +86,7 @@ func TestNewIdentityStoreSyncer_RepoError(t *testing.T) {
 func TestNewIdentityStoreSyncer_AddUserError(t *testing.T) {
 	//Given
 	configMap := &config.ConfigMap{
-		Parameters: map[string]interface{}{},
+		Parameters: map[string]string{},
 	}
 
 	repoMock := newMockIdentityStoreRepository(t)
@@ -107,7 +107,7 @@ func TestNewIdentityStoreSyncer_AddUserError(t *testing.T) {
 	}, nil)
 
 	syncer := IdentityStoreSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (identityStoreRepository, error) {
+		repoProvider: func(params map[string]string, role string) (identityStoreRepository, error) {
 			return repoMock, nil
 		},
 	}

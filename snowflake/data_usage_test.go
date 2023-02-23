@@ -14,7 +14,7 @@ import (
 func TestDataUsageSyncer_SyncDataUsage(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value"},
+		Parameters: map[string]string{"key": "value"},
 	}
 
 	repoMock := newMockDataUsageRepository(t)
@@ -55,7 +55,7 @@ func TestDataUsageSyncer_SyncDataUsage(t *testing.T) {
 	}, nil)
 
 	syncer := &DataUsageSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataUsageRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataUsageRepository, error) {
 			return repoMock, nil
 		},
 	}

@@ -31,14 +31,16 @@ func main() {
 	logger = base.Logger()
 	logger.SetLevel(hclog.Debug)
 
-	err := base.RegisterPlugins(wrappers.IdentityStoreSync(snowflake.NewIdentityStoreSyncer()),
+	err := base.RegisterPlugins(
+		wrappers.IdentityStoreSync(snowflake.NewIdentityStoreSyncer()),
 		wrappers.DataSourceSync(snowflake.NewDataSourceSyncer()),
 		role_based.AccessProviderRoleSync(snowflake.NewDataAccessSyncer(), roleNameConstraints),
-		wrappers.DataUsageSync(snowflake.NewDataUsageSyncer()), &info.InfoImpl{
-			Info: plugin.PluginInfo{
+		wrappers.DataUsageSync(snowflake.NewDataUsageSyncer()),
+		&info.InfoImpl{
+			Info: &plugin.PluginInfo{
 				Name:    "Snowflake",
 				Version: plugin.ParseVersion(version),
-				Parameters: []plugin.ParameterInfo{
+				Parameters: []*plugin.ParameterInfo{
 					{Name: "sf-account", Description: "The account name of the Snowflake account to connect to. For example, xy123456.eu-central-1", Mandatory: true},
 					{Name: "sf-user", Description: "The username to authenticate against the Snowflake account.", Mandatory: true},
 					{Name: "sf-password", Description: "The username to authenticate against the Snowflake account.", Mandatory: true},

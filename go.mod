@@ -5,15 +5,14 @@ go 1.18
 require (
 	github.com/aws/smithy-go v1.13.5
 	github.com/blockloop/scan v1.3.0
-	github.com/cstockton/go-conv v1.0.0
 	github.com/hashicorp/go-hclog v1.4.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/raito-io/cli v0.31.0
-	github.com/raito-io/golang-set v0.0.3
+	github.com/raito-io/cli v0.32.0-dev0
+	github.com/raito-io/golang-set v0.0.4
 	github.com/sirupsen/logrus v1.8.1
 	github.com/snowflakedb/gosnowflake v1.6.10
 	github.com/stretchr/testify v1.8.1
-	github.com/vektra/mockery/v2 v2.18.0
+	github.com/vektra/mockery/v2 v2.20.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 )
 

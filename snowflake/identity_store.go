@@ -20,23 +20,23 @@ type identityStoreRepository interface {
 }
 
 type IdentityStoreSyncer struct {
-	repoProvider func(params map[string]interface{}, role string) (identityStoreRepository, error)
+	repoProvider func(params map[string]string, role string) (identityStoreRepository, error)
 }
 
 func NewIdentityStoreSyncer() *IdentityStoreSyncer {
 	return &IdentityStoreSyncer{repoProvider: newIdentityStoreSnowflakeRepo}
 }
 
-func newIdentityStoreSnowflakeRepo(params map[string]interface{}, role string) (identityStoreRepository, error) {
+func newIdentityStoreSnowflakeRepo(params map[string]string, role string) (identityStoreRepository, error) {
 	return NewSnowflakeRepository(params, role)
 }
 
-func (s *IdentityStoreSyncer) GetIdentityStoreMetaData() is.MetaData {
+func (s *IdentityStoreSyncer) GetIdentityStoreMetaData(_ context.Context) (*is.MetaData, error) {
 	logger.Debug("Returning meta data for Snowflake identity store")
 
-	return is.MetaData{
+	return &is.MetaData{
 		Type: "snowflake",
-	}
+	}, nil
 }
 
 func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHandler wrappers.IdentityStoreIdentityHandler, configMap *config.ConfigMap) error {

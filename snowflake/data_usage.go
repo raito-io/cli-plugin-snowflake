@@ -24,14 +24,14 @@ type dataUsageRepository interface {
 }
 
 type DataUsageSyncer struct {
-	repoProvider func(params map[string]interface{}, role string) (dataUsageRepository, error)
+	repoProvider func(params map[string]string, role string) (dataUsageRepository, error)
 }
 
 func NewDataUsageSyncer() *DataUsageSyncer {
 	return &DataUsageSyncer{repoProvider: newDataUsageSnowflakeRepo}
 }
 
-func newDataUsageSnowflakeRepo(params map[string]interface{}, role string) (dataUsageRepository, error) {
+func newDataUsageSnowflakeRepo(params map[string]string, role string) (dataUsageRepository, error) {
 	return NewSnowflakeRepository(params, role)
 }
 
@@ -53,8 +53,8 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	numberOfDays := 14
 	startDate := time.Now().Truncate(24*time.Hour).AddDate(0, 0, -numberOfDays)
 
-	if configParams.Parameters["lastUsed"] != nil {
-		startDateRaw, errLocal := time.Parse(time.RFC3339, configParams.Parameters["lastUsed"].(string))
+	if _, found := configParams.Parameters["lastUsed"]; found {
+		startDateRaw, errLocal := time.Parse(time.RFC3339, configParams.Parameters["lastUsed"])
 		if errLocal == nil && startDateRaw.After(startDate) {
 			startDate = startDateRaw
 		}

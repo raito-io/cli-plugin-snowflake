@@ -3,9 +3,10 @@ package snowflake
 import (
 	"context"
 	"fmt"
-	"github.com/aws/smithy-go/ptr"
 	"testing"
 	"time"
+
+	"github.com/aws/smithy-go/ptr"
 
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
@@ -21,7 +22,7 @@ import (
 func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2"},
+		Parameters: map[string]string{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2"},
 	}
 
 	repoMock := newMockDataAccessRepository(t)
@@ -79,7 +80,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 	}, nil).Once()
 
 	syncer := &AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return repoMock, nil
 		},
 	}
@@ -196,7 +197,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfLinkToExternalIdentityStoreGroups: true},
+		Parameters: map[string]string{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfLinkToExternalIdentityStoreGroups: "true"},
 	}
 
 	repoMock := newMockDataAccessRepository(t)
@@ -244,7 +245,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 	}, nil).Once()
 
 	syncer := &AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return repoMock, nil
 		},
 	}
@@ -349,8 +350,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2",
-			SfStandardEdition: true},
+		Parameters: map[string]string{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2",
+			SfStandardEdition: "true"},
 	}
 
 	repoMock := newMockDataAccessRepository(t)
@@ -390,7 +391,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 	}, nil).Once()
 
 	syncer := &AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return repoMock, nil
 		},
 	}
@@ -481,13 +482,13 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 func TestAccessSyncer_SyncAccessProvidersFromTarget_ErrorOnConnectingToRepo(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value"},
+		Parameters: map[string]string{"key": "value"},
 	}
 
 	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
 
 	syncer := &AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, fmt.Errorf("boom")
 		},
 	}
@@ -502,7 +503,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_ErrorOnConnectingToRepo(t *t
 func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value"},
+		Parameters: map[string]string{"key": "value"},
 	}
 
 	rolesToRemove := []string{"ToRemove1", "ToRemove2"}
@@ -546,7 +547,7 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE DB1.Schema2.Table1", "RoleName3").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return repoMock, nil
 		},
 	}
@@ -628,13 +629,13 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 func TestAccessSyncer_SyncAccessProvidersToTarget_ErrorOnConnectionToRepo(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value"},
+		Parameters: map[string]string{"key": "value"},
 	}
 
 	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t, 1)
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, fmt.Errorf("boom")
 		},
 	}
@@ -670,7 +671,7 @@ func TestAccessSyncer_SyncAccessProvidersToTarget_ErrorOnConnectionToRepo(t *tes
 func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value"},
+		Parameters: map[string]string{"key": "value"},
 	}
 
 	repoMock := newMockDataAccessRepository(t)
@@ -694,7 +695,7 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE DB1.Schema1.Table1", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return repoMock, nil
 		},
 	}
@@ -730,11 +731,11 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 func TestAccessSyncer_SyncAccessAsCodeToTarget_ErrorOnRepoConnection(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]interface{}{"key": "value"},
+		Parameters: map[string]string{"key": "value"},
 	}
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, fmt.Errorf("boom")
 		},
 	}
@@ -772,7 +773,7 @@ func TestAccessSyncer_removeRolesToRemove_NoRoles(t *testing.T) {
 	repo := newMockDataAccessRepository(t)
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -800,7 +801,7 @@ func TestAccessSyncer_removeRolesToRemove(t *testing.T) {
 	})).Return(nil).Times(len(rolesToRemove))
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -822,7 +823,7 @@ func TestAccessSyncer_removeRolesToRemove_error(t *testing.T) {
 	repo.EXPECT().DropRole("Role2").Return(fmt.Errorf("BOOM")).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -898,7 +899,7 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 	}, nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -988,7 +989,7 @@ func TestAccessSyncer_importPoliciesOfType_ErrorOnDescribePolicy(t *testing.T) {
 	}, nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1015,7 +1016,7 @@ func generateAccessControls_table(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE DB1.Schema1.Table1", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1062,7 +1063,7 @@ func generateAccessControls_view(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("SELECT", "VIEW DB1.Schema1.Table2", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1126,7 +1127,7 @@ func generateAccessControls_schema(t *testing.T) {
 	}, nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1174,7 +1175,7 @@ func generateAccessControls_schema_nopropagate(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("SELECT", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1221,7 +1222,7 @@ func generateAccessControls_schema_noverify(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("CREATE TABLE", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1288,7 +1289,7 @@ func generateAccessControls_existing_schema(t *testing.T) {
 	}, nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1335,7 +1336,7 @@ func generateAccessControls_sharedDatabase(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("UPDATE", "DATABASE DB2", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1402,7 +1403,7 @@ func generateAccessControls_database(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("SELECT", "VIEW DB1.Schema2.View3", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1474,7 +1475,7 @@ func generateAccessControls_existing_database(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("SELECT", "VIEW DB1.Schema2.View3", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1520,7 +1521,7 @@ func generateAccessControls_warehouse(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("USAGE", "WAREHOUSE WH1", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1563,7 +1564,7 @@ func generateAccessControls_datasource(t *testing.T) {
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1635,7 +1636,7 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE DB1.Schema1.Table1", "existingRole1").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}
@@ -1699,7 +1700,7 @@ func TestAccessSyncer_generateAccessControls_inheritance(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrant("SELECT", "TABLE DB1.Schema1.Table3", "RoleName3").Return(nil).Once()
 
 	syncer := AccessSyncer{
-		repoProvider: func(params map[string]interface{}, role string) (dataAccessRepository, error) {
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
 	}

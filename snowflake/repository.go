@@ -36,7 +36,7 @@ type SnowflakeRepository struct {
 	role      string
 }
 
-func NewSnowflakeRepository(params map[string]interface{}, role string) (*SnowflakeRepository, error) {
+func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRepository, error) {
 	conn, role, err := ConnectToSnowflake(params, role)
 	if err != nil {
 		return nil, err
