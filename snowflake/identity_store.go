@@ -3,11 +3,13 @@ package snowflake
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	is "github.com/raito-io/cli/base/identity_store"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
+	"github.com/raito-io/golang-set/set"
 )
 
 //go:generate go run github.com/vektra/mockery/v2 --name=identityStoreRepository --with-expecter --inpackage
@@ -53,8 +55,23 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 		return err
 	}
 
+	visitedEmailSet := set.NewSet[string]()
+
 	for _, userRow := range userRows {
 		logger.Debug(fmt.Sprintf("Handling user %q", userRow.Name))
+
+		userRow.Email = strings.ToLower(userRow.Email)
+
+		// this is a PATCH for RAITO-349, will be removed after appserver fix is in production
+		if userRow.Email != "" {
+			if !visitedEmailSet.Contains(userRow.Email) {
+				visitedEmailSet.Add(userRow.Email)
+			} else {
+				emailParts := strings.Split(userRow.Email, "@")
+				userRow.Email = fmt.Sprintf("%s+%s@%s", emailParts[0], strings.ToLower(userRow.LoginName), emailParts[1])
+				visitedEmailSet.Add(userRow.Email)
+			}
+		}
 
 		displayName := userRow.DisplayName
 		if displayName == "" {
