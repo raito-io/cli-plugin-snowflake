@@ -7,7 +7,7 @@ require (
 	github.com/blockloop/scan v1.3.0
 	github.com/hashicorp/go-hclog v1.4.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/raito-io/cli v0.33.0-dev0
+	github.com/raito-io/cli v0.33.0-dev1
 	github.com/raito-io/golang-set v0.0.4
 	github.com/sirupsen/logrus v1.8.1
 	github.com/snowflakedb/gosnowflake v1.6.10
