@@ -575,75 +575,85 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 	roleCreated := make(map[string]interface{})
 
 	for rn, ea := range apMap {
-		da := ea.Access
+		accessElement := ea.Access
+		accessProvider := ea.AccessProvider
+
+		ignoreWho := accessProvider.WhoLocked != nil && *accessProvider.WhoLocked
+		ignoreWhat := accessProvider.WhatLocked != nil && *accessProvider.WhatLocked
+
+		logger.Info(fmt.Sprintf("Generating access controls for access provider %q (Ignore who: %t; Ignore what: %t)", accessProvider.Name, ignoreWho, ignoreWhat))
 
 		// Merge the users that are specified separately and from the expanded groups.
 		// Note: we don't expand groups ourselves here, because Snowflake doesn't have the concept of groups.
-		users := slice.StringSliceMerge(ea.AccessProvider.Who.Users, ea.AccessProvider.Who.UsersInGroups)
+		users := slice.StringSliceMerge(accessProvider.Who.Users, accessProvider.Who.UsersInGroups)
 
 		// Extract RoleNames from Access Providers that are among the whoList of this one
-		roles := make([]string, 0)
+		inheritedRoles := make([]string, 0)
 
-		for _, apWho := range ea.AccessProvider.Who.InheritFrom {
-			if strings.HasPrefix(apWho, "ID:") {
-				apId := apWho[3:]
-				for rn2, ea2 := range apMap {
-					if strings.EqualFold(ea2.AccessProvider.Id, apId) {
-						roles = append(roles, rn2)
-						break
+		if !ignoreWho {
+			for _, apWho := range accessProvider.Who.InheritFrom {
+				if strings.HasPrefix(apWho, "ID:") {
+					apId := apWho[3:]
+					for rn2, ea2 := range apMap {
+						if strings.EqualFold(ea2.AccessProvider.Id, apId) {
+							inheritedRoles = append(inheritedRoles, rn2)
+							break
+						}
 					}
+				} else {
+					inheritedRoles = append(inheritedRoles, apWho)
 				}
-			} else {
-				roles = append(roles, apWho)
 			}
 		}
 
 		// Build the expected expectedGrants
 		var expectedGrants []Grant
 
-		for whatIndex, what := range da.What {
-			permissions := getAllSnowflakePermissions(&da.What[whatIndex])
+		if !ignoreWhat {
+			for whatIndex, what := range accessElement.What {
+				permissions := getAllSnowflakePermissions(&accessElement.What[whatIndex])
 
-			if len(permissions) == 0 {
-				continue
-			}
-
-			if what.DataObject.Type == ds.Table {
-				grants, err := createGrantsForTable(permissions, what.DataObject.FullName, metaData)
-				if err != nil {
-					return err
+				if len(permissions) == 0 {
+					continue
 				}
 
-				expectedGrants = append(expectedGrants, grants...)
-			} else if what.DataObject.Type == ds.View {
-				grants, err := createGrantsForView(permissions, what.DataObject.FullName, metaData)
-				if err != nil {
-					return err
-				}
+				if what.DataObject.Type == ds.Table {
+					grants, err := createGrantsForTable(permissions, what.DataObject.FullName, metaData)
+					if err != nil {
+						return err
+					}
 
-				expectedGrants = append(expectedGrants, grants...)
-			} else if what.DataObject.Type == ds.Schema {
-				grants, err := createGrantsForSchema(repo, permissions, what.DataObject.FullName, metaData)
-				if err != nil {
-					return err
-				}
+					expectedGrants = append(expectedGrants, grants...)
+				} else if what.DataObject.Type == ds.View {
+					grants, err := createGrantsForView(permissions, what.DataObject.FullName, metaData)
+					if err != nil {
+						return err
+					}
 
-				expectedGrants = append(expectedGrants, grants...)
-			} else if what.DataObject.Type == "shared-database" {
-				for _, p := range permissions {
-					expectedGrants = append(expectedGrants, Grant{p, fmt.Sprintf("DATABASE %s", what.DataObject.FullName)})
-				}
-			} else if what.DataObject.Type == ds.Database {
-				grants, err := createGrantsForDatabase(repo, permissions, what.DataObject.FullName, metaData)
-				if err != nil {
-					return err
-				}
+					expectedGrants = append(expectedGrants, grants...)
+				} else if what.DataObject.Type == ds.Schema {
+					grants, err := createGrantsForSchema(repo, permissions, what.DataObject.FullName, metaData)
+					if err != nil {
+						return err
+					}
 
-				expectedGrants = append(expectedGrants, grants...)
-			} else if what.DataObject.Type == "warehouse" {
-				expectedGrants = append(expectedGrants, createGrantsForWarehouse(permissions, what.DataObject.FullName, metaData)...)
-			} else if what.DataObject.Type == ds.Datasource {
-				expectedGrants = append(expectedGrants, createGrantsForAccount(permissions, metaData)...)
+					expectedGrants = append(expectedGrants, grants...)
+				} else if what.DataObject.Type == "shared-database" {
+					for _, p := range permissions {
+						expectedGrants = append(expectedGrants, Grant{p, fmt.Sprintf("DATABASE %s", what.DataObject.FullName)})
+					}
+				} else if what.DataObject.Type == ds.Database {
+					grants, err := createGrantsForDatabase(repo, permissions, what.DataObject.FullName, metaData)
+					if err != nil {
+						return err
+					}
+
+					expectedGrants = append(expectedGrants, grants...)
+				} else if what.DataObject.Type == "warehouse" {
+					expectedGrants = append(expectedGrants, createGrantsForWarehouse(permissions, what.DataObject.FullName, metaData)...)
+				} else if what.DataObject.Type == ds.Datasource {
+					expectedGrants = append(expectedGrants, createGrantsForAccount(permissions, metaData)...)
+				}
 			}
 		}
 
@@ -653,101 +663,105 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 		if _, f := existingRoles[rn]; f {
 			logger.Info(fmt.Sprintf("Merging role %q", rn))
 
-			err := repo.CommentIfExists(createComment(ea.AccessProvider, true), "ROLE", rn)
+			err := repo.CommentIfExists(createComment(accessProvider, true), "ROLE", rn)
 			if err != nil {
 				return fmt.Errorf("error while updating comment on role %q: %s", rn, err.Error())
 			}
 
-			grantsOfRole, err := repo.GetGrantsOfRole(rn)
-			if err != nil {
-				return err
-			}
-
-			usersOfRole := make([]string, 0, len(grantsOfRole))
-			rolesOfRole := make([]string, 0, len(grantsOfRole))
-
-			for _, gor := range grantsOfRole {
-				if strings.EqualFold(gor.GrantedTo, "USER") {
-					usersOfRole = append(usersOfRole, gor.GranteeName)
-				} else if strings.EqualFold(gor.GrantedTo, "ROLE") {
-					rolesOfRole = append(rolesOfRole, gor.GranteeName)
+			if !ignoreWho {
+				grantsOfRole, err := repo.GetGrantsOfRole(rn)
+				if err != nil {
+					return err
 				}
-			}
 
-			toAdd := slice.StringSliceDifference(users, usersOfRole, false)
-			toRemove := slice.StringSliceDifference(usersOfRole, users, false)
-			logger.Info(fmt.Sprintf("Identified %d users to add and %d users to remove from role %q", len(toAdd), len(toRemove), rn))
+				usersOfRole := make([]string, 0, len(grantsOfRole))
+				rolesOfRole := make([]string, 0, len(grantsOfRole))
 
-			if len(toAdd) > 0 {
-				e := repo.GrantUsersToRole(ctx, rn, toAdd...)
-				if e != nil {
-					return fmt.Errorf("error while assigning users to role %q: %s", rn, e.Error())
-				}
-			}
-
-			if len(toRemove) > 0 {
-				e := repo.RevokeUsersFromRole(ctx, rn, toRemove...)
-				if e != nil {
-					return fmt.Errorf("error while unassigning users from role %q: %s", rn, e.Error())
-				}
-			}
-
-			toAdd = slice.StringSliceDifference(roles, rolesOfRole, false)
-			toRemove = slice.StringSliceDifference(rolesOfRole, roles, false)
-			logger.Info(fmt.Sprintf("Identified %d roles to add and %d roles to remove from role %q", len(toAdd), len(toRemove), rn))
-
-			if len(toAdd) > 0 {
-				e := repo.GrantRolesToRole(ctx, rn, toAdd...)
-				if e != nil {
-					return fmt.Errorf("error while assigning role to role %q: %s", rn, e.Error())
-				}
-			}
-
-			if len(toRemove) > 0 {
-				e := repo.RevokeRolesFromRole(ctx, rn, toRemove...)
-				if e != nil {
-					return fmt.Errorf("error while unassigning role from role %q: %s", rn, e.Error())
-				}
-			}
-
-			// Remove all future grants on schema and database if applicable.
-			// Since these are future grants, it's safe to just remove them and re-add them again (if required).
-			// We assume nobody manually added others to this role manually.
-			for _, what := range da.What {
-				if what.DataObject.Type == "database" {
-					e := repo.ExecuteRevoke("ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), rn)
-					if e != nil {
-						return fmt.Errorf("error while assigning future schema grants in database %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
+				for _, gor := range grantsOfRole {
+					if strings.EqualFold(gor.GrantedTo, "USER") {
+						usersOfRole = append(usersOfRole, gor.GranteeName)
+					} else if strings.EqualFold(gor.GrantedTo, "ROLE") {
+						rolesOfRole = append(rolesOfRole, gor.GranteeName)
 					}
+				}
 
-					e = repo.ExecuteRevoke("ALL", common.FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), rn)
+				toAdd := slice.StringSliceDifference(users, usersOfRole, false)
+				toRemove := slice.StringSliceDifference(usersOfRole, users, false)
+				logger.Info(fmt.Sprintf("Identified %d users to add and %d users to remove from role %q", len(toAdd), len(toRemove), rn))
+
+				if len(toAdd) > 0 {
+					e := repo.GrantUsersToRole(ctx, rn, toAdd...)
 					if e != nil {
-						return fmt.Errorf("error while assigning future table grants in database %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
+						return fmt.Errorf("error while assigning users to role %q: %s", rn, e.Error())
 					}
-				} else if what.DataObject.Type == "schema" {
-					e := repo.ExecuteRevoke("ALL", fmt.Sprintf("FUTURE TABLES IN SCHEMA %s", what.DataObject.FullName), rn)
+				}
+
+				if len(toRemove) > 0 {
+					e := repo.RevokeUsersFromRole(ctx, rn, toRemove...)
 					if e != nil {
-						return fmt.Errorf("error while assigning future table grants in schema %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
+						return fmt.Errorf("error while unassigning users from role %q: %s", rn, e.Error())
+					}
+				}
+
+				toAdd = slice.StringSliceDifference(inheritedRoles, rolesOfRole, false)
+				toRemove = slice.StringSliceDifference(rolesOfRole, inheritedRoles, false)
+				logger.Info(fmt.Sprintf("Identified %d roles to add and %d roles to remove from role %q", len(toAdd), len(toRemove), rn))
+
+				if len(toAdd) > 0 {
+					e := repo.GrantRolesToRole(ctx, rn, toAdd...)
+					if e != nil {
+						return fmt.Errorf("error while assigning role to role %q: %s", rn, e.Error())
+					}
+				}
+
+				if len(toRemove) > 0 {
+					e := repo.RevokeRolesFromRole(ctx, rn, toRemove...)
+					if e != nil {
+						return fmt.Errorf("error while unassigning role from role %q: %s", rn, e.Error())
 					}
 				}
 			}
 
-			grantsToRole, err := repo.GetGrantsToRole(rn)
-			if err != nil {
-				return err
-			}
+			if !ignoreWhat {
+				// Remove all future grants on schema and database if applicable.
+				// Since these are future grants, it's safe to just remove them and re-add them again (if required).
+				// We assume nobody manually added others to this role manually.
+				for _, what := range accessElement.What {
+					if what.DataObject.Type == "database" {
+						e := repo.ExecuteRevoke("ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), rn)
+						if e != nil {
+							return fmt.Errorf("error while assigning future schema grants in database %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
+						}
 
-			foundGrants = make([]Grant, 0, len(grantsToRole))
+						e = repo.ExecuteRevoke("ALL", common.FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), rn)
+						if e != nil {
+							return fmt.Errorf("error while assigning future table grants in database %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
+						}
+					} else if what.DataObject.Type == "schema" {
+						e := repo.ExecuteRevoke("ALL", fmt.Sprintf("FUTURE TABLES IN SCHEMA %s", what.DataObject.FullName), rn)
+						if e != nil {
+							return fmt.Errorf("error while assigning future table grants in schema %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
+						}
+					}
+				}
 
-			for _, grant := range grantsToRole {
-				if strings.EqualFold(grant.GrantedOn, "ACCOUNT") {
-					foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn})
-				} else if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
-					logger.Warn(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, rn))
-				} else if strings.EqualFold(grant.Privilege, "USAGE") && strings.EqualFold(grant.GrantedOn, "ROLE") {
-					logger.Debug(fmt.Sprintf("Ignoring USAGE permission on ROLE %q", grant.Name))
-				} else {
-					foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn + " " + grant.Name})
+				grantsToRole, err := repo.GetGrantsToRole(rn)
+				if err != nil {
+					return err
+				}
+
+				foundGrants = make([]Grant, 0, len(grantsToRole))
+
+				for _, grant := range grantsToRole {
+					if strings.EqualFold(grant.GrantedOn, "ACCOUNT") {
+						foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn})
+					} else if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
+						logger.Warn(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, rn))
+					} else if strings.EqualFold(grant.Privilege, "USAGE") && strings.EqualFold(grant.GrantedOn, "ROLE") {
+						logger.Debug(fmt.Sprintf("Ignoring USAGE permission on ROLE %q", grant.Name))
+					} else {
+						foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn + " " + grant.Name})
+					}
 				}
 			}
 
@@ -763,32 +777,37 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 				}
 
 				// Updating the comment (independent of creation)
-				err = repo.CommentIfExists(createComment(ea.AccessProvider, false), "ROLE", rn)
+				err = repo.CommentIfExists(createComment(accessProvider, false), "ROLE", rn)
 				if err != nil {
 					return fmt.Errorf("error while updating comment on role %q: %s", rn, err.Error())
 				}
 				roleCreated[rn] = struct{}{}
 			}
-			err := repo.GrantUsersToRole(ctx, rn, users...)
-			if err != nil {
-				logger.Error("Encountered error :" + err.Error())
 
-				return fmt.Errorf("error while assigning users to role %q: %s", rn, err.Error())
+			if !ignoreWho {
+				err := repo.GrantUsersToRole(ctx, rn, users...)
+				if err != nil {
+					logger.Error("Encountered error :" + err.Error())
+
+					return fmt.Errorf("error while assigning users to role %q: %s", rn, err.Error())
+				}
+
+				err = repo.GrantRolesToRole(ctx, rn, inheritedRoles...)
+				if err != nil {
+					logger.Error("Encountered error :" + err.Error())
+
+					return fmt.Errorf("error while assigning roles to role %q: %s", rn, err.Error())
+				}
+				// TODO assign role to SYSADMIN if requested (add as input parameter)
 			}
-
-			err = repo.GrantRolesToRole(ctx, rn, roles...)
-			if err != nil {
-				logger.Error("Encountered error :" + err.Error())
-
-				return fmt.Errorf("error while assigning roles to role %q: %s", rn, err.Error())
-			}
-			// TODO assign role to SYSADMIN if requested (add as input parameter)
 		}
 
-		err := mergeGrants(repo, rn, foundGrants, expectedGrants)
-		if err != nil {
-			logger.Error("Encountered error :" + err.Error())
-			return err
+		if !ignoreWhat {
+			err := mergeGrants(repo, rn, foundGrants, expectedGrants)
+			if err != nil {
+				logger.Error("Encountered error :" + err.Error())
+				return err
+			}
 		}
 	}
 
