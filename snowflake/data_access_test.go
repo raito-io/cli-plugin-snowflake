@@ -101,25 +101,21 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 				Groups:          []string{},
 				AccessProviders: []string{"GranteeRole1Number2"},
 			},
-			Access: []*sync_from_target.Access{
+			ActualName: "Role1",
+			What: []sync_from_target.WhatItem{
 				{
-					ActualName: "Role1",
-					What: []sync_from_target.WhatItem{
-						{
-							DataObject: &data_source.DataObjectReference{
-								FullName: "Share2.GranteeRole1Schema",
-								Type:     "SHARED-SCHEMA",
-							},
-							Permissions: []string{"READ"},
-						},
-						{
-							DataObject: &data_source.DataObjectReference{
-								FullName: "DB1.GranteeRole1Table",
-								Type:     "TABLE",
-							},
-							Permissions: []string{"SELECT"},
-						},
+					DataObject: &data_source.DataObjectReference{
+						FullName: "Share2.GranteeRole1Schema",
+						Type:     "SHARED-SCHEMA",
 					},
+					Permissions: []string{"READ"},
+				},
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.GranteeRole1Table",
+						Type:     "TABLE",
+					},
+					Permissions: []string{"SELECT"},
 				},
 			},
 			Action: 1,
@@ -134,12 +130,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 				Groups:          []string{},
 				AccessProviders: []string{},
 			},
-			Access: []*sync_from_target.Access{
-				{
-					ActualName: "Role2",
-					What:       []sync_from_target.WhatItem{},
-				},
-			},
+			ActualName: "Role2",
+			What:       []sync_from_target.WhatItem{},
 			Action: 1,
 			Policy: "",
 		}, {
@@ -152,12 +144,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 				Groups:          []string{},
 				AccessProviders: []string{"GranteeRole3"},
 			},
-			Access: []*sync_from_target.Access{
-				{
-					ActualName: "Role3",
-					What:       []sync_from_target.WhatItem{},
-				},
-			},
+			ActualName: "Role3",
+			What:       []sync_from_target.WhatItem{},
 			Action: 1,
 			Policy: "",
 		},
@@ -167,12 +155,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			Name:              "DB-schema1-MaskingPolicy1",
 			NamingHint:        "MaskingPolicy1",
 			Who:               nil,
-			Access: []*sync_from_target.Access{
-				{
-					ActualName: "MaskingPolicy1",
-					What:       []sync_from_target.WhatItem{},
-				},
-			},
+			ActualName: "MaskingPolicy1",
+			What:       []sync_from_target.WhatItem{},
 			Action: 3,
 			Policy: "PolicyBody 1",
 		},
@@ -182,12 +166,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			Name:              "DB-schema2-RowAccess1",
 			NamingHint:        "RowAccess1",
 			Who:               nil,
-			Access: []*sync_from_target.Access{
-				{
-					ActualName: "RowAccess1",
-					What:       []sync_from_target.WhatItem{},
-				},
-			},
+			ActualName: "RowAccess1",
+			What:       []sync_from_target.WhatItem{},
 			Action: 4,
 			Policy: "Row Access Policy Body",
 		},
@@ -266,25 +246,21 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 				Groups:          []string{},
 				AccessProviders: []string{"GranteeRole1Number2"},
 			},
-			Access: []*sync_from_target.Access{
+			ActualName: "Role1",
+			What: []sync_from_target.WhatItem{
 				{
-					ActualName: "Role1",
-					What: []sync_from_target.WhatItem{
-						{
-							DataObject: &data_source.DataObjectReference{
-								FullName: "Share2.GranteeRole1Schema",
-								Type:     "SHARED-SCHEMA",
-							},
-							Permissions: []string{"READ"},
-						},
-						{
-							DataObject: &data_source.DataObjectReference{
-								FullName: "DB1.GranteeRole1Table",
-								Type:     "TABLE",
-							},
-							Permissions: []string{"SELECT"},
-						},
+					DataObject: &data_source.DataObjectReference{
+						FullName: "Share2.GranteeRole1Schema",
+						Type:     "SHARED-SCHEMA",
 					},
+					Permissions: []string{"READ"},
+				},
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.GranteeRole1Table",
+						Type:     "TABLE",
+					},
+					Permissions: []string{"SELECT"},
 				},
 			},
 			Action: 1,
@@ -305,12 +281,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 				Groups:          []string{"Role3"},
 				AccessProviders: []string{},
 			},
-			Access: []*sync_from_target.Access{
-				{
-					ActualName: "Role3",
-					What:       []sync_from_target.WhatItem{},
-				},
-			},
+			ActualName: "Role3",
+			What:       []sync_from_target.WhatItem{},
 			Action: 1,
 			Policy: "",
 		},
@@ -320,12 +292,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 			Name:              "DB-schema1-MaskingPolicy1",
 			NamingHint:        "MaskingPolicy1",
 			Who:               nil,
-			Access: []*sync_from_target.Access{
-				{
-					ActualName: "MaskingPolicy1",
-					What:       []sync_from_target.WhatItem{},
-				},
-			},
+			ActualName: "MaskingPolicy1",
+			What:       []sync_from_target.WhatItem{},
 			Action: 3,
 			Policy: "PolicyBody 1",
 		},
@@ -335,12 +303,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 			Name:              "DB-schema2-RowAccess1",
 			NamingHint:        "RowAccess1",
 			Who:               nil,
-			Access: []*sync_from_target.Access{
-				{
-					ActualName: "RowAccess1",
-					What:       []sync_from_target.WhatItem{},
-				},
-			},
+			ActualName: "RowAccess1",
+			What:       []sync_from_target.WhatItem{},
 			Action: 4,
 			Policy: "Row Access Policy Body",
 		},
@@ -412,25 +376,21 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 				Groups:          []string{},
 				AccessProviders: []string{"GranteeRole1Number2"},
 			},
-			Access: []*sync_from_target.Access{
+			ActualName: "Role1",
+			What: []sync_from_target.WhatItem{
 				{
-					ActualName: "Role1",
-					What: []sync_from_target.WhatItem{
-						{
-							DataObject: &data_source.DataObjectReference{
-								FullName: "Share2.GranteeRole1Schema",
-								Type:     "SHARED-SCHEMA",
-							},
-							Permissions: []string{"READ"},
-						},
-						{
-							DataObject: &data_source.DataObjectReference{
-								FullName: "DB1.GranteeRole1Table",
-								Type:     "TABLE",
-							},
-							Permissions: []string{"SELECT"},
-						},
+					DataObject: &data_source.DataObjectReference{
+						FullName: "Share2.GranteeRole1Schema",
+						Type:     "SHARED-SCHEMA",
 					},
+					Permissions: []string{"READ"},
+				},
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.GranteeRole1Table",
+						Type:     "TABLE",
+					},
+					Permissions: []string{"SELECT"},
 				},
 			},
 			Action: 1,
@@ -445,12 +405,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 				Groups:          []string{},
 				AccessProviders: []string{},
 			},
-			Access: []*sync_from_target.Access{
-				{
-					ActualName: "Role2",
-					What:       []sync_from_target.WhatItem{},
-				},
-			},
+			ActualName: "Role2",
+			What:       []sync_from_target.WhatItem{},
 			Action: 1,
 			Policy: "",
 		}, {
@@ -463,12 +419,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 				Groups:          []string{},
 				AccessProviders: []string{"GranteeRole3"},
 			},
-			Access: []*sync_from_target.Access{
-				{
-					ActualName: "Role3",
-					What:       []sync_from_target.WhatItem{},
-				},
-			},
+			ActualName: "Role3",
+			What:       []sync_from_target.WhatItem{},
 			Action: 1,
 			Policy: "",
 		},
@@ -868,18 +820,14 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 			Name:              "DB1-Schema1-Policy1",
 			NamingHint:        "Policy1",
 			Who:               nil,
-			Access: []*sync_from_target.Access{
+			ActualName: "Policy1",
+			What: []sync_from_target.WhatItem{
 				{
-					ActualName: "Policy1",
-					What: []sync_from_target.WhatItem{
-						{
-							DataObject: &data_source.DataObjectReference{
-								FullName: "DB1.Schema1.EntityName1.ColumnName1",
-								Type:     "COLUMN",
-							},
-							Permissions: []string{},
-						},
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.Schema1.EntityName1.ColumnName1",
+						Type:     "COLUMN",
 					},
+					Permissions: []string{},
 				},
 			},
 			Action: sync_from_target.Grant,
@@ -891,18 +839,14 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 			Name:              "DB1-Schema2-Policy2",
 			NamingHint:        "Policy2",
 			Who:               nil,
-			Access: []*sync_from_target.Access{
+			ActualName: "Policy2",
+			What: []sync_from_target.WhatItem{
 				{
-					ActualName: "Policy2",
-					What: []sync_from_target.WhatItem{
-						{
-							DataObject: &data_source.DataObjectReference{
-								FullName: "DB1.Schema1.EntityName1",
-								Type:     "TABLE",
-							},
-							Permissions: []string{},
-						},
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.Schema1.EntityName1",
+						Type:     "TABLE",
 					},
+					Permissions: []string{},
 				},
 			},
 			Action: sync_from_target.Grant,

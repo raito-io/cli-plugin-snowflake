@@ -315,12 +315,8 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 				AccessProviders: accessProviders,
 				Groups:          groups,
 			},
-			Access: []*exporter.Access{
-				{
-					ActualName: roleEntity.Name,
-					What:       make([]exporter.WhatItem, 0),
-				},
-			},
+			ActualName: roleEntity.Name,
+			What:       make([]exporter.WhatItem, 0),
 		}
 		ap = accessProviderMap[roleEntity.Name]
 
@@ -439,12 +435,8 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 			Action:            action,
 			NotInternalizable: true,
 			Who:               nil,
-			Access: []*exporter.Access{
-				{
-					ActualName: policy.Name,
-					What:       make([]exporter.WhatItem, 0),
-				},
-			},
+			ActualName: policy.Name,
+			What:       make([]exporter.WhatItem, 0),
 		}
 
 		// get policy definition
