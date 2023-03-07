@@ -435,8 +435,8 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 			Action:            action,
 			NotInternalizable: true,
 			Who:               nil,
-			ActualName: policy.Name,
-			What:       make([]exporter.WhatItem, 0),
+			ActualName:        policy.Name,
+			What:              make([]exporter.WhatItem, 0),
 		}
 
 		// get policy definition
