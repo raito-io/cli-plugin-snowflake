@@ -552,34 +552,15 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access2 := &importer.Access{
-		Id: "Access2",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table2", Type: "table"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access3 := &importer.Access{
-		Id: "Access3",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
 	ap1 := &importer.AccessProvider{
 		Id:   "AccessProviderId1",
 		Name: "AccessProvider1",
 		Who: importer.WhoItem{
 			Users: []string{"User1", "User2"},
 		},
-		Access: []*importer.Access{access1},
+		What: []importer.WhatItem{
+			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+		},
 	}
 
 	ap2 := &importer.AccessProvider{
@@ -588,7 +569,9 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 		Who: importer.WhoItem{
 			Groups: []string{"Group1"},
 		},
-		Access: []*importer.Access{access1},
+		What: []importer.WhatItem{
+			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table2", Type: "table"}, Permissions: []string{"SELECT"}},
+		},
 	}
 
 	ap3 := &importer.AccessProvider{
@@ -597,22 +580,15 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 		Who: importer.WhoItem{
 			Groups: []string{"User1"},
 		},
-		Access: []*importer.Access{access1},
+		What: []importer.WhatItem{
+			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+		},
 	}
 
-	access := map[string]importer.EnrichedAccess{
-		"RoleName1": {
-			AccessProvider: ap1,
-			Access:         access1,
-		},
-		"ExistingRole1": {
-			AccessProvider: ap2,
-			Access:         access2,
-		},
-		"RoleName3": {
-			AccessProvider: ap3,
-			Access:         access3,
-		},
+	access := map[string]*importer.AccessProvider{
+		"RoleName1":     ap1,
+		"ExistingRole1": ap2,
+		"RoleName3":     ap3,
 	}
 
 	//When
@@ -620,9 +596,9 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 
 	//Then
 	assert.NoError(t, err)
-	assert.ElementsMatch(t, []importer.AccessSyncFeedbackInformation{{AccessId: "Access1", ActualName: "RoleName1"}},
+	assert.ElementsMatch(t, []importer.AccessSyncFeedbackInformation{{AccessId: "AccessProviderId1", ActualName: "RoleName1"}},
 		feedbackHandler.AccessProviderFeedback["AccessProviderId1"])
-	assert.ElementsMatch(t, []importer.AccessSyncFeedbackInformation{{AccessId: "Access3", ActualName: "RoleName3"}},
+	assert.ElementsMatch(t, []importer.AccessSyncFeedbackInformation{{AccessId: "AccessProviderId3", ActualName: "RoleName3"}},
 		feedbackHandler.AccessProviderFeedback["AccessProviderId3"])
 }
 
@@ -640,24 +616,16 @@ func TestAccessSyncer_SyncAccessProvidersToTarget_ErrorOnConnectionToRepo(t *tes
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "TABLE"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "TABLE"}, Permissions: []string{"SELECT"}},
+			},
 		},
 	}
 
@@ -700,24 +668,16 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+			},
 		},
 	}
 
@@ -740,24 +700,16 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget_ErrorOnRepoConnection(t *testing.
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "TABLE"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "TABLE"}, Permissions: []string{"SELECT"}},
+			},
 		},
 	}
 
@@ -1021,24 +973,16 @@ func generateAccessControls_table(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+			},
 		},
 	}
 
@@ -1068,24 +1012,16 @@ func generateAccessControls_view(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table2", Type: "view"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table2", Type: "view"}, Permissions: []string{"SELECT"}},
+			},
 		},
 	}
 
@@ -1132,24 +1068,16 @@ func generateAccessControls_schema(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"READ"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"READ"}},
+			},
 		},
 	}
 
@@ -1180,24 +1108,16 @@ func generateAccessControls_schema_nopropagate(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"SELECT"}},
+			},
 		},
 	}
 
@@ -1227,24 +1147,16 @@ func generateAccessControls_schema_noverify(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"CREATE TABLE"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"CREATE TABLE"}},
+			},
 		},
 	}
 
@@ -1294,24 +1206,16 @@ func generateAccessControls_existing_schema(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"READ"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"READ"}},
+			},
 		},
 	}
 
@@ -1341,24 +1245,16 @@ func generateAccessControls_sharedDatabase(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB2", Type: "shared-database"}, Permissions: []string{"WRITE"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB2", Type: "shared-database"}, Permissions: []string{"WRITE"}},
+			},
 		},
 	}
 
@@ -1408,24 +1304,16 @@ func generateAccessControls_database(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"READ"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"READ"}},
+			},
 		},
 	}
 
@@ -1480,24 +1368,16 @@ func generateAccessControls_existing_database(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"READ"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"READ"}},
+			},
 		},
 	}
 
@@ -1526,24 +1406,16 @@ func generateAccessControls_warehouse(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "WH1", Type: "warehouse"}, Permissions: []string{"MONITOR"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "WH1", Type: "warehouse"}, Permissions: []string{"MONITOR"}},
+			},
 		},
 	}
 
@@ -1569,24 +1441,16 @@ func generateAccessControls_datasource(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DS1", Type: "datasource"}, Permissions: []string{"READ"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users: []string{"User1", "User2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1", "User2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DS1", Type: "datasource"}, Permissions: []string{"READ"}},
+			},
 		},
 	}
 
@@ -1641,25 +1505,17 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"existingRole1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					Users:       []string{"User1", "User2"},
-					InheritFrom: []string{"Role1", "Role2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users:       []string{"User1", "User2"},
+				InheritFrom: []string{"Role1", "Role2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+			},
 		},
 	}
 
@@ -1705,60 +1561,36 @@ func TestAccessSyncer_generateAccessControls_inheritance(t *testing.T) {
 		},
 	}
 
-	access1 := &importer.Access{
-		Id: "Access1",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access2 := &importer.Access{
-		Id: "Access2",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table2", Type: "table"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access3 := &importer.Access{
-		Id: "Access3",
-		What: []importer.WhatItem{
-			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table3", Type: "table"}, Permissions: []string{"SELECT"}},
-		},
-	}
-
-	access := map[string]importer.EnrichedAccess{
+	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId1",
-				Name: "AccessProvider1",
-				Who: importer.WhoItem{
-					InheritFrom: []string{"ID:AccessProviderId2"},
-				},
-				Access: []*importer.Access{access1},
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				InheritFrom: []string{"ID:AccessProviderId2"},
 			},
-			Access: access1,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+			},
 		},
 		"RoleName2": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId2",
-				Name: "AccessProvider2",
-				Who: importer.WhoItem{
-					InheritFrom: []string{"RoleName3"},
-				},
-				Access: []*importer.Access{access2},
+			Id:   "AccessProviderId2",
+			Name: "AccessProvider2",
+			Who: importer.WhoItem{
+				InheritFrom: []string{"RoleName3"},
 			},
-			Access: access2,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table2", Type: "table"}, Permissions: []string{"SELECT"}},
+			},
 		},
 		"RoleName3": {
-			AccessProvider: &importer.AccessProvider{
-				Id:   "AccessProviderId3",
-				Name: "AccessProvider3",
-				Who: importer.WhoItem{
-					Users: []string{"User1"},
-				},
-				Access: []*importer.Access{access3},
+			Id:   "AccessProviderId3",
+			Name: "AccessProvider3",
+			Who: importer.WhoItem{
+				Users: []string{"User1"},
 			},
-			Access: access3,
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table3", Type: "table"}, Permissions: []string{"SELECT"}},
+			},
 		},
 	}
 

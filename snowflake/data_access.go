@@ -118,7 +118,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	return nil
 }
 
-func (s *AccessSyncer) SyncAccessProvidersToTarget(ctx context.Context, rolesToRemove []string, access map[string]importer.EnrichedAccess, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+func (s *AccessSyncer) SyncAccessProvidersToTarget(ctx context.Context, rolesToRemove []string, accessProviders map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
 	logger.Info("Configuring access providers as roles in Snowflake")
 
 	repo, err := s.repoProvider(configMap.Parameters, "")
@@ -136,24 +136,24 @@ func (s *AccessSyncer) SyncAccessProvidersToTarget(ctx context.Context, rolesToR
 		return err
 	}
 
-	existingRoles, err := s.findRoles("", access, repo)
+	existingRoles, err := s.findRoles("", accessProviders, repo)
 	if err != nil {
 		return err
 	}
 
-	err = s.generateAccessControls(ctx, access, existingRoles, repo, false)
+	err = s.generateAccessControls(ctx, accessProviders, existingRoles, repo, false)
 	if err != nil {
 		return err
 	}
 
 	feedbackMap := make(map[string][]importer.AccessSyncFeedbackInformation)
 
-	for roleName, access := range access {
-		feedbackElement := importer.AccessSyncFeedbackInformation{AccessId: access.Access.Id, ActualName: roleName}
-		if feedbackObjects, found := feedbackMap[access.AccessProvider.Id]; found {
-			feedbackMap[access.AccessProvider.Id] = append(feedbackObjects, feedbackElement)
+	for roleName, accessProvider := range accessProviders {
+		feedbackElement := importer.AccessSyncFeedbackInformation{AccessId: accessProvider.Id, ActualName: roleName}
+		if feedbackObjects, found := feedbackMap[accessProvider.Id]; found {
+			feedbackMap[accessProvider.Id] = append(feedbackObjects, feedbackElement)
 		} else {
-			feedbackMap[access.AccessProvider.Id] = []importer.AccessSyncFeedbackInformation{feedbackElement}
+			feedbackMap[accessProvider.Id] = []importer.AccessSyncFeedbackInformation{feedbackElement}
 		}
 	}
 
@@ -167,7 +167,7 @@ func (s *AccessSyncer) SyncAccessProvidersToTarget(ctx context.Context, rolesToR
 	return nil
 }
 
-func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, access map[string]importer.EnrichedAccess, prefix string, configMap *config.ConfigMap) error {
+func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, access map[string]*importer.AccessProvider, prefix string, configMap *config.ConfigMap) error {
 	logger.Info("Configuring access providers as roles in Snowflake")
 
 	repo, err := s.repoProvider(configMap.Parameters, "")
@@ -355,7 +355,7 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: object.GrantedOn}
 		} else if do.FullName != object.Name {
 			if len(permissions) > 0 {
-				ap.Access[0].What = append(ap.Access[0].What, exporter.WhatItem{
+				ap.What = append(ap.What, exporter.WhatItem{
 					DataObject:  do,
 					Permissions: permissions,
 				})
@@ -378,7 +378,7 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 			databaseName := strings.Split(object.Name, ".")[0]
 			if _, f := shares[databaseName]; f {
 				if _, f := sharesApplied[databaseName]; strings.EqualFold(object.GrantedOn, "TABLE") && !f {
-					ap.Access[0].What = append(ap.Access[0].What, exporter.WhatItem{
+					ap.What = append(ap.What, exporter.WhatItem{
 						DataObject:  &ds.DataObjectReference{FullName: databaseName, Type: "shared-" + ds.Database},
 						Permissions: []string{"IMPORTED PRIVILEGES"},
 					})
@@ -392,7 +392,7 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 		}
 
 		if k == len(grantToEntities)-1 && len(permissions) > 0 {
-			ap.Access[0].What = append(ap.Access[0].What, exporter.WhatItem{
+			ap.What = append(ap.What, exporter.WhatItem{
 				DataObject:  do,
 				Permissions: permissions,
 			})
@@ -491,7 +491,7 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 				}
 			}
 
-			ap.Access[0].What = append(ap.Access[0].What, exporter.WhatItem{
+			ap.What = append(ap.What, exporter.WhatItem{
 				DataObject:  &dor,
 				Permissions: []string{},
 			})
@@ -525,7 +525,7 @@ func isNotInternizableRole(role string) bool {
 }
 
 // findRoles returns a map where the keys are all the roles that exist in Snowflake right now and the value indicates if it was found in apMap or not.
-func (s *AccessSyncer) findRoles(prefix string, apMap map[string]importer.EnrichedAccess, repo dataAccessRepository) (map[string]bool, error) {
+func (s *AccessSyncer) findRoles(prefix string, apMap map[string]*importer.AccessProvider, repo dataAccessRepository) (map[string]bool, error) {
 	foundRoles := make(map[string]bool)
 
 	roleEntities, err := repo.GetRolesWithPrefix(prefix)
@@ -557,7 +557,7 @@ func buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
 }
 
 //nolint:gocyclo
-func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]importer.EnrichedAccess, existingRoles map[string]bool, repo dataAccessRepository, verifyAndPropagate bool) error {
+func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, repo dataAccessRepository, verifyAndPropagate bool) error {
 	// Initializes empty map
 	metaData := make(map[string]map[string]struct{})
 
@@ -574,10 +574,7 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 
 	roleCreated := make(map[string]interface{})
 
-	for rn, ea := range apMap {
-		accessElement := ea.Access
-		accessProvider := ea.AccessProvider
-
+	for rn, accessProvider := range apMap {
 		ignoreWho := accessProvider.WhoLocked != nil && *accessProvider.WhoLocked
 		ignoreWhat := accessProvider.WhatLocked != nil && *accessProvider.WhatLocked
 
@@ -594,8 +591,8 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 			for _, apWho := range accessProvider.Who.InheritFrom {
 				if strings.HasPrefix(apWho, "ID:") {
 					apId := apWho[3:]
-					for rn2, ea2 := range apMap {
-						if strings.EqualFold(ea2.AccessProvider.Id, apId) {
+					for rn2, accessProvider2 := range apMap {
+						if strings.EqualFold(accessProvider2.Id, apId) {
 							inheritedRoles = append(inheritedRoles, rn2)
 							break
 						}
@@ -610,8 +607,8 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 		var expectedGrants []Grant
 
 		if !ignoreWhat {
-			for whatIndex, what := range accessElement.What {
-				permissions := getAllSnowflakePermissions(&accessElement.What[whatIndex])
+			for whatIndex, what := range accessProvider.What {
+				permissions := getAllSnowflakePermissions(&accessProvider.What[whatIndex])
 
 				if len(permissions) == 0 {
 					continue
@@ -726,7 +723,7 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 				// Remove all future grants on schema and database if applicable.
 				// Since these are future grants, it's safe to just remove them and re-add them again (if required).
 				// We assume nobody manually added others to this role manually.
-				for _, what := range accessElement.What {
+				for _, what := range accessProvider.What {
 					if what.DataObject.Type == "database" {
 						e := repo.ExecuteRevoke("ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), rn)
 						if e != nil {
