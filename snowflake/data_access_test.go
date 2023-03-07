@@ -132,8 +132,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			ActualName: "Role2",
 			What:       []sync_from_target.WhatItem{},
-			Action: 1,
-			Policy: "",
+			Action:     1,
+			Policy:     "",
 		}, {
 			ExternalId:        "Role3",
 			NotInternalizable: true,
@@ -146,8 +146,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			ActualName: "Role3",
 			What:       []sync_from_target.WhatItem{},
-			Action: 1,
-			Policy: "",
+			Action:     1,
+			Policy:     "",
 		},
 		{
 			ExternalId:        "DB-schema1-MaskingPolicy1",
@@ -155,10 +155,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			Name:              "DB-schema1-MaskingPolicy1",
 			NamingHint:        "MaskingPolicy1",
 			Who:               nil,
-			ActualName: "MaskingPolicy1",
-			What:       []sync_from_target.WhatItem{},
-			Action: 3,
-			Policy: "PolicyBody 1",
+			ActualName:        "MaskingPolicy1",
+			What:              []sync_from_target.WhatItem{},
+			Action:            3,
+			Policy:            "PolicyBody 1",
 		},
 		{
 			ExternalId:        "DB-schema2-RowAccess1",
@@ -166,10 +166,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			Name:              "DB-schema2-RowAccess1",
 			NamingHint:        "RowAccess1",
 			Who:               nil,
-			ActualName: "RowAccess1",
-			What:       []sync_from_target.WhatItem{},
-			Action: 4,
-			Policy: "Row Access Policy Body",
+			ActualName:        "RowAccess1",
+			What:              []sync_from_target.WhatItem{},
+			Action:            4,
+			Policy:            "Row Access Policy Body",
 		},
 	}, fileCreator.AccessProviders)
 }
@@ -283,8 +283,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 			},
 			ActualName: "Role3",
 			What:       []sync_from_target.WhatItem{},
-			Action: 1,
-			Policy: "",
+			Action:     1,
+			Policy:     "",
 		},
 		{
 			ExternalId:        "DB-schema1-MaskingPolicy1",
@@ -292,10 +292,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 			Name:              "DB-schema1-MaskingPolicy1",
 			NamingHint:        "MaskingPolicy1",
 			Who:               nil,
-			ActualName: "MaskingPolicy1",
-			What:       []sync_from_target.WhatItem{},
-			Action: 3,
-			Policy: "PolicyBody 1",
+			ActualName:        "MaskingPolicy1",
+			What:              []sync_from_target.WhatItem{},
+			Action:            3,
+			Policy:            "PolicyBody 1",
 		},
 		{
 			ExternalId:        "DB-schema2-RowAccess1",
@@ -303,10 +303,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 			Name:              "DB-schema2-RowAccess1",
 			NamingHint:        "RowAccess1",
 			Who:               nil,
-			ActualName: "RowAccess1",
-			What:       []sync_from_target.WhatItem{},
-			Action: 4,
-			Policy: "Row Access Policy Body",
+			ActualName:        "RowAccess1",
+			What:              []sync_from_target.WhatItem{},
+			Action:            4,
+			Policy:            "Row Access Policy Body",
 		},
 	}, fileCreator.AccessProviders)
 }
@@ -407,8 +407,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 			},
 			ActualName: "Role2",
 			What:       []sync_from_target.WhatItem{},
-			Action: 1,
-			Policy: "",
+			Action:     1,
+			Policy:     "",
 		}, {
 			ExternalId:        "Role3",
 			NotInternalizable: true,
@@ -421,8 +421,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 			},
 			ActualName: "Role3",
 			What:       []sync_from_target.WhatItem{},
-			Action: 1,
-			Policy: "",
+			Action:     1,
+			Policy:     "",
 		},
 	}, fileCreator.AccessProviders)
 	repoMock.AssertNotCalled(t, "GetPolicies", "MASKING")
@@ -820,7 +820,7 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 			Name:              "DB1-Schema1-Policy1",
 			NamingHint:        "Policy1",
 			Who:               nil,
-			ActualName: "Policy1",
+			ActualName:        "Policy1",
 			What: []sync_from_target.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
@@ -839,7 +839,7 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 			Name:              "DB1-Schema2-Policy2",
 			NamingHint:        "Policy2",
 			Who:               nil,
-			ActualName: "Policy2",
+			ActualName:        "Policy2",
 			What: []sync_from_target.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{

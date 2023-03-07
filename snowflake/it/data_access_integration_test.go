@@ -86,20 +86,17 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 
 	actualRoleName := generateRole("TESTROLE1", "")
 
-	access := map[string]sync_to_target.EnrichedAccess{
-		actualRoleName: {
-			Access: access1,
-			AccessProvider: &sync_to_target.AccessProvider{
-				Id:          fmt.Sprintf("%s_ap_id1", testId),
-				Access:      []*sync_to_target.Access{access1},
-				Name:        fmt.Sprintf("%s_ap1", testId),
-				Action:      sync_to_target.Grant,
-				NamingHint:  actualRoleName,
-				Delete:      false,
-				Description: fmt.Sprintf("Integration testing for test %s", testId),
-				Who: sync_to_target.WhoItem{
-					Users: []string{snowflakeUserName},
-				},
+	access := map[string]*sync_to_target.AccessProvider{
+		actualRoleName: &sync_to_target.AccessProvider{
+			Id:          fmt.Sprintf("%s_ap_id1", testId),
+			Access:      []*sync_to_target.Access{access1},
+			Name:        fmt.Sprintf("%s_ap1", testId),
+			Action:      sync_to_target.Grant,
+			NamingHint:  actualRoleName,
+			Delete:      false,
+			Description: fmt.Sprintf("Integration testing for test %s", testId),
+			Who: sync_to_target.WhoItem{
+				Users: []string{snowflakeUserName},
 			},
 		},
 	}
@@ -138,7 +135,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	//Given
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T(), 1)
 	rolesToRemove = append(rolesToRemove, actualRoleName)
-	access = make(map[string]sync_to_target.EnrichedAccess)
+	access = make(map[string]*sync_to_target.AccessProvider)
 
 	//When
 	err = dataAccessSyncer.SyncAccessProvidersToTarget(context.Background(), rolesToRemove, access, dataAccessFeedbackHandler, config)
@@ -216,7 +213,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	})
 
 	//Given
-	access = make(map[string]sync_to_target.EnrichedAccess)
+	access = make(map[string]*sync_to_target.AccessProvider)
 
 	//When
 	err = dataAccessSyncer.SyncAccessAsCodeToTarget(context.Background(), access, prefix, config)
