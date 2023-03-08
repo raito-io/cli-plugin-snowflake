@@ -47,6 +47,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
 		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
 		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
+		{GrantedOn: "MATERIALIZED_VIEW", Name: "DB1.GranteeRole1MatView", Privilege: "SELECT"},
 	}, nil).Once()
 	repoMock.EXPECT().GetGrantsOfRole("Role2").Return([]GrantOfRole{
 		{GrantedTo: "USER", GranteeName: "GranteeRole2"},
@@ -114,6 +115,13 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					DataObject: &data_source.DataObjectReference{
 						FullName: "DB1.GranteeRole1Table",
 						Type:     "TABLE",
+					},
+					Permissions: []string{"SELECT"},
+				},
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.GranteeRole1MatView",
+						Type:     "VIEW",
 					},
 					Permissions: []string{"SELECT"},
 				},
