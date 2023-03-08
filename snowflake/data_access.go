@@ -33,7 +33,7 @@ var PermissionMap = map[string]PermissionTarget{
 }
 
 var RolesNotinternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
-var AcceptedTypes = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "COLUMN": {}, "SHARED-DATABASE": {}}
+var AcceptedTypes = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "VIEW": {}, "COLUMN": {}, "SHARED-DATABASE": {}}
 
 const (
 	whoLockedReason    = "The 'who' for this Snowflake role cannot be changed because it was imported from an external identity store"
@@ -350,18 +350,21 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 	sharesApplied := make(map[string]struct{}, 0)
 
 	for k, object := range grantToEntities {
+		grant := object
+		mapGrantedOn(&grant)
+
 		if k == 0 {
-			sfObject := common.ParseFullName(object.Name)
-			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: object.GrantedOn}
-		} else if do.FullName != object.Name {
+			sfObject := common.ParseFullName(grant.Name)
+			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: grant.GrantedOn}
+		} else if do.FullName != grant.Name {
 			if len(permissions) > 0 {
 				ap.Access[0].What = append(ap.Access[0].What, exporter.WhatItem{
 					DataObject:  do,
 					Permissions: permissions,
 				})
 			}
-			sfObject := common.ParseFullName(object.Name)
-			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: object.GrantedOn}
+			sfObject := common.ParseFullName(grant.Name)
+			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: grant.GrantedOn}
 			permissions = make([]string, 0)
 		}
 
@@ -370,14 +373,14 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 		}
 
 		// We do not import USAGE as this is handled separately in the data access export
-		if !strings.EqualFold("USAGE", object.Privilege) {
-			if _, f := AcceptedTypes[strings.ToUpper(object.GrantedOn)]; f {
-				permissions = append(permissions, object.Privilege)
+		if !strings.EqualFold("USAGE", grant.Privilege) {
+			if _, f := AcceptedTypes[strings.ToUpper(grant.GrantedOn)]; f {
+				permissions = append(permissions, grant.Privilege)
 			}
 
-			databaseName := strings.Split(object.Name, ".")[0]
+			databaseName := strings.Split(grant.Name, ".")[0]
 			if _, f := shares[databaseName]; f {
-				if _, f := sharesApplied[databaseName]; strings.EqualFold(object.GrantedOn, "TABLE") && !f {
+				if _, f := sharesApplied[databaseName]; strings.EqualFold(grant.GrantedOn, "TABLE") && !f {
 					ap.Access[0].What = append(ap.Access[0].What, exporter.WhatItem{
 						DataObject:  &ds.DataObjectReference{FullName: databaseName, Type: "shared-" + ds.Database},
 						Permissions: []string{"IMPORTED PRIVILEGES"},
@@ -752,7 +755,10 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 
 				foundGrants = make([]Grant, 0, len(grantsToRole))
 
-				for _, grant := range grantsToRole {
+				for _, o := range grantsToRole {
+					grant := o
+					mapGrantedOn(&grant)
+
 					if strings.EqualFold(grant.GrantedOn, "ACCOUNT") {
 						foundGrants = append(foundGrants, Grant{grant.Privilege, grant.GrantedOn})
 					} else if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
@@ -812,6 +818,14 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 	}
 
 	return nil
+}
+
+// mapGrantedOn will cover the fact that the SHOW GRANTS query doesn't correctly return the 'GRANTED ON' field as the value to use to actually grant or revoke a role.
+func mapGrantedOn(grant *GrantToRole) {
+	// MATERIALIZED VIEWS should just be called VIEW for revoking and granting
+	if strings.EqualFold(grant.GrantedOn, "MATERIALIZED_VIEW") {
+		grant.GrantedOn = "VIEW"
+	}
 }
 
 func createGrantsForTable(permissions []string, fullName string, metaData map[string]map[string]struct{}) ([]Grant, error) {
