@@ -71,34 +71,26 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 
 	rolesToRemove := []string{}
 
-	access1 := &sync_to_target.Access{
-		What: []sync_to_target.WhatItem{
-			{
-				DataObject: &data_source.DataObjectReference{
-					FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
-					Type:     "table",
-				},
-				Permissions: []string{"SELECT"},
-			},
-		},
-		Id: fmt.Sprintf("%s_AccessRole1", testId),
-	}
-
 	actualRoleName := generateRole("TESTROLE1", "")
 
-	access := map[string]sync_to_target.EnrichedAccess{
+	access := map[string]*sync_to_target.AccessProvider{
 		actualRoleName: {
-			Access: access1,
-			AccessProvider: &sync_to_target.AccessProvider{
-				Id:          fmt.Sprintf("%s_ap_id1", testId),
-				Access:      []*sync_to_target.Access{access1},
-				Name:        fmt.Sprintf("%s_ap1", testId),
-				Action:      sync_to_target.Grant,
-				NamingHint:  actualRoleName,
-				Delete:      false,
-				Description: fmt.Sprintf("Integration testing for test %s", testId),
-				Who: sync_to_target.WhoItem{
-					Users: []string{snowflakeUserName},
+			Id:          fmt.Sprintf("%s_ap_id1", testId),
+			Name:        fmt.Sprintf("%s_ap1", testId),
+			Action:      sync_to_target.Grant,
+			NamingHint:  actualRoleName,
+			Delete:      false,
+			Description: fmt.Sprintf("Integration testing for test %s", testId),
+			Who: sync_to_target.WhoItem{
+				Users: []string{snowflakeUserName},
+			},
+			What: []sync_to_target.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+						Type:     "table",
+					},
+					Permissions: []string{"SELECT"},
 				},
 			},
 		},
@@ -121,7 +113,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	s.Equal(map[string][]sync_to_target.AccessSyncFeedbackInformation{
 		fmt.Sprintf("%s_ap_id1", testId): {{
 			ActualName: actualRoleName,
-			AccessId:   fmt.Sprintf("%s_AccessRole1", testId),
+			AccessId:   fmt.Sprintf("%s_ap_id1", testId),
 		}},
 	}, accessProviderFeedback)
 
@@ -138,7 +130,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	//Given
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T(), 1)
 	rolesToRemove = append(rolesToRemove, actualRoleName)
-	access = make(map[string]sync_to_target.EnrichedAccess)
+	access = make(map[string]*sync_to_target.AccessProvider)
 
 	//When
 	err = dataAccessSyncer.SyncAccessProvidersToTarget(context.Background(), rolesToRemove, access, dataAccessFeedbackHandler, config)
@@ -162,34 +154,26 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	//Given
 	prefix := fmt.Sprintf("%s$AAC_", testId)
 
-	access1 := &sync_to_target.Access{
-		What: []sync_to_target.WhatItem{
-			{
-				DataObject: &data_source.DataObjectReference{
-					FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
-					Type:     "table",
-				},
-				Permissions: []string{"SELECT"},
-			},
-		},
-		Id: fmt.Sprintf("%s_AccessRole1", testId),
-	}
-
 	actualRoleName := generateRole("TESTROLE1", prefix)
 
-	access := map[string]sync_to_target.EnrichedAccess{
+	access := map[string]*sync_to_target.AccessProvider{
 		actualRoleName: {
-			Access: access1,
-			AccessProvider: &sync_to_target.AccessProvider{
-				Id:          fmt.Sprintf("%s_ap_id1", testId),
-				Access:      []*sync_to_target.Access{access1},
-				Name:        fmt.Sprintf("%s_ap1", testId),
-				Action:      sync_to_target.Grant,
-				NamingHint:  actualRoleName,
-				Delete:      false,
-				Description: fmt.Sprintf("Integration testing for test %s", testId),
-				Who: sync_to_target.WhoItem{
-					Users: []string{snowflakeUserName},
+			Id:          fmt.Sprintf("%s_ap_id1", testId),
+			Name:        fmt.Sprintf("%s_ap1", testId),
+			Action:      sync_to_target.Grant,
+			NamingHint:  actualRoleName,
+			Delete:      false,
+			Description: fmt.Sprintf("Integration testing for test %s", testId),
+			Who: sync_to_target.WhoItem{
+				Users: []string{snowflakeUserName},
+			},
+			What: []sync_to_target.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+						Type:     "table",
+					},
+					Permissions: []string{"SELECT"},
 				},
 			},
 		},
@@ -216,7 +200,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	})
 
 	//Given
-	access = make(map[string]sync_to_target.EnrichedAccess)
+	access = make(map[string]*sync_to_target.AccessProvider)
 
 	//When
 	err = dataAccessSyncer.SyncAccessAsCodeToTarget(context.Background(), access, prefix, config)
