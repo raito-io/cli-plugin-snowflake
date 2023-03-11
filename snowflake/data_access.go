@@ -1088,7 +1088,7 @@ func getSnowflakePermissions(permission string) []string {
 		return pt.snowflakePermissions
 	}
 
-	logger.Warn(fmt.Sprintf("Unknown raito permission %q found. Mapping as is", permission))
+	logger.Debug(fmt.Sprintf("Unknown raito permission %q found. Mapping as is", permission))
 
 	return []string{permission}
 }
