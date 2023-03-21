@@ -79,9 +79,9 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 		}
 
 		user := is.User{
-			ExternalId: userRow.LoginName,
-			UserName:   userRow.Name,
-			Name:       displayName,
+			ExternalId: cleanDoubleQuotes(userRow.LoginName),
+			UserName:   cleanDoubleQuotes(userRow.Name),
+			Name:       cleanDoubleQuotes(displayName),
 			Email:      userRow.Email,
 		}
 
