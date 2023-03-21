@@ -56,7 +56,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 		{GrantedOn: "GrandOnRole2Number1", Name: "GranteeRole2", Privilege: "USAGE"},
 	}, nil).Once()
 	repoMock.EXPECT().GetGrantsOfRole("Role3").Return([]GrantOfRole{
-		{GrantedTo: "ROLE", GranteeName: "GranteeRole3"},
+		{GrantedTo: "ROLE", GranteeName: "\"GranteeRole.3\""},
 	}, nil).Once()
 	repoMock.EXPECT().GetGrantsToRole("Role3").Return([]GrantToRole{
 		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
@@ -150,7 +150,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			Who: &sync_from_target.WhoItem{
 				Users:           []string{},
 				Groups:          []string{},
-				AccessProviders: []string{"GranteeRole3"},
+				AccessProviders: []string{"GranteeRole.3"},
 			},
 			ActualName: "Role3",
 			What:       []sync_from_target.WhatItem{},
