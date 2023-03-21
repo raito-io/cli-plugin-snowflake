@@ -79,9 +79,9 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 		}
 
 		user := is.User{
-			ExternalId: userRow.LoginName,
-			UserName:   userRow.Name,
-			Name:       displayName,
+			ExternalId: cleanDoubleQuotes(userRow.LoginName),
+			UserName:   cleanDoubleQuotes(userRow.Name),
+			Name:       cleanDoubleQuotes(displayName),
 			Email:      userRow.Email,
 		}
 
@@ -92,4 +92,12 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 	}
 
 	return nil
+}
+
+func cleanDoubleQuotes(input string) string {
+	if len(input) > 0 && strings.HasPrefix(input, "\"") && strings.HasSuffix(input, "\"") {
+		return input[1 : len(input)-1]
+	}
+
+	return input
 }
