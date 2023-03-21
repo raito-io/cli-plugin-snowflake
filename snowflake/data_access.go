@@ -290,14 +290,9 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 
 		for _, grantee := range grantOfEntities {
 			if grantee.GrantedTo == "USER" {
-				users = append(users, grantee.GranteeName)
+				users = append(users, cleanDoubleQuotes(grantee.GranteeName))
 			} else if grantee.GrantedTo == "ROLE" {
-				ap := grantee.GranteeName
-				if strings.HasPrefix(ap, "\"") && strings.HasSuffix(ap, "\"") {
-					ap = ap[1 : len(ap)-1]
-				}
-
-				accessProviders = append(accessProviders, ap)
+				accessProviders = append(accessProviders, cleanDoubleQuotes(grantee.GranteeName))
 			}
 		}
 	}

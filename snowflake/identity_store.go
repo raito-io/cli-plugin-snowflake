@@ -93,11 +93,3 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 
 	return nil
 }
-
-func cleanDoubleQuotes(input string) string {
-	if len(input) > 0 && strings.HasPrefix(input, "\"") && strings.HasSuffix(input, "\"") {
-		return input[1 : len(input)-1]
-	}
-
-	return input
-}
