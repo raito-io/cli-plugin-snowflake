@@ -9,8 +9,6 @@ import (
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
-
-	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
 //go:generate go run github.com/vektra/mockery/v2 --name=dataSourceRepository --with-expecter --inpackage
@@ -21,10 +19,10 @@ type dataSourceRepository interface {
 	GetWarehouses() ([]DbEntity, error)
 	GetShares() ([]DbEntity, error)
 	GetDataBases() ([]DbEntity, error)
-	GetSchemasInDatabase(databaseName string) ([]DbEntity, error)
-	GetTablesInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error)
-	GetViewsInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error)
-	GetColumnsInTable(sfObject *common.SnowflakeObject) ([]DbEntity, error)
+	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
+	GetViewsInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
+	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
 }
 
 type DataSourceSyncer struct {
@@ -66,9 +64,17 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 		excludedDatabases = v
 	}
 
-	excludedSchemas := "INFORMATION_SCHEMA"
+	excludedSchemaList := "INFORMATION_SCHEMA"
 	if v, ok := configParams.Parameters[SfExcludedSchemas]; ok {
-		excludedSchemas += "," + v
+		excludedSchemaList += "," + v
+	}
+
+	excludedSchemas := make(map[string]struct{})
+
+	if excludedSchemaList != "" {
+		for _, e := range strings.Split(excludedSchemaList, ",") {
+			excludedSchemas[e] = struct{}{}
+		}
 	}
 
 	err = s.readWarehouses(repo, dataSourceHandler)
@@ -81,7 +87,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 		return err
 	}
 
-	databases, err := s.readDatabases(repo, excludedDatabases, dataSourceHandler)
+	databases, err := s.readDatabases(repo, excludedDatabases, dataSourceHandler, sharesMap)
 	if err != nil {
 		return err
 	}
@@ -95,141 +101,137 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 			doTypePrefix = "shared-"
 		}
 
-		schemas, err := s.readSchemaInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix)
+		err = s.readSchemasInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix)
 		if err != nil {
 			return err
 		}
 
-		for _, schema := range schemas {
-			sfObject := common.SnowflakeObject{Database: &database.Name, Schema: &schema.Name, Table: nil, Column: nil}
+		err = s.readTablesInDatabase(database.Name, excludedSchemas, dataSourceHandler, doTypePrefix+ds.Table, repo.GetTablesInDatabase)
+		if err != nil {
+			return err
+		}
 
-			tables, err := s.readTablesInSchema(repo, &sfObject, dataSourceHandler, doTypePrefix)
-			if err != nil {
-				return err
-			}
+		err = s.readTablesInDatabase(database.Name, excludedSchemas, dataSourceHandler, doTypePrefix+ds.View, repo.GetViewsInDatabase)
+		if err != nil {
+			return err
+		}
 
-			for _, table := range tables {
-				sfObjectTable := sfObject
-				sfObjectTable.Table = &table.Name
-
-				err = s.readColumnsOfSfObject(repo, &sfObjectTable, dataSourceHandler, doTypePrefix)
-				if err != nil {
-					return err
-				}
-			}
-
-			views, err := s.readViewsInSchema(repo, &sfObject, dataSourceHandler, doTypePrefix)
-			if err != nil {
-				return err
-			}
-
-			for _, view := range views {
-				sfObjectView := sfObject
-				sfObjectView.Table = &view.Name
-
-				err = s.readColumnsOfSfObject(repo, &sfObjectView, dataSourceHandler, doTypePrefix)
-				if err != nil {
-					if strings.Contains(err.Error(), "Insufficient privileges to operate on table") {
-						logger.Warn(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito. The snowflake user should either have OWNERSHIP or SELECT permissions on the underlying table", view.Name))
-						logger.Debug(fmt.Sprintf("Privileges error: %s", err.Error()))
-					} else {
-						logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))
-						return fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error())
-					}
-				}
-			}
+		err = s.readColumnsInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix)
+		if err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (s *DataSourceSyncer) readViewsInSchema(repo dataSourceRepository, sfObject *common.SnowflakeObject, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]DbEntity, error) {
-	views, err := repo.GetViewsInSchema(sfObject)
-	if err != nil {
-		return nil, err
-	}
+func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) error {
+	typeName := doTypePrefix + ds.Column
 
-	views, err = s.addDbEntitiesToImporter(dataSourceHandler, views, doTypePrefix+ds.View, sfObject.GetFullName(false),
-		func(name string) string { return sfObject.GetFullName(false) + "." + name },
-		func(name, fullName string) bool { return true })
+	return repo.GetColumnsInDatabase(dbName, func(entity interface{}) error {
+		column := entity.(*ColumnEntity)
+		schemaName := column.Schema
+		schemaFullName := column.Database + "." + schemaName
+		_, ff := excludedSchemas[schemaFullName]
+		_, fs := excludedSchemas[schemaName]
 
-	if err != nil {
-		logger.Error(fmt.Sprintf("error while syncing tables for schema %q between Snowflake and Raito: %s", *sfObject.Schema, err.Error()))
-		return nil, fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", *sfObject.Schema, err.Error())
-	}
+		fullName := schemaFullName + "." + column.Table + "." + column.Name
 
-	return views, nil
-}
-
-func (s *DataSourceSyncer) readColumnsOfSfObject(repo dataSourceRepository, sfObjectTable *common.SnowflakeObject, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) error {
-	columns, err := repo.GetColumnsInTable(sfObjectTable)
-	if err != nil {
-		return err
-	}
-
-	_, err = s.addDbEntitiesToImporter(dataSourceHandler, columns, doTypePrefix+ds.Column, sfObjectTable.GetFullName(false),
-		func(name string) string { return sfObjectTable.GetFullName(false) + "." + name },
-		func(name, fullName string) bool { return true },
-	)
-	if err != nil {
-		logger.Error(fmt.Sprintf("error while syncing columns for table %q between Snowflake and Raito: %s", *sfObjectTable.Table, err.Error()))
-		return fmt.Errorf("error while syncing columns for table %q between Snowflake and Raito: %s", *sfObjectTable.Table, err.Error())
-	}
-
-	return nil
-}
-
-func (s *DataSourceSyncer) readTablesInSchema(repo dataSourceRepository, sfObject *common.SnowflakeObject, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]DbEntity, error) {
-	tables, err := repo.GetTablesInSchema(sfObject)
-	if err != nil {
-		return nil, err
-	}
-
-	tables, err = s.addDbEntitiesToImporter(dataSourceHandler, tables, doTypePrefix+ds.Table, sfObject.GetFullName(false),
-		func(name string) string { return sfObject.GetFullName(false) + "." + name },
-		func(name, fullName string) bool { return true })
-
-	if err != nil {
-		logger.Error(fmt.Sprintf("error while syncing tables for schema %q between Snowflake and Raito: %s", *sfObject.Schema, err.Error()))
-		return nil, fmt.Errorf("error while syncing tables for schema %q between Snowflake and Raito: %s", *sfObject.Schema, err.Error())
-	}
-
-	return tables, nil
-}
-
-func (s *DataSourceSyncer) readSchemaInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas string, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) ([]DbEntity, error) {
-	schemas, err := repo.GetSchemasInDatabase(databaseName)
-	if err != nil {
-		return nil, err
-	}
-
-	excludes := make(map[string]struct{})
-
-	if excludedSchemas != "" {
-		for _, e := range strings.Split(excludedSchemas, ",") {
-			excludes[e] = struct{}{}
+		if ff || fs {
+			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
+			return nil
 		}
-	}
 
-	schemas, err = s.addDbEntitiesToImporter(dataSourceHandler, schemas, doTypePrefix+ds.Schema, databaseName,
-		func(name string) string { return databaseName + "." + name },
-		func(name, fullName string) bool {
-			_, f := excludes[fullName]
-			if f {
-				return !f
-			}
-			_, f = excludes[name]
-			return !f
-		})
-	if err != nil {
-		return nil, err
-	}
+		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", typeName, fullName))
 
-	return schemas, nil
+		comment := ""
+		if column.Comment != nil {
+			comment = *column.Comment
+		}
+		do := ds.DataObject{
+			ExternalId:       fullName,
+			Name:             column.Name,
+			FullName:         fullName,
+			Type:             typeName,
+			Description:      comment,
+			ParentExternalId: schemaFullName + "." + column.Table,
+		}
+
+		return dataSourceHandler.AddDataObjects(&do)
+	})
 }
 
-func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler) ([]DbEntity, error) {
+func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) error {
+	typeName := doTypePrefix + ds.Schema
+
+	return repo.GetSchemasInDatabase(databaseName, func(entity interface{}) error {
+		schema := entity.(*SchemaEntity)
+
+		fullName := schema.Database + "." + schema.Name
+
+		_, ff := excludedSchemas[fullName]
+		_, fs := excludedSchemas[schema.Name]
+
+		if ff || fs {
+			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
+			return nil
+		}
+
+		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", typeName, fullName))
+
+		comment := ""
+		if schema.Comment != nil {
+			comment = *schema.Comment
+		}
+		do := ds.DataObject{
+			ExternalId:       fullName,
+			Name:             schema.Name,
+			FullName:         fullName,
+			Type:             typeName,
+			Description:      comment,
+			ParentExternalId: schema.Database,
+		}
+
+		return dataSourceHandler.AddDataObjects(&do)
+	})
+}
+
+func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, typeName string, fetcher func(dbName string, schemaName string, entityHandler EntityHandler) error) error {
+	return fetcher(databaseName, "", func(entity interface{}) error {
+		table := entity.(*TableEntity)
+
+		schemaName := table.Schema
+		schemaFullName := table.Database + "." + schemaName
+		_, ff := excludedSchemas[schemaFullName]
+		_, fs := excludedSchemas[schemaName]
+
+		fullName := schemaFullName + "." + table.Name
+
+		if ff || fs {
+			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
+			return nil
+		}
+
+		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", typeName, fullName))
+
+		comment := ""
+		if table.Comment != nil {
+			comment = *table.Comment
+		}
+		do := ds.DataObject{
+			ExternalId:       fullName,
+			Name:             table.Name,
+			FullName:         fullName,
+			Type:             typeName,
+			Description:      comment,
+			ParentExternalId: table.Database + "." + table.Schema,
+		}
+
+		return dataSourceHandler.AddDataObjects(&do)
+	})
+}
+
+func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler, shares map[string]struct{}) ([]DbEntity, error) {
 	databases, err := repo.GetDataBases()
 	if err != nil {
 		return nil, err
@@ -246,8 +248,9 @@ func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedData
 	databases, err = s.addDbEntitiesToImporter(dataSourceHandler, databases, ds.Database, "",
 		func(name string) string { return name },
 		func(name, fullName string) bool {
+			_, shared := shares[fullName]
 			_, f := excludes[fullName]
-			return !f
+			return !f && !shared
 		})
 	if err != nil {
 		return nil, err
@@ -344,6 +347,23 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.Da
 
 	return dbEntities, nil
 }
+
+/*func (s *DataSourceSyncer) HandleTags(ctx context.Context, configMap *config.ConfigMap, fullName string, resourceType string) ([]*tag.Tag, error) {
+	standard := configMap.GetBoolWithDefault(SfStandardEdition, false)
+	skipTags := configMap.GetBoolWithDefault(SfSkipTags, false)
+
+	if standard || skipTags {
+		return nil, nil
+	}
+
+	`SELECT *
+		FROM TABLE(
+		  MASTER_DATA.INFORMATION_SCHEMA.TAG_REFERENCES(
+			'MASTER_DATA.SALES.CUSTOMER',
+			'table'
+		  )
+		)`
+}*/
 
 func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaData, error) {
 	logger.Debug("Returning meta data for Snowflake data source")

@@ -10,4 +10,5 @@ const (
 	SfExternalIdentityStoreOwners       = "sf-external-identity-store-owners"
 	SfStandardEdition                   = "sf-standard-edition"
 	SfLinkToExternalIdentityStoreGroups = "sf-link-to-external-identity-store-groups"
+	SfSkipTags                          = "sf-skip-tags"
 )

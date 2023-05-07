@@ -309,7 +309,7 @@ func TestDataSourceSyncer_SyncDataSource_readSchemaInDatabase(t *testing.T) {
 	syncer := createSyncer(nil)
 
 	//When
-	entities, err := syncer.readSchemaInDatabase(repoMock, databaseName, excludeSchemas, dataSourceObjectHandlerMock, "prefix-")
+	entities, err := syncer.readSchemasInDatabase(repoMock, databaseName, excludeSchemas, dataSourceObjectHandlerMock, "prefix-")
 
 	//Then
 	assert.NoError(t, err)

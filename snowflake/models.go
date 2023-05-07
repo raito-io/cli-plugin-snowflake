@@ -14,6 +14,32 @@ type DbEntity struct {
 	Comment *string `db:"comment"`
 }
 
+type SchemaEntity struct {
+	Database string  `db:"CATALOG_NAME"`
+	Name     string  `db:"SCHEMA_NAME"`
+	Comment  *string `db:"COMMENT"`
+}
+
+type TableEntity struct {
+	Database string  `db:"TABLE_CATALOG"`
+	Schema   string  `db:"TABLE_SCHEMA"`
+	Name     string  `db:"TABLE_NAME"`
+	Comment  *string `db:"COMMENT"`
+}
+
+type ColumnEntity struct {
+	Database string  `db:"TABLE_CATALOG"`
+	Schema   string  `db:"TABLE_SCHEMA"`
+	Table    string  `db:"TABLE_NAME"`
+	Name     string  `db:"COLUMN_NAME"`
+	Comment  *string `db:"COMMENT"`
+}
+
+type TagEntity struct {
+	TagName  string `db:"tag_name"`
+	TagValue string `db:"tag_value"`
+}
+
 // Identity Store
 type UserEntity struct {
 	Name        string `db:"name"`
