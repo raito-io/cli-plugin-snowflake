@@ -3,9 +3,8 @@ package snowflake
 import (
 	"database/sql"
 	"fmt"
-	"strings"
-
 	"github.com/raito-io/cli/base/tag"
+	"strings"
 )
 
 // Implementation of Scanner interface for NullString
