@@ -685,16 +685,16 @@ func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []s
 }
 
 func getSchemasInDatabaseQuery(dbName string) string {
-	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.SCHEMATA`, dbName)
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.SCHEMATA`, common.FormatQuery("%s", dbName))
 }
 
 func getTablesInDatabaseQuery(dbName string, schemaName string) string {
 	whereClause := "WHERE TABLE_TYPE != 'VIEW'"
 	if schemaName != "" {
-		whereClause += fmt.Sprintf(` AND TABLE_SCHEMA = %q`, schemaName)
+		whereClause += fmt.Sprintf(` AND TABLE_SCHEMA = '%s'`, schemaName)
 	}
 
-	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.TABLES %s`, dbName, whereClause)
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.TABLES %s`, common.FormatQuery("%s", dbName), whereClause)
 }
 
 func getViewsInDatabaseQuery(dbName string, schemaName string) string {
@@ -703,11 +703,11 @@ func getViewsInDatabaseQuery(dbName string, schemaName string) string {
 		whereClause += fmt.Sprintf(` WHERE TABLE_SCHEMA = '%s'`, schemaName)
 	}
 
-	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.VIEWS %s`, dbName, whereClause)
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.VIEWS %s`, common.FormatQuery("%s", dbName), whereClause)
 }
 
 func getColumnsInDatabaseQuery(dbName string) string {
-	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.COLUMNS`, dbName)
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.COLUMNS`, common.FormatQuery("%s", dbName))
 }
 
 func scanRow(rows *sql.Rows, dest interface{}) error {

@@ -15,8 +15,6 @@ import (
 	"github.com/raito-io/cli/base/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
-	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
 func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
@@ -1000,19 +998,16 @@ func generateAccessControls_schema(t *testing.T) {
 
 	database := "DB1"
 	schema := "Schema2"
-	repoMock.EXPECT().GetTablesInSchema(&common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}).Return([]DbEntity{
-		{Name: "Table3"},
-	}, nil).Once()
 
-	repoMock.EXPECT().GetViewsInSchema(&common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}).Return([]DbEntity{
-		{Name: "View3"},
-	}, nil).Once()
+	repoMock.EXPECT().GetTablesInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetViewsInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
+		handler(&TableEntity{Database: s, Schema: s2, Name: "View3"})
+		return nil
+	}).Once()
 
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
@@ -1139,18 +1134,15 @@ func generateAccessControls_existing_schema(t *testing.T) {
 
 	database := "DB1"
 	schema := "Schema2"
-	repoMock.EXPECT().GetTablesInSchema(&common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}).Return([]DbEntity{
-		{Name: "Table3"},
-	}, nil).Once()
-	repoMock.EXPECT().GetViewsInSchema(&common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}).Return([]DbEntity{
-		{Name: "View3"},
-	}, nil).Once()
+	repoMock.EXPECT().GetTablesInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetViewsInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
+		handler(&TableEntity{Database: s, Schema: s2, Name: "View3"})
+		return nil
+	}).Once()
 
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
@@ -1228,22 +1220,20 @@ func generateAccessControls_database(t *testing.T) {
 
 	database := "DB1"
 	schema := "Schema2"
-	repoMock.EXPECT().GetTablesInSchema(&common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}).Return([]DbEntity{
-		{Name: "Table3"},
-	}, nil).Once()
-	repoMock.EXPECT().GetViewsInSchema(&common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}).Return([]DbEntity{
-		{Name: "View3"},
-	}, nil).Once()
+	repoMock.EXPECT().GetTablesInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3"})
+		return nil
+	}).Once()
 
-	repoMock.EXPECT().GetSchemasInDatabase("DB1").Return([]DbEntity{
-		{Name: "Schema2"},
-	}, nil).Once()
+	repoMock.EXPECT().GetViewsInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
+		handler(&TableEntity{Database: s, Schema: s2, Name: "View3"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetSchemasInDatabase("DB1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&SchemaEntity{Database: s, Name: "Schema2"})
+		return nil
+	}).Once()
 
 	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB1", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrant("USAGE", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
@@ -1289,22 +1279,20 @@ func generateAccessControls_existing_database(t *testing.T) {
 
 	database := "DB1"
 	schema := "Schema2"
-	repoMock.EXPECT().GetTablesInSchema(&common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}).Return([]DbEntity{
-		{Name: "Table3"},
-	}, nil).Once()
-	repoMock.EXPECT().GetViewsInSchema(&common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}).Return([]DbEntity{
-		{Name: "View3"},
-	}, nil).Once()
+	repoMock.EXPECT().GetTablesInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3"})
+		return nil
+	}).Once()
 
-	repoMock.EXPECT().GetSchemasInDatabase("DB1").Return([]DbEntity{
-		{Name: "Schema2"},
-	}, nil).Once()
+	repoMock.EXPECT().GetViewsInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
+		handler(&TableEntity{Database: s, Schema: s2, Name: "View3"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetSchemasInDatabase("DB1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&SchemaEntity{Database: s, Name: "Schema2"})
+		return nil
+	}).Once()
 
 	repoMock.EXPECT().ExecuteRevoke("ALL", "FUTURE SCHEMAS IN DATABASE DB1", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteRevoke("ALL", "FUTURE TABLES IN DATABASE DB1", "RoleName1").Return(nil).Once()
