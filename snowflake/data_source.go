@@ -3,6 +3,7 @@ package snowflake
 import (
 	"context"
 	"fmt"
+	"github.com/raito-io/cli/base/tag"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ type dataSourceRepository interface {
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetViewsInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetTags(databaseName string) (map[string][]*tag.Tag, error)
 }
 
 type DataSourceSyncer struct {
@@ -58,6 +60,9 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 
 	dataSourceHandler.SetDataSourceName(sfAccount)
 	dataSourceHandler.SetDataSourceFullname(sfAccount)
+
+	standard := configParams.GetBoolWithDefault(SfStandardEdition, false)
+	skipTags := configParams.GetBoolWithDefault(SfSkipTags, false)
 
 	excludedDatabases := ""
 	if v, ok := configParams.Parameters[SfExcludedDatabases]; ok {
@@ -101,22 +106,33 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 			doTypePrefix = "shared-"
 		}
 
-		err = s.readSchemasInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix)
+		tagMap := make(map[string][]*tag.Tag)
+		if !standard && !skipTags {
+			tagMap, err = repo.GetTags(database.Name)
+
+			if err != nil {
+				return err
+			}
+		}
+
+		logger.Info(fmt.Sprintf("Found tags for database %s: %+v", database.Name, tagMap))
+
+		err = s.readSchemasInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix, tagMap)
 		if err != nil {
 			return err
 		}
 
-		err = s.readTablesInDatabase(database.Name, excludedSchemas, dataSourceHandler, doTypePrefix+ds.Table, repo.GetTablesInDatabase)
+		err = s.readTablesInDatabase(database.Name, excludedSchemas, dataSourceHandler, doTypePrefix+ds.Table, repo.GetTablesInDatabase, tagMap)
 		if err != nil {
 			return err
 		}
 
-		err = s.readTablesInDatabase(database.Name, excludedSchemas, dataSourceHandler, doTypePrefix+ds.View, repo.GetViewsInDatabase)
+		err = s.readTablesInDatabase(database.Name, excludedSchemas, dataSourceHandler, doTypePrefix+ds.View, repo.GetViewsInDatabase, tagMap)
 		if err != nil {
 			return err
 		}
 
-		err = s.readColumnsInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix)
+		err = s.readColumnsInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix, tagMap)
 		if err != nil {
 			return err
 		}
@@ -125,7 +141,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	return nil
 }
 
-func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) error {
+func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
 	typeName := doTypePrefix + ds.Column
 
 	return repo.GetColumnsInDatabase(dbName, func(entity interface{}) error {
@@ -155,13 +171,14 @@ func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbNa
 			Type:             typeName,
 			Description:      comment,
 			ParentExternalId: schemaFullName + "." + column.Table,
+			Tags:             tagMap[fullName],
 		}
 
 		return dataSourceHandler.AddDataObjects(&do)
 	})
 }
 
-func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string) error {
+func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
 	typeName := doTypePrefix + ds.Schema
 
 	return repo.GetSchemasInDatabase(databaseName, func(entity interface{}) error {
@@ -190,13 +207,14 @@ func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, data
 			Type:             typeName,
 			Description:      comment,
 			ParentExternalId: schema.Database,
+			Tags:             tagMap[fullName],
 		}
 
 		return dataSourceHandler.AddDataObjects(&do)
 	})
 }
 
-func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, typeName string, fetcher func(dbName string, schemaName string, entityHandler EntityHandler) error) error {
+func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, typeName string, fetcher func(dbName string, schemaName string, entityHandler EntityHandler) error, tagMap map[string][]*tag.Tag) error {
 	return fetcher(databaseName, "", func(entity interface{}) error {
 		table := entity.(*TableEntity)
 
@@ -225,6 +243,7 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSch
 			Type:             typeName,
 			Description:      comment,
 			ParentExternalId: table.Database + "." + table.Schema,
+			Tags:             tagMap[fullName],
 		}
 
 		return dataSourceHandler.AddDataObjects(&do)

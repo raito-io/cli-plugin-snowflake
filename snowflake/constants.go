@@ -11,4 +11,6 @@ const (
 	SfStandardEdition                   = "sf-standard-edition"
 	SfLinkToExternalIdentityStoreGroups = "sf-link-to-external-identity-store-groups"
 	SfSkipTags                          = "sf-skip-tags"
+
+	TagSource = "Snowflake"
 )

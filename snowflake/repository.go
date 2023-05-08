@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/raito-io/cli/base/tag"
 	"reflect"
 	"strings"
 	"time"
@@ -474,6 +475,29 @@ func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
 	return r[0], nil
 }
 
+func (repo *SnowflakeRepository) GetTags(databaseName string) (map[string][]*tag.Tag, error) {
+	tagMap := make(map[string][]*tag.Tag)
+
+	rows, _, err := repo.query(fmt.Sprintf("select column_name, object_database, object_schema, object_name, domain, tag_name, tag_value from SNOWFLAKE.ACCOUNT_USAGE.tag_references where object_deleted is null and object_database = '%s';", databaseName))
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		tagEntity := TagEntity{}
+		scanRow(rows, &tagEntity)
+
+		fullName := tagEntity.GetFullName()
+		if fullName != "" {
+			tagMap[fullName] = append(tagMap[fullName], tagEntity.CreateTag())
+		} else {
+			logger.Warn(fmt.Sprintf("skipping tag (%+v) because cannot construct full name", tagEntity))
+		}
+	}
+
+	return tagMap, nil
+}
+
 func (repo *SnowflakeRepository) GetWarehouses() ([]DbEntity, error) {
 	q := "SHOW WAREHOUSES"
 	return repo.getDbEntities(q)
@@ -556,21 +580,6 @@ func (repo *SnowflakeRepository) getDbEntities(query string) ([]DbEntity, error)
 	}
 
 	return dbs, nil
-}
-
-func readDbEntities[T any](repo *SnowflakeRepository, query string, result *[]T) error {
-	rows, _, err := repo.query(query)
-	if err != nil {
-		return err
-	}
-
-	err = scan.Rows(result, rows)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func handleDbEntities(repo *SnowflakeRepository, query string, createEntity EntityCreator, handleEntity EntityHandler) error {
