@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
 )
 
@@ -530,7 +529,11 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemasInDatabase() {
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 
 	//When
-	schemas, err := s.repo.GetSchemasInDatabase(database)
+	schemas := make([]snowflake.SchemaEntity, 0)
+	err := s.repo.GetSchemasInDatabase(database, func(entity interface{}) error {
+		schemas = append(schemas, entity.(snowflake.SchemaEntity))
+		return nil
+	})
 
 	//Then
 	s.NoError(err)
@@ -560,13 +563,13 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 	//Given
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 	schema := "ORDERING"
-	sfObjectSchema := common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}
 
 	//When
-	tables, err := s.repo.GetTablesInSchema(&sfObjectSchema)
+	tables := make([]snowflake.TableEntity, 0)
+	err := s.repo.GetTablesInDatabase(database, schema, func(entity interface{}) error {
+		tables = append(tables, entity.(snowflake.TableEntity))
+		return nil
+	})
 
 	//Then
 	s.NoError(err)
@@ -586,13 +589,13 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetViewsInSchema() {
 	//Given
 	database := "SNOWFLAKE"
 	schema := "ACCOUNT_USAGE"
-	sfObjectSchema := common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}
 
 	//When
-	views, err := s.repo.GetViewsInSchema(&sfObjectSchema)
+	views := make([]snowflake.TableEntity, 0)
+	err := s.repo.GetViewsInDatabase(database, schema, func(entity interface{}) error {
+		views = append(views, entity.(snowflake.TableEntity))
+		return nil
+	})
 
 	//Then
 	s.NoError(err)
@@ -611,14 +614,16 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 	schema := "ORDERING"
 	table := "ORDERS"
-	sfObjectTable := common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-		Table:    &table,
-	}
 
 	//When
-	columns, err := s.repo.GetColumnsInTable(&sfObjectTable)
+	columns := make([]snowflake.ColumnEntity, 0)
+	err := s.repo.GetColumnsInDatabase(database, func(entity interface{}) error {
+		column := entity.(snowflake.ColumnEntity)
+		if column.Schema == schema && column.Table == table {
+			columns = append(columns, column)
+		}
+		return nil
+	})
 
 	//Then
 	s.NoError(err)
