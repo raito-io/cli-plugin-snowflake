@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/raito-io/cli/base/tag"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/raito-io/cli/base/tag"
 
 	"github.com/blockloop/scan"
 	"github.com/hashicorp/go-multierror"
@@ -485,7 +486,11 @@ func (repo *SnowflakeRepository) GetTags(databaseName string) (map[string][]*tag
 
 	for rows.Next() {
 		tagEntity := TagEntity{}
-		scanRow(rows, &tagEntity)
+
+		err = scanRow(rows, &tagEntity)
+		if err != nil {
+			return nil, err
+		}
 
 		fullName := tagEntity.GetFullName()
 		if fullName != "" {
@@ -688,6 +693,7 @@ func getTablesInDatabaseQuery(dbName string, schemaName string) string {
 	if schemaName != "" {
 		whereClause += fmt.Sprintf(` AND TABLE_SCHEMA = %q`, schemaName)
 	}
+
 	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.TABLES %s`, dbName, whereClause)
 }
 
@@ -696,6 +702,7 @@ func getViewsInDatabaseQuery(dbName string, schemaName string) string {
 	if schemaName != "" {
 		whereClause += fmt.Sprintf(` WHERE TABLE_SCHEMA = '%s'`, schemaName)
 	}
+
 	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.VIEWS %s`, dbName, whereClause)
 }
 

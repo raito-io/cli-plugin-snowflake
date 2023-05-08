@@ -3,9 +3,10 @@ package snowflake
 import (
 	"context"
 	"fmt"
-	"github.com/raito-io/cli/base/tag"
 	"strings"
 	"time"
+
+	"github.com/raito-io/cli/base/tag"
 
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"

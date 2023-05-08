@@ -938,74 +938,72 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 		if _, f := metaData[ds.Database][strings.ToUpper(p)]; len(metaData) == 0 || f {
 			matchFound = true
 			grants = append(grants, Grant{p, fmt.Sprintf(`DATABASE %s`, sfObject.GetFullName(true))})
-		} else {
-			if schemas == nil {
-				err = repo.GetSchemasInDatabase(database, func(entity interface{}) error {
-					schema := entity.(*SchemaEntity)
+		} else if schemas == nil {
+			err = repo.GetSchemasInDatabase(database, func(entity interface{}) error {
+				schema := entity.(*SchemaEntity)
 
-					if schema.Name == "INFORMATION_SCHEMA" {
-						return nil
-					}
-
-					sfObject.Schema = &schema.Name
-					grants = append(grants, Grant{"USAGE", fmt.Sprintf("SCHEMA %s", sfObject.GetFullName(true))})
-
-					// Check if the permission is applicable on schemas
-					if _, f := metaData[ds.Schema][strings.ToUpper(p)]; f {
-						matchFound = true
-						grants = append(grants, Grant{p, common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
-					} else {
-						// Check if the permission is applicable on the tables in the schema
-						if _, f := metaData[ds.Table][strings.ToUpper(p)]; f {
-							tables, f := tablesPerSchema[schema.Name]
-							if !f {
-								tables = make([]TableEntity, 0)
-								err = repo.GetTablesInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
-									table := entity.(*TableEntity)
-									tables = append(tables, *table)
-									return nil
-								})
-								if err != nil {
-									return err
-								}
-
-								tablesPerSchema[schema.Name] = tables
-							}
-							matchFound = true
-							for _, table := range tables {
-								grants = append(grants, Grant{p, common.FormatQuery(`TABLE %s.%s.%s`, *sfObject.Database, *sfObject.Schema, table.Name)})
-							}
-						}
-
-						// Check if the permission is applicable on the views in the schema
-						if _, f := metaData[ds.View][strings.ToUpper(p)]; f {
-							views, f := viewsPerSchema[schema.Name]
-							if !f {
-								views = make([]TableEntity, 0)
-								err = repo.GetViewsInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
-									view := entity.(*TableEntity)
-									views = append(views, *view)
-									return nil
-								})
-								if err != nil {
-									return err
-								}
-								viewsPerSchema[schema.Name] = views
-							}
-
-							matchFound = true
-							for _, view := range views {
-								grants = append(grants, Grant{p, common.FormatQuery(`VIEW %s.%s.%s`, *sfObject.Database, *sfObject.Schema, view.Name)})
-							}
-						}
-					}
-
+				if schema.Name == "INFORMATION_SCHEMA" {
 					return nil
-				})
-
-				if err != nil {
-					return nil, err
 				}
+
+				sfObject.Schema = &schema.Name
+				grants = append(grants, Grant{"USAGE", fmt.Sprintf("SCHEMA %s", sfObject.GetFullName(true))})
+
+				// Check if the permission is applicable on schemas
+				if _, f := metaData[ds.Schema][strings.ToUpper(p)]; f {
+					matchFound = true
+					grants = append(grants, Grant{p, common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
+				} else {
+					// Check if the permission is applicable on the tables in the schema
+					if _, f := metaData[ds.Table][strings.ToUpper(p)]; f {
+						tables, f := tablesPerSchema[schema.Name]
+						if !f {
+							tables = make([]TableEntity, 0)
+							err = repo.GetTablesInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
+								table := entity.(*TableEntity)
+								tables = append(tables, *table)
+								return nil
+							})
+							if err != nil {
+								return err
+							}
+
+							tablesPerSchema[schema.Name] = tables
+						}
+						matchFound = true
+						for _, table := range tables {
+							grants = append(grants, Grant{p, common.FormatQuery(`TABLE %s.%s.%s`, *sfObject.Database, *sfObject.Schema, table.Name)})
+						}
+					}
+
+					// Check if the permission is applicable on the views in the schema
+					if _, f := metaData[ds.View][strings.ToUpper(p)]; f {
+						views, f := viewsPerSchema[schema.Name]
+						if !f {
+							views = make([]TableEntity, 0)
+							err = repo.GetViewsInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
+								view := entity.(*TableEntity)
+								views = append(views, *view)
+								return nil
+							})
+							if err != nil {
+								return err
+							}
+							viewsPerSchema[schema.Name] = views
+						}
+
+						matchFound = true
+						for _, view := range views {
+							grants = append(grants, Grant{p, common.FormatQuery(`VIEW %s.%s.%s`, *sfObject.Database, *sfObject.Schema, view.Name)})
+						}
+					}
+				}
+
+				return nil
+			})
+
+			if err != nil {
+				return nil, err
 			}
 		}
 
