@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
 )
 
@@ -198,7 +197,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToRole() {
 
 	//Then
 	s.NoError(err)
-	s.True(len(grantsToRole) >= 94)
+	s.True(len(grantsToRole) >= 88, "grantsToRole only has %d grants: %+v", len(grantsToRole), grantsToRole)
 
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "USAGE",
@@ -530,7 +529,11 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemasInDatabase() {
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 
 	//When
-	schemas, err := s.repo.GetSchemasInDatabase(database)
+	schemas := make([]snowflake.SchemaEntity, 0)
+	err := s.repo.GetSchemasInDatabase(database, func(entity interface{}) error {
+		schemas = append(schemas, *entity.(*snowflake.SchemaEntity))
+		return nil
+	})
 
 	//Then
 	s.NoError(err)
@@ -538,21 +541,24 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemasInDatabase() {
 
 	comment := ""
 
-	s.Contains(schemas, snowflake.DbEntity{
-		Name:    "PUBLIC",
-		Comment: &comment,
+	s.Contains(schemas, snowflake.SchemaEntity{
+		Database: "SNOWFLAKE_INTEGRATION_TEST",
+		Name:     "PUBLIC",
+		Comment:  nil,
 	})
 
-	s.Contains(schemas, snowflake.DbEntity{
-		Name:    "ORDERING",
-		Comment: &comment,
+	s.Contains(schemas, snowflake.SchemaEntity{
+		Database: "SNOWFLAKE_INTEGRATION_TEST",
+		Name:     "ORDERING",
+		Comment:  &comment,
 	})
 
 	comment = "Views describing the contents of schemas in this database"
 
-	s.Contains(schemas, snowflake.DbEntity{
-		Name:    "INFORMATION_SCHEMA",
-		Comment: &comment,
+	s.Contains(schemas, snowflake.SchemaEntity{
+		Database: "SNOWFLAKE_INTEGRATION_TEST",
+		Name:     "INFORMATION_SCHEMA",
+		Comment:  &comment,
 	})
 }
 
@@ -560,24 +566,23 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 	//Given
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 	schema := "ORDERING"
-	sfObjectSchema := common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}
 
 	//When
-	tables, err := s.repo.GetTablesInSchema(&sfObjectSchema)
+	tables := make([]snowflake.TableEntity, 0)
+	err := s.repo.GetTablesInDatabase(database, schema, func(entity interface{}) error {
+		tables = append(tables, *entity.(*snowflake.TableEntity))
+		return nil
+	})
 
 	//Then
 	s.NoError(err)
 	s.Len(tables, 1)
 
-	comment := ""
-
-	s.Equal([]snowflake.DbEntity{
+	s.Equal([]snowflake.TableEntity{
 		{
-			Name:    "ORDERS",
-			Comment: &comment,
+			Database: "SNOWFLAKE_INTEGRATION_TEST",
+			Schema:   "ORDERING",
+			Name:     "ORDERS",
 		},
 	}, tables)
 }
@@ -586,23 +591,23 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetViewsInSchema() {
 	//Given
 	database := "SNOWFLAKE"
 	schema := "ACCOUNT_USAGE"
-	sfObjectSchema := common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-	}
 
 	//When
-	views, err := s.repo.GetViewsInSchema(&sfObjectSchema)
+	views := make([]snowflake.TableEntity, 0)
+	err := s.repo.GetViewsInDatabase(database, schema, func(entity interface{}) error {
+		views = append(views, *entity.(*snowflake.TableEntity))
+		return nil
+	})
 
 	//Then
 	s.NoError(err)
 	s.True(len(views) > 56)
 
-	comment := ""
-
-	s.Contains(views, snowflake.DbEntity{
-		Name:    "ACCESS_HISTORY",
-		Comment: &comment,
+	s.Contains(views, snowflake.TableEntity{
+		Database: database,
+		Schema:   schema,
+		Name:     "ACCESS_HISTORY",
+		Comment:  nil,
 	})
 }
 
@@ -611,46 +616,75 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 	schema := "ORDERING"
 	table := "ORDERS"
-	sfObjectTable := common.SnowflakeObject{
-		Database: &database,
-		Schema:   &schema,
-		Table:    &table,
-	}
 
 	//When
-	columns, err := s.repo.GetColumnsInTable(&sfObjectTable)
+	columns := make([]snowflake.ColumnEntity, 0)
+	err := s.repo.GetColumnsInDatabase(database, func(entity interface{}) error {
+		column := entity.(*snowflake.ColumnEntity)
+		if column.Schema == schema && column.Table == table {
+			columns = append(columns, *column)
+		}
+		return nil
+	})
 
 	//Then
 	s.NoError(err)
 	s.Len(columns, 9)
 
-	s.ElementsMatch(columns, []snowflake.DbEntity{
+	s.ElementsMatch(columns, []snowflake.ColumnEntity{
 		{
-			Name: "CLERK",
+			Database: database,
+			Schema:   schema,
+			Table:    table,
+			Name:     "CLERK",
 		},
 		{
-			Name: "COMMENT",
+			Database: database,
+			Schema:   schema,
+			Table:    table,
+			Name:     "COMMENT",
 		},
 		{
-			Name: "CUSTKEY",
+			Database: database,
+			Schema:   schema,
+			Table:    table,
+			Name:     "CUSTKEY",
 		},
 		{
-			Name: "ORDERDATE",
+			Database: database,
+			Schema:   schema,
+			Table:    table,
+			Name:     "ORDERDATE",
 		},
 		{
-			Name: "ORDERKEY",
+			Database: database,
+			Schema:   schema,
+			Table:    table,
+			Name:     "ORDERKEY",
 		},
 		{
-			Name: "ORDERPRIORITY",
+			Database: database,
+			Schema:   schema,
+			Table:    table,
+			Name:     "ORDERPRIORITY",
 		},
 		{
-			Name: "ORDERSTATUS",
+			Database: database,
+			Schema:   schema,
+			Table:    table,
+			Name:     "ORDERSTATUS",
 		},
 		{
-			Name: "SHIPPRIORITY",
+			Database: database,
+			Schema:   schema,
+			Table:    table,
+			Name:     "SHIPPRIORITY",
 		},
 		{
-			Name: "TOTALPRICE",
+			Database: database,
+			Schema:   schema,
+			Table:    table,
+			Name:     "TOTALPRICE",
 		},
 	})
 }

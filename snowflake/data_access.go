@@ -56,9 +56,9 @@ type dataAccessRepository interface {
 	DropRole(roleName string) error
 	ExecuteGrant(perm, on, role string) error
 	ExecuteRevoke(perm, on, role string) error
-	GetTablesInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error)
-	GetViewsInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error)
-	GetSchemasInDatabase(databaseName string) ([]DbEntity, error)
+	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
+	GetViewsInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
+	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	CommentIfExists(comment, objectType, objectName string) error
 	GrantUsersToRole(ctx context.Context, role string, users ...string) error
 	RevokeUsersFromRole(ctx context.Context, role string, users ...string) error
@@ -860,8 +860,8 @@ func createGrantsForSchema(repo dataAccessRepository, permissions []string, full
 		Grant{"USAGE", common.FormatQuery(`DATABASE %s`, *sfObject.Database)},
 		Grant{"USAGE", common.FormatQuery(`SCHEMA %s.%s`, *sfObject.Database, *sfObject.Schema)})
 
-	var tables []DbEntity
-	var views []DbEntity
+	var tables []TableEntity
+	var views []TableEntity
 	var err error
 
 	for _, p := range permissions {
@@ -874,7 +874,11 @@ func createGrantsForSchema(repo dataAccessRepository, permissions []string, full
 			// Check if the permission is applicable on the tables in the schema
 			if _, f := metaData[ds.Table][strings.ToUpper(p)]; f {
 				if tables == nil {
-					tables, err = repo.GetTablesInSchema(&sfObject)
+					err = repo.GetTablesInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
+						table := entity.(*TableEntity)
+						tables = append(tables, *table)
+						return nil
+					})
 					if err != nil {
 						return nil, err
 					}
@@ -890,7 +894,11 @@ func createGrantsForSchema(repo dataAccessRepository, permissions []string, full
 			// Check if the permission is applicable on the views in the schema
 			if _, f := metaData[ds.View][strings.ToUpper(p)]; f {
 				if views == nil {
-					views, err = repo.GetViewsInSchema(&sfObject)
+					err = repo.GetViewsInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
+						view := entity.(*TableEntity)
+						views = append(views, *view)
+						return nil
+					})
 					if err != nil {
 						return nil, err
 					}
@@ -919,9 +927,9 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 
 	grants = append(grants, Grant{"USAGE", fmt.Sprintf(`DATABASE %s`, sfObject.GetFullName(true))})
 
-	var schemas []DbEntity
-	tablesPerSchema := make(map[string][]DbEntity)
-	viewsPerSchema := make(map[string][]DbEntity)
+	var schemas []SchemaEntity
+	tablesPerSchema := make(map[string][]TableEntity)
+	viewsPerSchema := make(map[string][]TableEntity)
 	var err error
 
 	for _, p := range permissions {
@@ -930,20 +938,15 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 		if _, f := metaData[ds.Database][strings.ToUpper(p)]; len(metaData) == 0 || f {
 			matchFound = true
 			grants = append(grants, Grant{p, fmt.Sprintf(`DATABASE %s`, sfObject.GetFullName(true))})
-		} else {
-			if schemas == nil {
-				schemas, err = repo.GetSchemasInDatabase(database)
-				if err != nil {
-					return nil, err
-				}
-			}
+		} else if schemas == nil {
+			err = repo.GetSchemasInDatabase(database, func(entity interface{}) error {
+				schema := entity.(*SchemaEntity)
 
-			for i, schema := range schemas {
 				if schema.Name == "INFORMATION_SCHEMA" {
-					continue
+					return nil
 				}
 
-				sfObject.Schema = &schemas[i].Name
+				sfObject.Schema = &schema.Name
 				grants = append(grants, Grant{"USAGE", fmt.Sprintf("SCHEMA %s", sfObject.GetFullName(true))})
 
 				// Check if the permission is applicable on schemas
@@ -955,10 +958,16 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 					if _, f := metaData[ds.Table][strings.ToUpper(p)]; f {
 						tables, f := tablesPerSchema[schema.Name]
 						if !f {
-							tables, err = repo.GetTablesInSchema(&sfObject)
+							tables = make([]TableEntity, 0)
+							err = repo.GetTablesInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
+								table := entity.(*TableEntity)
+								tables = append(tables, *table)
+								return nil
+							})
 							if err != nil {
-								return nil, err
+								return err
 							}
+
 							tablesPerSchema[schema.Name] = tables
 						}
 						matchFound = true
@@ -971,9 +980,14 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 					if _, f := metaData[ds.View][strings.ToUpper(p)]; f {
 						views, f := viewsPerSchema[schema.Name]
 						if !f {
-							views, err = repo.GetViewsInSchema(&sfObject)
+							views = make([]TableEntity, 0)
+							err = repo.GetViewsInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
+								view := entity.(*TableEntity)
+								views = append(views, *view)
+								return nil
+							})
 							if err != nil {
-								return nil, err
+								return err
 							}
 							viewsPerSchema[schema.Name] = views
 						}
@@ -984,6 +998,12 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 						}
 					}
 				}
+
+				return nil
+			})
+
+			if err != nil {
+				return nil, err
 			}
 		}
 

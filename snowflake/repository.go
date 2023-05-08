@@ -8,12 +8,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/raito-io/cli/base/tag"
+
 	"github.com/blockloop/scan"
 	"github.com/hashicorp/go-multierror"
 	sf "github.com/snowflakedb/gosnowflake"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
+
+type EntityHandler func(entity interface{}) error
+type EntityCreator func() interface{}
 
 func (nullString *NullString) Scan(value interface{}) error {
 	var ns sql.NullString
@@ -471,6 +476,33 @@ func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
 	return r[0], nil
 }
 
+func (repo *SnowflakeRepository) GetTags(databaseName string) (map[string][]*tag.Tag, error) {
+	tagMap := make(map[string][]*tag.Tag)
+
+	rows, _, err := repo.query(fmt.Sprintf("select column_name, object_database, object_schema, object_name, domain, tag_name, tag_value from SNOWFLAKE.ACCOUNT_USAGE.tag_references where object_deleted is null and object_database = '%s';", databaseName))
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		tagEntity := TagEntity{}
+
+		err = scanRow(rows, &tagEntity)
+		if err != nil {
+			return nil, err
+		}
+
+		fullName := tagEntity.GetFullName()
+		if fullName != "" {
+			tagMap[fullName] = append(tagMap[fullName], tagEntity.CreateTag())
+		} else {
+			logger.Warn(fmt.Sprintf("skipping tag (%+v) because cannot construct full name", tagEntity))
+		}
+	}
+
+	return tagMap, nil
+}
+
 func (repo *SnowflakeRepository) GetWarehouses() ([]DbEntity, error) {
 	q := "SHOW WAREHOUSES"
 	return repo.getDbEntities(q)
@@ -494,32 +526,36 @@ func (repo *SnowflakeRepository) GetDataBases() ([]DbEntity, error) {
 	return repo.getDbEntities(q)
 }
 
-func (repo *SnowflakeRepository) GetSchemasInDatabase(databaseName string) ([]DbEntity, error) {
+func (repo *SnowflakeRepository) GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error {
 	q := getSchemasInDatabaseQuery(databaseName)
-	return repo.getDbEntities(q)
+
+	return handleDbEntities(repo, q, func() interface{} {
+		return &SchemaEntity{}
+	}, handleEntity)
 }
 
-func (repo *SnowflakeRepository) GetTablesInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
-	q := getTablesInSchemaQuery(sfObject, "TABLES")
-	return repo.getDbEntities(q)
+func (repo *SnowflakeRepository) GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {
+	q := getTablesInDatabaseQuery(databaseName, schemaName)
+
+	return handleDbEntities(repo, q, func() interface{} {
+		return &TableEntity{}
+	}, handleEntity)
 }
 
-func (repo *SnowflakeRepository) GetViewsInSchema(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
-	q := getTablesInSchemaQuery(sfObject, "VIEWS")
-	return repo.getDbEntities(q)
+func (repo *SnowflakeRepository) GetViewsInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {
+	q := getViewsInDatabaseQuery(databaseName, schemaName)
+
+	return handleDbEntities(repo, q, func() interface{} {
+		return &TableEntity{}
+	}, handleEntity)
 }
 
-func (repo *SnowflakeRepository) GetColumnsInTable(sfObject *common.SnowflakeObject) ([]DbEntity, error) {
-	q := getColumnsInTableQuery(sfObject)
-	_, err := repo.getDbEntities(q)
+func (repo *SnowflakeRepository) GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error {
+	q := getColumnsInDatabaseQuery(databaseName)
 
-	if err != nil {
-		return nil, err
-	}
-
-	q = "select \"column_name\" as \"name\" from table(result_scan(LAST_QUERY_ID()))"
-
-	return repo.getDbEntities(q)
+	return handleDbEntities(repo, q, func() interface{} {
+		return &ColumnEntity{}
+	}, handleEntity)
 }
 
 func (repo *SnowflakeRepository) CommentIfExists(comment, objectType, objectName string) error {
@@ -549,6 +585,30 @@ func (repo *SnowflakeRepository) getDbEntities(query string) ([]DbEntity, error)
 	}
 
 	return dbs, nil
+}
+
+func handleDbEntities(repo *SnowflakeRepository, query string, createEntity EntityCreator, handleEntity EntityHandler) error {
+	rows, _, err := repo.query(query)
+	if err != nil {
+		return err
+	}
+
+	for rows.Next() {
+		entity := createEntity()
+
+		err = scanRow(rows, entity)
+
+		if err != nil {
+			return err
+		}
+
+		err = handleEntity(entity)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, error) {
@@ -625,14 +685,59 @@ func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []s
 }
 
 func getSchemasInDatabaseQuery(dbName string) string {
-	//nolint // %q does not yield expected results
-	return fmt.Sprintf(`SHOW SCHEMAS IN DATABASE "%s"`, dbName)
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.SCHEMATA`, common.FormatQuery("%s", dbName))
 }
 
-func getTablesInSchemaQuery(sfObject *common.SnowflakeObject, tableLevelObject string) string {
-	return fmt.Sprintf(`SHOW %s IN SCHEMA %s`, tableLevelObject, sfObject.GetFullName(true))
+func getTablesInDatabaseQuery(dbName string, schemaName string) string {
+	whereClause := "WHERE TABLE_TYPE != 'VIEW'"
+	if schemaName != "" {
+		whereClause += fmt.Sprintf(` AND TABLE_SCHEMA = '%s'`, schemaName)
+	}
+
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.TABLES %s`, common.FormatQuery("%s", dbName), whereClause)
 }
 
-func getColumnsInTableQuery(sfObject *common.SnowflakeObject) string {
-	return fmt.Sprintf(`SHOW COLUMNS IN TABLE %s`, sfObject.GetFullName(true))
+func getViewsInDatabaseQuery(dbName string, schemaName string) string {
+	whereClause := ""
+	if schemaName != "" {
+		whereClause += fmt.Sprintf(` WHERE TABLE_SCHEMA = '%s'`, schemaName)
+	}
+
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.VIEWS %s`, common.FormatQuery("%s", dbName), whereClause)
+}
+
+func getColumnsInDatabaseQuery(dbName string) string {
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.COLUMNS`, common.FormatQuery("%s", dbName))
+}
+
+func scanRow(rows *sql.Rows, dest interface{}) error {
+	v := reflect.ValueOf(dest)
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		return fmt.Errorf("destination must be a non-nil pointer")
+	}
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	fieldPtrs := make([]interface{}, len(columns))
+
+	for i := 0; i < len(columns); i++ {
+		fieldName := columns[i]
+		field := v.Elem().FieldByNameFunc(func(s string) bool {
+			field, _ := v.Elem().Type().FieldByName(s)
+			return field.Tag.Get("db") == fieldName
+		})
+
+		if field.IsValid() {
+			fieldPtrs[i] = field.Addr().Interface()
+		} else {
+			// If the field is not found in the struct, use a placeholder to ignore the column
+			var placeholder interface{}
+			fieldPtrs[i] = &placeholder
+		}
+	}
+
+	return rows.Scan(fieldPtrs...)
 }

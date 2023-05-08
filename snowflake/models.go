@@ -3,18 +3,77 @@ package snowflake
 import (
 	"database/sql"
 	"fmt"
+	"strings"
+
+	"github.com/raito-io/cli/base/tag"
 )
 
 // Implementation of Scanner interface for NullString
 type NullString sql.NullString
 
 // Data Source
+
 type DbEntity struct {
 	Name    string  `db:"name"`
 	Comment *string `db:"comment"`
 }
 
+type SchemaEntity struct {
+	Database string  `db:"CATALOG_NAME"`
+	Name     string  `db:"SCHEMA_NAME"`
+	Comment  *string `db:"COMMENT"`
+}
+
+type TagEntity struct {
+	Database string  `db:"OBJECT_DATABASE"`
+	Schema   *string `db:"OBJECT_SCHEMA"`
+	Name     string  `db:"OBJECT_NAME"`
+	Domain   string  `db:"DOMAIN"`
+	TagName  string  `db:"TAG_NAME"`
+	TagValue string  `db:"TAG_VALUE"`
+	Column   *string `db:"COLUMN_NAME"`
+}
+
+func (t *TagEntity) CreateTag() *tag.Tag {
+	return &tag.Tag{
+		Key:    t.TagName,
+		Value:  t.TagValue,
+		Source: TagSource,
+	}
+}
+
+func (t *TagEntity) GetFullName() string {
+	switch strings.ToUpper(t.Domain) {
+	case "DATABASE":
+		return t.Database
+	case "SCHEMA":
+		return t.Database + "." + t.Name
+	case "TABLE":
+		return t.Database + "." + *t.Schema + "." + t.Name
+	case "COLUMN":
+		return t.Database + "." + *t.Schema + "." + t.Name + "." + *t.Column
+	}
+
+	return ""
+}
+
+type TableEntity struct {
+	Database string  `db:"TABLE_CATALOG"`
+	Schema   string  `db:"TABLE_SCHEMA"`
+	Name     string  `db:"TABLE_NAME"`
+	Comment  *string `db:"COMMENT"`
+}
+
+type ColumnEntity struct {
+	Database string  `db:"TABLE_CATALOG"`
+	Schema   string  `db:"TABLE_SCHEMA"`
+	Table    string  `db:"TABLE_NAME"`
+	Name     string  `db:"COLUMN_NAME"`
+	Comment  *string `db:"COMMENT"`
+}
+
 // Identity Store
+
 type UserEntity struct {
 	Name        string `db:"name"`
 	LoginName   string `db:"login_name"`

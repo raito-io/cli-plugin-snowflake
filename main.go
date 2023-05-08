@@ -50,6 +50,7 @@ func main() {
 					{Name: "sf-external-identity-store-owners", Description: "The optional comma-separated list of owners of SCIM integrations with external identity stores (e.g. Okta or Active Directory). Roles which are imported from groups from these identity stores will be partially or fully locked in Raito to avoid a conflict with the SCIM integration.", Mandatory: false},
 					{Name: "sf-link-to-external-identity-store-groups", Description: "This boolean parameter can be set when the 'sf-external-identity-store-owners' parameter is set. When 'true', the 'who' of roles coming from the external access provider will refer to the group of the external access provider and the 'what' of the access provider will still be editable in Raito Cloud. When 'false' (default) the 'who' will contain the unpacked users of the group and the access provider in Raito Cloud will be locked entirely.", Mandatory: false},
 					{Name: "sf-standard-edition", Description: "If set enterprise features will be disabled", Mandatory: false},
+					{Name: "sf-skip-tags", Description: "If set, tags will not be fetched", Mandatory: false},
 				},
 			},
 		})
