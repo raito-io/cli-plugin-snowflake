@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli/base/tag"
 
 	ds "github.com/raito-io/cli/base/data_source"
@@ -26,10 +27,12 @@ type dataSourceRepository interface {
 	GetViewsInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTags(databaseName string) (map[string][]*tag.Tag, error)
+	ExecuteGrant(perm, on, role string) error
 }
 
 type DataSourceSyncer struct {
 	repoProvider func(params map[string]string, role string) (dataSourceRepository, error)
+	SfSyncRole   string
 }
 
 func NewDataSourceSyncer() *DataSourceSyncer {
@@ -58,6 +61,8 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	if err != nil {
 		return err
 	}
+
+	s.SfSyncRole = configParams.GetStringWithDefault(SfRole, "ACCOUNTADMIN")
 
 	dataSourceHandler.SetDataSourceName(sfAccount)
 	dataSourceHandler.SetDataSourceFullname(sfAccount)
@@ -274,6 +279,23 @@ func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedData
 		})
 	if err != nil {
 		return nil, err
+	}
+
+	// grant the SYNC role USAGE/IMPORTED PRIVILEGES on each database so it can query the INFORMATION_SCHEMA
+	if s.SfSyncRole != "ACCOUNTADMIN" {
+		for _, db := range databases {
+			err := repo.ExecuteGrant("USAGE", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+
+			if err != nil && strings.Contains(err.Error(), "IMPORTED PRIVILEGES") {
+				err2 := repo.ExecuteGrant("IMPORTED PRIVILEGES", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+
+				if err2 != nil {
+					return nil, err2
+				}
+			} else if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return databases, nil
