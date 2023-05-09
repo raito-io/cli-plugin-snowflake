@@ -326,7 +326,7 @@ func (repo *SnowflakeRepository) RevokeUsersFromRole(ctx context.Context, role s
 }
 
 func (repo *SnowflakeRepository) ExecuteGrant(perm, on, role string) error {
-	if repo.isProtectedRoleName(role) && !strings.EqualFold(perm, "USAGE") {
+	if repo.isProtectedRoleName(role) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
 		return nil
 	}

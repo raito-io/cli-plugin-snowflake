@@ -3,9 +3,10 @@ package snowflake
 import (
 	"context"
 	"fmt"
-	"github.com/raito-io/cli/base/tag"
 	"testing"
 	"time"
+
+	"github.com/raito-io/cli/base/tag"
 
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
@@ -305,6 +306,9 @@ func TestDataSourceSyncer_SyncDataSource_readDatabases(t *testing.T) {
 	repoMock.EXPECT().GetDataBases().Return([]DbEntity{
 		{Name: "DB1"}, {Name: "ExcludeDatabase1"}, {Name: "DB2"}, {Name: "ExcludeDatabase2"},
 	}, nil).Once()
+
+	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB1", "").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB2", "").Return(nil).Once()
 
 	syncer := createSyncer(nil)
 
