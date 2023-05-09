@@ -132,6 +132,8 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 					if strings.Contains(err.Error(), "Insufficient privileges to operate on table") {
 						logger.Warn(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito. The snowflake user should either have OWNERSHIP or SELECT permissions on the underlying table", view.Name))
 						logger.Debug(fmt.Sprintf("Privileges error: %s", err.Error()))
+					} else if strings.Contains(err.Error(), "Invalid materialized view") {
+						logger.Warn(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito. This view is no longer valid.", view.Name))
 					} else {
 						logger.Error(fmt.Sprintf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error()))
 						return fmt.Errorf("error while syncing columns for view %q between Snowflake and Raito: %s", view.Name, err.Error())
