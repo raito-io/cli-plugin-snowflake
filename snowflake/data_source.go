@@ -151,12 +151,6 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 		if err != nil {
 			return err
 		}
-
-		err = s.cleanDatabasePermissions(repo, database)
-
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -296,19 +290,6 @@ func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, d
 			if err2 != nil {
 				return err2
 			}
-		}
-	}
-
-	return nil
-}
-
-func (s *DataSourceSyncer) cleanDatabasePermissions(repo dataSourceRepository, db DbEntity) error {
-	// grant the SYNC role USAGE/IMPORTED PRIVILEGES on each database so it can query the INFORMATION_SCHEMA
-	if s.SfSyncRole != AccountAdmin {
-		err := repo.ExecuteRevoke("SELECT", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
-
-		if err != nil && !strings.Contains(err.Error(), "IMPORTED PRIVILEGES") {
-			return err
 		}
 	}
 
