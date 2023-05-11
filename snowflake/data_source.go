@@ -14,6 +14,8 @@ import (
 	"github.com/raito-io/cli/base/wrappers"
 )
 
+const AccountAdmin = "ACCOUNTADMIN"
+
 //go:generate go run github.com/vektra/mockery/v2 --name=dataSourceRepository --with-expecter --inpackage
 type dataSourceRepository interface {
 	Close() error
@@ -28,6 +30,7 @@ type dataSourceRepository interface {
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTags(databaseName string) (map[string][]*tag.Tag, error)
 	ExecuteGrant(perm, on, role string) error
+	ExecuteRevoke(perm, on, role string) error
 }
 
 type DataSourceSyncer struct {
@@ -62,7 +65,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 		return err
 	}
 
-	s.SfSyncRole = configParams.GetStringWithDefault(SfRole, "ACCOUNTADMIN")
+	s.SfSyncRole = configParams.GetStringWithDefault(SfRole, AccountAdmin)
 
 	dataSourceHandler.SetDataSourceName(sfAccount)
 	dataSourceHandler.SetDataSourceFullname(sfAccount)
@@ -107,6 +110,12 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	databases = append(databases, shares...)
 
 	for _, database := range databases {
+		err := s.setupDatabasePermissions(repo, database)
+
+		if err != nil {
+			return err
+		}
+
 		doTypePrefix := ""
 		if _, f := sharesMap[database.Name]; f {
 			doTypePrefix = "shared-"
@@ -139,6 +148,12 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 		}
 
 		err = s.readColumnsInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix, tagMap)
+		if err != nil {
+			return err
+		}
+
+		err = s.cleanDatabasePermissions(repo, database)
+
 		if err != nil {
 			return err
 		}
@@ -256,6 +271,50 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSch
 	})
 }
 
+func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, db DbEntity) error {
+	// grant the SYNC role USAGE/IMPORTED PRIVILEGES on each database so it can query the INFORMATION_SCHEMA
+	if s.SfSyncRole != AccountAdmin {
+		err := repo.ExecuteGrant("USAGE", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+
+		if err != nil && strings.Contains(err.Error(), "IMPORTED PRIVILEGES") {
+			err2 := repo.ExecuteGrant("IMPORTED PRIVILEGES", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+
+			if err2 != nil {
+				return err2
+			}
+		} else if err != nil {
+			return err
+		} else {
+			err2 := repo.ExecuteGrant("USAGE", fmt.Sprintf("ALL SCHEMAS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+
+			if err2 != nil {
+				return err2
+			}
+
+			err2 = repo.ExecuteGrant("SELECT", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+
+			if err2 != nil {
+				return err2
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *DataSourceSyncer) cleanDatabasePermissions(repo dataSourceRepository, db DbEntity) error {
+	// grant the SYNC role USAGE/IMPORTED PRIVILEGES on each database so it can query the INFORMATION_SCHEMA
+	if s.SfSyncRole != AccountAdmin {
+		err := repo.ExecuteRevoke("SELECT", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+
+		if err != nil && !strings.Contains(err.Error(), "IMPORTED PRIVILEGES") {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler, shares map[string]struct{}) ([]DbEntity, error) {
 	databases, err := repo.GetDataBases()
 	if err != nil {
@@ -279,29 +338,6 @@ func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedData
 		})
 	if err != nil {
 		return nil, err
-	}
-
-	// grant the SYNC role USAGE/IMPORTED PRIVILEGES on each database so it can query the INFORMATION_SCHEMA
-	if s.SfSyncRole != "ACCOUNTADMIN" {
-		for _, db := range databases {
-			err := repo.ExecuteGrant("USAGE", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
-
-			if err != nil && strings.Contains(err.Error(), "IMPORTED PRIVILEGES") {
-				err2 := repo.ExecuteGrant("IMPORTED PRIVILEGES", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
-
-				if err2 != nil {
-					return nil, err2
-				}
-			} else if err != nil {
-				return nil, err
-			} else {
-				err2 := repo.ExecuteGrant("USAGE", fmt.Sprintf("ALL SCHEMAS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
-
-				if err2 != nil {
-					return nil, err2
-				}
-			}
-		}
 	}
 
 	return databases, nil

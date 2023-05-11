@@ -307,11 +307,6 @@ func TestDataSourceSyncer_SyncDataSource_readDatabases(t *testing.T) {
 		{Name: "DB1"}, {Name: "ExcludeDatabase1"}, {Name: "DB2"}, {Name: "ExcludeDatabase2"},
 	}, nil).Once()
 
-	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB1", "").Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrant("USAGE", "ALL SCHEMAS IN DATABASE DB1", "").Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB2", "").Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrant("USAGE", "ALL SCHEMAS IN DATABASE DB2", "").Return(nil).Once()
-
 	syncer := createSyncer(nil)
 
 	//When

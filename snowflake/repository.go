@@ -326,7 +326,7 @@ func (repo *SnowflakeRepository) RevokeUsersFromRole(ctx context.Context, role s
 }
 
 func (repo *SnowflakeRepository) ExecuteGrant(perm, on, role string) error {
-	if repo.isProtectedRoleName(role) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") {
+	if repo.isProtectedRoleName(role) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "SELECT") {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
 		return nil
 	}
@@ -345,7 +345,7 @@ func (repo *SnowflakeRepository) ExecuteGrant(perm, on, role string) error {
 }
 
 func (repo *SnowflakeRepository) ExecuteRevoke(perm, on, role string) error {
-	if repo.isProtectedRoleName(role) {
+	if repo.isProtectedRoleName(role) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "SELECT") {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
 		return nil
 	}
