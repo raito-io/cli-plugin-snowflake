@@ -107,6 +107,50 @@ func (_c *mockDataSourceRepository_ExecuteGrant_Call) RunAndReturn(run func(stri
 	return _c
 }
 
+// ExecuteRevoke provides a mock function with given fields: perm, on, role
+func (_m *mockDataSourceRepository) ExecuteRevoke(perm string, on string, role string) error {
+	ret := _m.Called(perm, on, role)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(perm, on, role)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataSourceRepository_ExecuteRevoke_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteRevoke'
+type mockDataSourceRepository_ExecuteRevoke_Call struct {
+	*mock.Call
+}
+
+// ExecuteRevoke is a helper method to define mock.On call
+//   - perm string
+//   - on string
+//   - role string
+func (_e *mockDataSourceRepository_Expecter) ExecuteRevoke(perm interface{}, on interface{}, role interface{}) *mockDataSourceRepository_ExecuteRevoke_Call {
+	return &mockDataSourceRepository_ExecuteRevoke_Call{Call: _e.mock.On("ExecuteRevoke", perm, on, role)}
+}
+
+func (_c *mockDataSourceRepository_ExecuteRevoke_Call) Run(run func(perm string, on string, role string)) *mockDataSourceRepository_ExecuteRevoke_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataSourceRepository_ExecuteRevoke_Call) Return(_a0 error) *mockDataSourceRepository_ExecuteRevoke_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataSourceRepository_ExecuteRevoke_Call) RunAndReturn(run func(string, string, string) error) *mockDataSourceRepository_ExecuteRevoke_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetColumnsInDatabase provides a mock function with given fields: databaseName, handleEntity
 func (_m *mockDataSourceRepository) GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error {
 	ret := _m.Called(databaseName, handleEntity)
