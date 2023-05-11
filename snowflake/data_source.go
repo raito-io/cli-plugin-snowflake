@@ -294,6 +294,12 @@ func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedData
 				}
 			} else if err != nil {
 				return nil, err
+			} else {
+				err2 := repo.ExecuteGrant("USAGE", fmt.Sprintf("ALL SCHEMAS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+
+				if err2 != nil {
+					return nil, err2
+				}
 			}
 		}
 	}
