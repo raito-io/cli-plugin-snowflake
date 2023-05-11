@@ -72,6 +72,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 
 	standard := configParams.GetBoolWithDefault(SfStandardEdition, false)
 	skipTags := configParams.GetBoolWithDefault(SfSkipTags, false)
+	skipColumns := configParams.GetBoolWithDefault(SfSkipColumns, false)
 
 	excludedDatabases := ""
 	if v, ok := configParams.Parameters[SfExcludedDatabases]; ok {
@@ -130,8 +131,6 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 			}
 		}
 
-		logger.Info(fmt.Sprintf("Found tags for database %s: %+v", database.Name, tagMap))
-
 		err = s.readSchemasInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix, tagMap)
 		if err != nil {
 			return err
@@ -147,9 +146,11 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 			return err
 		}
 
-		err = s.readColumnsInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix, tagMap)
-		if err != nil {
-			return err
+		if !skipColumns {
+			err = s.readColumnsInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix, tagMap)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

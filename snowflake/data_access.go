@@ -99,12 +99,19 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 		return err
 	}
 
-	if !configMap.GetBoolWithDefault(SfStandardEdition, false) {
-		logger.Info("Reading masking policies from Snowflake")
+	skipColumns := configMap.GetBoolWithDefault(SfSkipColumns, false)
+	standardEdition := configMap.GetBoolWithDefault(SfStandardEdition, false)
 
-		err = s.importMaskingPolicies(accessProviderHandler, repo)
-		if err != nil {
-			return err
+	if !standardEdition {
+		if !skipColumns {
+			logger.Info("Reading masking policies from Snowflake")
+
+			err = s.importMaskingPolicies(accessProviderHandler, repo)
+			if err != nil {
+				return err
+			}
+		} else {
+			logger.Info("Skipping masking policies")
 		}
 
 		logger.Info("Reading row access policies from Snowflake")
@@ -113,6 +120,8 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 		if err != nil {
 			return err
 		}
+	} else {
+		logger.Info("Skipping masking policies and row access policies due to Snowflake Standard Edition.")
 	}
 
 	return nil
