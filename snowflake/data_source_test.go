@@ -308,7 +308,9 @@ func TestDataSourceSyncer_SyncDataSource_readDatabases(t *testing.T) {
 	}, nil).Once()
 
 	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB1", "").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("USAGE", "ALL SCHEMAS IN DATABASE DB1", "").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB2", "").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("USAGE", "ALL SCHEMAS IN DATABASE DB2", "").Return(nil).Once()
 
 	syncer := createSyncer(nil)
 
