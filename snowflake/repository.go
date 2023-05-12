@@ -558,10 +558,22 @@ func (repo *SnowflakeRepository) GetColumnsInDatabase(databaseName string, handl
 	}, handleEntity)
 }
 
-func (repo *SnowflakeRepository) CommentIfExists(comment, objectType, objectName string) error {
-	q := fmt.Sprintf(`COMMENT IF EXISTS ON %s %s IS '%s'`, objectType, objectName, comment)
-
+func (repo *SnowflakeRepository) CommentRoleIfExists(comment, objectName string) error {
+	q := fmt.Sprintf(`COMMENT IF EXISTS ON ROLE %s IS '%s'`, common.FormatQuery("%s", objectName), comment)
 	_, _, err := repo.query(q)
+
+	if err == nil {
+		return nil
+	}
+
+	ownershipQuery := common.FormatQuery(`GRANT OWNERSHIP ON ROLE %s TO ROLE %s`, objectName, repo.role)
+	_, _, err = repo.query(ownershipQuery)
+
+	if err != nil {
+		logger.Warn(fmt.Sprintf("error while trying to change ownership for role '%s': %s ", objectName, err.Error()))
+	}
+
+	_, _, err = repo.query(q)
 
 	return err
 }

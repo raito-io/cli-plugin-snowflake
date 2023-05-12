@@ -694,7 +694,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_NonExistin
 	roleName := fmt.Sprintf("%s_REPO_TEST_COMMENT_NON_EXISTING_ROLE", testId)
 
 	//When
-	err := s.repo.CommentIfExists("SomeComment", "ROLE", roleName)
+	err := s.repo.CommentRoleIfExists("SomeComment", roleName)
 
 	//Then
 	s.NoError(err)
@@ -708,7 +708,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_Role() {
 	comment := "Some comment"
 
 	//When
-	err = s.repo.CommentIfExists(comment, "ROLE", roleName)
+	err = s.repo.CommentRoleIfExists(comment, roleName)
 
 	//Then
 	s.NoError(err)
