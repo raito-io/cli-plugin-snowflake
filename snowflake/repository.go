@@ -562,17 +562,15 @@ func (repo *SnowflakeRepository) CommentIfExists(comment, objectType, objectName
 	q := fmt.Sprintf(`COMMENT IF EXISTS ON %s %s IS '%s'`, objectType, common.FormatQuery("%s", objectName), comment)
 	_, _, err := repo.query(q)
 
-	if err == nil {
-		return nil
+	if err == nil || objectType != "ROLE" {
+		return err
 	}
 
-	if objectType == "ROLE" && strings.Contains(err.Error(), "Insufficient privileges to operate on role") {
-		ownershipQuery := common.FormatQuery(`GRANT OWNERSHIP ON ROLE %s TO ROLE %s`, objectName, repo.role)
-		_, _, err = repo.query(ownershipQuery)
+	ownershipQuery := common.FormatQuery(`GRANT OWNERSHIP ON ROLE %s TO ROLE %s`, objectName, repo.role)
+	_, _, err = repo.query(ownershipQuery)
 
-		if err != nil {
-			return err
-		}
+	if err != nil {
+		logger.Warn(fmt.Sprintf("error while trying to change ownership for role '%s': %s ", objectName, err.Error()))
 	}
 
 	_, _, err = repo.query(q)
