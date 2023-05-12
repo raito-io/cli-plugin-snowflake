@@ -559,19 +559,23 @@ func (repo *SnowflakeRepository) GetColumnsInDatabase(databaseName string, handl
 }
 
 func (repo *SnowflakeRepository) CommentIfExists(comment, objectType, objectName string) error {
-	objectNameFormatted := common.FormatQuery("%s", objectName)
-	if objectType == "ROLE" {
-		q := common.FormatQuery(`GRANT OWNERSHIP ON ROLE %s TO ROLE %s`, objectNameFormatted, repo.role)
-		_, _, err := repo.query(q)
+	q := fmt.Sprintf(`COMMENT IF EXISTS ON %s %s IS '%s'`, objectType, common.FormatQuery("%s", objectName), comment)
+	_, _, err := repo.query(q)
+
+	if err == nil {
+		return nil
+	}
+
+	if objectType == "ROLE" && strings.Contains(err.Error(), "Insufficient privileges to operate on role") {
+		ownershipQuery := common.FormatQuery(`GRANT OWNERSHIP ON ROLE %s TO ROLE %s`, objectName, repo.role)
+		_, _, err = repo.query(ownershipQuery)
 
 		if err != nil {
 			return err
 		}
 	}
 
-	q := fmt.Sprintf(`COMMENT IF EXISTS ON %s %s IS '%s'`, objectType, objectNameFormatted, comment)
-
-	_, _, err := repo.query(q)
+	_, _, err = repo.query(q)
 
 	return err
 }
