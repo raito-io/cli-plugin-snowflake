@@ -59,7 +59,7 @@ type dataAccessRepository interface {
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetViewsInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
-	CommentIfExists(comment, objectType, objectName string) error
+	CommentRoleIfExists(comment, objectName string) error
 	GrantUsersToRole(ctx context.Context, role string, users ...string) error
 	RevokeUsersFromRole(ctx context.Context, role string, users ...string) error
 	GrantRolesToRole(ctx context.Context, role string, roles ...string) error
@@ -664,7 +664,7 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 		if _, f := existingRoles[rn]; f {
 			logger.Info(fmt.Sprintf("Merging role %q", rn))
 
-			err := repo.CommentIfExists(createComment(accessProvider, true), "ROLE", rn)
+			err := repo.CommentRoleIfExists(createComment(accessProvider, true), rn)
 			if err != nil {
 				return fmt.Errorf("error while updating comment on role %q: %s", rn, err.Error())
 			}
@@ -781,7 +781,7 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 				}
 
 				// Updating the comment (independent of creation)
-				err = repo.CommentIfExists(createComment(accessProvider, false), "ROLE", rn)
+				err = repo.CommentRoleIfExists(createComment(accessProvider, false), rn)
 				if err != nil {
 					return fmt.Errorf("error while updating comment on role %q: %s", rn, err.Error())
 				}

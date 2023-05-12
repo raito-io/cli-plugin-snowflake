@@ -63,13 +63,13 @@ func (_c *mockDataAccessRepository_Close_Call) RunAndReturn(run func() error) *m
 	return _c
 }
 
-// CommentIfExists provides a mock function with given fields: comment, objectType, objectName
-func (_m *mockDataAccessRepository) CommentIfExists(comment string, objectType string, objectName string) error {
-	ret := _m.Called(comment, objectType, objectName)
+// CommentRoleIfExists provides a mock function with given fields: comment, objectName
+func (_m *mockDataAccessRepository) CommentRoleIfExists(comment string, objectName string) error {
+	ret := _m.Called(comment, objectName)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(comment, objectType, objectName)
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(comment, objectName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -77,32 +77,31 @@ func (_m *mockDataAccessRepository) CommentIfExists(comment string, objectType s
 	return r0
 }
 
-// mockDataAccessRepository_CommentIfExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CommentIfExists'
-type mockDataAccessRepository_CommentIfExists_Call struct {
+// mockDataAccessRepository_CommentRoleIfExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CommentRoleIfExists'
+type mockDataAccessRepository_CommentRoleIfExists_Call struct {
 	*mock.Call
 }
 
-// CommentIfExists is a helper method to define mock.On call
+// CommentRoleIfExists is a helper method to define mock.On call
 //   - comment string
-//   - objectType string
 //   - objectName string
-func (_e *mockDataAccessRepository_Expecter) CommentIfExists(comment interface{}, objectType interface{}, objectName interface{}) *mockDataAccessRepository_CommentIfExists_Call {
-	return &mockDataAccessRepository_CommentIfExists_Call{Call: _e.mock.On("CommentIfExists", comment, objectType, objectName)}
+func (_e *mockDataAccessRepository_Expecter) CommentRoleIfExists(comment interface{}, objectName interface{}) *mockDataAccessRepository_CommentRoleIfExists_Call {
+	return &mockDataAccessRepository_CommentRoleIfExists_Call{Call: _e.mock.On("CommentRoleIfExists", comment, objectName)}
 }
 
-func (_c *mockDataAccessRepository_CommentIfExists_Call) Run(run func(comment string, objectType string, objectName string)) *mockDataAccessRepository_CommentIfExists_Call {
+func (_c *mockDataAccessRepository_CommentRoleIfExists_Call) Run(run func(comment string, objectName string)) *mockDataAccessRepository_CommentRoleIfExists_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string))
+		run(args[0].(string), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *mockDataAccessRepository_CommentIfExists_Call) Return(_a0 error) *mockDataAccessRepository_CommentIfExists_Call {
+func (_c *mockDataAccessRepository_CommentRoleIfExists_Call) Return(_a0 error) *mockDataAccessRepository_CommentRoleIfExists_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_CommentIfExists_Call) RunAndReturn(run func(string, string, string) error) *mockDataAccessRepository_CommentIfExists_Call {
+func (_c *mockDataAccessRepository_CommentRoleIfExists_Call) RunAndReturn(run func(string, string) error) *mockDataAccessRepository_CommentRoleIfExists_Call {
 	_c.Call.Return(run)
 	return _c
 }
