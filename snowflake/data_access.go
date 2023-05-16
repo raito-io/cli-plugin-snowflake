@@ -251,6 +251,20 @@ func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProvide
 
 	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
 
+	excludedRoleList := ""
+	if v, ok := configMap.Parameters[SfExcludedRoles]; ok {
+		excludedRoleList = v
+	}
+
+	excludedRoles := make(map[string]struct{})
+
+	if excludedRoleList != "" {
+		for _, e := range strings.Split(excludedRoleList, ",") {
+			e = strings.TrimSpace(e)
+			excludedRoles[e] = struct{}{}
+		}
+	}
+
 	shares, err := getShareNames(repo)
 	if err != nil {
 		return err
@@ -264,6 +278,11 @@ func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProvide
 	accessProviderMap := make(map[string]*exporter.AccessProvider)
 
 	for _, roleEntity := range roleEntities {
+		if _, exclude := excludedRoles[roleEntity.Name]; exclude {
+			logger.Info("Skipping SnowFlake ROLE " + roleEntity.Name)
+			continue
+		}
+
 		err = s.importAccessForRole(roleEntity, externalGroupOwners, linkToExternalIdentityStoreGroups, repo, accessProviderMap, shares, accessProviderHandler)
 		if err != nil {
 			return err
