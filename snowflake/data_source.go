@@ -570,6 +570,11 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Permission:  "USAGE",
 						Description: "Enables using a virtual warehouse and, as a result, executing queries on the warehouse. If the warehouse is configured to auto-resume when a SQL statement (e.g. query) is submitted to it, the warehouse resumes automatically and executes the statement.",
 					},
+					{
+						Permission:             "OWNERSHIP",
+						Description:            "Grants full control over a warehouse. Only a single role can hold this privilege on a specific object at a time.",
+						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
+					},
 				},
 				Children: []string{},
 			},
@@ -582,8 +587,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Description: "Enables creating a new schema in a database, including cloning a schema.",
 					},
 					{
-						Permission:  "USAGE",
-						Description: "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
+						Permission:             "USAGE",
+						Description:            "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
+						UsageGlobalPermissions: []string{ds.Read},
 					},
 					{
 						Permission:  "MODIFY",
@@ -592,6 +598,11 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 					{
 						Permission:  "MONITOR",
 						Description: "Enables performing the DESCRIBE command on the database.",
+					},
+					{
+						Permission:             "OWNERSHIP",
+						Description:            "Grants full control over the database. Only a single role can hold this privilege on a specific object at a time.",
+						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
 					},
 				},
 				Children: []string{ds.Schema},
@@ -609,8 +620,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Description: "Enables performing the DESCRIBE command on the schema.",
 					},
 					{
-						Permission:  "USAGE",
-						Description: "Enables using a schema, including returning the schema details in the SHOW SCHEMAS command output. To execute SHOW <objects> commands for objects (tables, views, stages, file formats, sequences, pipes, or functions) in the schema, a role must have at least one privilege granted on the object.",
+						Permission:             "USAGE",
+						Description:            "Enables using a schema, including returning the schema details in the SHOW SCHEMAS command output. To execute SHOW <objects> commands for objects (tables, views, stages, file formats, sequences, pipes, or functions) in the schema, a role must have at least one privilege granted on the object.",
+						UsageGlobalPermissions: []string{ds.Read},
 					},
 					{
 						Permission:  "CREATE TABLE",
@@ -680,6 +692,11 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Permission:  "ADD SEARCH OPTIMIZATION",
 						Description: "Enables adding search optimization to a table in a schema.",
 					},
+					{
+						Permission:             "OWNERSHIP",
+						Description:            "Grants full control over the schema. Only a single role can hold this privilege on a specific object at a time.",
+						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
+					},
 				},
 				Children: []string{ds.Table, ds.View},
 			},
@@ -688,33 +705,58 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 				Type: ds.Table,
 				Permissions: []*ds.DataObjectTypePermission{
 					{
-						Permission:        "SELECT",
-						Description:       "Enables executing a SELECT statement on a table.",
-						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
+						Permission:             "SELECT",
+						Description:            "Enables executing a SELECT statement on a table.",
+						UsageGlobalPermissions: []string{ds.Read},
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
 					},
 					{
-						Permission:        "INSERT",
-						Description:       "Enables executing an INSERT command on a table. Also enables using the ALTER TABLE command with a RECLUSTER clause to manually recluster a table with a clustering key.",
-						GlobalPermissions: ds.InsertGlobalPermission().StringValues(),
+						Permission:             "INSERT",
+						Description:            "Enables executing an INSERT command on a table. Also enables using the ALTER TABLE command with a RECLUSTER clause to manually recluster a table with a clustering key.",
+						UsageGlobalPermissions: []string{ds.Write},
+						GlobalPermissions:      ds.InsertGlobalPermission().StringValues(),
 					},
 					{
-						Permission:        "UPDATE",
-						Description:       "Enables executing an UPDATE command on a table.",
-						GlobalPermissions: ds.UpdateGlobalPermission().StringValues(),
+						Permission:             "UPDATE",
+						Description:            "Enables executing an UPDATE command on a table.",
+						UsageGlobalPermissions: []string{ds.Write},
+						GlobalPermissions:      ds.UpdateGlobalPermission().StringValues(),
 					},
 					{
-						Permission:        "TRUNCATE",
-						Description:       "Enables executing a TRUNCATE TABLE command on a table.",
-						GlobalPermissions: ds.DeleteGlobalPermission().StringValues(),
+						Permission:             "TRUNCATE",
+						Description:            "Enables executing a TRUNCATE TABLE command on a table.",
+						UsageGlobalPermissions: []string{ds.Write},
+						GlobalPermissions:      ds.DeleteGlobalPermission().StringValues(),
 					},
 					{
-						Permission:        "DELETE",
-						Description:       "Enables executing a DELETE command on a table.",
-						GlobalPermissions: ds.DeleteGlobalPermission().StringValues(),
+						Permission:             "DELETE",
+						Description:            "Enables executing a DELETE command on a table.",
+						UsageGlobalPermissions: []string{ds.Write},
+						GlobalPermissions:      ds.DeleteGlobalPermission().StringValues(),
 					},
 					{
-						Permission:  "REFERENCES",
-						Description: "Enables referencing a table as the unique/primary key table for a foreign key constraint. Also enables viewing the structure of a table (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
+						Permission:             "REFERENCES",
+						UsageGlobalPermissions: []string{ds.Admin},
+						Description:            "Enables referencing a table as the unique/primary key table for a foreign key constraint. Also enables viewing the structure of a table (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
+					},
+					{
+						Permission:             "OWNERSHIP",
+						Description:            "Grants full control over the table. Required to alter most properties of a table, with the exception of reclustering. Only a single role can hold this privilege on a specific object at a time. Note that in a managed access schema, only the schema owner (i.e. the role with the OWNERSHIP privilege on the schema) or a role with the MANAGE GRANTS privilege can grant or revoke privileges on objects in the schema, including future grants.",
+						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
+					},
+				},
+				Actions: []*ds.DataObjectTypeAction{
+					{
+						Action:        "SELECT",
+						GlobalActions: []string{ds.Read},
+					},
+					{
+						Action:        "INSERT",
+						GlobalActions: []string{ds.Write},
+					},
+					{
+						Action:        "UPDATE",
+						GlobalActions: []string{ds.Write},
 					},
 				},
 				Children: []string{ds.Column},
@@ -724,13 +766,33 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 				Type: ds.View,
 				Permissions: []*ds.DataObjectTypePermission{
 					{
-						Permission:        "SELECT",
-						Description:       "Enables executing a SELECT statement on a view.",
-						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
+						Permission:             "SELECT",
+						Description:            "Enables executing a SELECT statement on a view.",
+						UsageGlobalPermissions: []string{ds.Read},
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
 					},
 					{
 						Permission:  "REFERENCES",
 						Description: "Enables viewing the structure of a view (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
+					},
+					{
+						Permission:             "OWNERSHIP",
+						Description:            "Grants full control over the view. Required to alter a view. Only a single role can hold this privilege on a specific object at a time. Note that in a managed access schema, only the schema owner (i.e. the role with the OWNERSHIP privilege on the schema) or a role with the MANAGE GRANTS privilege can grant or revoke privileges on objects in the schema, including future grants.",
+						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
+					},
+				},
+				Actions: []*ds.DataObjectTypeAction{
+					{
+						Action:        "SELECT",
+						GlobalActions: []string{ds.Read},
+					},
+					{
+						Action:        "INSERT",
+						GlobalActions: []string{ds.Write},
+					},
+					{
+						Action:        "UPDATE",
+						GlobalActions: []string{ds.Write},
 					},
 				},
 				Children: []string{ds.Column},
@@ -770,6 +832,19 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 			{
 				Name: "shared-" + ds.Column,
 				Type: ds.Column,
+			},
+		},
+		UsageMetaInfo: &ds.UsageMetaInput{
+			DefaultLevel: "table",
+			Levels: []*ds.UsageMetaInputDetail{
+				{
+					Name:            "table",
+					DataObjectTypes: []string{"table", "view"},
+				},
+				{
+					Name:            "schema",
+					DataObjectTypes: []string{"schema"},
+				},
 			},
 		},
 	}, nil
