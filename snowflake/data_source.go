@@ -574,6 +574,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Permission:             "OWNERSHIP",
 						Description:            "Grants full control over a warehouse. Only a single role can hold this privilege on a specific object at a time.",
 						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
+						CannotBeGranted:        true,
 					},
 				},
 				Children: []string{},
@@ -587,9 +588,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Description: "Enables creating a new schema in a database, including cloning a schema.",
 					},
 					{
-						Permission:             "USAGE",
-						Description:            "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
-						UsageGlobalPermissions: []string{ds.Read},
+						Permission:      "USAGE",
+						Description:     "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
+						CannotBeGranted: true,
 					},
 					{
 						Permission:  "MODIFY",
@@ -603,6 +604,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Permission:             "OWNERSHIP",
 						Description:            "Grants full control over the database. Only a single role can hold this privilege on a specific object at a time.",
 						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
+						CannotBeGranted:        true,
 					},
 				},
 				Children: []string{ds.Schema},
@@ -620,9 +622,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Description: "Enables performing the DESCRIBE command on the schema.",
 					},
 					{
-						Permission:             "USAGE",
-						Description:            "Enables using a schema, including returning the schema details in the SHOW SCHEMAS command output. To execute SHOW <objects> commands for objects (tables, views, stages, file formats, sequences, pipes, or functions) in the schema, a role must have at least one privilege granted on the object.",
-						UsageGlobalPermissions: []string{ds.Read},
+						Permission:      "USAGE",
+						Description:     "Enables using a schema, including returning the schema details in the SHOW SCHEMAS command output. To execute SHOW <objects> commands for objects (tables, views, stages, file formats, sequences, pipes, or functions) in the schema, a role must have at least one privilege granted on the object.",
+						CannotBeGranted: true,
 					},
 					{
 						Permission:  "CREATE TABLE",
@@ -696,6 +698,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Permission:             "OWNERSHIP",
 						Description:            "Grants full control over the schema. Only a single role can hold this privilege on a specific object at a time.",
 						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
+						CannotBeGranted:        true,
 					},
 				},
 				Children: []string{ds.Table, ds.View},
@@ -743,6 +746,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Permission:             "OWNERSHIP",
 						Description:            "Grants full control over the table. Required to alter most properties of a table, with the exception of reclustering. Only a single role can hold this privilege on a specific object at a time. Note that in a managed access schema, only the schema owner (i.e. the role with the OWNERSHIP privilege on the schema) or a role with the MANAGE GRANTS privilege can grant or revoke privileges on objects in the schema, including future grants.",
 						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
+						CannotBeGranted:        true,
 					},
 				},
 				Actions: []*ds.DataObjectTypeAction{
