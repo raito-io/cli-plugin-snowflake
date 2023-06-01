@@ -58,10 +58,11 @@ func (t *TagEntity) GetFullName() string {
 }
 
 type TableEntity struct {
-	Database string  `db:"TABLE_CATALOG"`
-	Schema   string  `db:"TABLE_SCHEMA"`
-	Name     string  `db:"TABLE_NAME"`
-	Comment  *string `db:"COMMENT"`
+	Database  string  `db:"TABLE_CATALOG"`
+	Schema    string  `db:"TABLE_SCHEMA"`
+	Name      string  `db:"TABLE_NAME"`
+	TableType string  `db:"TABLE_TYPE"`
+	Comment   *string `db:"COMMENT"`
 }
 
 type ColumnEntity struct {
@@ -130,7 +131,19 @@ type GrantToRole struct {
 
 type Grant struct {
 	Permissions string
-	On          string
+	// OnType represents the raito data object type of the targeted object
+	OnType string
+	On     string
+}
+
+// GetGrantOnType returns the type to use in a GRANT query.
+func (g *Grant) GetGrantOnType() string {
+	if sfType, f := raitoTypeToSnowflakeGrantType[g.OnType]; f {
+		return sfType
+	}
+
+	// By default, we take the uppercase version of the raito data object type
+	return strings.ToUpper(g.OnType)
 }
 
 type policyEntity struct {
