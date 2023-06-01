@@ -566,7 +566,7 @@ func (repo *SnowflakeRepository) CommentRoleIfExists(comment, objectName string)
 		return nil
 	}
 
-	ownershipQuery := common.FormatQuery(`GRANT OWNERSHIP ON ROLE %s TO ROLE %s`, objectName, repo.role)
+	ownershipQuery := common.FormatQuery(`GRANT OWNERSHIP ON ROLE %s TO ROLE %s REVOKE CURRENT GRANTS`, common.FormatQuery("%s", objectName), repo.role)
 	_, _, err = repo.query(ownershipQuery)
 
 	if err != nil {
