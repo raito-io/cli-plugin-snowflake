@@ -8,10 +8,17 @@ import (
 
 // raitoTypeToSnowflakeGrantType maps the Raito data objects types for tabular data onto the Snowflake names
 var raitoTypeToSnowflakeGrantType = map[string]string{
-	ds.Table:         "TABLE",
-	ds.View:          "VIEW",
-	MaterializedView: "VIEW",
-	ExternalTable:    "EXTERNAL TABLE",
+	ds.Table:          "TABLE",
+	ds.View:           "VIEW",
+	MaterializedView:  "VIEW",
+	ExternalTable:     "EXTERNAL TABLE",
+	"shared-database": "DATABASE",
+	"shared-table":    "TABLE",
+	"shared-schema":   "SCHEMA",
+}
+
+func isTableType(t string) bool {
+	return t == ds.Table || t == ds.View || t == MaterializedView || t == ExternalTable
 }
 
 // convertSnowflakeTableTypeToRaito maps the Snowflake types coming from the INFORMATION_SCHEMA views to the corresponding Raito type

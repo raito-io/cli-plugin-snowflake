@@ -105,21 +105,21 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 				{
 					DataObject: &data_source.DataObjectReference{
 						FullName: "Share2.GranteeRole1Schema",
-						Type:     "SHARED-SCHEMA",
+						Type:     "",
 					},
 					Permissions: []string{"READ"},
 				},
 				{
 					DataObject: &data_source.DataObjectReference{
 						FullName: "DB1.GranteeRole1Table",
-						Type:     "TABLE",
+						Type:     "",
 					},
 					Permissions: []string{"SELECT"},
 				},
 				{
 					DataObject: &data_source.DataObjectReference{
 						FullName: "DB1.GranteeRole1MatView",
-						Type:     "VIEW",
+						Type:     "",
 					},
 					Permissions: []string{"SELECT"},
 				},
@@ -257,14 +257,14 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 				{
 					DataObject: &data_source.DataObjectReference{
 						FullName: "Share2.GranteeRole1Schema",
-						Type:     "SHARED-SCHEMA",
+						Type:     "",
 					},
 					Permissions: []string{"READ"},
 				},
 				{
 					DataObject: &data_source.DataObjectReference{
 						FullName: "DB1.GranteeRole1Table",
-						Type:     "TABLE",
+						Type:     "",
 					},
 					Permissions: []string{"SELECT"},
 				},
@@ -387,14 +387,14 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 				{
 					DataObject: &data_source.DataObjectReference{
 						FullName: "Share2.GranteeRole1Schema",
-						Type:     "SHARED-SCHEMA",
+						Type:     "",
 					},
 					Permissions: []string{"READ"},
 				},
 				{
 					DataObject: &data_source.DataObjectReference{
 						FullName: "DB1.GranteeRole1Table",
-						Type:     "TABLE",
+						Type:     "",
 					},
 					Permissions: []string{"SELECT"},
 				},
@@ -1000,12 +1000,8 @@ func generateAccessControls_schema(t *testing.T) {
 	schema := "Schema2"
 
 	repoMock.EXPECT().GetTablesInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3"})
-		return nil
-	}).Once()
-
-	repoMock.EXPECT().GetViewsInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "View3"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3", TableType: "BASE TABLE"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "View3", TableType: "VIEW"})
 		return nil
 	}).Once()
 
@@ -1023,7 +1019,7 @@ func generateAccessControls_schema(t *testing.T) {
 				Users: []string{"User1", "User2"},
 			},
 			What: []importer.WhatItem{
-				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"READ"}},
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"SELECT"}},
 			},
 		},
 	}
@@ -1046,8 +1042,6 @@ func generateAccessControls_schema_nopropagate(t *testing.T) {
 
 	repoMock.EXPECT().ExecuteGrant("USAGE", "DATABASE DB1", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrant("USAGE", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
-	// This is wrong for snowflake, but it's just to test that we correctly don't propagate
-	repoMock.EXPECT().ExecuteGrant("SELECT", "SCHEMA DB1.Schema2", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
@@ -1135,12 +1129,8 @@ func generateAccessControls_existing_schema(t *testing.T) {
 	database := "DB1"
 	schema := "Schema2"
 	repoMock.EXPECT().GetTablesInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3"})
-		return nil
-	}).Once()
-
-	repoMock.EXPECT().GetViewsInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "View3"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3", TableType: "BASE TABLE"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "View3", TableType: "VIEW"})
 		return nil
 	}).Once()
 
@@ -1158,7 +1148,7 @@ func generateAccessControls_existing_schema(t *testing.T) {
 				Users: []string{"User1", "User2"},
 			},
 			What: []importer.WhatItem{
-				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"READ"}},
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2", Type: "schema"}, Permissions: []string{"SELECT"}},
 			},
 		},
 	}
@@ -1179,9 +1169,7 @@ func generateAccessControls_sharedDatabase(t *testing.T) {
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
 
-	repoMock.EXPECT().ExecuteGrant("DELETE", "DATABASE DB2", "RoleName1").Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrant("INSERT", "DATABASE DB2", "RoleName1").Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrant("UPDATE", "DATABASE DB2", "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrant("IMPORTED PRIVILEGES", "DATABASE DB2", "RoleName1").Return(nil).Once()
 
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
@@ -1197,7 +1185,7 @@ func generateAccessControls_sharedDatabase(t *testing.T) {
 				Users: []string{"User1", "User2"},
 			},
 			What: []importer.WhatItem{
-				{DataObject: &data_source.DataObjectReference{FullName: "DB2", Type: "shared-database"}, Permissions: []string{"WRITE"}},
+				{DataObject: &data_source.DataObjectReference{FullName: "DB2", Type: "shared-database"}, Permissions: []string{"IMPORTED PRIVILEGES"}},
 			},
 		},
 	}
@@ -1221,12 +1209,8 @@ func generateAccessControls_database(t *testing.T) {
 	database := "DB1"
 	schema := "Schema2"
 	repoMock.EXPECT().GetTablesInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3"})
-		return nil
-	}).Once()
-
-	repoMock.EXPECT().GetViewsInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "View3"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3", TableType: "BASE TABLE"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "View3", TableType: "VIEW"})
 		return nil
 	}).Once()
 
@@ -1254,7 +1238,7 @@ func generateAccessControls_database(t *testing.T) {
 				Users: []string{"User1", "User2"},
 			},
 			What: []importer.WhatItem{
-				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"READ"}},
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"SELECT"}},
 			},
 		},
 	}
@@ -1280,12 +1264,8 @@ func generateAccessControls_existing_database(t *testing.T) {
 	database := "DB1"
 	schema := "Schema2"
 	repoMock.EXPECT().GetTablesInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3"})
-		return nil
-	}).Once()
-
-	repoMock.EXPECT().GetViewsInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "View3"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3", TableType: "BASE TABLE"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "View3", TableType: "VIEW"})
 		return nil
 	}).Once()
 
@@ -1316,7 +1296,7 @@ func generateAccessControls_existing_database(t *testing.T) {
 				Users: []string{"User1", "User2"},
 			},
 			What: []importer.WhatItem{
-				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"READ"}},
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"SELECT"}},
 			},
 		},
 	}

@@ -3,7 +3,6 @@ package snowflake
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -18,19 +17,6 @@ import (
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
-
-// PermissionTarget is used as value for the PermissionMap to map a Raito permission to a list of snowflake permissions
-// and a string to use in the role name to represent the permission
-type PermissionTarget struct {
-	snowflakePermissions []string
-	// The name (typically just 1 or 2 letters) to use in the generated role name
-	roleName string
-}
-
-var PermissionMap = map[string]PermissionTarget{
-	"READ":  {snowflakePermissions: []string{"SELECT"}, roleName: "R"},
-	"WRITE": {snowflakePermissions: []string{"UPDATE", "INSERT", "DELETE"}, roleName: "W"},
-}
 
 var RolesNotinternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
 var AcceptedTypes = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "VIEW": {}, "COLUMN": {}, "SHARED-DATABASE": {}, "EXTERNAL_TABLE": {}, "MATERIALIZED_VIEW": {}}
@@ -627,18 +613,18 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 			}
 		}
 
-		// Build the expected expectedGrants
+		// Build the expected grants
 		var expectedGrants []Grant
 
 		if !ignoreWhat {
-			for whatIndex, what := range accessProvider.What {
-				permissions := getAllSnowflakePermissions(&accessProvider.What[whatIndex])
+			for _, what := range accessProvider.What {
+				permissions := what.Permissions
 
 				if len(permissions) == 0 {
 					continue
 				}
 
-				if _, f := raitoTypeToSnowflakeGrantType[what.DataObject.Type]; f {
+				if isTableType(what.DataObject.Type) {
 					grants, err := createGrantsForTableOrView(what.DataObject.Type, permissions, what.DataObject.FullName, propagateMetaData)
 					if err != nil {
 						return err
@@ -654,7 +640,7 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 					expectedGrants = append(expectedGrants, grants...)
 				} else if what.DataObject.Type == "shared-database" {
 					for _, p := range permissions {
-						expectedGrants = append(expectedGrants, Grant{p, ds.Database, what.DataObject.FullName})
+						expectedGrants = append(expectedGrants, Grant{p, "shared-database", what.DataObject.FullName})
 					}
 				} else if what.DataObject.Type == ds.Database {
 					grants, err := createGrantsForDatabase(repo, permissions, what.DataObject.FullName, propagateMetaData)
@@ -1063,39 +1049,4 @@ func createComment(ap *importer.AccessProvider, update bool) string {
 	}
 
 	return fmt.Sprintf("%s by Raito from access provider %s. %s", action, ap.Name, ap.Description)
-}
-
-// getAllSnowflakePermissions maps a Raito permission from the data access element to the list of permissions it corresponds to in Snowflake
-// The result will be sorted alphabetically
-func getAllSnowflakePermissions(what *importer.WhatItem) []string {
-	allPerms := make([]string, 0, len(what.Permissions))
-
-	for _, perm := range what.Permissions {
-		perm = strings.ToUpper(perm)
-		if strings.EqualFold(perm, "USAGE") {
-			logger.Debug("Skipping explicit USAGE permission as Raito handles this automatically")
-			continue
-		} else if strings.EqualFold(perm, "OWNERSHIP") {
-			logger.Debug("Skipping explicit OWNERSHIP permission as Raito does not manage this permission")
-			continue
-		}
-
-		allPerms = append(allPerms, getSnowflakePermissions(perm)...)
-	}
-
-	sort.Strings(allPerms)
-
-	return allPerms
-}
-
-// mapPermission maps a Raito permission to the list of permissions it corresponds to in Snowflake
-func getSnowflakePermissions(permission string) []string {
-	pt, f := PermissionMap[permission]
-	if f {
-		return pt.snowflakePermissions
-	}
-
-	logger.Debug(fmt.Sprintf("Unknown raito permission %q found. Mapping as is", permission))
-
-	return []string{permission}
 }

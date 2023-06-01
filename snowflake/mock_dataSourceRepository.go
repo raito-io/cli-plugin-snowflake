@@ -492,50 +492,6 @@ func (_c *mockDataSourceRepository_GetTags_Call) RunAndReturn(run func(string) (
 	return _c
 }
 
-// GetViewsInDatabase provides a mock function with given fields: databaseName, schemaName, handleEntity
-func (_m *mockDataSourceRepository) GetViewsInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {
-	ret := _m.Called(databaseName, schemaName, handleEntity)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, EntityHandler) error); ok {
-		r0 = rf(databaseName, schemaName, handleEntity)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockDataSourceRepository_GetViewsInDatabase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetViewsInDatabase'
-type mockDataSourceRepository_GetViewsInDatabase_Call struct {
-	*mock.Call
-}
-
-// GetViewsInDatabase is a helper method to define mock.On call
-//   - databaseName string
-//   - schemaName string
-//   - handleEntity EntityHandler
-func (_e *mockDataSourceRepository_Expecter) GetViewsInDatabase(databaseName interface{}, schemaName interface{}, handleEntity interface{}) *mockDataSourceRepository_GetViewsInDatabase_Call {
-	return &mockDataSourceRepository_GetViewsInDatabase_Call{Call: _e.mock.On("GetViewsInDatabase", databaseName, schemaName, handleEntity)}
-}
-
-func (_c *mockDataSourceRepository_GetViewsInDatabase_Call) Run(run func(databaseName string, schemaName string, handleEntity EntityHandler)) *mockDataSourceRepository_GetViewsInDatabase_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(EntityHandler))
-	})
-	return _c
-}
-
-func (_c *mockDataSourceRepository_GetViewsInDatabase_Call) Return(_a0 error) *mockDataSourceRepository_GetViewsInDatabase_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockDataSourceRepository_GetViewsInDatabase_Call) RunAndReturn(run func(string, string, EntityHandler) error) *mockDataSourceRepository_GetViewsInDatabase_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetWarehouses provides a mock function with given fields:
 func (_m *mockDataSourceRepository) GetWarehouses() ([]DbEntity, error) {
 	ret := _m.Called()

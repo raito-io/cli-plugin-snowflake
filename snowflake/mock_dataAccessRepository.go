@@ -800,50 +800,6 @@ func (_c *mockDataAccessRepository_GetTablesInDatabase_Call) RunAndReturn(run fu
 	return _c
 }
 
-// GetViewsInDatabase provides a mock function with given fields: databaseName, schemaName, handleEntity
-func (_m *mockDataAccessRepository) GetViewsInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {
-	ret := _m.Called(databaseName, schemaName, handleEntity)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, EntityHandler) error); ok {
-		r0 = rf(databaseName, schemaName, handleEntity)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockDataAccessRepository_GetViewsInDatabase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetViewsInDatabase'
-type mockDataAccessRepository_GetViewsInDatabase_Call struct {
-	*mock.Call
-}
-
-// GetViewsInDatabase is a helper method to define mock.On call
-//   - databaseName string
-//   - schemaName string
-//   - handleEntity EntityHandler
-func (_e *mockDataAccessRepository_Expecter) GetViewsInDatabase(databaseName interface{}, schemaName interface{}, handleEntity interface{}) *mockDataAccessRepository_GetViewsInDatabase_Call {
-	return &mockDataAccessRepository_GetViewsInDatabase_Call{Call: _e.mock.On("GetViewsInDatabase", databaseName, schemaName, handleEntity)}
-}
-
-func (_c *mockDataAccessRepository_GetViewsInDatabase_Call) Run(run func(databaseName string, schemaName string, handleEntity EntityHandler)) *mockDataAccessRepository_GetViewsInDatabase_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(EntityHandler))
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetViewsInDatabase_Call) Return(_a0 error) *mockDataAccessRepository_GetViewsInDatabase_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetViewsInDatabase_Call) RunAndReturn(run func(string, string, EntityHandler) error) *mockDataAccessRepository_GetViewsInDatabase_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GrantRolesToRole provides a mock function with given fields: ctx, role, roles
 func (_m *mockDataAccessRepository) GrantRolesToRole(ctx context.Context, role string, roles ...string) error {
 	_va := make([]interface{}, len(roles))
