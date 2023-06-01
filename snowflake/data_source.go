@@ -762,6 +762,14 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						Action:        "UPDATE",
 						GlobalActions: []string{ds.Write},
 					},
+					{
+						Action:        "DELETE",
+						GlobalActions: []string{ds.Write},
+					},
+					{
+						Action:        "TRUNCATE",
+						GlobalActions: []string{ds.Write},
+					},
 				},
 				Children: []string{ds.Column},
 			},
@@ -789,14 +797,6 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 					{
 						Action:        "SELECT",
 						GlobalActions: []string{ds.Read},
-					},
-					{
-						Action:        "INSERT",
-						GlobalActions: []string{ds.Write},
-					},
-					{
-						Action:        "UPDATE",
-						GlobalActions: []string{ds.Write},
 					},
 				},
 				Children: []string{ds.Column},
