@@ -580,9 +580,10 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 
 	s.Equal([]snowflake.TableEntity{
 		{
-			Database: "SNOWFLAKE_INTEGRATION_TEST",
-			Schema:   "ORDERING",
-			Name:     "ORDERS",
+			Database:  "SNOWFLAKE_INTEGRATION_TEST",
+			Schema:    "ORDERING",
+			Name:      "ORDERS",
+			TableType: "BASE TABLE",
 		},
 	}, tables)
 }
@@ -594,7 +595,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetViewsInSchema() {
 
 	//When
 	views := make([]snowflake.TableEntity, 0)
-	err := s.repo.GetViewsInDatabase(database, schema, func(entity interface{}) error {
+	err := s.repo.GetTablesInDatabase(database, schema, func(entity interface{}) error {
 		views = append(views, *entity.(*snowflake.TableEntity))
 		return nil
 	})
@@ -604,10 +605,11 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetViewsInSchema() {
 	s.True(len(views) > 56)
 
 	s.Contains(views, snowflake.TableEntity{
-		Database: database,
-		Schema:   schema,
-		Name:     "ACCESS_HISTORY",
-		Comment:  nil,
+		Database:  database,
+		Schema:    schema,
+		Name:      "ACCESS_HISTORY",
+		Comment:   nil,
+		TableType: "VIEW",
 	})
 }
 
