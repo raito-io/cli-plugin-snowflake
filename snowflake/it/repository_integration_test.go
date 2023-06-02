@@ -576,39 +576,22 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 
 	//Then
 	s.NoError(err)
-	s.Len(tables, 1)
+	s.Len(tables, 2)
 
 	s.Equal([]snowflake.TableEntity{
 		{
-			Database: "SNOWFLAKE_INTEGRATION_TEST",
-			Schema:   "ORDERING",
-			Name:     "ORDERS",
+			Database:  "SNOWFLAKE_INTEGRATION_TEST",
+			Schema:    "ORDERING",
+			Name:      "ORDER_VIEW",
+			TableType: "VIEW",
+		},
+		{
+			Database:  "SNOWFLAKE_INTEGRATION_TEST",
+			Schema:    "ORDERING",
+			Name:      "ORDERS",
+			TableType: "BASE TABLE",
 		},
 	}, tables)
-}
-
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GetViewsInSchema() {
-	//Given
-	database := "SNOWFLAKE"
-	schema := "ACCOUNT_USAGE"
-
-	//When
-	views := make([]snowflake.TableEntity, 0)
-	err := s.repo.GetViewsInDatabase(database, schema, func(entity interface{}) error {
-		views = append(views, *entity.(*snowflake.TableEntity))
-		return nil
-	})
-
-	//Then
-	s.NoError(err)
-	s.True(len(views) > 56)
-
-	s.Contains(views, snowflake.TableEntity{
-		Database: database,
-		Schema:   schema,
-		Name:     "ACCESS_HISTORY",
-		Comment:  nil,
-	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {

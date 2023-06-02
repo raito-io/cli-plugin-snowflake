@@ -71,18 +71,19 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetTablesInDatabase("Database1", "", mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "Table1"})
-		handler(&TableEntity{Database: s, Schema: s2, Name: "Table2"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table1", TableType: "BASE TABLE"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table2", TableType: "BASE TABLE"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "View1", TableType: "VIEW"})
 		return nil
 	}).Once()
 
 	repoMock.EXPECT().GetTablesInDatabase("Database2", "", mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3", TableType: "BASE TABLE"})
 		return nil
 	}).Once()
 
 	repoMock.EXPECT().GetTablesInDatabase("Share1", "", mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "Table4"})
+		handler(&TableEntity{Database: s, Schema: s2, Name: "Table4", TableType: "BASE TABLE"})
 		return nil
 	}).Once()
 
@@ -96,19 +97,6 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetColumnsInDatabase("Share1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
-		return nil
-	}).Once()
-
-	repoMock.EXPECT().GetViewsInDatabase("Database1", "", mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "View1"})
-		return nil
-	}).Once()
-
-	repoMock.EXPECT().GetViewsInDatabase("Database2", "", mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
-		return nil
-	}).Once()
-
-	repoMock.EXPECT().GetViewsInDatabase("Share1", "", mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
 		return nil
 	}).Once()
 

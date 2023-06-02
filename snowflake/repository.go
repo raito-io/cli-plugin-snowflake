@@ -542,14 +542,6 @@ func (repo *SnowflakeRepository) GetTablesInDatabase(databaseName string, schema
 	}, handleEntity)
 }
 
-func (repo *SnowflakeRepository) GetViewsInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {
-	q := getViewsInDatabaseQuery(databaseName, schemaName)
-
-	return handleDbEntities(repo, q, func() interface{} {
-		return &TableEntity{}
-	}, handleEntity)
-}
-
 func (repo *SnowflakeRepository) GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error {
 	q := getColumnsInDatabaseQuery(databaseName)
 
@@ -701,21 +693,12 @@ func getSchemasInDatabaseQuery(dbName string) string {
 }
 
 func getTablesInDatabaseQuery(dbName string, schemaName string) string {
-	whereClause := "WHERE TABLE_TYPE != 'VIEW'"
+	whereClause := ""
 	if schemaName != "" {
-		whereClause += fmt.Sprintf(` AND TABLE_SCHEMA = '%s'`, schemaName)
+		whereClause += fmt.Sprintf(`WHERE TABLE_SCHEMA = '%s'`, schemaName)
 	}
 
 	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.TABLES %s`, common.FormatQuery("%s", dbName), whereClause)
-}
-
-func getViewsInDatabaseQuery(dbName string, schemaName string) string {
-	whereClause := ""
-	if schemaName != "" {
-		whereClause += fmt.Sprintf(` WHERE TABLE_SCHEMA = '%s'`, schemaName)
-	}
-
-	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.VIEWS %s`, common.FormatQuery("%s", dbName), whereClause)
 }
 
 func getColumnsInDatabaseQuery(dbName string) string {
