@@ -62,11 +62,16 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 
 	startDate := time.Now().Truncate(24*time.Hour).AddDate(0, 0, -numberOfDays)
 
-	if _, found := configParams.Parameters["lastUsed"]; found {
+	if v, found := configParams.Parameters["lastUsed"]; found && v != "" {
+		logger.Info(fmt.Sprintf("last used from config: %s", configParams.Parameters["lastUsed"]))
 		startDateRaw, errLocal := time.Parse(time.RFC3339, configParams.Parameters["lastUsed"])
 		if errLocal == nil && startDateRaw.After(startDate) {
 			startDate = startDateRaw
 		}
+	}
+
+	if v, found := configParams.Parameters["firstUsed"]; found && v != "" {
+		logger.Info(fmt.Sprintf("first used from config: %s", configParams.Parameters["firstUsed"]))
 	}
 
 	logger.Info(fmt.Sprintf("using start date %s", startDate.Format(time.RFC3339)))
