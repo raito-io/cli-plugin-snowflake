@@ -65,6 +65,7 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	if v, found := configParams.Parameters["lastUsed"]; found && v != "" {
 		logger.Info(fmt.Sprintf("last used from config: %s", configParams.Parameters["lastUsed"]))
 		startDateRaw, errLocal := time.Parse(time.RFC3339, configParams.Parameters["lastUsed"])
+
 		if errLocal == nil && startDateRaw.After(startDate) {
 			startDate = startDateRaw
 		}
