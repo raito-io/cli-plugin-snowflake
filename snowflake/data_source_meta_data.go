@@ -523,7 +523,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 			},
 		},
 		UsageMetaInfo: &ds.UsageMetaInput{
-			DefaultLevel: "table",
+			DefaultLevel: ds.Table,
 			Levels: []*ds.UsageMetaInputDetail{
 				{
 					Name:            ds.Table,
