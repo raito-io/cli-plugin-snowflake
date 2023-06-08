@@ -473,14 +473,21 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 						UsageGlobalPermissions: []string{ds.Read},
 					},
 					{
-						Permission:  "REFERENCES",
-						Description: "Enables viewing the structure of a view (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
+						Permission:             "REFERENCES",
+						Description:            "Enables viewing the structure of a view (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
+						UsageGlobalPermissions: []string{ds.Admin},
 					},
 					{
 						Permission:             "OWNERSHIP",
 						Description:            "Grants full control over the materialized view. Only a single role can hold this privilege on a specific object at a time.",
 						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
 						CannotBeGranted:        true,
+					},
+				},
+				Actions: []*ds.DataObjectTypeAction{
+					{
+						Action:        "SELECT",
+						GlobalActions: []string{ds.Read},
 					},
 				},
 				Children: []string{ds.Column},
@@ -507,15 +514,42 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 				Children: []string{"shared-" + ds.Table, "shared-" + ds.View},
 			},
 			{
-				Name:     "shared-" + ds.Table,
-				Type:     ds.Table,
+				Name: "shared-" + ds.Table,
+				Type: ds.Table,
+				Permissions: []*ds.DataObjectTypePermission{
+					{
+						Permission:             "SELECT",
+						Description:            "Enables executing a SELECT statement on a table.",
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
+						UsageGlobalPermissions: []string{ds.Read},
+					},
+				},
+				Actions: []*ds.DataObjectTypeAction{
+					{
+						Action:        "SELECT",
+						GlobalActions: []string{ds.Read},
+					},
+				},
 				Children: []string{"shared-" + ds.Column},
 			},
 			{
-				Name:        "shared-" + ds.View,
-				Type:        ds.View,
-				Permissions: []*ds.DataObjectTypePermission{},
-				Children:    []string{"shared-" + ds.Column},
+				Name: "shared-" + ds.View,
+				Type: ds.View,
+				Permissions: []*ds.DataObjectTypePermission{
+					{
+						Permission:             "SELECT",
+						Description:            "Enables executing a SELECT statement on a view.",
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
+						UsageGlobalPermissions: []string{ds.Read},
+					},
+				},
+				Actions: []*ds.DataObjectTypeAction{
+					{
+						Action:        "SELECT",
+						GlobalActions: []string{ds.Read},
+					},
+				},
+				Children: []string{"shared-" + ds.Column},
 			},
 			{
 				Name: "shared-" + ds.Column,
