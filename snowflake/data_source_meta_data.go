@@ -556,5 +556,14 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 				Type: ds.Column,
 			},
 		},
+		UsageMetaInfo: &ds.UsageMetaInput{
+			DefaultLevel: ds.Table,
+			Levels: []*ds.UsageMetaInputDetail{
+				{
+					Name:            ds.Table,
+					DataObjectTypes: []string{ds.Table, ds.View, ExternalTable, MaterializedView, "shared-" + ds.Table, "shared-" + ds.View},
+				},
+			},
+		},
 	}, nil
 }
