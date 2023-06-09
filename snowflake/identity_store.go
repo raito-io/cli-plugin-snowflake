@@ -35,7 +35,9 @@ func (s *IdentityStoreSyncer) GetIdentityStoreMetaData(_ context.Context) (*is.M
 	logger.Debug("Returning meta data for Snowflake identity store")
 
 	return &is.MetaData{
-		Type: "snowflake",
+		Type:        "snowflake",
+		CanBeMaster: false,
+		CanBeLinked: false,
 	}, nil
 }
 
