@@ -351,8 +351,8 @@ github.com/pkg/sftp v1.13.1/go.mod h1:3HaPG6Dq1ILlpPZRO0HVMrsydcdLt6HRDccSgb87qR
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
-github.com/raito-io/cli v0.41.0-pre h1:33OZih6EvMd11vxgKzYm2Hoa38/Evc1GzhCtsWIriAk=
-github.com/raito-io/cli v0.41.0-pre/go.mod h1:CNwSJSDBvgY1QsOHT2buP7UFBC2qEOg/tBj0FuN/6eg=
+github.com/raito-io/cli v0.42.0 h1:5um6h+jY9ilQUrhlao0zgwolKPCwq/AO5aehOkZchYA=
+github.com/raito-io/cli v0.42.0/go.mod h1:wGXu5fBHOuvz3yAXcH88AokpRmvZr4aDpnmu0+sjZW8=
 github.com/raito-io/golang-set v0.0.4 h1:7zk8r1TCE/F9JOOgseIXYx7oZJdC9/j5uivkCYjnCg0=
 github.com/raito-io/golang-set v0.0.4/go.mod h1:ktKACNnQeSpzo0Nes6jDTs74UOau8psJpAesatiEKQE=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
