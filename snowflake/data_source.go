@@ -110,7 +110,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	databases = append(databases, shares...)
 
 	for _, database := range databases {
-		logger.Info(fmt.Sprintf("Handling database %v", database))
+		logger.Info(fmt.Sprintf("Handling database %q", database.Name))
 
 		err := s.setupDatabasePermissions(repo, database)
 
@@ -416,6 +416,7 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.Da
 		if db.Name == "" {
 			continue
 		}
+
 		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", doType, db.Name))
 
 		fullName := externalIdGenerator(db.Name)
