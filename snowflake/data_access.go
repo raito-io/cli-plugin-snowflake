@@ -442,14 +442,16 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 
 		logger.Info(fmt.Sprintf("Reading SnowFlake %s policy %s in Schema %s, Table %s", policyType, policy.Name, policy.SchemaName, policy.DatabaseName))
 
+		fullName := fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name)
+
 		ap := exporter.AccessProvider{
-			ExternalId:        fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
-			Name:              fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name),
+			ExternalId:        fullName,
+			Name:              fullName,
 			NamingHint:        policy.Name,
 			Action:            action,
 			NotInternalizable: true,
 			Who:               nil,
-			ActualName:        policy.Name,
+			ActualName:        fullName,
 			What:              make([]exporter.WhatItem, 0),
 		}
 
