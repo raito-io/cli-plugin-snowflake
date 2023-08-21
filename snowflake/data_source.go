@@ -302,12 +302,6 @@ func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, d
 				return err2
 			}
 
-			err2 = repo.ExecuteGrant("REFERENCES", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
-
-			if err2 != nil {
-				return err2
-			}
-
 			err2 = repo.ExecuteGrant("REFERENCES", fmt.Sprintf("ALL VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
