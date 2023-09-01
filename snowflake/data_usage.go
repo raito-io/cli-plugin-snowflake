@@ -49,7 +49,7 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	const numRowsPerBatch = 10000
 	queryHistoryTable := "SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY"
 
-	numberOfDays := configParams.GetIntWithDefault(SfDataUsageWindow, 14)
+	numberOfDays := configParams.GetIntWithDefault(SfDataUsageWindow, 90)
 	if numberOfDays > 90 {
 		logger.Info(fmt.Sprintf("Capping data usage window to 90 days (from %d days)", numberOfDays))
 		numberOfDays = 90
