@@ -110,6 +110,8 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	databases = append(databases, shares...)
 
 	for _, database := range databases {
+		logger.Info(fmt.Sprintf("Handling database %q", database.Name))
+
 		err := s.setupDatabasePermissions(repo, database)
 
 		if err != nil {
@@ -288,31 +290,25 @@ func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, d
 				return err2
 			}
 
-			err2 = repo.ExecuteGrant("SELECT", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = repo.ExecuteGrant("REFERENCES", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrant("SELECT", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = repo.ExecuteGrant("REFERENCES", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrant("SELECT", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = repo.ExecuteGrant("REFERENCES", fmt.Sprintf("ALL VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrant("SELECT", fmt.Sprintf("ALL VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
-
-			if err2 != nil {
-				return err2
-			}
-
-			err2 = repo.ExecuteGrant("SELECT", fmt.Sprintf("ALL MATERIALIZED VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = repo.ExecuteGrant("REFERENCES", fmt.Sprintf("ALL MATERIALIZED VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
@@ -411,6 +407,10 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.Da
 	dbEntities := make([]DbEntity, 0, 20)
 
 	for _, db := range entities {
+		if db.Name == "" {
+			continue
+		}
+
 		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", doType, db.Name))
 
 		fullName := externalIdGenerator(db.Name)
