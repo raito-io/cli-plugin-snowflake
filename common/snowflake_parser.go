@@ -147,8 +147,8 @@ func ParseFullName(fullName string) SnowflakeObject {
 
 // Split a fully-qualitied Snowflake resource object into individual objects.
 // Single data objects (database, schema, table, ...) can be double quoted or not.
-// If not double quoted, no special characters allowed. Keep in mind you can have a `fullName` with some fields quoted, others not
-// If double quoted, all unicode characters are allowed. A double quote in the name (`"`) is encoded as a double double quote (`""`),
+// If not double-quoted, no special characters allowed. Keep in mind you can have a `fullName` with some fields quoted, others not
+// If double-quoted, all unicode characters are allowed. A double quote in the name (`"`) is encoded as a double double quote (`""`),
 // therefore, double quotes are allowed at the beginning and end, but otherwise they always need to come in pairs (`""`).
 // Dots are ignored as a data object/field separator until the field-delimiting double quote has passed.
 func splitFullName(fullName string, currentResults []string, err error) ([]string, error) {
