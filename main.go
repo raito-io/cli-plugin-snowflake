@@ -53,7 +53,7 @@ func main() {
 					{Name: snowflake.SfStandardEdition, Description: "If set enterprise features will be disabled", Mandatory: false},
 					{Name: snowflake.SfSkipTags, Description: "If set, tags will not be fetched", Mandatory: false},
 					{Name: snowflake.SfSkipColumns, Description: "If set, columns and column masking policies will not be imported.", Mandatory: false},
-					{Name: snowflake.SfDataUsageWindow, Description: "The maximum number of days of usage data to retrieve. Default is 14. Maximum is 90 days. ", Mandatory: false},
+					{Name: snowflake.SfDataUsageWindow, Description: "The maximum number of days of usage data to retrieve. Default is 90. Maximum is 90 days. ", Mandatory: false},
 				},
 			},
 		})
