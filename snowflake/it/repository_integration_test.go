@@ -212,7 +212,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToRole() {
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "SELECT",
 		GrantedOn: "TABLE",
-		Name:      "SNOWFLAKE_SAMPLE_DATA.TPCDS_SF10TCL_OLD",
+		Name:      "SNOWFLAKE_SAMPLE_DATA.TPCDS_SF100TCL_OLD.CALL_CENTER",
 	})
 }
 
