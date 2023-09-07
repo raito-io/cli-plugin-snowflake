@@ -592,10 +592,6 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 
 		logger.Info(fmt.Sprintf("Generating access controls for access provider %q (Ignore who: %t; Ignore what: %t)", accessProvider.Name, ignoreWho, ignoreWhat))
 
-		// Merge the users that are specified separately and from the expanded groups.
-		// Note: we don't expand groups ourselves here, because Snowflake doesn't have the concept of groups.
-		users := slice.StringSliceMerge(accessProvider.Who.Users, accessProvider.Who.UsersInGroups)
-
 		// Extract RoleNames from Access Providers that are among the whoList of this one
 		inheritedRoles := make([]string, 0)
 
@@ -687,8 +683,8 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 					}
 				}
 
-				toAdd := slice.StringSliceDifference(users, usersOfRole, false)
-				toRemove := slice.StringSliceDifference(usersOfRole, users, false)
+				toAdd := slice.StringSliceDifference(accessProvider.Who.Users, usersOfRole, false)
+				toRemove := slice.StringSliceDifference(usersOfRole, accessProvider.Who.Users, false)
 				logger.Info(fmt.Sprintf("Identified %d users to add and %d users to remove from role %q", len(toAdd), len(toRemove), rn))
 
 				if len(toAdd) > 0 {
@@ -791,7 +787,7 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 			}
 
 			if !ignoreWho {
-				err := repo.GrantUsersToRole(ctx, rn, users...)
+				err := repo.GrantUsersToRole(ctx, rn, accessProvider.Who.Users...)
 				if err != nil {
 					logger.Error("Encountered error :" + err.Error())
 

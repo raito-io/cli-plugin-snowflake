@@ -14,8 +14,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 	logger.Debug("Returning meta data for Snowflake data source")
 
 	return &ds.MetaData{
-		Type:              "snowflake",
-		SupportedFeatures: []string{ds.RowFiltering, ds.ColumnMasking},
+		Type:                  "snowflake",
+		SupportedFeatures:     []string{ds.RowFiltering, ds.ColumnMasking},
+		SupportsApInheritance: true,
 		DataObjectTypes: []*ds.DataObjectType{
 			{
 				Name: ds.Datasource,
@@ -573,10 +574,8 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 				IsNamedEntity:                 true,
 				CanBeCreated:                  true,
 				CanBeAssumed:                  true,
-				CanAssumeMultiple:             false,
+				CanAssumeMultiple:             true,
 				AllowedWhoAccessProviderTypes: []string{access_provider.Role},
-				ExportSupportsApInheritance:   true,
-				ExportRequiresWhatUnpacking:   false,
 			},
 		},
 	}, nil
