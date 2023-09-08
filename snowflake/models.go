@@ -92,7 +92,7 @@ type QueryDbEntities struct {
 	DatabaseName          NullString `db:"DATABASE_NAME" useColumnName:"true"`
 	SchemaName            NullString `db:"SCHEMA_NAME" useColumnName:"true"`
 	User                  string     `db:"USER_NAME" useColumnName:"true"`
-	Role                  string     `db:"ROLE_NAME" useColumnName:"true"`
+	Role                  NullString `db:"ROLE_NAME" useColumnName:"true"`
 	StartTime             string     `db:"START_TIME" useColumnName:"true"`
 	EndTime               string     `db:"END_TIME" useColumnName:"true"`
 	BytesTranferred       int        `db:"OUTBOUND_DATA_TRANSFER_BYTES" useColumnName:"true"`
@@ -105,7 +105,7 @@ type QueryDbEntities struct {
 }
 
 func (entity QueryDbEntities) String() string {
-	return fmt.Sprintf("ID: %s, Status: %s, SQL Query: %s, DatabaseName: %s, SchemaName: %s, UserName: %s, RoleName: %s, StartTime: %s, EndTime: %s, DirectObjectsAccessed: %v, BaseObjectsAccess: %v",
+	return fmt.Sprintf("ID: %s, Status: %s, SQL Query: %s, DatabaseName: %s, SchemaName: %s, UserName: %s, RoleName: %v, StartTime: %s, EndTime: %s, DirectObjectsAccessed: %v, BaseObjectsAccess: %v",
 		entity.ExternalId, entity.Status, entity.Query, entity.DatabaseName.String, entity.SchemaName.String, entity.User, entity.Role, entity.StartTime, entity.EndTime, entity.DirectObjectsAccessed, entity.BaseObjectsAccessed)
 }
 
