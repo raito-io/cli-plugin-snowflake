@@ -5,6 +5,7 @@ import (
 
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/raito-io/cli/base"
+	"github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	"github.com/raito-io/cli/base/info"
 	"github.com/raito-io/cli/base/util/plugin"
@@ -34,7 +35,7 @@ func main() {
 	err := base.RegisterPlugins(
 		wrappers.IdentityStoreSync(snowflake.NewIdentityStoreSyncer()),
 		wrappers.DataSourceSync(snowflake.NewDataSourceSyncer()),
-		role_based.AccessProviderRoleSync(snowflake.NewDataAccessSyncer(), roleNameConstraints),
+		role_based.AccessProviderRoleSync(snowflake.NewDataAccessSyncer(), roleNameConstraints, access_provider.WithSupportPartialSync()),
 		wrappers.DataUsageSync(snowflake.NewDataUsageSyncer()),
 		&info.InfoImpl{
 			Info: &plugin.PluginInfo{

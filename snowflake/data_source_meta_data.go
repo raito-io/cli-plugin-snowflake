@@ -3,6 +3,7 @@ package snowflake
 import (
 	"context"
 
+	"github.com/raito-io/cli/base/access_provider"
 	ds "github.com/raito-io/cli/base/data_source"
 )
 
@@ -13,8 +14,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 	logger.Debug("Returning meta data for Snowflake data source")
 
 	return &ds.MetaData{
-		Type:              "snowflake",
-		SupportedFeatures: []string{ds.RowFiltering, ds.ColumnMasking},
+		Type:                  "snowflake",
+		SupportedFeatures:     []string{ds.RowFiltering, ds.ColumnMasking},
+		SupportsApInheritance: true,
 		DataObjectTypes: []*ds.DataObjectType{
 			{
 				Name: ds.Datasource,
@@ -563,6 +565,17 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaD
 					Name:            ds.Table,
 					DataObjectTypes: []string{ds.Table, ds.View, ExternalTable, MaterializedView, "shared-" + ds.Table, "shared-" + ds.View},
 				},
+			},
+		},
+		AccessProviderTypes: []*ds.AccessProviderType{
+			{
+				Type:                          access_provider.Role,
+				Label:                         access_provider.Role,
+				IsNamedEntity:                 true,
+				CanBeCreated:                  true,
+				CanBeAssumed:                  true,
+				CanAssumeMultiple:             true,
+				AllowedWhoAccessProviderTypes: []string{access_provider.Role},
 			},
 		},
 	}, nil
