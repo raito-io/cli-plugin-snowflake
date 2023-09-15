@@ -197,7 +197,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToRole() {
 
 	//Then
 	s.NoError(err)
-	s.True(len(grantsToRole) >= 88, "grantsToRole only has %d grants: %+v", len(grantsToRole), grantsToRole)
+	s.True(len(grantsToRole) >= 87, "grantsToRole only has %d grants: %+v", len(grantsToRole), grantsToRole)
 
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "USAGE",

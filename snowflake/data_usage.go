@@ -140,13 +140,17 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 					unparsableQueries[emptyDu.Query] = true
 				}
 			} else {
+				roleName := ""
+				if returnedRow.Role.Valid {
+					roleName = returnedRow.Role.String
+				}
 				du := du.Statement{
 					ExternalId:          returnedRow.ExternalId,
 					AccessedDataObjects: accessedDataObjects,
 					Success:             returnedRow.Status == "SUCCESS",
 					Status:              returnedRow.Status,
 					User:                returnedRow.User,
-					Role:                returnedRow.Role,
+					Role:                roleName,
 					StartTime:           startTime.Unix(),
 					EndTime:             endTime.Unix(),
 					Bytes:               returnedRow.BytesTranferred,
