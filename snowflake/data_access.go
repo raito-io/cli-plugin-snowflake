@@ -135,7 +135,7 @@ func (s *AccessSyncer) SyncAccessProvidersToTarget(ctx context.Context, rolesToR
 		return err
 	}
 
-	err = s.generateAccessControls(ctx, accessProviders, existingRoles, repo, false)
+	err = s.generateAccessControls(ctx, accessProviders, existingRoles, repo)
 	if err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, access map[
 		return err
 	}
 
-	err = s.generateAccessControls(ctx, access, existingRoles, repo, true)
+	err = s.generateAccessControls(ctx, access, existingRoles, repo)
 	if err != nil {
 		return err
 	}
@@ -565,7 +565,7 @@ func buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
 }
 
 //nolint:gocyclo
-func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, repo dataAccessRepository, verifyAndPropagate bool) error {
+func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, repo dataAccessRepository) error {
 	// We always need the meta data
 	syncer := DataSourceSyncer{}
 	md, err := syncer.GetDataSourceMetaData(ctx)
@@ -575,14 +575,6 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 	}
 
 	metaData := buildMetaDataMap(md)
-
-	// Initializes empty map
-	propagateMetaData := make(map[string]map[string]struct{})
-
-	// Keep the propagateMetaData empty if not needing to do the propagation. Otherwise, use the metadata map.
-	if verifyAndPropagate {
-		propagateMetaData = metaData
-	}
 
 	roleCreated := make(map[string]interface{})
 
@@ -623,14 +615,14 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 				}
 
 				if isTableType(what.DataObject.Type) {
-					grants, err := createGrantsForTableOrView(what.DataObject.Type, permissions, what.DataObject.FullName, propagateMetaData)
+					grants, err := createGrantsForTableOrView(what.DataObject.Type, permissions, what.DataObject.FullName, metaData)
 					if err != nil {
 						return err
 					}
 
 					expectedGrants = append(expectedGrants, grants...)
 				} else if what.DataObject.Type == ds.Schema {
-					grants, err := createGrantsForSchema(repo, permissions, what.DataObject.FullName, propagateMetaData)
+					grants, err := createGrantsForSchema(repo, permissions, what.DataObject.FullName, metaData)
 					if err != nil {
 						return err
 					}
@@ -641,16 +633,16 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 						expectedGrants = append(expectedGrants, Grant{p, "shared-database", what.DataObject.FullName})
 					}
 				} else if what.DataObject.Type == ds.Database {
-					grants, err := createGrantsForDatabase(repo, permissions, what.DataObject.FullName, propagateMetaData)
+					grants, err := createGrantsForDatabase(repo, permissions, what.DataObject.FullName, metaData)
 					if err != nil {
 						return err
 					}
 
 					expectedGrants = append(expectedGrants, grants...)
 				} else if what.DataObject.Type == "warehouse" {
-					expectedGrants = append(expectedGrants, createGrantsForWarehouse(permissions, what.DataObject.FullName, propagateMetaData)...)
+					expectedGrants = append(expectedGrants, createGrantsForWarehouse(permissions, what.DataObject.FullName, metaData)...)
 				} else if what.DataObject.Type == ds.Datasource {
-					expectedGrants = append(expectedGrants, createGrantsForAccount(permissions, propagateMetaData)...)
+					expectedGrants = append(expectedGrants, createGrantsForAccount(permissions, metaData)...)
 				}
 			}
 		}
@@ -829,7 +821,7 @@ func createGrantsForTableOrView(doType string, permissions []string, fullName st
 		Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
 
 	for _, p := range permissions {
-		if _, f := metaData[doType][strings.ToUpper(p)]; len(metaData) == 0 || f {
+		if _, f := metaData[doType][strings.ToUpper(p)]; f {
 			grants = append(grants, Grant{p, doType, common.FormatQuery(`%s.%s.%s`, *sfObject.Database, *sfObject.Schema, *sfObject.Table)})
 		} else {
 			logger.Warn("Permission %q does not apply to type %s", p, strings.ToUpper(doType))
@@ -856,7 +848,7 @@ func createGrantsForSchema(repo dataAccessRepository, permissions []string, full
 
 	for _, p := range permissions {
 		// Check if the permission is applicable on the schema itself
-		if _, f := metaData[ds.Schema][strings.ToUpper(p)]; len(metaData) == 0 || f {
+		if _, f := metaData[ds.Schema][strings.ToUpper(p)]; f {
 			grants = append(grants, Grant{p, ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
 		} else {
 			if tables == nil {
@@ -907,7 +899,7 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 	for _, p := range permissions {
 		matchFound := false
 
-		if _, f := metaData[ds.Database][strings.ToUpper(p)]; len(metaData) == 0 || f {
+		if _, f := metaData[ds.Database][strings.ToUpper(p)]; f {
 			matchFound = true
 			grants = append(grants, Grant{p, ds.Database, sfObject.GetFullName(true)})
 		} else if schemas == nil {
@@ -975,7 +967,7 @@ func createGrantsForWarehouse(permissions []string, warehouse string, metaData m
 	grants = append(grants, Grant{"USAGE", "warehouse", common.FormatQuery(`%s`, warehouse)})
 
 	for _, p := range permissions {
-		if _, f := metaData["warehouse"][strings.ToUpper(p)]; len(metaData) != 0 && !f {
+		if _, f := metaData["warehouse"][strings.ToUpper(p)]; !f {
 			logger.Warn("Permission %q does not apply to type WAREHOUSE. Skipping", p)
 			continue
 		}
@@ -990,7 +982,7 @@ func createGrantsForAccount(permissions []string, metaData map[string]map[string
 	grants := make([]Grant, 0, len(permissions))
 
 	for _, p := range permissions {
-		if _, f := metaData[ds.Datasource][strings.ToUpper(p)]; len(metaData) != 0 && !f {
+		if _, f := metaData[ds.Datasource][strings.ToUpper(p)]; !f {
 			logger.Warn("Permission %q does not apply to type ACCOUNT (datasource). Skipping", p)
 			continue
 		}
