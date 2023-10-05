@@ -335,6 +335,59 @@ func (_c *mockDataAccessRepository_ExecuteRevoke_Call) RunAndReturn(run func(str
 	return _c
 }
 
+// GetDataBases provides a mock function with given fields:
+func (_m *mockDataAccessRepository) GetDataBases() ([]DbEntity, error) {
+	ret := _m.Called()
+
+	var r0 []DbEntity
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]DbEntity, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]DbEntity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataAccessRepository_GetDataBases_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDataBases'
+type mockDataAccessRepository_GetDataBases_Call struct {
+	*mock.Call
+}
+
+// GetDataBases is a helper method to define mock.On call
+func (_e *mockDataAccessRepository_Expecter) GetDataBases() *mockDataAccessRepository_GetDataBases_Call {
+	return &mockDataAccessRepository_GetDataBases_Call{Call: _e.mock.On("GetDataBases")}
+}
+
+func (_c *mockDataAccessRepository_GetDataBases_Call) Run(run func()) *mockDataAccessRepository_GetDataBases_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetDataBases_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetDataBases_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetDataBases_Call) RunAndReturn(run func() ([]DbEntity, error)) *mockDataAccessRepository_GetDataBases_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetGrantsOfRole provides a mock function with given fields: roleName
 func (_m *mockDataAccessRepository) GetGrantsOfRole(roleName string) ([]GrantOfRole, error) {
 	ret := _m.Called(roleName)
@@ -796,6 +849,59 @@ func (_c *mockDataAccessRepository_GetTablesInDatabase_Call) Return(_a0 error) *
 }
 
 func (_c *mockDataAccessRepository_GetTablesInDatabase_Call) RunAndReturn(run func(string, string, EntityHandler) error) *mockDataAccessRepository_GetTablesInDatabase_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetWarehouses provides a mock function with given fields:
+func (_m *mockDataAccessRepository) GetWarehouses() ([]DbEntity, error) {
+	ret := _m.Called()
+
+	var r0 []DbEntity
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]DbEntity, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]DbEntity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataAccessRepository_GetWarehouses_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetWarehouses'
+type mockDataAccessRepository_GetWarehouses_Call struct {
+	*mock.Call
+}
+
+// GetWarehouses is a helper method to define mock.On call
+func (_e *mockDataAccessRepository_Expecter) GetWarehouses() *mockDataAccessRepository_GetWarehouses_Call {
+	return &mockDataAccessRepository_GetWarehouses_Call{Call: _e.mock.On("GetWarehouses")}
+}
+
+func (_c *mockDataAccessRepository_GetWarehouses_Call) Run(run func()) *mockDataAccessRepository_GetWarehouses_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetWarehouses_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetWarehouses_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetWarehouses_Call) RunAndReturn(run func() ([]DbEntity, error)) *mockDataAccessRepository_GetWarehouses_Call {
 	_c.Call.Return(run)
 	return _c
 }

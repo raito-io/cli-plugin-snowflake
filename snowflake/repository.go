@@ -551,7 +551,7 @@ func (repo *SnowflakeRepository) GetColumnsInDatabase(databaseName string, handl
 }
 
 func (repo *SnowflakeRepository) CommentRoleIfExists(comment, objectName string) error {
-	q := fmt.Sprintf(`COMMENT IF EXISTS ON ROLE %s IS '%s'`, common.FormatQuery("%s", objectName), comment)
+	q := fmt.Sprintf(`COMMENT IF EXISTS ON ROLE %s IS '%s'`, common.FormatQuery("%s", objectName), strings.Replace(comment, "'", "", -1))
 	_, _, err := repo.query(q)
 
 	if err == nil {

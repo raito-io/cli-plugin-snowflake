@@ -5,6 +5,7 @@ package it
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -578,7 +579,11 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 	s.NoError(err)
 	s.Len(tables, 2)
 
-	s.Equal([]snowflake.TableEntity{
+	sort.Slice(tables, func(i, j int) bool {
+		return tables[i].Name < tables[j].Name
+	})
+
+	expected := []snowflake.TableEntity{
 		{
 			Database:  "SNOWFLAKE_INTEGRATION_TEST",
 			Schema:    "ORDERING",
@@ -591,7 +596,13 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 			Name:      "ORDERS",
 			TableType: "BASE TABLE",
 		},
-	}, tables)
+	}
+
+	sort.Slice(expected, func(i, j int) bool {
+		return expected[i].Name < expected[j].Name
+	})
+
+	s.Equal(expected, tables)
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
