@@ -71,6 +71,7 @@ type ColumnEntity struct {
 	Table    string  `db:"TABLE_NAME"`
 	Name     string  `db:"COLUMN_NAME"`
 	Comment  *string `db:"COMMENT"`
+	DataType string  `db:"DATA_TYPE"`
 }
 
 // Identity Store
@@ -146,7 +147,7 @@ func (g *Grant) GetGrantOnType() string {
 	return strings.ToUpper(g.OnType)
 }
 
-type policyEntity struct {
+type PolicyEntity struct {
 	Name         string `db:"name"`
 	DatabaseName string `db:"database_name"`
 	SchemaName   string `db:"schema_name"`

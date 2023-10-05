@@ -59,10 +59,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 	repoMock.EXPECT().GetGrantsToRole("Role3").Return([]GrantToRole{
 		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
 	}, nil).Once()
-	repoMock.EXPECT().GetPolicies("MASKING").Return([]policyEntity{
+	repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{
 		{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING_POLICY"},
 	}, nil).Once()
-	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]policyEntity{
+	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
 		{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
 	}, nil).Once()
 	repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
@@ -211,10 +211,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 	repoMock.EXPECT().GetGrantsToRole("Role3").Return([]GrantToRole{
 		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
 	}, nil).Once()
-	repoMock.EXPECT().GetPolicies("MASKING").Return([]policyEntity{
+	repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{
 		{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING_POLICY"},
 	}, nil).Once()
-	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]policyEntity{
+	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
 		{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
 	}, nil).Once()
 	repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
@@ -458,7 +458,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_ErrorOnConnectingToRepo(t *t
 	assert.Error(t, err)
 }
 
-func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
+func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
 		Parameters: map[string]string{"key": "value"},
@@ -550,7 +550,7 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 	}
 
 	//When
-	err := syncer.SyncAccessProvidersToTarget(context.Background(), rolesToRemove, access, feedbackHandler, &configParams)
+	err := syncer.SyncAccessProviderRolesToTarget(context.Background(), rolesToRemove, access, feedbackHandler, &configParams)
 
 	//Then
 	assert.NoError(t, err)
@@ -560,7 +560,7 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 		feedbackHandler.AccessProviderFeedback["AccessProviderId3"])
 }
 
-func TestAccessSyncer_SyncAccessProvidersToTarget_ErrorOnConnectionToRepo(t *testing.T) {
+func TestAccessSyncer_SyncAccessProviderRolesToTarget_ErrorOnConnectionToRepo(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
 		Parameters: map[string]string{"key": "value"},
@@ -588,7 +588,7 @@ func TestAccessSyncer_SyncAccessProvidersToTarget_ErrorOnConnectionToRepo(t *tes
 	}
 
 	//When
-	err := syncer.SyncAccessProvidersToTarget(context.Background(), []string{"roleToRemove1"}, access, feedbackHandler, &configParams)
+	err := syncer.SyncAccessProviderRolesToTarget(context.Background(), []string{"roleToRemove1"}, access, feedbackHandler, &configParams)
 
 	//Then
 	assert.Error(t, err)
@@ -678,6 +678,69 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget_ErrorOnRepoConnection(t *testing.
 	assert.Error(t, err)
 }
 
+func TestAccessSyncer_SyncAccessProviderMasksToTarget(t *testing.T) {
+	// Given
+	configParams := config.ConfigMap{
+		Parameters: map[string]string{"key": "value"},
+	}
+
+	repoMock := newMockDataAccessRepository(t)
+	fileCreator := mocks.NewSimpleAccessProviderFeedbackHandler(t, 1)
+
+	masksToRemove := []string{"maskToRemove1"}
+	masks := []*importer.AccessProvider{
+		{
+			Id:   "MaskId1",
+			Name: "Mask1",
+			Who: importer.WhoItem{
+				Users:       []string{"User1", "User2"},
+				InheritFrom: []string{"Role1", "Role2"},
+			},
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1.Column1", Type: "column"}},
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2.Table1.Column1", Type: "column"}},
+			},
+			Action: importer.Mask,
+		},
+		{
+			Id:   "MaskId2",
+			Name: "Mask2",
+			Who: importer.WhoItem{
+				Users: []string{"User1"},
+			},
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table3.Column1", Type: "column"}},
+			},
+			Action: importer.Mask,
+		},
+	}
+
+	repoMock.EXPECT().GetPoliciesLike("MASKING", "RAITO_MASK1%").Return(nil, nil).Once() //No existing masks
+	repoMock.EXPECT().CreateMaskPolicy("DB1", "Schema1", mock.AnythingOfType("string"), []string{"DB1.Schema1.Table1.Column1"}, (*string)(nil), &MaskingBeneficiaries{Users: []string{"User1", "User2"}, Roles: []string{"Role1", "Role2"}}).Return(nil)
+	repoMock.EXPECT().CreateMaskPolicy("DB1", "Schema2", mock.AnythingOfType("string"), []string{"DB1.Schema2.Table1.Column1"}, (*string)(nil), &MaskingBeneficiaries{Users: []string{"User1", "User2"}, Roles: []string{"Role1", "Role2"}}).Return(nil)
+
+	repoMock.EXPECT().GetPoliciesLike("MASKING", "RAITO_MASK2%").Return([]PolicyEntity{{Name: "RAITO_MASK2_OLD_TEXT", SchemaName: "Schema1", DatabaseName: "DB1"}}, nil).Once()
+	repoMock.EXPECT().CreateMaskPolicy("DB1", "Schema1", mock.AnythingOfType("string"), []string{"DB1.Schema1.Table3.Column1"}, (*string)(nil), &MaskingBeneficiaries{Users: []string{"User1"}}).Return(nil)
+	repoMock.EXPECT().DropMaskingPolicy("DB1", "Schema1", "RAITO_MASK2_OLD").Return(nil)
+
+	repoMock.EXPECT().GetPoliciesLike("MASKING", "RAITO_MASKTOREMOVE1%").Return([]PolicyEntity{{Name: "RAITO_maskToRemove1_TEXT", SchemaName: "Schema3", DatabaseName: "DB1"}, {Name: "RAITO_maskToRemove1_INT", SchemaName: "Schema1", DatabaseName: "DB1"}}, nil).Once()
+	repoMock.EXPECT().DropMaskingPolicy("DB1", "Schema3", "RAITO_MASKTOREMOVE1").Return(nil)
+	repoMock.EXPECT().DropMaskingPolicy("DB1", "Schema1", "RAITO_MASKTOREMOVE1").Return(nil)
+
+	syncer := &AccessSyncer{
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
+			return repoMock, nil
+		},
+	}
+
+	// When
+	err := syncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, fileCreator, &configParams)
+
+	// Then
+	assert.NoError(t, err)
+	assert.Len(t, fileCreator.AccessProviderFeedback, 2)
+}
+
 func TestAccessSyncer_removeRolesToRemove_NoRoles(t *testing.T) {
 	//Given
 	repo := newMockDataAccessRepository(t)
@@ -752,7 +815,7 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 
 	policyType := "policyType"
 
-	repoMock.EXPECT().GetPolicies(policyType).Return([]policyEntity{
+	repoMock.EXPECT().GetPolicies(policyType).Return([]PolicyEntity{
 		{
 			Name:         "Policy1",
 			Owner:        "PolicyOwner",
@@ -869,7 +932,7 @@ func TestAccessSyncer_importPoliciesOfType_ErrorOnDescribePolicy(t *testing.T) {
 
 	policyType := "policyType"
 
-	repoMock.EXPECT().GetPolicies(policyType).Return([]policyEntity{
+	repoMock.EXPECT().GetPolicies(policyType).Return([]PolicyEntity{
 		{
 			Name:         "Policy1",
 			Owner:        "PolicyOwner",

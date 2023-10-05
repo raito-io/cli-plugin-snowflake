@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-
+	gonanoid "github.com/matoous/go-nanoid/v2"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -25,6 +25,8 @@ const (
 	whoLockedReason    = "The 'who' for this Snowflake role cannot be changed because it was imported from an external identity store"
 	nameLockedReason   = "This Snowflake role cannot be renamed because it was imported from an external identity store"
 	deleteLockedReason = "This Snowflake role cannot be deleted because it was imported from an external identity store"
+
+	idAlphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 )
 
 //go:generate go run github.com/vektra/mockery/v2 --name=dataAccessRepository --with-expecter --inpackage
@@ -36,7 +38,8 @@ type dataAccessRepository interface {
 	GetRolesWithPrefix(prefix string) ([]RoleEntity, error)
 	GetGrantsOfRole(roleName string) ([]GrantOfRole, error)
 	GetGrantsToRole(roleName string) ([]GrantToRole, error)
-	GetPolicies(policy string) ([]policyEntity, error)
+	GetPolicies(policy string) ([]PolicyEntity, error)
+	GetPoliciesLike(policy string, like string) ([]PolicyEntity, error)
 	DescribePolicy(policyType, dbName, schema, policyName string) ([]describePolicyEntity, error)
 	GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error)
 	DropRole(roleName string) error
@@ -50,6 +53,8 @@ type dataAccessRepository interface {
 	GrantRolesToRole(ctx context.Context, role string, roles ...string) error
 	RevokeRolesFromRole(ctx context.Context, role string, roles ...string) error
 	CreateRole(roleName string) error
+	CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) error
+	DropMaskingPolicy(databaseName string, schema string, maskName string) (err error)
 }
 
 type AccessSyncer struct {
@@ -66,7 +71,7 @@ func newDataAccessSnowflakeRepo(params map[string]string, role string) (dataAcce
 	return NewSnowflakeRepository(params, role)
 }
 
-func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap) error {
+func (s *AccessSyncer) SyncAccessProvidersFromTarget(_ context.Context, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap) error {
 	repo, err := s.repoProvider(configMap.Parameters, "")
 	if err != nil {
 		return err
@@ -112,7 +117,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	return nil
 }
 
-func (s *AccessSyncer) SyncAccessProvidersToTarget(ctx context.Context, rolesToRemove []string, accessProviders map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, rolesToRemove []string, accessProviders map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
 	logger.Info("Configuring access providers as roles in Snowflake")
 
 	repo, err := s.repoProvider(configMap.Parameters, "")
@@ -153,6 +158,38 @@ func (s *AccessSyncer) SyncAccessProvidersToTarget(ctx context.Context, rolesToR
 
 	for apId, feedbackObjects := range feedbackMap {
 		err = feedbackHandler.AddAccessProviderFeedback(apId, feedbackObjects...)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, masksToRemove []string, access []*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+	logger.Info(fmt.Sprintf("Configuring access provider as masks in Snowflake. Update %d masks remove %d masks", len(access), len(masksToRemove)))
+
+	repo, err := s.repoProvider(configMap.Parameters, "")
+	if err != nil {
+		return err
+	}
+
+	// Step 1: Update masks en create new masks
+	for _, mask := range access {
+		maskName, err2 := s.updateMask(ctx, mask, repo)
+		if err2 != nil {
+			return err2
+		}
+
+		err = feedbackHandler.AddAccessProviderFeedback(mask.Id, importer.AccessSyncFeedbackInformation{AccessId: mask.Id, ActualName: maskName})
+		if err != nil {
+			return err
+		}
+	}
+
+	// Step 2: Remove old masks
+	for _, maskToRemove := range masksToRemove {
+		err = s.removeMask(ctx, maskToRemove, repo)
 		if err != nil {
 			return err
 		}
@@ -816,6 +853,88 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 	return nil
 }
 
+func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvider, repo dataAccessRepository) (string, error) {
+	logger.Info(fmt.Sprintf("Updating mask %q", mask.Name))
+
+	globalMaskName := raitoMaskName(mask.Name)
+	uniqueMaskName := raitoMaskUniqueName(mask.Name)
+
+	// Load beneficieries
+	beneficiaries := MaskingBeneficiaries{
+		Users: mask.Who.Users,
+		Roles: mask.Who.InheritFrom,
+	}
+
+	dosPerSchema := map[string][]string{}
+
+	for _, do := range mask.What {
+		fullnameSplit := strings.Split(do.DataObject.FullName, ".")
+
+		if len(fullnameSplit) != 4 {
+			logger.Error(fmt.Sprintf("Invalid fullname for column %s in mask %s", do.DataObject.FullName, mask.Name))
+
+			continue
+		}
+
+		schemaName := fullnameSplit[1]
+		database := fullnameSplit[0]
+
+		schemaFullName := strings.Join([]string{database, schemaName}, ".")
+
+		dosPerSchema[schemaFullName] = append(dosPerSchema[schemaFullName], do.DataObject.FullName)
+	}
+
+	existingPolicies, err := repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", globalMaskName, "%"))
+	if err != nil {
+		return uniqueMaskName, err
+	}
+
+	for schema, dos := range dosPerSchema {
+		logger.Info(fmt.Sprintf("Updating mask %q for schema %q", mask.Name, schema))
+		namesplit := strings.Split(schema, ".")
+
+		database := namesplit[0]
+		schemaName := namesplit[1]
+
+		err = repo.CreateMaskPolicy(database, schemaName, uniqueMaskName, dos, nil, &beneficiaries)
+		if err != nil {
+			return uniqueMaskName, err
+		}
+	}
+
+	for _, policy := range existingPolicies {
+		existingUniqueMaskNameSpit := strings.Split(policy.Name, "_")
+		existingUniqueMaskName := strings.Join(existingUniqueMaskNameSpit[:len(existingUniqueMaskNameSpit)-1], "_")
+
+		err = repo.DropMaskingPolicy(policy.DatabaseName, policy.SchemaName, existingUniqueMaskName)
+		if err != nil {
+			return uniqueMaskName, err
+		}
+	}
+
+	return uniqueMaskName, nil
+}
+
+func (s *AccessSyncer) removeMask(_ context.Context, mask string, repo dataAccessRepository) error {
+	logger.Info(fmt.Sprintf("Remove mask %q", mask))
+
+	maskName := raitoMaskName(mask)
+
+	existingPolicies, err := repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", maskName, "%"))
+	if err != nil {
+		return err
+	}
+
+	for _, policy := range existingPolicies {
+		err = repo.DropMaskingPolicy(policy.DatabaseName, policy.SchemaName, maskName)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func createGrantsForTableOrView(doType string, permissions []string, fullName string, metaData map[string]map[string]struct{}) ([]Grant, error) {
 	// TODO: this does not work for Raito full names
 	sfObject := common.ParseFullName(fullName)
@@ -1047,4 +1166,12 @@ func createComment(ap *importer.AccessProvider, update bool) string {
 	}
 
 	return fmt.Sprintf("%s by Raito from access provider %s. %s", action, ap.Name, ap.Description)
+}
+
+func raitoMaskName(name string) string {
+	return fmt.Sprintf("RAITO_%s", strings.ToUpper(name))
+}
+
+func raitoMaskUniqueName(name string) string {
+	return strings.Join([]string{raitoMaskName(name), gonanoid.MustGenerate(idAlphabet, 8)}, "_")
 }

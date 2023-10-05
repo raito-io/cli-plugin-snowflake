@@ -9,6 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
+	gonanoid "github.com/matoous/go-nanoid/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
@@ -695,4 +699,41 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_Role() {
 
 	//Then
 	s.NoError(err)
+}
+
+func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateMaskPolicy() {
+	s.T().Skip("Skip test as Masking is a non standard edition feature")
+
+	// Given
+	database := "RUBEN_TEST"
+	schema := "TESTING"
+	table := "CITIES"
+	column := "CITY"
+
+	beneficiary := snowflake.MaskingBeneficiaries{
+		Roles: []string{"RUBEN_AP"},
+	}
+
+	maskName := strings.Join([]string{"MaskingTest", gonanoid.MustGenerate("0123456789ABCDEF", 8)}, "_")
+
+	// When
+	err := s.repo.CreateMaskPolicy(database, schema, maskName, []string{fmt.Sprintf("%s.%s.%s.%s", database, schema, table, column)}, ptr.String("NULL_MASK"), &beneficiary)
+
+	// Then
+	require.NoError(s.T(), err)
+
+	policyEntries, err := s.repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", maskName, "%"))
+	require.NoError(s.T(), err)
+	require.Len(s.T(), policyEntries, 1)
+	assert.True(s.T(), strings.HasPrefix(policyEntries[0].Name, strings.ToUpper(maskName)))
+
+	// When
+	err = s.repo.DropMaskingPolicy(database, schema, maskName)
+
+	// Then
+	require.NoError(s.T(), err)
+
+	policyEntries, err = s.repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", maskName, "%"))
+	require.NoError(s.T(), err)
+	assert.Len(s.T(), policyEntries, 0)
 }
