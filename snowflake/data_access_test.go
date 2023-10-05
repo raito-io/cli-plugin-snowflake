@@ -82,6 +82,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return repoMock, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	//When
@@ -234,6 +236,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return repoMock, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	//When
@@ -364,6 +368,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return repoMock, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	//When
@@ -449,6 +455,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_ErrorOnConnectingToRepo(t *t
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, fmt.Errorf("boom")
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	//When
@@ -508,6 +516,8 @@ func TestAccessSyncer_SyncAccessProvidersToTarget(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return repoMock, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	ap1 := &importer.AccessProvider{
@@ -572,6 +582,8 @@ func TestAccessSyncer_SyncAccessProvidersToTarget_ErrorOnConnectionToRepo(t *tes
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, fmt.Errorf("boom")
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -624,6 +636,8 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return repoMock, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -656,6 +670,8 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget_ErrorOnRepoConnection(t *testing.
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, fmt.Errorf("boom")
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -686,6 +702,8 @@ func TestAccessSyncer_removeRolesToRemove_NoRoles(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	//When
@@ -714,6 +732,8 @@ func TestAccessSyncer_removeRolesToRemove(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	//When
@@ -736,6 +756,8 @@ func TestAccessSyncer_removeRolesToRemove_error(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	//When
@@ -812,6 +834,8 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	//When
@@ -894,6 +918,8 @@ func TestAccessSyncer_importPoliciesOfType_ErrorOnDescribePolicy(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	//When
@@ -921,6 +947,8 @@ func generateAccessControls_table(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -960,6 +988,8 @@ func generateAccessControls_view(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1009,6 +1039,8 @@ func generateAccessControls_schema(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1048,6 +1080,8 @@ func generateAccessControls_schema_noverify(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1100,6 +1134,8 @@ func generateAccessControls_existing_schema(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1137,6 +1173,8 @@ func generateAccessControls_sharedDatabase(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1190,6 +1228,8 @@ func generateAccessControls_database(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1248,6 +1288,8 @@ func generateAccessControls_existing_database(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1286,6 +1328,8 @@ func generateAccessControls_warehouse(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1316,11 +1360,15 @@ func generateAccessControls_datasource(t *testing.T) {
 	repoMock.EXPECT().CommentRoleIfExists(mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "RoleName1").Return(nil).Once()
+	repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Once()
+	repoMock.EXPECT().GetDataBases().Return([]DbEntity{}, nil).Once()
 
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1384,6 +1432,8 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1440,6 +1490,8 @@ func TestAccessSyncer_generateAccessControls_inheritance(t *testing.T) {
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
 		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 
 	access := map[string]*importer.AccessProvider{
