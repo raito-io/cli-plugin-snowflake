@@ -888,9 +888,9 @@ func createGrantsForSchema(repo dataAccessRepository, permissions []string, full
 func createGrantsForDatabase(repo dataAccessRepository, permissions []string, database string, metaData map[string]map[string]struct{}) ([]Grant, error) {
 	grants := make([]Grant, 0, len(permissions)+1)
 
-	sfObject := common.SnowflakeObject{Database: &database, Schema: nil, Table: nil, Column: nil}
+	sfDBObject := common.SnowflakeObject{Database: &database, Schema: nil, Table: nil, Column: nil}
 
-	grants = append(grants, Grant{"USAGE", ds.Database, sfObject.GetFullName(true)})
+	grants = append(grants, Grant{"USAGE", ds.Database, sfDBObject.GetFullName(true)})
 
 	var schemas []SchemaEntity
 	tablesPerSchema := make(map[string][]TableEntity)
@@ -901,7 +901,7 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 
 		if _, f := metaData[ds.Database][strings.ToUpper(p)]; f {
 			matchFound = true
-			grants = append(grants, Grant{p, ds.Database, sfObject.GetFullName(true)})
+			grants = append(grants, Grant{p, ds.Database, sfDBObject.GetFullName(true)})
 		} else if schemas == nil {
 			err = repo.GetSchemasInDatabase(database, func(entity interface{}) error {
 				schema := entity.(*SchemaEntity)
@@ -910,18 +910,18 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 					return nil
 				}
 
-				sfObject.Schema = &schema.Name
-				grants = append(grants, Grant{"USAGE", ds.Schema, sfObject.GetFullName(true)})
+				sfSchemaObject := common.SnowflakeObject{Database: &database, Schema: &schema.Name, Table: nil, Column: nil}
+				grants = append(grants, Grant{"USAGE", ds.Schema, sfSchemaObject.GetFullName(true)})
 
 				// Check if the permission is applicable on schemas
 				if _, f := metaData[ds.Schema][strings.ToUpper(p)]; f {
 					matchFound = true
-					grants = append(grants, Grant{p, ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
+					grants = append(grants, Grant{p, ds.Schema, common.FormatQuery(`%s.%s`, *sfSchemaObject.Database, *sfSchemaObject.Schema)})
 				} else {
 					tables, f := tablesPerSchema[schema.Name]
 					if !f {
 						tables = make([]TableEntity, 0)
-						err = repo.GetTablesInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
+						err = repo.GetTablesInDatabase(*sfSchemaObject.Database, *sfSchemaObject.Schema, func(entity interface{}) error {
 							table := entity.(*TableEntity)
 							tables = append(tables, *table)
 							return nil
@@ -941,7 +941,7 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 						// Check if the permission is applicable on the data object type
 						if _, f := metaData[raitoType][strings.ToUpper(p)]; f {
 							matchFound = true
-							grants = append(grants, Grant{p, raitoType, common.FormatQuery(`%s.%s.%s`, *sfObject.Database, *sfObject.Schema, table.Name)})
+							grants = append(grants, Grant{p, raitoType, common.FormatQuery(`%s.%s.%s`, *sfSchemaObject.Database, *sfSchemaObject.Schema, table.Name)})
 						}
 					}
 				}
