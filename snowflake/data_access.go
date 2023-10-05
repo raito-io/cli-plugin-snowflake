@@ -1009,6 +1009,7 @@ func createPermissionGrantsForDatabase(repo dataAccessRepository, database, p st
 
 	if _, f := metaData[dbType][strings.ToUpper(p)]; f {
 		matchFound = true
+
 		grants = append(grants, Grant{p, ds.Database, database})
 	} else {
 		schemas, err := getSchemasForDatabase(repo, database)
@@ -1030,7 +1031,8 @@ func createPermissionGrantsForDatabase(repo dataAccessRepository, database, p st
 
 			// Only generate the USAGE grant if any applicable permissions were applied on the schema or any item below
 			if schemaMatchFound && !isShared {
-				sfSchemaObject := common.SnowflakeObject{Database: &database, Schema: &schema.Name, Table: nil, Column: nil}
+				schemaName := schema.Name
+				sfSchemaObject := common.SnowflakeObject{Database: &database, Schema: &schemaName, Table: nil, Column: nil}
 				grants = append(grants, Grant{"USAGE", ds.Schema, sfSchemaObject.GetFullName(true)})
 			}
 
@@ -1067,6 +1069,7 @@ func createGrantsForDatabase(repo dataAccessRepository, permissions []string, da
 	for _, p := range permissions {
 		databaseMatchFound := false
 		grants, databaseMatchFound, err = createPermissionGrantsForDatabase(repo, database, p, metaData, grants, isShared)
+
 		if err != nil {
 			return nil, err
 		}
@@ -1148,7 +1151,8 @@ func createGrantsForAccount(repo dataAccessRepository, permissions []string, met
 
 				// Only generate the USAGE grant if any applicable permissions were applied or any item below
 				if databaseMatchFound && !isShare {
-					sfDBObject := common.SnowflakeObject{Database: &database.Name, Schema: nil, Table: nil, Column: nil}
+					dsName := database.Name
+					sfDBObject := common.SnowflakeObject{Database: &dsName, Schema: nil, Table: nil, Column: nil}
 					grants = append(grants, Grant{"USAGE", ds.Database, sfDBObject.GetFullName(true)})
 				}
 			}
