@@ -38,7 +38,7 @@ func TestSimpleMaskGenerator_Generate(t *testing.T) {
 			methodResult: "MASK(val)",
 			result: result{
 				expectsError:  false,
-				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) -> column_type\nMASK(val);",
+				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) RETURNS column_type ->\nMASK(val);",
 			},
 		},
 		{
@@ -54,7 +54,7 @@ func TestSimpleMaskGenerator_Generate(t *testing.T) {
 			methodResult: "MASK(val)",
 			result: result{
 				expectsError:  false,
-				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) -> column_type\nCASE\n\tWHEN current_user() IN ('test_user') THEN val\n\tELSE MASK(val)\nEND;",
+				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) RETURNS column_type ->\nCASE\n\tWHEN current_user() IN ('test_user') THEN val\n\tELSE MASK(val)\nEND;",
 			},
 		},
 		{
@@ -70,7 +70,7 @@ func TestSimpleMaskGenerator_Generate(t *testing.T) {
 			methodResult: "MASK(val)",
 			result: result{
 				expectsError:  false,
-				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) -> column_type\nCASE\n\tWHEN current_user() IN ('test_user1', 'test_user2', 'test_user3') THEN val\n\tELSE MASK(val)\nEND;",
+				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) RETURNS column_type ->\nCASE\n\tWHEN current_user() IN ('test_user1', 'test_user2', 'test_user3') THEN val\n\tELSE MASK(val)\nEND;",
 			},
 		},
 		{
@@ -86,7 +86,7 @@ func TestSimpleMaskGenerator_Generate(t *testing.T) {
 			methodResult: "MASK(val)",
 			result: result{
 				expectsError:  false,
-				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) -> column_type\nCASE\n\tWHEN current_role() IN ('test_role') THEN val\n\tELSE MASK(val)\nEND;",
+				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) RETURNS column_type ->\nCASE\n\tWHEN current_role() IN ('test_role') THEN val\n\tELSE MASK(val)\nEND;",
 			},
 		},
 		{
@@ -102,7 +102,7 @@ func TestSimpleMaskGenerator_Generate(t *testing.T) {
 			methodResult: "MASK(val)",
 			result: result{
 				expectsError:  false,
-				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) -> column_type\nCASE\n\tWHEN current_role() IN ('test_role1', 'test_role2', 'test_role3') THEN val\n\tELSE MASK(val)\nEND;",
+				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) RETURNS column_type ->\nCASE\n\tWHEN current_role() IN ('test_role1', 'test_role2', 'test_role3') THEN val\n\tELSE MASK(val)\nEND;",
 			},
 		},
 		{
@@ -118,7 +118,7 @@ func TestSimpleMaskGenerator_Generate(t *testing.T) {
 			methodResult: "MASK2(val)",
 			result: result{
 				expectsError:  false,
-				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) -> column_type\nCASE\n\tWHEN current_role() IN ('test_role1', 'test_role2', 'test_role3') THEN val\n\tWHEN current_user() IN ('test_user1', 'test_user2', 'test_user3') THEN val\n\tELSE MASK2(val)\nEND;",
+				maskingResult: "CREATE MASKING POLICY test_mask AS (val column_type) RETURNS column_type ->\nCASE\n\tWHEN current_role() IN ('test_role1', 'test_role2', 'test_role3') THEN val\n\tWHEN current_user() IN ('test_user1', 'test_user2', 'test_user3') THEN val\n\tELSE MASK2(val)\nEND;",
 			},
 		},
 	}
@@ -174,5 +174,5 @@ func TestNullMask_Generate(t *testing.T) {
 
 	// Then
 	require.NoError(t, err)
-	assert.Equal(t, MaskingPolicy("CREATE MASKING POLICY test_mask AS (val column_type) -> column_type\nCASE\n\tWHEN current_role() IN ('test_role1', 'test_role2', 'test_role3') THEN val\n\tWHEN current_user() IN ('test_user1', 'test_user2', 'test_user3') THEN val\n\tELSE NULL\nEND;"), result)
+	assert.Equal(t, MaskingPolicy("CREATE MASKING POLICY test_mask AS (val column_type) RETURNS column_type ->\nCASE\n\tWHEN current_role() IN ('test_role1', 'test_role2', 'test_role3') THEN val\n\tWHEN current_user() IN ('test_user1', 'test_user2', 'test_user3') THEN val\n\tELSE NULL\nEND;"), result)
 }
