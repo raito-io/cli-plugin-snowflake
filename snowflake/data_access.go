@@ -898,7 +898,7 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 		schemaName := fullnameSplit[1]
 		database := fullnameSplit[0]
 
-		schemaFullName := strings.Join([]string{database, schemaName}, ".")
+		schemaFullName := database + "." + schemaName
 
 		dosPerSchema[schemaFullName] = append(dosPerSchema[schemaFullName], do.DataObject.FullName)
 	}
@@ -1340,5 +1340,5 @@ func raitoMaskName(name string) string {
 }
 
 func raitoMaskUniqueName(name string) string {
-	return strings.Join([]string{raitoMaskName(name), gonanoid.MustGenerate(idAlphabet, 8)}, "_")
+	return raitoMaskName(name) + "_" + gonanoid.MustGenerate(idAlphabet, 8)
 }

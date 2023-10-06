@@ -585,7 +585,7 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 	}
 
 	// Get all column types
-	q := fmt.Sprintf("SELECT * FROM %s.INFORMATION_SCHEMA.COLUMNS WHERE CONCAT_WS('.', TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME) IN (%s)", databaseName, strings.Join(columnLiterats, ", "))
+	q := fmt.Sprintf("SELECT * FROM %s.INFORMATION_SCHEMA.COLUMNS WHERE CONCAT_WS('.', TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME) IN (%s)", databaseName, strings.Join(columnLiterats, ", ")) //nolint:gosec
 
 	err = handleDbEntities(repo, q, func() interface{} { return &ColumnEntity{} }, func(entity interface{}) error {
 		columnEntity := entity.(*ColumnEntity)
@@ -687,9 +687,9 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 	var policyEntries []policyReferenceEntity
 
 	for _, policy := range policies {
-		entities, err := repo.GetPolicyReferences(databaseName, schema, policy.Name)
-		if err != nil {
-			return err
+		entities, err2 := repo.GetPolicyReferences(databaseName, schema, policy.Name)
+		if err2 != nil {
+			return err2
 		}
 
 		policyEntries = append(policyEntries, entities...)
@@ -707,8 +707,8 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 		tx.Commit() //nolint
 	}()
 
-	for _, entity := range policyEntries {
-		_, err = tx.Exec(fmt.Sprintf("ALTER TABLE %s.%s.%s ALTER COLUMN %s UNSET MASKING POLICY", databaseName, schema, entity.REF_ENTITY_NAME, entity.REF_COLUMN_NAME.String))
+	for i := range policyEntries {
+		_, err = tx.Exec(fmt.Sprintf("ALTER TABLE %s.%s.%s ALTER COLUMN %s UNSET MASKING POLICY", databaseName, schema, policyEntries[i].REF_ENTITY_NAME, policyEntries[i].REF_COLUMN_NAME.String))
 		if err != nil {
 			return err
 		}
@@ -745,8 +745,8 @@ func (repo *SnowflakeRepository) getDbEntities(query string) ([]DbEntity, error)
 	return dbs, nil
 }
 
-func handleDbEntities(repo *SnowflakeRepository, query string, createEntity EntityCreator, handleEntity EntityHandler, args ...any) error {
-	rows, _, err := repo.query(query, args...)
+func handleDbEntities(repo *SnowflakeRepository, query string, createEntity EntityCreator, handleEntity EntityHandler) error {
+	rows, _, err := repo.query(query)
 	if err != nil {
 		return err
 	}
@@ -769,10 +769,10 @@ func handleDbEntities(repo *SnowflakeRepository, query string, createEntity Enti
 	return nil
 }
 
-func (repo *SnowflakeRepository) query(query string, args ...any) (*sql.Rows, time.Duration, error) {
+func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, error) {
 	logger.Debug(fmt.Sprintf("Sending query: %s", query))
 	startQuery := time.Now()
-	result, err := QuerySnowflake(repo.conn, query, args...)
+	result, err := QuerySnowflake(repo.conn, query)
 	sec := time.Since(startQuery).Round(time.Millisecond)
 	repo.queryTime += sec
 
