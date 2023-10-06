@@ -14,6 +14,7 @@ var raitoTypeToSnowflakeGrantType = map[string]string{
 	ExternalTable:     "EXTERNAL TABLE",
 	"shared-database": "DATABASE",
 	"shared-table":    "TABLE",
+	"shared-view":     "VIEW",
 	"shared-schema":   "SCHEMA",
 }
 

@@ -47,6 +47,8 @@ type dataAccessRepository interface {
 	ExecuteRevoke(perm, on, role string) error
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetDataBases() ([]DbEntity, error)
+	GetWarehouses() ([]DbEntity, error)
 	CommentRoleIfExists(comment, objectName string) error
 	GrantUsersToRole(ctx context.Context, role string, users ...string) error
 	RevokeUsersFromRole(ctx context.Context, role string, users ...string) error
@@ -58,12 +60,18 @@ type dataAccessRepository interface {
 }
 
 type AccessSyncer struct {
-	repoProvider func(params map[string]string, role string) (dataAccessRepository, error)
+	repoProvider            func(params map[string]string, role string) (dataAccessRepository, error)
+	tablesPerSchemaCache    map[string][]TableEntity
+	schemasPerDataBaseCache map[string][]SchemaEntity
+	databasesCache          []DbEntity
+	warehousesCache         []DbEntity
 }
 
 func NewDataAccessSyncer() *AccessSyncer {
 	return &AccessSyncer{
-		repoProvider: newDataAccessSnowflakeRepo,
+		repoProvider:            newDataAccessSnowflakeRepo,
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
 	}
 }
 
@@ -140,7 +148,7 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, role
 		return err
 	}
 
-	err = s.generateAccessControls(ctx, accessProviders, existingRoles, repo, false)
+	err = s.generateAccessControls(ctx, accessProviders, existingRoles, repo)
 	if err != nil {
 		return err
 	}
@@ -229,7 +237,7 @@ func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, access map[
 		return err
 	}
 
-	err = s.generateAccessControls(ctx, access, existingRoles, repo, true)
+	err = s.generateAccessControls(ctx, access, existingRoles, repo)
 	if err != nil {
 		return err
 	}
@@ -602,7 +610,7 @@ func buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
 }
 
 //nolint:gocyclo
-func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, repo dataAccessRepository, verifyAndPropagate bool) error {
+func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, repo dataAccessRepository) error {
 	// We always need the meta data
 	syncer := DataSourceSyncer{}
 	md, err := syncer.GetDataSourceMetaData(ctx)
@@ -612,14 +620,6 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 	}
 
 	metaData := buildMetaDataMap(md)
-
-	// Initializes empty map
-	propagateMetaData := make(map[string]map[string]struct{})
-
-	// Keep the propagateMetaData empty if not needing to do the propagation. Otherwise, use the metadata map.
-	if verifyAndPropagate {
-		propagateMetaData = metaData
-	}
 
 	roleCreated := make(map[string]interface{})
 
@@ -660,34 +660,49 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 				}
 
 				if isTableType(what.DataObject.Type) {
-					grants, err := createGrantsForTableOrView(what.DataObject.Type, permissions, what.DataObject.FullName, propagateMetaData)
+					grants, err := s.createGrantsForTableOrView(what.DataObject.Type, permissions, what.DataObject.FullName, metaData)
 					if err != nil {
 						return err
 					}
 
 					expectedGrants = append(expectedGrants, grants...)
 				} else if what.DataObject.Type == ds.Schema {
-					grants, err := createGrantsForSchema(repo, permissions, what.DataObject.FullName, propagateMetaData)
+					grants, err := s.createGrantsForSchema(repo, permissions, what.DataObject.FullName, metaData, false)
+					if err != nil {
+						return err
+					}
+
+					expectedGrants = append(expectedGrants, grants...)
+				} else if what.DataObject.Type == "shared-schema" {
+					grants, err := s.createGrantsForSchema(repo, permissions, what.DataObject.FullName, metaData, true)
 					if err != nil {
 						return err
 					}
 
 					expectedGrants = append(expectedGrants, grants...)
 				} else if what.DataObject.Type == "shared-database" {
-					for _, p := range permissions {
-						expectedGrants = append(expectedGrants, Grant{p, "shared-database", what.DataObject.FullName})
+					grants, err := s.createGrantsForDatabase(repo, permissions, what.DataObject.FullName, metaData, true)
+					if err != nil {
+						return err
 					}
+
+					expectedGrants = append(expectedGrants, grants...)
 				} else if what.DataObject.Type == ds.Database {
-					grants, err := createGrantsForDatabase(repo, permissions, what.DataObject.FullName, propagateMetaData)
+					grants, err := s.createGrantsForDatabase(repo, permissions, what.DataObject.FullName, metaData, false)
 					if err != nil {
 						return err
 					}
 
 					expectedGrants = append(expectedGrants, grants...)
 				} else if what.DataObject.Type == "warehouse" {
-					expectedGrants = append(expectedGrants, createGrantsForWarehouse(permissions, what.DataObject.FullName, propagateMetaData)...)
+					expectedGrants = append(expectedGrants, s.createGrantsForWarehouse(permissions, what.DataObject.FullName, metaData)...)
 				} else if what.DataObject.Type == ds.Datasource {
-					expectedGrants = append(expectedGrants, createGrantsForAccount(permissions, propagateMetaData)...)
+					grants, err := s.createGrantsForAccount(repo, permissions, metaData)
+					if err != nil {
+						return err
+					}
+
+					expectedGrants = append(expectedGrants, grants...)
 				}
 			}
 		}
@@ -935,7 +950,7 @@ func (s *AccessSyncer) removeMask(_ context.Context, mask string, repo dataAcces
 	return nil
 }
 
-func createGrantsForTableOrView(doType string, permissions []string, fullName string, metaData map[string]map[string]struct{}) ([]Grant, error) {
+func (s *AccessSyncer) createGrantsForTableOrView(doType string, permissions []string, fullName string, metaData map[string]map[string]struct{}) ([]Grant, error) {
 	// TODO: this does not work for Raito full names
 	sfObject := common.ParseFullName(fullName)
 	if sfObject.Database == nil || sfObject.Schema == nil || sfObject.Table == nil {
@@ -943,22 +958,103 @@ func createGrantsForTableOrView(doType string, permissions []string, fullName st
 	}
 
 	grants := make([]Grant, 0, len(permissions)+2)
-	grants = append(grants,
-		Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, *sfObject.Database)},
-		Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
 
 	for _, p := range permissions {
-		if _, f := metaData[doType][strings.ToUpper(p)]; len(metaData) == 0 || f {
+		if _, f := metaData[doType][strings.ToUpper(p)]; f {
 			grants = append(grants, Grant{p, doType, common.FormatQuery(`%s.%s.%s`, *sfObject.Database, *sfObject.Schema, *sfObject.Table)})
 		} else {
 			logger.Warn("Permission %q does not apply to type %s", p, strings.ToUpper(doType))
 		}
 	}
 
+	if len(grants) > 0 {
+		grants = append(grants,
+			Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, *sfObject.Database)},
+			Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
+	}
+
 	return grants, nil
 }
 
-func createGrantsForSchema(repo dataAccessRepository, permissions []string, fullName string, metaData map[string]map[string]struct{}) ([]Grant, error) {
+func (s *AccessSyncer) getTablesForSchema(repo dataAccessRepository, database, schema string) ([]TableEntity, error) {
+	cacheKey := database + "." + schema
+
+	if tables, f := s.tablesPerSchemaCache[cacheKey]; f {
+		return tables, nil
+	}
+
+	tables := make([]TableEntity, 10)
+
+	err := repo.GetTablesInDatabase(database, schema, func(entity interface{}) error {
+		table := entity.(*TableEntity)
+		tables = append(tables, *table)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	s.tablesPerSchemaCache[cacheKey] = tables
+
+	return tables, nil
+}
+
+func (s *AccessSyncer) getSchemasForDatabase(repo dataAccessRepository, database string) ([]SchemaEntity, error) {
+	if schemas, f := s.schemasPerDataBaseCache[database]; f {
+		return schemas, nil
+	}
+
+	schemas := make([]SchemaEntity, 10)
+
+	err := repo.GetSchemasInDatabase(database, func(entity interface{}) error {
+		schema := entity.(*SchemaEntity)
+		schemas = append(schemas, *schema)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	s.schemasPerDataBaseCache[database] = schemas
+
+	return schemas, nil
+}
+
+func (s *AccessSyncer) getDatabases(repo dataAccessRepository) ([]DbEntity, error) {
+	if s.databasesCache != nil {
+		return s.databasesCache, nil
+	}
+
+	var err error
+	s.databasesCache, err = repo.GetDataBases()
+
+	if err != nil {
+		s.databasesCache = nil
+		return nil, err
+	}
+
+	return s.databasesCache, nil
+}
+
+func (s *AccessSyncer) getWarehouses(repo dataAccessRepository) ([]DbEntity, error) {
+	if s.warehousesCache != nil {
+		return s.warehousesCache, nil
+	}
+
+	var err error
+	s.warehousesCache, err = repo.GetWarehouses()
+
+	if err != nil {
+		s.warehousesCache = nil
+		return nil, err
+	}
+
+	return s.warehousesCache, nil
+}
+
+func (s *AccessSyncer) createGrantsForSchema(repo dataAccessRepository, permissions []string, fullName string, metaData map[string]map[string]struct{}, isShared bool) ([]Grant, error) {
 	// TODO: this does not work for Raito full names
 	sfObject := common.ParseFullName(fullName)
 	if sfObject.Database == nil || sfObject.Schema == nil || sfObject.Table != nil || sfObject.Column != nil {
@@ -966,135 +1062,154 @@ func createGrantsForSchema(repo dataAccessRepository, permissions []string, full
 	}
 
 	grants := make([]Grant, 0, len(permissions)+2)
-	grants = append(grants,
-		Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, *sfObject.Database)},
-		Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
 
-	var tables []TableEntity
 	var err error
 
 	for _, p := range permissions {
-		// Check if the permission is applicable on the schema itself
-		if _, f := metaData[ds.Schema][strings.ToUpper(p)]; len(metaData) == 0 || f {
-			grants = append(grants, Grant{p, ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
-		} else {
-			if tables == nil {
-				err = repo.GetTablesInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
-					table := entity.(*TableEntity)
-					tables = append(tables, *table)
-					return nil
-				})
-				if err != nil {
-					return nil, err
-				}
-			}
+		permissionMatchFound := false
 
-			matchFound := false
-
-			// Run through all the tabular things (tables, views, ...) in the schema
-			for _, table := range tables {
-				// Get the corresponding Raito data object type
-				raitoType := convertSnowflakeTableTypeToRaito(table.TableType)
-
-				// Check if the permission is applicable on the data object type
-				if _, f2 := metaData[raitoType][strings.ToUpper(p)]; f2 {
-					matchFound = true
-					grants = append(grants, Grant{p, raitoType, common.FormatQuery(`%s.%s.%s`, *sfObject.Database, *sfObject.Schema, table.Name)})
-				}
-			}
-
-			if !matchFound {
-				logger.Warn("Permission %q does not apply to type SCHEMA or any of its descendants. Skipping", p)
-			}
+		grants, permissionMatchFound, err = s.createPermissionGrantsForSchema(repo, *sfObject.Database, *sfObject.Schema, p, metaData, grants, isShared)
+		if err != nil {
+			return nil, err
 		}
+
+		if !permissionMatchFound {
+			logger.Warn("Permission %q does not apply to type SCHEMA or any of its descendants. Skipping", p)
+		}
+	}
+
+	// Only generate the USAGE grant if any applicable permissions were applied on the schema or any item below
+	if len(grants) > 0 && !isShared {
+		grants = append(grants,
+			Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, *sfObject.Database)},
+			Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
 	}
 
 	return grants, nil
 }
 
-func createGrantsForDatabase(repo dataAccessRepository, permissions []string, database string, metaData map[string]map[string]struct{}) ([]Grant, error) {
+func (s *AccessSyncer) createPermissionGrantsForSchema(repo dataAccessRepository, database, schema, p string, metaData map[string]map[string]struct{}, grants []Grant, isShared bool) ([]Grant, bool, error) {
+	matchFound := false
+
+	schemaType := ds.Schema
+	if isShared {
+		schemaType = "shared-" + schemaType
+	}
+
+	// Check if the permission is applicable on the schema itself
+	if _, f := metaData[schemaType][strings.ToUpper(p)]; f {
+		grants = append(grants, Grant{p, schemaType, common.FormatQuery(`%s.%s`, database, schema)})
+		matchFound = true
+	} else {
+		tables, err := s.getTablesForSchema(repo, database, schema)
+		if err != nil {
+			return nil, false, err
+		}
+
+		// Run through all the tabular things (tables, views, ...) in the schema
+		for _, table := range tables {
+			tableMatchFound := false
+			grants, tableMatchFound = s.createPermissionGrantsForTable(database, schema, table, p, metaData, grants, isShared)
+			matchFound = matchFound || tableMatchFound
+		}
+	}
+
+	return grants, matchFound, nil
+}
+
+func (s *AccessSyncer) createPermissionGrantsForDatabase(repo dataAccessRepository, database, p string, metaData map[string]map[string]struct{}, grants []Grant, isShared bool) ([]Grant, bool, error) {
+	matchFound := false
+
+	dbType := ds.Database
+	if isShared {
+		dbType = "shared-" + dbType
+	}
+
+	if _, f := metaData[dbType][strings.ToUpper(p)]; f {
+		matchFound = true
+
+		grants = append(grants, Grant{p, dbType, database})
+	} else {
+		schemas, err := s.getSchemasForDatabase(repo, database)
+		if err != nil {
+			return nil, false, err
+		}
+
+		for _, schema := range schemas {
+			if schema.Name == "INFORMATION_SCHEMA" || schema.Name == "" {
+				continue
+			}
+
+			schemaMatchFound := false
+
+			grants, schemaMatchFound, err = s.createPermissionGrantsForSchema(repo, database, schema.Name, p, metaData, grants, isShared)
+			if err != nil {
+				return nil, matchFound, err
+			}
+
+			// Only generate the USAGE grant if any applicable permissions were applied on the schema or any item below
+			if schemaMatchFound && !isShared {
+				schemaName := schema.Name
+				sfSchemaObject := common.SnowflakeObject{Database: &database, Schema: &schemaName, Table: nil, Column: nil}
+				grants = append(grants, Grant{"USAGE", ds.Schema, sfSchemaObject.GetFullName(true)})
+			}
+
+			matchFound = matchFound || schemaMatchFound
+		}
+	}
+
+	return grants, matchFound, nil
+}
+
+func (s *AccessSyncer) createPermissionGrantsForTable(database string, schema string, table TableEntity, p string, metaData map[string]map[string]struct{}, grants []Grant, isShared bool) ([]Grant, bool) {
+	// Get the corresponding Raito data object type
+	tableType := convertSnowflakeTableTypeToRaito(table.TableType)
+	if isShared {
+		tableType = "shared-" + tableType
+	}
+
+	// Check if the permission is applicable on the data object type
+	if _, f2 := metaData[tableType][strings.ToUpper(p)]; f2 {
+		grants = append(grants, Grant{p, tableType, common.FormatQuery(`%s.%s.%s`, database, schema, table.Name)})
+		return grants, true
+	}
+
+	return grants, false
+}
+
+func (s *AccessSyncer) createGrantsForDatabase(repo dataAccessRepository, permissions []string, database string, metaData map[string]map[string]struct{}, isShared bool) ([]Grant, error) {
 	grants := make([]Grant, 0, len(permissions)+1)
 
-	sfObject := common.SnowflakeObject{Database: &database, Schema: nil, Table: nil, Column: nil}
-
-	grants = append(grants, Grant{"USAGE", ds.Database, sfObject.GetFullName(true)})
-
-	var schemas []SchemaEntity
-	tablesPerSchema := make(map[string][]TableEntity)
 	var err error
 
 	for _, p := range permissions {
-		matchFound := false
+		databaseMatchFound := false
+		grants, databaseMatchFound, err = s.createPermissionGrantsForDatabase(repo, database, p, metaData, grants, isShared)
 
-		if _, f := metaData[ds.Database][strings.ToUpper(p)]; len(metaData) == 0 || f {
-			matchFound = true
-			grants = append(grants, Grant{p, ds.Database, sfObject.GetFullName(true)})
-		} else if schemas == nil {
-			err = repo.GetSchemasInDatabase(database, func(entity interface{}) error {
-				schema := entity.(*SchemaEntity)
-
-				if schema.Name == "INFORMATION_SCHEMA" {
-					return nil
-				}
-
-				sfObject.Schema = &schema.Name
-				grants = append(grants, Grant{"USAGE", ds.Schema, sfObject.GetFullName(true)})
-
-				// Check if the permission is applicable on schemas
-				if _, f := metaData[ds.Schema][strings.ToUpper(p)]; f {
-					matchFound = true
-					grants = append(grants, Grant{p, ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
-				} else {
-					tables, f := tablesPerSchema[schema.Name]
-					if !f {
-						tables = make([]TableEntity, 0)
-						err = repo.GetTablesInDatabase(*sfObject.Database, *sfObject.Schema, func(entity interface{}) error {
-							table := entity.(*TableEntity)
-							tables = append(tables, *table)
-							return nil
-						})
-						if err != nil {
-							return err
-						}
-
-						tablesPerSchema[schema.Name] = tables
-					}
-
-					// Run through all the tabular things (tables, views, ...) in the schema
-					for _, table := range tables {
-						// Get the corresponding Raito data object type
-						raitoType := convertSnowflakeTableTypeToRaito(table.TableType)
-
-						// Check if the permission is applicable on the data object type
-						if _, f := metaData[raitoType][strings.ToUpper(p)]; f {
-							matchFound = true
-							grants = append(grants, Grant{p, raitoType, common.FormatQuery(`%s.%s.%s`, *sfObject.Database, *sfObject.Schema, table.Name)})
-						}
-					}
-				}
-
-				return nil
-			})
-
-			if err != nil {
-				return nil, err
-			}
+		if err != nil {
+			return nil, err
 		}
 
-		if !matchFound {
+		if !databaseMatchFound {
 			logger.Warn("Permission %q does not apply to type DATABASE or any of its descendants. Skipping", p)
 		}
 	}
 
+	// Only generate the USAGE grant if any applicable permissions were applied or any item below
+	if len(grants) > 0 && !isShared {
+		sfDBObject := common.SnowflakeObject{Database: &database, Schema: nil, Table: nil, Column: nil}
+		grants = append(grants, Grant{"USAGE", ds.Database, sfDBObject.GetFullName(true)})
+	}
+
 	return grants, nil
 }
 
-func createGrantsForWarehouse(permissions []string, warehouse string, metaData map[string]map[string]struct{}) []Grant {
+func (s *AccessSyncer) createGrantsForWarehouse(permissions []string, warehouse string, metaData map[string]map[string]struct{}) []Grant {
 	grants := make([]Grant, 0, len(permissions)+2)
 	grants = append(grants, Grant{"USAGE", "warehouse", common.FormatQuery(`%s`, warehouse)})
 
 	for _, p := range permissions {
-		if _, f := metaData["warehouse"][strings.ToUpper(p)]; len(metaData) != 0 && !f {
+		if _, f := metaData["warehouse"][strings.ToUpper(p)]; !f {
 			logger.Warn("Permission %q does not apply to type WAREHOUSE. Skipping", p)
 			continue
 		}
@@ -1105,19 +1220,67 @@ func createGrantsForWarehouse(permissions []string, warehouse string, metaData m
 	return grants
 }
 
-func createGrantsForAccount(permissions []string, metaData map[string]map[string]struct{}) []Grant {
+func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permissions []string, metaData map[string]map[string]struct{}) ([]Grant, error) {
 	grants := make([]Grant, 0, len(permissions))
 
 	for _, p := range permissions {
-		if _, f := metaData[ds.Datasource][strings.ToUpper(p)]; len(metaData) != 0 && !f {
-			logger.Warn("Permission %q does not apply to type ACCOUNT (datasource). Skipping", p)
-			continue
+		matchFound := false
+
+		if _, f := metaData[ds.Datasource][strings.ToUpper(p)]; f {
+			grants = append(grants, Grant{p, "account", ""})
+			matchFound = true
+		} else {
+			if _, f2 := metaData["warehouse"][strings.ToUpper(p)]; f2 {
+				matchFound = true
+
+				warehouses, err := s.getWarehouses(repo)
+				if err != nil {
+					return nil, err
+				}
+
+				for _, warehouse := range warehouses {
+					grants = append(grants, Grant{p, "warehouse", common.FormatQuery(`%s`, warehouse.Name)})
+				}
+			}
+
+			shareNames, err := getShareNames(repo)
+			if err != nil {
+				return nil, err
+			}
+
+			databases, err := s.getDatabases(repo)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, database := range databases {
+				databaseMatchFound := false
+
+				_, isShare := shareNames[database.Name]
+
+				grants, databaseMatchFound, err = s.createPermissionGrantsForDatabase(repo, database.Name, p, metaData, grants, isShare)
+				if err != nil {
+					return nil, err
+				}
+
+				matchFound = matchFound || databaseMatchFound
+
+				// Only generate the USAGE grant if any applicable permissions were applied or any item below
+				if databaseMatchFound && !isShare {
+					dsName := database.Name
+					sfDBObject := common.SnowflakeObject{Database: &dsName, Schema: nil, Table: nil, Column: nil}
+					grants = append(grants, Grant{"USAGE", ds.Database, sfDBObject.GetFullName(true)})
+				}
+			}
 		}
 
-		grants = append(grants, Grant{p, "account", ""})
+		if !matchFound {
+			logger.Warn("Permission %q does not apply to type ACCOUNT (datasource) or any of its descendants. Skipping", p)
+			continue
+		}
 	}
 
-	return grants
+	return grants, nil
 }
 
 func mergeGrants(repo dataAccessRepository, role string, found []Grant, expected []Grant, metaData map[string]map[string]struct{}) error {
