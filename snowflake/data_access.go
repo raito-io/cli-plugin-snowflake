@@ -26,6 +26,7 @@ const (
 	nameLockedReason   = "This Snowflake role cannot be renamed because it was imported from an external identity store"
 	deleteLockedReason = "This Snowflake role cannot be deleted because it was imported from an external identity store"
 
+	maskPrefix = "RAITO_"
 	idAlphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 )
 
@@ -482,6 +483,9 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 	for _, policy := range policyEntities {
 		if !strings.HasPrefix(strings.Replace(policy.Kind, "_", " ", -1), policyType) {
 			logger.Warn(fmt.Sprintf("Skipping policy %s of kind %s, expected: %s", policy.Name, policyType, policy.Kind))
+			continue
+		} else if policyType == "MASKING" && strings.HasPrefix(policy.Name, maskPrefix) {
+			logger.Debug(fmt.Sprintf("Masking policy %s defined by RAITO. Not exporting this", policy.Name))
 			continue
 		}
 
@@ -1332,7 +1336,7 @@ func createComment(ap *importer.AccessProvider, update bool) string {
 }
 
 func raitoMaskName(name string) string {
-	return fmt.Sprintf("RAITO_%s", strings.ReplaceAll(strings.ToUpper(name), " ", "_"))
+	return fmt.Sprintf("%s%s", maskPrefix, strings.ReplaceAll(strings.ToUpper(name), " ", "_"))
 }
 
 func raitoMaskUniqueName(name string) string {
