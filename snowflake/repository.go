@@ -622,9 +622,11 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 			return err2
 		}
 
+		logger.Debug(fmt.Sprintf("Execute query to create mask %s: '%s'", maskingName, maskingPolicy))
+
 		_, err = tx.Exec(string(maskingPolicy))
 		if err != nil {
-			return err
+			return fmt.Errorf("creation of mask %s: %w", maskingName, err)
 		}
 
 		_, err = tx.Exec(fmt.Sprintf("GRANT OWNERSHIP ON MASKING POLICY %s TO ROLE %s", maskingName, repo.role))
@@ -641,10 +643,12 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 			fullnameSplit := strings.Split(column, ".")
 
 			q = fmt.Sprintf("ALTER TABLE %s.%s.%s ALTER COLUMN %s SET MASKING POLICY %s FORCE", fullnameSplit[0], fullnameSplit[1], fullnameSplit[2], fullnameSplit[3], maskingName)
-			_, err = tx.Exec(q)
 
+			logger.Debug(fmt.Sprintf("Execute query to assign mask %s to column %s: '%s'", maskingName, column, q))
+
+			_, err = tx.Exec(q)
 			if err != nil {
-				return err
+				return fmt.Errorf("mask %s assignment to column %s: %w", maskingName, column, err)
 			}
 		}
 	}

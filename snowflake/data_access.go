@@ -1169,7 +1169,7 @@ func createComment(ap *importer.AccessProvider, update bool) string {
 }
 
 func raitoMaskName(name string) string {
-	return fmt.Sprintf("RAITO_%s", strings.ToUpper(name))
+	return fmt.Sprintf("RAITO_%s", strings.ReplaceAll(strings.ToUpper(name), " ", "_"))
 }
 
 func raitoMaskUniqueName(name string) string {
