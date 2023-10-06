@@ -177,7 +177,7 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, role
 
 func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, masksToRemove []string, access []*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
 	if configMap.GetBoolWithDefault(SfStandardEdition, false) {
-		if len(masksToRemove) > 0 || len(masksToRemove) > 0 {
+		if len(masksToRemove) > 0 || len(access) > 0 {
 			logger.Error("Skipping masking policies due to Snowflake Standard Edition.")
 		}
 
