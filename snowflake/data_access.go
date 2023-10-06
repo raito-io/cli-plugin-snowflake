@@ -176,6 +176,14 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, role
 }
 
 func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, masksToRemove []string, access []*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+	if configMap.GetBoolWithDefault(SfStandardEdition, false) {
+		if len(masksToRemove) > 0 || len(masksToRemove) > 0 {
+			logger.Error("Skipping masking policies due to Snowflake Standard Edition.")
+		}
+
+		return nil
+	}
+
 	logger.Info(fmt.Sprintf("Configuring access provider as masks in Snowflake. Update %d masks remove %d masks", len(access), len(masksToRemove)))
 
 	repo, err := s.repoProvider(configMap.Parameters, "")
