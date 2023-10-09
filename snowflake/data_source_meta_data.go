@@ -5,17 +5,23 @@ import (
 
 	"github.com/raito-io/cli/base/access_provider"
 	ds "github.com/raito-io/cli/base/data_source"
+	"github.com/raito-io/cli/base/util/config"
 )
 
 const ExternalTable = "external-" + ds.Table
 const MaterializedView = "materialized-" + ds.View
 
-func (s *DataSourceSyncer) GetDataSourceMetaData(ctx context.Context) (*ds.MetaData, error) {
+func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam *config.ConfigMap) (*ds.MetaData, error) {
 	logger.Debug("Returning meta data for Snowflake data source")
+
+	var supportedFeatures []string
+	if !configParam.GetBoolWithDefault(SfStandardEdition, false) {
+		supportedFeatures = append(supportedFeatures, ds.RowFiltering, ds.ColumnMasking)
+	}
 
 	return &ds.MetaData{
 		Type:                  "snowflake",
-		SupportedFeatures:     []string{ds.RowFiltering, ds.ColumnMasking},
+		SupportedFeatures:     supportedFeatures,
 		SupportsApInheritance: true,
 		DataObjectTypes: []*ds.DataObjectType{
 			{

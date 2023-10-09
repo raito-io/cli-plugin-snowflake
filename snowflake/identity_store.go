@@ -31,7 +31,7 @@ func newIdentityStoreSnowflakeRepo(params map[string]string, role string) (ident
 	return NewSnowflakeRepository(params, role)
 }
 
-func (s *IdentityStoreSyncer) GetIdentityStoreMetaData(_ context.Context) (*is.MetaData, error) {
+func (s *IdentityStoreSyncer) GetIdentityStoreMetaData(_ context.Context, _ *config.ConfigMap) (*is.MetaData, error) {
 	logger.Debug("Returning meta data for Snowflake identity store")
 
 	return &is.MetaData{
