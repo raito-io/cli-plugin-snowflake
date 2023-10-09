@@ -101,7 +101,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	config := s.getConfig()
 
 	//When
-	err := dataAccessSyncer.SyncAccessProvidersToTarget(context.Background(), rolesToRemove, access, dataAccessFeedbackHandler, config)
+	err := dataAccessSyncer.SyncAccessProviderRolesToTarget(context.Background(), rolesToRemove, access, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
@@ -133,7 +133,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	access = make(map[string]*sync_to_target.AccessProvider)
 
 	//When
-	err = dataAccessSyncer.SyncAccessProvidersToTarget(context.Background(), rolesToRemove, access, dataAccessFeedbackHandler, config)
+	err = dataAccessSyncer.SyncAccessProviderRolesToTarget(context.Background(), rolesToRemove, access, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)

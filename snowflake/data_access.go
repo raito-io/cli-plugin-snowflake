@@ -120,7 +120,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	return nil
 }
 
-func (s *AccessSyncer) SyncAccessProvidersToTarget(ctx context.Context, rolesToRemove []string, accessProviders map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, rolesToRemove []string, accessProviders map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
 	logger.Info("Configuring access providers as roles in Snowflake")
 
 	repo, err := s.repoProvider(configMap.Parameters, "")
@@ -143,7 +143,7 @@ func (s *AccessSyncer) SyncAccessProvidersToTarget(ctx context.Context, rolesToR
 		return err
 	}
 
-	err = s.generateAccessControls(ctx, accessProviders, existingRoles, repo)
+	err = s.generateAccessControls(ctx, accessProviders, existingRoles, repo, configMap)
 	if err != nil {
 		return err
 	}
@@ -167,6 +167,11 @@ func (s *AccessSyncer) SyncAccessProvidersToTarget(ctx context.Context, rolesToR
 	}
 
 	return nil
+}
+
+func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, masksToRemove []string, access []*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, access map[string]*importer.AccessProvider, prefix string, configMap *config.ConfigMap) error {
@@ -200,7 +205,7 @@ func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, access map[
 		return err
 	}
 
-	err = s.generateAccessControls(ctx, access, existingRoles, repo)
+	err = s.generateAccessControls(ctx, access, existingRoles, repo, configMap)
 	if err != nil {
 		return err
 	}
@@ -573,10 +578,10 @@ func buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
 }
 
 //nolint:gocyclo
-func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, repo dataAccessRepository) error {
+func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, repo dataAccessRepository, configMap *config.ConfigMap) error {
 	// We always need the meta data
 	syncer := DataSourceSyncer{}
-	md, err := syncer.GetDataSourceMetaData(ctx)
+	md, err := syncer.GetDataSourceMetaData(ctx, configMap)
 
 	if err != nil {
 		return err
