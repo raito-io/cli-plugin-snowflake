@@ -191,7 +191,7 @@ func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, mask
 		return err
 	}
 
-	// Step 1: Update masks en create new masks
+	// Step 1: Update masks and create new masks
 	for _, mask := range access {
 		maskName, err2 := s.updateMask(ctx, mask, repo)
 		if err2 != nil {
@@ -886,7 +886,7 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 	globalMaskName := raitoMaskName(mask.Name)
 	uniqueMaskName := raitoMaskUniqueName(mask.Name)
 
-	// Load beneficieries
+	// Step 0: Load beneficieries
 	beneficiaries := MaskingBeneficiaries{
 		Users: mask.Who.Users,
 		Roles: mask.Who.InheritFrom,
@@ -911,11 +911,13 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 		dosPerSchema[schemaFullName] = append(dosPerSchema[schemaFullName], do.DataObject.FullName)
 	}
 
+	// Step 1: Get existing masking policies with same prefix
 	existingPolicies, err := repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", globalMaskName, "%"))
 	if err != nil {
 		return uniqueMaskName, err
 	}
 
+	// Step 2: For each schema create a new masking policy and force the DataObjects to use the new policy
 	for schema, dos := range dosPerSchema {
 		logger.Info(fmt.Sprintf("Updating mask %q for schema %q", mask.Name, schema))
 		namesplit := strings.Split(schema, ".")
@@ -929,6 +931,7 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 		}
 	}
 
+	// Step 3: Remove old policies that we misted in step 1
 	for _, policy := range existingPolicies {
 		existingUniqueMaskNameSpit := strings.Split(policy.Name, "_")
 		existingUniqueMaskName := strings.Join(existingUniqueMaskNameSpit[:len(existingUniqueMaskNameSpit)-1], "_")
