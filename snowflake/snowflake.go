@@ -52,8 +52,8 @@ func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string,
 	return conn, role, nil
 }
 
-func QuerySnowflake(conn *sql.DB, query string) (*sql.Rows, error) {
-	rows, err := conn.Query(query)
+func QuerySnowflake(conn *sql.DB, query string, args ...any) (*sql.Rows, error) {
+	rows, err := conn.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error while querying Snowflake with query '%s': %s", query, err.Error())
 	}

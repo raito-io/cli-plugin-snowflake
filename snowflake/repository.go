@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/raito-io/cli/base/tag"
+	"github.com/raito-io/golang-set/set"
 
 	"github.com/blockloop/scan"
 	"github.com/hashicorp/go-multierror"
@@ -39,6 +40,8 @@ type SnowflakeRepository struct {
 	conn      *sql.DB
 	queryTime time.Duration
 	role      string
+
+	maskFactory *MaskFactory
 }
 
 func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRepository, error) {
@@ -50,6 +53,8 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 	return &SnowflakeRepository{
 		conn: conn,
 		role: role,
+
+		maskFactory: NewMaskFactory(),
 	}, nil
 }
 
@@ -385,7 +390,7 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 	return userRows, nil
 }
 
-func (repo *SnowflakeRepository) GetPolicies(policy string) ([]policyEntity, error) {
+func (repo *SnowflakeRepository) GetPolicies(policy string) ([]PolicyEntity, error) {
 	q := fmt.Sprintf("SHOW %s POLICIES", policy)
 
 	rows, _, err := repo.query(q)
@@ -393,7 +398,7 @@ func (repo *SnowflakeRepository) GetPolicies(policy string) ([]policyEntity, err
 		return nil, err
 	}
 
-	var policyEntities []policyEntity
+	var policyEntities []PolicyEntity
 
 	err = scan.Rows(&policyEntities, rows)
 	if err != nil {
@@ -568,6 +573,155 @@ func (repo *SnowflakeRepository) CommentRoleIfExists(comment, objectName string)
 	_, _, err = repo.query(q)
 
 	return err
+}
+
+func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) (err error) {
+	dataObjectTypeMap := map[string][]string{}
+	columnTypes := set.Set[string]{}
+
+	columnLiterats := make([]string, 0, len(columnsFullName))
+	for _, fullName := range columnsFullName {
+		columnLiterats = append(columnLiterats, fmt.Sprintf("'%s'", fullName))
+	}
+
+	// Get all column types
+	q := fmt.Sprintf("SELECT * FROM %s.INFORMATION_SCHEMA.COLUMNS WHERE CONCAT_WS('.', TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME) IN (%s)", databaseName, strings.Join(columnLiterats, ", ")) //nolint:gosec
+
+	err = handleDbEntities(repo, q, func() interface{} { return &ColumnEntity{} }, func(entity interface{}) error {
+		columnEntity := entity.(*ColumnEntity)
+
+		fullName := strings.Join([]string{columnEntity.Database, columnEntity.Schema, columnEntity.Table, columnEntity.Name}, ".")
+		dataObjectTypeMap[columnEntity.DataType] = append(dataObjectTypeMap[columnEntity.DataType], fullName)
+		columnTypes.Add(columnEntity.DataType)
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	tx, err := repo.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback() //nolint
+		}
+		tx.Commit() //nolint
+	}()
+
+	maskingForDataObjects := map[string][]string{}
+
+	// For each column type create a masking policy
+	for columnType := range columnTypes {
+		maskingName, maskingPolicy, err2 := repo.maskFactory.CreateMask(fmt.Sprintf("%s.%s.%s", databaseName, schema, maskName), columnType, maskType, beneficiaries)
+		if err2 != nil {
+			return err2
+		}
+
+		logger.Debug(fmt.Sprintf("Execute query to create mask %s: '%s'", maskingName, maskingPolicy))
+
+		_, err = tx.Exec(string(maskingPolicy))
+		if err != nil {
+			return fmt.Errorf("creation of mask %s: %w", maskingName, err)
+		}
+
+		_, err = tx.Exec(fmt.Sprintf("GRANT OWNERSHIP ON MASKING POLICY %s TO ROLE %s", maskingName, repo.role))
+		if err != nil {
+			return err
+		}
+
+		maskingForDataObjects[maskingName] = dataObjectTypeMap[columnType]
+	}
+
+	// Assign all columns to the correct masking policy
+	for maskingName, columns := range maskingForDataObjects {
+		for _, column := range columns {
+			fullnameSplit := strings.Split(column, ".")
+
+			q = fmt.Sprintf("ALTER TABLE %s.%s.%s ALTER COLUMN %s SET MASKING POLICY %s FORCE", fullnameSplit[0], fullnameSplit[1], fullnameSplit[2], fullnameSplit[3], maskingName)
+
+			logger.Debug(fmt.Sprintf("Execute query to assign mask %s to column %s: '%s'", maskingName, column, q))
+
+			_, err = tx.Exec(q)
+			if err != nil {
+				return fmt.Errorf("mask %s assignment to column %s: %w", maskingName, column, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (repo *SnowflakeRepository) GetPoliciesLike(policy string, like string) ([]PolicyEntity, error) {
+	q := fmt.Sprintf("SHOW %s POLICIES LIKE '%s';", policy, like)
+
+	var policyEntities []PolicyEntity
+
+	err := handleDbEntities(repo, q, func() interface{} {
+		return &PolicyEntity{}
+	}, func(entity interface{}) error {
+		pEntry := entity.(*PolicyEntity)
+		policyEntities = append(policyEntities, *pEntry)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Info(fmt.Sprintf("Found %d %s policies", len(policyEntities), policy))
+
+	return policyEntities, nil
+}
+
+func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema string, maskName string) (err error) {
+	policies, err := repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s_%s", maskName, "%"))
+	if err != nil {
+		return err
+	}
+
+	var policyEntries []policyReferenceEntity
+
+	for _, policy := range policies {
+		entities, err2 := repo.GetPolicyReferences(databaseName, schema, policy.Name)
+		if err2 != nil {
+			return err2
+		}
+
+		policyEntries = append(policyEntries, entities...)
+	}
+
+	tx, err := repo.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback() //nolint
+		}
+		tx.Commit() //nolint
+	}()
+
+	for i := range policyEntries {
+		_, err = tx.Exec(fmt.Sprintf("ALTER TABLE %s.%s.%s ALTER COLUMN %s UNSET MASKING POLICY", databaseName, schema, policyEntries[i].REF_ENTITY_NAME, policyEntries[i].REF_COLUMN_NAME.String))
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, policy := range policies {
+		_, err = tx.Exec(fmt.Sprintf("DROP MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (repo *SnowflakeRepository) getDbEntities(query string) ([]DbEntity, error) {
