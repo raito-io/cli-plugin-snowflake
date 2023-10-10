@@ -170,8 +170,7 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, role
 }
 
 func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, masksToRemove []string, access []*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, access map[string]*importer.AccessProvider, prefix string, configMap *config.ConfigMap) error {
