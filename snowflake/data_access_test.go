@@ -1028,7 +1028,7 @@ func generateAccessControls_table(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1069,7 +1069,7 @@ func generateAccessControls_view(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1120,7 +1120,7 @@ func generateAccessControls_schema(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1161,7 +1161,7 @@ func generateAccessControls_schema_noverify(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1215,7 +1215,7 @@ func generateAccessControls_existing_schema(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"RoleName1": true}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"RoleName1": true}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1254,7 +1254,7 @@ func generateAccessControls_sharedDatabase(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1309,7 +1309,7 @@ func generateAccessControls_database(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1369,7 +1369,7 @@ func generateAccessControls_existing_database(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"RoleName1": true}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"RoleName1": true}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1409,7 +1409,7 @@ func generateAccessControls_warehouse(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1448,7 +1448,7 @@ func generateAccessControls_datasource(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1514,7 +1514,7 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"existingRole1": true}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"existingRole1": true}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1591,7 +1591,7 @@ func TestAccessSyncer_generateAccessControls_inheritance(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock)
+	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{})
 
 	//Then
 	assert.NoError(t, err)
