@@ -231,7 +231,7 @@ func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, access map[
 
 	for role, toKeep := range existingRoles {
 		if !toKeep {
-			rolesToRemove[role] = &importer.AccessProvider{Id: role, ActualName: &role}
+			rolesToRemove[role] = &importer.AccessProvider{Id: role, ActualName: ptr.String(role)}
 		}
 	}
 
@@ -257,6 +257,7 @@ func (d *dummyFeedbackHandler) AddAccessProviderFeedback(accessProviderFeedback 
 			logger.Error(fmt.Sprintf("error during syncing of access provider %q; %s", accessProviderFeedback.AccessProvider, err))
 		}
 	}
+
 	return nil
 }
 
@@ -267,7 +268,7 @@ func (s *AccessSyncer) removeRolesToRemove(rolesToRemove map[string]*importer.Ac
 		for roleToRemove, roleAp := range rolesToRemove {
 			externalId := roleToRemove
 
-			fi := &importer.AccessProviderSyncFeedback{
+			fi := importer.AccessProviderSyncFeedback{
 				AccessProvider: roleAp.Id,
 				ActualName:     roleToRemove,
 				ExternalId:     &externalId,
@@ -278,12 +279,10 @@ func (s *AccessSyncer) removeRolesToRemove(rolesToRemove map[string]*importer.Ac
 			if err != nil && !strings.Contains(err.Error(), "does not exist") {
 				logger.Error(fmt.Sprintf("unable to drop role %q: %s", roleToRemove, err.Error()))
 
-				if fi != nil {
-					fi.Errors = append(fi.Errors, fmt.Sprintf("unable to drop role %q: %s", roleToRemove, err.Error()))
-				}
+				fi.Errors = append(fi.Errors, fmt.Sprintf("unable to drop role %q: %s", roleToRemove, err.Error()))
 			}
 
-			err = feedbackHandler.AddAccessProviderFeedback(*fi)
+			err = feedbackHandler.AddAccessProviderFeedback(fi)
 			if err != nil {
 				return err
 			}
@@ -645,6 +644,7 @@ func buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
 	return metaDataMap
 }
 
+//nolint:gocyclo
 func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, rolesCreated map[string]interface{}, repo dataAccessRepository, metaData map[string]map[string]struct{}) error {
 	accessProvider := apMap[rn]
 
@@ -886,7 +886,6 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 	return nil
 }
 
-//nolint:gocyclo
 func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, repo dataAccessRepository, configMap *config.ConfigMap, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
 	// We always need the meta data
 	syncer := DataSourceSyncer{}
