@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli/base/tag"
+
+	"github.com/raito-io/cli-plugin-snowflake/common"
 
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
@@ -73,7 +74,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	skipTags := configParams.GetBoolWithDefault(SfSkipTags, false)
 	skipColumns := configParams.GetBoolWithDefault(SfSkipColumns, false)
 
-	excludedDatabases := ""
+	excludedDatabases := "SNOWFLAKE"
 	if v, ok := configParams.Parameters[SfExcludedDatabases]; ok {
 		excludedDatabases = v
 	}
