@@ -5,6 +5,7 @@ package it
 import (
 	"context"
 	"fmt"
+	"github.com/aws/smithy-go/ptr"
 	"strings"
 	"testing"
 
@@ -65,11 +66,11 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	s.Contains(externalIds, "PUBLIC")
 }
 
-func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderRolesToTarget() {
+func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	//Given
-	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T(), 1)
+	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
-	rolesToRemove := []string{}
+	rolesToRemove := map[string]*sync_to_target.AccessProvider{}
 
 	actualRoleName := generateRole("TESTROLE1", "")
 
@@ -110,11 +111,13 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderRolesToTarget()
 	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
 
 	s.Len(accessProviderFeedback, 1)
-	s.Equal(map[string][]sync_to_target.AccessSyncFeedbackInformation{
-		fmt.Sprintf("%s_ap_id1", testId): {{
-			ActualName: actualRoleName,
-			AccessId:   fmt.Sprintf("%s_ap_id1", testId),
-		}},
+	s.Equal([]sync_to_target.AccessProviderSyncFeedback{
+		{
+			ActualName:     actualRoleName,
+			AccessProvider: fmt.Sprintf("%s_ap_id1", testId),
+			ExternalId:     &actualRoleName,
+			Type:           ptr.String("role"),
+		},
 	}, accessProviderFeedback)
 
 	roles, err := s.sfRepo.GetRoles()
@@ -128,8 +131,9 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderRolesToTarget()
 	})
 
 	//Given
-	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T(), 1)
-	rolesToRemove = append(rolesToRemove, actualRoleName)
+	id := fmt.Sprintf("%s_ap_id1", testId)
+	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+	rolesToRemove = map[string]*sync_to_target.AccessProvider{actualRoleName: {Id: id}}
 	access = make(map[string]*sync_to_target.AccessProvider)
 
 	//When
@@ -137,7 +141,13 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderRolesToTarget()
 
 	//Then
 	s.NoError(err)
-	s.Empty(dataAccessFeedbackHandler.AccessProviderFeedback)
+	s.ElementsMatch(dataAccessFeedbackHandler.AccessProviderFeedback, []sync_to_target.AccessProviderSyncFeedback{
+		{
+			AccessProvider: id,
+			ActualName:     actualRoleName,
+			ExternalId:     &actualRoleName,
+		},
+	})
 
 	roles, err = s.sfRepo.GetRoles()
 	s.NoError(err)
@@ -150,7 +160,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderRolesToTarget()
 	})
 }
 
-func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessAsCodeToTarget() {
+func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	//Given
 	prefix := fmt.Sprintf("%s$AAC_", testId)
 
@@ -223,7 +233,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 	s.T().Skip("Skip test as Masking is a non standard edition feature")
 
 	//Given
-	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T(), 1)
+	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
 	database := "RUBEN_TEST"
 	schema := "TESTING"
@@ -232,12 +242,12 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 
 	doFullname := fmt.Sprintf("%s.%s.%s.%s", database, schema, table, column)
 
-	var masksToRemove []string
+	var masksToRemove map[string]*sync_to_target.AccessProvider
 
 	maskName := fmt.Sprintf("%s_mask_id1", testId)
 
-	masks := []*sync_to_target.AccessProvider{
-		{
+	masks := map[string]*sync_to_target.AccessProvider{
+		maskName: {
 			Id:          maskName,
 			Name:        maskName,
 			Action:      sync_to_target.Mask,
@@ -272,17 +282,12 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 
 	s.Len(accessProviderFeedback, 1)
 
-	feedbackObject, found := accessProviderFeedback[fmt.Sprintf("%s_mask_id1", testId)]
-	s.True(found)
-	s.NotNil(feedbackObject)
-	s.Len(feedbackObject, 1)
-
-	s.True(strings.HasPrefix(feedbackObject[0].ActualName, fmt.Sprintf("RAITO_%s", strings.ToUpper(maskName))))
+	s.True(strings.HasPrefix(accessProviderFeedback[0].ActualName, fmt.Sprintf("RAITO_%s", strings.ToUpper(maskName))))
 
 	maskPolicies, err := s.sfRepo.GetPolicies("MASKING")
 	s.NoError(err)
 	s.Contains(maskPolicies, snowflake.PolicyEntity{
-		Name:         fmt.Sprintf("%s_TEXT", strings.ToUpper(feedbackObject[0].ActualName)),
+		Name:         fmt.Sprintf("%s_TEXT", strings.ToUpper(accessProviderFeedback[0].ActualName)),
 		SchemaName:   schema,
 		DatabaseName: database,
 		Kind:         "MASKING_POLICY",
@@ -300,17 +305,12 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 
 	s.Len(accessProviderFeedback, 1)
 
-	feedbackObject, found = accessProviderFeedback[fmt.Sprintf("%s_mask_id1", testId)]
-	s.True(found)
-	s.NotNil(feedbackObject)
-	s.Len(feedbackObject, 1)
-
-	s.True(strings.HasPrefix(feedbackObject[0].ActualName, fmt.Sprintf("RAITO_%s", strings.ToUpper(maskName))))
+	s.True(strings.HasPrefix(accessProviderFeedback[0].ActualName, fmt.Sprintf("RAITO_%s", strings.ToUpper(maskName))))
 
 	maskPolicies, err = s.sfRepo.GetPolicies("MASKING")
 	s.NoError(err)
 	s.Contains(maskPolicies, snowflake.PolicyEntity{
-		Name:         fmt.Sprintf("%s_TEXT", strings.ToUpper(feedbackObject[0].ActualName)),
+		Name:         fmt.Sprintf("%s_TEXT", strings.ToUpper(accessProviderFeedback[0].ActualName)),
 		SchemaName:   schema,
 		DatabaseName: database,
 		Kind:         "MASKING_POLICY",
@@ -318,8 +318,8 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 	})
 
 	//Given
-	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T(), 1)
-	masksToRemove = append(masksToRemove, maskName)
+	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+	masksToRemove[maskName] = &sync_to_target.AccessProvider{}
 	masks = nil
 
 	//When
@@ -332,7 +332,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 	maskPolicies, err = s.sfRepo.GetPolicies("MASKING")
 	s.NoError(err)
 	s.NotContains(maskPolicies, snowflake.PolicyEntity{
-		Name:         fmt.Sprintf("%s_TEXT", feedbackObject[0].ActualName),
+		Name:         fmt.Sprintf("%s_TEXT", accessProviderFeedback[0].ActualName),
 		SchemaName:   schema,
 		DatabaseName: database,
 		Owner:        "ACCOUNTADMIN",
@@ -346,12 +346,12 @@ func generateRole(username string, prefix string) string {
 	return strings.ToUpper(fmt.Sprintf("%s_%s", prefix, username))
 }
 
-func filterFeedbackInformation(feedbackInformation map[string][]sync_to_target.AccessSyncFeedbackInformation) map[string][]sync_to_target.AccessSyncFeedbackInformation {
-	result := make(map[string][]sync_to_target.AccessSyncFeedbackInformation)
+func filterFeedbackInformation(feedbackInformation []sync_to_target.AccessProviderSyncFeedback) []sync_to_target.AccessProviderSyncFeedback {
+	result := make([]sync_to_target.AccessProviderSyncFeedback, 0, len(feedbackInformation))
 
-	for key, feedbackList := range feedbackInformation {
-		if strings.HasPrefix(key, testId) {
-			result[key] = feedbackList
+	for _, feedbackList := range feedbackInformation {
+		if strings.HasPrefix(feedbackList.AccessProvider, testId) {
+			result = append(result, feedbackList)
 		}
 	}
 
