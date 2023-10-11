@@ -3,9 +3,10 @@ package snowflake
 import (
 	"context"
 	"fmt"
-	"github.com/raito-io/cli/base/access_provider"
 	"strings"
 	"time"
+
+	"github.com/raito-io/cli/base/access_provider"
 
 	"github.com/aws/smithy-go/ptr"
 	gonanoid "github.com/matoous/go-nanoid/v2"
@@ -267,6 +268,7 @@ func (s *AccessSyncer) removeRolesToRemove(rolesToRemove map[string]*importer.Ac
 			// If an error occurs (and not already deleted), we send an error back as feedback
 			if err != nil && !strings.Contains(err.Error(), "does not exist") {
 				logger.Error(fmt.Sprintf("unable to drop role %q: %s", roleToRemove, err.Error()))
+
 				if fi != nil {
 					fi.Errors = append(fi.Errors, fmt.Sprintf("unable to drop role %q: %s", roleToRemove, err.Error()))
 				}
