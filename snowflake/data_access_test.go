@@ -729,14 +729,14 @@ func TestAccessSyncer_SyncAccessProviderMasksToTarget(t *testing.T) {
 	repoMock := newMockDataAccessRepository(t)
 	fileCreator := mocks.NewSimpleAccessProviderFeedbackHandler(t)
 
-	masksToRemove := map[string]*importer.AccessProvider{"maskToRemove1": {Id: "xxx"}}
+	masksToRemove := map[string]*importer.AccessProvider{"RAITO_MASKTOREMOVE1": {Id: "xxx", ActualName: ptr.String("RAITO_MASKTOREMOVE1")}}
 	masks := map[string]*importer.AccessProvider{
 		"Mask1": {
 			Id:   "MaskId1",
 			Name: "Mask1",
 			Who: importer.WhoItem{
 				Users:       []string{"User1", "User2"},
-				InheritFrom: []string{"Role1", "Role2"},
+				InheritFrom: []string{"Role1", "ID:Role2-Id"},
 			},
 			What: []importer.WhatItem{
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1.Column1", Type: "column"}},
@@ -776,7 +776,7 @@ func TestAccessSyncer_SyncAccessProviderMasksToTarget(t *testing.T) {
 	}
 
 	// When
-	err := syncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, fileCreator, &configParams)
+	err := syncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, map[string]string{"Role2-Id": "Role2"}, fileCreator, &configParams)
 
 	// Then
 	assert.NoError(t, err)
