@@ -657,7 +657,7 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 }
 
 func (repo *SnowflakeRepository) GetPoliciesLike(policy string, like string) ([]PolicyEntity, error) {
-	q := fmt.Sprintf("SHOW %s POLICIES LIKE '%s';", policy, like)
+	q := fmt.Sprintf("SHOW %s POLICIES LIKE '%s';", policy, strings.ToUpper(like))
 
 	var policyEntities []PolicyEntity
 

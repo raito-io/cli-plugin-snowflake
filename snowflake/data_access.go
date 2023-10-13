@@ -159,7 +159,7 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, apTo
 	return nil
 }
 
-func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
 	if configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		if len(apToRemoveMap) > 0 || len(apMap) > 0 {
 			logger.Error("Skipping masking policies due to Snowflake Standard Edition.")
@@ -177,7 +177,7 @@ func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apTo
 
 	// Step 1: Update masks and create new masks
 	for _, mask := range apMap {
-		maskName, err2 := s.updateMask(ctx, mask, repo)
+		maskName, err2 := s.updateMask(ctx, mask, roleNameMap, repo)
 		fi := importer.AccessProviderSyncFeedback{AccessProvider: mask.Id, ActualName: maskName, ExternalId: &maskName}
 
 		if err2 != nil {
@@ -930,7 +930,7 @@ func (s *AccessSyncer) handleAccessProviderFeedback(feedbackHandler wrappers.Acc
 	return feedbackHandler.AddAccessProviderFeedback(*fi)
 }
 
-func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvider, repo dataAccessRepository) (string, error) {
+func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvider, roleNameMap map[string]string, repo dataAccessRepository) (string, error) {
 	logger.Info(fmt.Sprintf("Updating mask %q", mask.Name))
 
 	globalMaskName := raitoMaskName(mask.Name)
@@ -939,7 +939,16 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 	// Step 0: Load beneficieries
 	beneficiaries := MaskingBeneficiaries{
 		Users: mask.Who.Users,
-		Roles: mask.Who.InheritFrom,
+	}
+
+	for _, role := range mask.Who.InheritFrom {
+		if strings.HasPrefix(role, "ID:") {
+			if roleName, found := roleNameMap[role[3:]]; found {
+				beneficiaries.Roles = append(beneficiaries.Roles, roleName)
+			}
+		} else {
+			beneficiaries.Roles = append(beneficiaries.Roles, role)
+		}
 	}
 
 	dosPerSchema := map[string][]string{}
@@ -995,10 +1004,8 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 	return uniqueMaskName, nil
 }
 
-func (s *AccessSyncer) removeMask(_ context.Context, mask string, repo dataAccessRepository) error {
-	logger.Info(fmt.Sprintf("Remove mask %q", mask))
-
-	maskName := raitoMaskName(mask)
+func (s *AccessSyncer) removeMask(_ context.Context, maskName string, repo dataAccessRepository) error {
+	logger.Info(fmt.Sprintf("Remove mask %q", maskName))
 
 	existingPolicies, err := repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", maskName, "%"))
 	if err != nil {
