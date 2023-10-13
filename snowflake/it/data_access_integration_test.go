@@ -5,9 +5,10 @@ package it
 import (
 	"context"
 	"fmt"
-	"github.com/aws/smithy-go/ptr"
 	"strings"
 	"testing"
+
+	"github.com/aws/smithy-go/ptr"
 
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/data_source"
@@ -242,7 +243,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 
 	doFullname := fmt.Sprintf("%s.%s.%s.%s", database, schema, table, column)
 
-	var masksToRemove map[string]*sync_to_target.AccessProvider
+	masksToRemove := map[string]*sync_to_target.AccessProvider{}
 
 	maskName := fmt.Sprintf("%s_mask_id1", testId)
 
@@ -272,7 +273,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 	config := s.getConfig()
 
 	//When
-	err := dataAccessSyncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, dataAccessFeedbackHandler, config)
+	err := dataAccessSyncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, map[string]string{}, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
@@ -294,8 +295,10 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 		Owner:        "ACCOUNTADMIN",
 	})
 
+	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+
 	//When updating the mask will be recreated
-	err = dataAccessSyncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, dataAccessFeedbackHandler, config)
+	err = dataAccessSyncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, map[string]string{}, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
@@ -319,20 +322,24 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 
 	//Given
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
-	masksToRemove[maskName] = &sync_to_target.AccessProvider{}
+	masksToRemove["RAITO_"+maskName] = &sync_to_target.AccessProvider{}
 	masks = nil
 
+	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+
 	//When
-	err = dataAccessSyncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, dataAccessFeedbackHandler, config)
+	err = dataAccessSyncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, map[string]string{}, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
-	s.Empty(dataAccessFeedbackHandler.AccessProviderFeedback)
+	s.Len(accessProviderFeedback, 1)
+
+	s.True(strings.HasPrefix(accessProviderFeedback[0].ActualName, fmt.Sprintf("RAITO_%s", strings.ToUpper(maskName))))
 
 	maskPolicies, err = s.sfRepo.GetPolicies("MASKING")
 	s.NoError(err)
 	s.NotContains(maskPolicies, snowflake.PolicyEntity{
-		Name:         fmt.Sprintf("%s_TEXT", accessProviderFeedback[0].ActualName),
+		Name:         fmt.Sprintf("RAITO_%s_TEXT", strings.ToUpper(accessProviderFeedback[0].ActualName)),
 		SchemaName:   schema,
 		DatabaseName: database,
 		Owner:        "ACCOUNTADMIN",
