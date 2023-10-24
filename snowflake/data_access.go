@@ -24,9 +24,10 @@ var RolesNotinternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN
 var AcceptedTypes = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "VIEW": {}, "COLUMN": {}, "SHARED-DATABASE": {}, "EXTERNAL_TABLE": {}, "MATERIALIZED_VIEW": {}}
 
 const (
-	whoLockedReason    = "The 'who' for this Snowflake role cannot be changed because it was imported from an external identity store"
-	nameLockedReason   = "This Snowflake role cannot be renamed because it was imported from an external identity store"
-	deleteLockedReason = "This Snowflake role cannot be deleted because it was imported from an external identity store"
+	whoLockedReason         = "The 'who' for this Snowflake role cannot be changed because it was imported from an external identity store"
+	inheritanceLockedReason = "The inheritance for this Snowflake role cannot be changed because it was imported from an external identity store"
+	nameLockedReason        = "This Snowflake role cannot be renamed because it was imported from an external identity store"
+	deleteLockedReason      = "This Snowflake role cannot be deleted because it was imported from an external identity store"
 
 	maskPrefix = "RAITO_"
 	idAlphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -413,6 +414,8 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 				ap.DeleteLockedReason = ptr.String(deleteLockedReason)
 				ap.WhoLocked = ptr.Bool(true)
 				ap.WhoLockedReason = ptr.String(whoLockedReason)
+				ap.InheritanceLocked = ptr.Bool(true)
+				ap.InheritanceLockedReason = ptr.String(inheritanceLockedReason)
 			} else {
 				// Otherwise we have to do a full lock
 				ap.NotInternalizable = true
@@ -649,14 +652,15 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 	accessProvider := apMap[rn]
 
 	ignoreWho := accessProvider.WhoLocked != nil && *accessProvider.WhoLocked
+	ignoreInheritance := accessProvider.InheritanceLocked != nil && *accessProvider.InheritanceLocked
 	ignoreWhat := accessProvider.WhatLocked != nil && *accessProvider.WhatLocked
 
-	logger.Info(fmt.Sprintf("Generating access controls for access provider %q (Ignore who: %t; Ignore what: %t)", accessProvider.Name, ignoreWho, ignoreWhat))
+	logger.Info(fmt.Sprintf("Generating access controls for access provider %q (Ignore who: %t; Ignore inheritance: %t; Ignore what: %t)", accessProvider.Name, ignoreWho, ignoreInheritance, ignoreWhat))
 
 	// Extract RoleNames from Access Providers that are among the whoList of this one
 	inheritedRoles := make([]string, 0)
 
-	if !ignoreWho {
+	if !ignoreInheritance {
 		for _, apWho := range accessProvider.Who.InheritFrom {
 			if strings.HasPrefix(apWho, "ID:") {
 				apId := apWho[3:]
@@ -742,7 +746,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 			return fmt.Errorf("error while updating comment on role %q: %s", rn, err2.Error())
 		}
 
-		if !ignoreWho {
+		if !ignoreWho || !ignoreInheritance {
 			grantsOfRole, err3 := repo.GetGrantsOfRole(rn)
 			if err3 != nil {
 				return err3
@@ -759,39 +763,43 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 				}
 			}
 
-			toAdd := slice.StringSliceDifference(accessProvider.Who.Users, usersOfRole, false)
-			toRemove := slice.StringSliceDifference(usersOfRole, accessProvider.Who.Users, false)
-			logger.Info(fmt.Sprintf("Identified %d users to add and %d users to remove from role %q", len(toAdd), len(toRemove), rn))
+			if !ignoreWho {
+				toAdd := slice.StringSliceDifference(accessProvider.Who.Users, usersOfRole, false)
+				toRemove := slice.StringSliceDifference(usersOfRole, accessProvider.Who.Users, false)
+				logger.Info(fmt.Sprintf("Identified %d users to add and %d users to remove from role %q", len(toAdd), len(toRemove), rn))
 
-			if len(toAdd) > 0 {
-				e := repo.GrantUsersToRole(ctx, rn, toAdd...)
-				if e != nil {
-					return fmt.Errorf("error while assigning users to role %q: %s", rn, e.Error())
+				if len(toAdd) > 0 {
+					e := repo.GrantUsersToRole(ctx, rn, toAdd...)
+					if e != nil {
+						return fmt.Errorf("error while assigning users to role %q: %s", rn, e.Error())
+					}
+				}
+
+				if len(toRemove) > 0 {
+					e := repo.RevokeUsersFromRole(ctx, rn, toRemove...)
+					if e != nil {
+						return fmt.Errorf("error while unassigning users from role %q: %s", rn, e.Error())
+					}
 				}
 			}
 
-			if len(toRemove) > 0 {
-				e := repo.RevokeUsersFromRole(ctx, rn, toRemove...)
-				if e != nil {
-					return fmt.Errorf("error while unassigning users from role %q: %s", rn, e.Error())
+			if !ignoreInheritance {
+				toAdd := slice.StringSliceDifference(inheritedRoles, rolesOfRole, false)
+				toRemove := slice.StringSliceDifference(rolesOfRole, inheritedRoles, false)
+				logger.Info(fmt.Sprintf("Identified %d roles to add and %d roles to remove from role %q", len(toAdd), len(toRemove), rn))
+
+				if len(toAdd) > 0 {
+					e := repo.GrantRolesToRole(ctx, rn, toAdd...)
+					if e != nil {
+						return fmt.Errorf("error while assigning role to role %q: %s", rn, e.Error())
+					}
 				}
-			}
 
-			toAdd = slice.StringSliceDifference(inheritedRoles, rolesOfRole, false)
-			toRemove = slice.StringSliceDifference(rolesOfRole, inheritedRoles, false)
-			logger.Info(fmt.Sprintf("Identified %d roles to add and %d roles to remove from role %q", len(toAdd), len(toRemove), rn))
-
-			if len(toAdd) > 0 {
-				e := repo.GrantRolesToRole(ctx, rn, toAdd...)
-				if e != nil {
-					return fmt.Errorf("error while assigning role to role %q: %s", rn, e.Error())
-				}
-			}
-
-			if len(toRemove) > 0 {
-				e := repo.RevokeRolesFromRole(ctx, rn, toRemove...)
-				if e != nil {
-					return fmt.Errorf("error while unassigning role from role %q: %s", rn, e.Error())
+				if len(toRemove) > 0 {
+					e := repo.RevokeRolesFromRole(ctx, rn, toRemove...)
+					if e != nil {
+						return fmt.Errorf("error while unassigning role from role %q: %s", rn, e.Error())
+					}
 				}
 			}
 		}
@@ -867,12 +875,13 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 			if err != nil {
 				return fmt.Errorf("error while assigning users to role %q: %s", rn, err.Error())
 			}
+		}
 
-			err = repo.GrantRolesToRole(ctx, rn, inheritedRoles...)
+		if !ignoreInheritance {
+			err := repo.GrantRolesToRole(ctx, rn, inheritedRoles...)
 			if err != nil {
 				return fmt.Errorf("error while assigning roles to role %q: %s", rn, err.Error())
 			}
-			// TODO assign role to SYSADMIN if requested (add as input parameter)
 		}
 	}
 
