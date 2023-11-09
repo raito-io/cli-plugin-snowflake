@@ -473,7 +473,7 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 				// TODO do we need to do this for all tabular types?
 				if _, f := sharesApplied[databaseName]; strings.EqualFold(grant.GrantedOn, "TABLE") && !f {
 					ap.What = append(ap.What, exporter.WhatItem{
-						DataObject:  &ds.DataObjectReference{FullName: databaseName, Type: "shared-" + ds.Database},
+						DataObject:  &ds.DataObjectReference{FullName: databaseName, Type: SharedPrefix + ds.Database},
 						Permissions: []string{"IMPORTED PRIVILEGES"},
 					})
 					sharesApplied[databaseName] = struct{}{}
@@ -1174,7 +1174,7 @@ func (s *AccessSyncer) createPermissionGrantsForSchema(repo dataAccessRepository
 
 	schemaType := ds.Schema
 	if isShared {
-		schemaType = "shared-" + schemaType
+		schemaType = SharedPrefix + schemaType
 	}
 
 	// Check if the permission is applicable on the schema itself
@@ -1203,7 +1203,7 @@ func (s *AccessSyncer) createPermissionGrantsForDatabase(repo dataAccessReposito
 
 	dbType := ds.Database
 	if isShared {
-		dbType = "shared-" + dbType
+		dbType = SharedPrefix + dbType
 	}
 
 	if _, f := metaData[dbType][strings.ToUpper(p)]; f {
@@ -1246,7 +1246,7 @@ func (s *AccessSyncer) createPermissionGrantsForTable(database string, schema st
 	// Get the corresponding Raito data object type
 	tableType := convertSnowflakeTableTypeToRaito(table.TableType)
 	if isShared {
-		tableType = "shared-" + tableType
+		tableType = SharedPrefix + tableType
 	}
 
 	// Check if the permission is applicable on the data object type
