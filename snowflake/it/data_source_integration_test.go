@@ -33,7 +33,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	config.Parameters[snowflake.SfRole] = "ACCOUNTADMIN"
 
 	//When
-	err := dataSourceSyncer.SyncDataSource(context.Background(), dataSourceObjectHandler, config)
+	err := dataSourceSyncer.SyncDataSource(context.Background(), dataSourceObjectHandler, &data_source.DataSourceSyncConfig{ConfigMap: config})
 
 	//Then
 	sourceName := strings.ToUpper(strings.Split(sfAccount, ".")[0])
