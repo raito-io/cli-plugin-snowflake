@@ -75,7 +75,7 @@ func (s *DataSourceSyncer) shouldHandle(fullName string) bool {
 // shouldGoInto checks if we need to go deeper into this data object or not.
 func (s *DataSourceSyncer) shouldGoInto(fullName string) bool {
 	// No partial sync specified, so do everything
-	if s.startFrom == "" || strings.HasPrefix(s.startFrom, fullName) {
+	if s.startFrom == "" || strings.HasPrefix(s.startFrom, fullName) || strings.HasPrefix(fullName, s.startFrom) {
 		return true
 	}
 
