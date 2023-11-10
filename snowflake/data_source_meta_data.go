@@ -142,7 +142,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						Description: "Grants ability to set value for the SHARE_RESTRICTIONS parameter which enables a Business Critical provider account to add a consumer account (with Non-Business Critical edition) to a share.",
 					},
 				},
-				Children: []string{ds.Database, "shared-" + ds.Database, "warehouse"},
+				Children: []string{ds.Database, SharedPrefix + ds.Database, "warehouse"},
 			},
 			{
 				Name: "warehouse",
@@ -505,7 +505,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				Type: ds.Column,
 			},
 			{
-				Name: "shared-" + ds.Database,
+				Name: SharedPrefix + ds.Database,
 				Type: ds.Database,
 				Permissions: []*ds.DataObjectTypePermission{
 					{
@@ -514,15 +514,15 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
 				},
-				Children: []string{"shared-" + ds.Schema},
+				Children: []string{SharedPrefix + ds.Schema},
 			},
 			{
-				Name:     "shared-" + ds.Schema,
+				Name:     SharedPrefix + ds.Schema,
 				Type:     ds.Schema,
-				Children: []string{"shared-" + ds.Table, "shared-" + ds.View},
+				Children: []string{SharedPrefix + ds.Table, SharedPrefix + ds.View},
 			},
 			{
-				Name: "shared-" + ds.Table,
+				Name: SharedPrefix + ds.Table,
 				Type: ds.Table,
 				Permissions: []*ds.DataObjectTypePermission{
 					{
@@ -538,10 +538,10 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						GlobalActions: []string{ds.Read},
 					},
 				},
-				Children: []string{"shared-" + ds.Column},
+				Children: []string{SharedPrefix + ds.Column},
 			},
 			{
-				Name: "shared-" + ds.View,
+				Name: SharedPrefix + ds.View,
 				Type: ds.View,
 				Permissions: []*ds.DataObjectTypePermission{
 					{
@@ -557,10 +557,10 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						GlobalActions: []string{ds.Read},
 					},
 				},
-				Children: []string{"shared-" + ds.Column},
+				Children: []string{SharedPrefix + ds.Column},
 			},
 			{
-				Name: "shared-" + ds.Column,
+				Name: SharedPrefix + ds.Column,
 				Type: ds.Column,
 			},
 		},
@@ -569,7 +569,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 			Levels: []*ds.UsageMetaInputDetail{
 				{
 					Name:            ds.Table,
-					DataObjectTypes: []string{ds.Table, ds.View, ExternalTable, MaterializedView, "shared-" + ds.Table, "shared-" + ds.View},
+					DataObjectTypes: []string{ds.Table, ds.View, ExternalTable, MaterializedView, SharedPrefix + ds.Table, "shared-" + ds.View},
 				},
 			},
 		},

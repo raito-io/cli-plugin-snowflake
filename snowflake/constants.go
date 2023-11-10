@@ -16,4 +16,6 @@ const (
 	SfDataUsageWindow                   = "sf-data-usage-window"
 
 	TagSource = "Snowflake"
+
+	SharedPrefix = "shared-"
 )

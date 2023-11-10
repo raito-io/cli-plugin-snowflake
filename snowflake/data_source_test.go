@@ -103,7 +103,9 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	syncer := createSyncer(repoMock)
 
 	//When
-	err := syncer.SyncDataSource(context.Background(), dataSourceObjectHandlerMock, &configParams)
+	err := syncer.SyncDataSource(context.Background(), dataSourceObjectHandlerMock, &data_source.DataSourceSyncConfig{
+		ConfigMap: &configParams,
+	})
 
 	//Then
 	assert.NoError(t, err)
@@ -128,7 +130,9 @@ func TestDataSourceSyncer_SyncDataSource_ErrorOnSnowflakeAccount(t *testing.T) {
 	syncer := createSyncer(repoMock)
 
 	//When
-	err := syncer.SyncDataSource(context.Background(), dataSourceObjectHandlerMock, &configParams)
+	err := syncer.SyncDataSource(context.Background(), dataSourceObjectHandlerMock, &data_source.DataSourceSyncConfig{
+		ConfigMap: &configParams,
+	})
 
 	//Then
 	assert.Error(t, err)
@@ -361,6 +365,63 @@ func TestDataSourceSyncer_SyncDataSource_readSchemaInDatabase(t *testing.T) {
 		ExternalId:       "DB1.Schema2",
 		ParentExternalId: "DB1",
 	})
+}
+
+func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
+	//Given
+	repoMock := newMockDataSourceRepository(t)
+	dataSourceObjectHandlerMock := mocks.NewSimpleDataSourceObjectHandler(t, 1)
+
+	repoMock.EXPECT().Close().Return(nil).Once()
+	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+	repoMock.EXPECT().GetSnowFlakeAccountName().Return("SnowflakeAccountName", nil).Once()
+	repoMock.EXPECT().GetWarehouses().Return([]DbEntity{
+		{Name: "Warehouse1"},
+		{Name: "Warehouse2"},
+	}, nil).Once()
+	repoMock.EXPECT().GetShares().Return([]DbEntity{
+		{Name: "Share1"},
+	}, nil).Once()
+	repoMock.EXPECT().GetDataBases().Return([]DbEntity{
+		{Name: "Database1"}, {Name: "Database2"},
+	}, nil).Once()
+
+	repoMock.EXPECT().GetTags(mock.Anything).Return(map[string][]*tag.Tag{}, nil)
+
+	repoMock.EXPECT().GetSchemasInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&SchemaEntity{Database: s, Name: "schema1"})
+		handler(&SchemaEntity{Database: s, Name: "schema2"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetTablesInDatabase("Database1", "", mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
+		handler(&TableEntity{Database: s, Schema: "schema1", Name: "Table1", TableType: "BASE TABLE"})
+		handler(&TableEntity{Database: s, Schema: "schema1", Name: "Table2", TableType: "BASE TABLE"})
+		handler(&TableEntity{Database: s, Schema: "schema1", Name: "View1", TableType: "VIEW"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetColumnsInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&ColumnEntity{Database: s, Schema: "schema1", Table: "Table1", Name: "IDColumn"})
+		handler(&ColumnEntity{Database: s, Schema: "schema1", Table: "Table2", Name: "AnotherColumn"})
+		handler(&ColumnEntity{Database: s, Schema: "schema2", Table: "View1", Name: "ViewColumn"})
+		return nil
+	}).Once()
+
+	syncer := createSyncer(repoMock)
+
+	//When
+	err := syncer.SyncDataSource(context.Background(), dataSourceObjectHandlerMock, &data_source.DataSourceSyncConfig{
+		ConfigMap:          &config.ConfigMap{Parameters: map[string]string{"key": "value"}},
+		DataObjectParent:   "Database1.schema1",
+		DataObjectExcludes: []string{"Table2", "View1"},
+	})
+
+	//Then
+	assert.NoError(t, err)
+	assert.Len(t, dataSourceObjectHandlerMock.DataObjects, 2)
+	assert.Equal(t, "Database1.schema1.Table1", dataSourceObjectHandlerMock.DataObjects[0].FullName)
+	assert.Equal(t, "Database1.schema1.Table1.IDColumn", dataSourceObjectHandlerMock.DataObjects[1].FullName)
 }
 
 func createSyncer(repo dataSourceRepository) *DataSourceSyncer {

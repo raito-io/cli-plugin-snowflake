@@ -11,7 +11,6 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/common"
 
 	ds "github.com/raito-io/cli/base/data_source"
-	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
 )
 
@@ -36,6 +35,9 @@ type dataSourceRepository interface {
 type DataSourceSyncer struct {
 	repoProvider func(params map[string]string, role string) (dataSourceRepository, error)
 	SfSyncRole   string
+
+	startFrom       string
+	excludeChildren []string
 }
 
 func NewDataSourceSyncer() *DataSourceSyncer {
@@ -48,7 +50,44 @@ func newDataSourceSnowflakeRepo(params map[string]string, role string) (dataSour
 	return NewSnowflakeRepository(params, role)
 }
 
-func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler wrappers.DataSourceObjectHandler, configParams *config.ConfigMap) error {
+// shouldHandle determines if this data object needs to be handled by the syncer or not. It does this by looking at the configuration options to only sync a part.
+func (s *DataSourceSyncer) shouldHandle(fullName string) bool {
+	// No partial sync specified, so do everything
+	if s.startFrom == "" {
+		return true
+	}
+
+	// Check if the data object is under the data object to start from
+	if !strings.HasPrefix(fullName, s.startFrom) || s.startFrom == fullName {
+		return false
+	}
+
+	// Check if we hit any excludes
+	for _, exclude := range s.excludeChildren {
+		if strings.HasPrefix(fullName, s.startFrom+"."+exclude) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// shouldGoInto checks if we need to go deeper into this data object or not.
+func (s *DataSourceSyncer) shouldGoInto(fullName string) bool {
+	// No partial sync specified, so do everything
+	if s.startFrom == "" || strings.HasPrefix(s.startFrom, fullName) || strings.HasPrefix(fullName, s.startFrom) {
+		return true
+	}
+
+	return false
+}
+
+func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler wrappers.DataSourceObjectHandler, config *ds.DataSourceSyncConfig) error {
+	configParams := config.ConfigMap
+
+	s.startFrom = config.DataObjectParent
+	s.excludeChildren = config.DataObjectExcludes
+
 	repo, err := s.repoProvider(configParams.Parameters, "")
 	if err != nil {
 		return err
@@ -121,7 +160,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 
 		doTypePrefix := ""
 		if _, f := sharesMap[database.Name]; f {
-			doTypePrefix = "shared-"
+			doTypePrefix = SharedPrefix
 		}
 
 		tagMap := make(map[string][]*tag.Tag)
@@ -166,7 +205,7 @@ func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbNa
 
 		fullName := schemaFullName + "." + column.Table + "." + column.Name
 
-		if ff || fs {
+		if ff || fs || !s.shouldHandle(fullName) {
 			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
@@ -202,7 +241,7 @@ func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, data
 		_, ff := excludedSchemas[fullName]
 		_, fs := excludedSchemas[schema.Name]
 
-		if ff || fs {
+		if ff || fs || !s.shouldHandle(fullName) {
 			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
@@ -246,7 +285,7 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSch
 
 		fullName := schemaFullName + "." + table.Name
 
-		if ff || fs {
+		if ff || fs || !s.shouldHandle(fullName) {
 			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
@@ -339,7 +378,7 @@ func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedData
 		func(name, fullName string) bool {
 			_, shared := shares[fullName]
 			_, f := excludes[fullName]
-			return !f && !shared
+			return !f && !shared && s.shouldGoInto(fullName)
 		})
 	if err != nil {
 		return nil, err
@@ -368,7 +407,7 @@ func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludedDatabas
 		func(name string) string { return name },
 		func(name, fullName string) bool {
 			_, f := excludes[fullName]
-			return !f
+			return !f && s.shouldGoInto(fullName)
 		})
 	if err != nil {
 		return nil, nil, err
@@ -396,7 +435,7 @@ func (s *DataSourceSyncer) readWarehouses(repo dataSourceRepository, dataSourceH
 
 	_, err = s.addDbEntitiesToImporter(dataSourceHandler, dbWarehouses, "warehouse", "",
 		func(name string) string { return name },
-		func(name, fullName string) bool { return true })
+		func(name, fullName string) bool { return s.shouldGoInto(fullName) })
 	if err != nil {
 		return err
 	}
@@ -416,25 +455,31 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.Da
 
 		fullName := externalIdGenerator(db.Name)
 		if filter(db.Name, fullName) {
-			comment := ""
-			if db.Comment != nil {
-				comment = *db.Comment
-			}
-			do := ds.DataObject{
-				ExternalId:       fullName,
-				Name:             db.Name,
-				FullName:         fullName,
-				Type:             doType,
-				Description:      comment,
-				ParentExternalId: parent,
-			}
+			// Potentially, we don't have to handle this object itself but only one of its descendants
+			if s.shouldHandle(fullName) {
+				comment := ""
+				if db.Comment != nil {
+					comment = *db.Comment
+				}
 
-			err := dataObjectHandler.AddDataObjects(&do)
-			if err != nil {
-				return nil, err
+				do := ds.DataObject{
+					ExternalId:       fullName,
+					Name:             db.Name,
+					FullName:         fullName,
+					Type:             doType,
+					Description:      comment,
+					ParentExternalId: parent,
+				}
+
+				err := dataObjectHandler.AddDataObjects(&do)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			dbEntities = append(dbEntities, db)
+		} else {
+			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", doType, fullName))
 		}
 	}
 
