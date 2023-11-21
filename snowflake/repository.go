@@ -586,6 +586,7 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 	}
 
 	var validMaskName []rune
+
 	for _, r := range maskName {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
 			validMaskName = append(validMaskName, r)
