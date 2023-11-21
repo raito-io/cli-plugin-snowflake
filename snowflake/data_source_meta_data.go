@@ -584,5 +584,19 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				AllowedWhoAccessProviderTypes: []string{access_provider.Role},
 			},
 		},
+		MaskingMetadata: &ds.MaskingMetadata{
+			MaskTypes: []*ds.MaskingType{
+				{
+					DisplayName: "NULL",
+					ExternalId:  NullMaskId,
+					Description: "Returns NULL instead of the column value.",
+				},
+				{
+					DisplayName: "HASH (sha256)",
+					ExternalId:  SHA256MaskId,
+					Description: "Returns the SHA-256 hash of the column value.",
+				},
+			},
+		},
 	}, nil
 }
