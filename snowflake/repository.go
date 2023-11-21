@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/golang-set/set"
@@ -583,6 +584,16 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 	for _, fullName := range columnsFullName {
 		columnLiterats = append(columnLiterats, fmt.Sprintf("'%s'", fullName))
 	}
+
+	var validMaskName []rune
+
+	for _, r := range maskName {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
+			validMaskName = append(validMaskName, r)
+		}
+	}
+
+	maskName = string(validMaskName)
 
 	// Get all column types
 	q := fmt.Sprintf("SELECT * FROM %s.INFORMATION_SCHEMA.COLUMNS WHERE CONCAT_WS('.', TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME) IN (%s)", databaseName, strings.Join(columnLiterats, ", ")) //nolint:gosec

@@ -993,7 +993,7 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 		database := namesplit[0]
 		schemaName := namesplit[1]
 
-		err = repo.CreateMaskPolicy(database, schemaName, uniqueMaskName, dos, nil, &beneficiaries)
+		err = repo.CreateMaskPolicy(database, schemaName, uniqueMaskName, dos, mask.Type, &beneficiaries)
 		if err != nil {
 			return uniqueMaskName, err
 		}

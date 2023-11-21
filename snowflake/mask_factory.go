@@ -7,9 +7,15 @@ import (
 
 var _maskFactory *MaskFactory
 
+const (
+	NullMaskId   = "NULL"
+	SHA256MaskId = "SHA256"
+)
+
 func init() {
 	_maskFactory = NewMaskFactory()
-	_maskFactory.RegisterMaskGenerator("NULL_MASK", NullMask())
+	_maskFactory.RegisterMaskGenerator(NullMaskId, NullMask())
+	_maskFactory.RegisterMaskGenerator(SHA256MaskId, Sha256Mask())
 }
 
 //go:generate go run github.com/vektra/mockery/v2 --name=MaskGenerator --with-expecter --inpackage
@@ -144,4 +150,29 @@ func (m *nullMaskMethod) MaskMethod(_ string) string {
 
 func (m *nullMaskMethod) SupportedType(_ string) bool {
 	return true
+}
+
+//////////////////
+// SHA-256 MASK //
+//////////////////
+
+func Sha256Mask() MaskGenerator {
+	return NewSimpleMaskGenerator(&shaHashMaskMethod{digestSize: 256})
+}
+
+type shaHashMaskMethod struct {
+	digestSize int
+}
+
+func (m *shaHashMaskMethod) MaskMethod(variableName string) string {
+	return fmt.Sprintf("SHA2(%s, %d)", variableName, m.digestSize)
+}
+
+func (m *shaHashMaskMethod) SupportedType(columnType string) bool {
+	columnType = strings.ToLower(columnType)
+	if strings.HasPrefix(columnType, "varchar") || strings.HasPrefix(columnType, "char") || strings.HasPrefix(columnType, "string") || strings.HasPrefix(columnType, "text") {
+		return true
+	}
+
+	return false
 }

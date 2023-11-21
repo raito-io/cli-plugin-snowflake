@@ -176,3 +176,18 @@ func TestNullMask_Generate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, MaskingPolicy("CREATE MASKING POLICY test_mask AS (val column_type) RETURNS column_type ->\nCASE\n\tWHEN current_role() IN ('test_role1', 'test_role2', 'test_role3') THEN val\n\tWHEN current_user() IN ('test_user1', 'test_user2', 'test_user3') THEN val\n\tELSE NULL\nEND;"), result)
 }
+
+func TestSha256Mask_Generate(t *testing.T) {
+	hashMask := Sha256Mask()
+	beneficiaries := MaskingBeneficiaries{
+		Roles: []string{"test_role1", "test_role2", "test_role3"},
+		Users: []string{"test_user1", "test_user2", "test_user3"},
+	}
+
+	// When
+	result, err := hashMask.Generate("test_mask", "text", &beneficiaries)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, MaskingPolicy("CREATE MASKING POLICY test_mask AS (val text) RETURNS text ->\nCASE\n\tWHEN current_role() IN ('test_role1', 'test_role2', 'test_role3') THEN val\n\tWHEN current_user() IN ('test_user1', 'test_user2', 'test_user3') THEN val\n\tELSE SHA2(val, 256)\nEND;"), result)
+}
