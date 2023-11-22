@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/wrappers/mocks"
 	"github.com/stretchr/testify/suite"
@@ -113,6 +114,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 		Description:      "",
 		ParentExternalId: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
 		Tags:             nil,
+		DataType:         ptr.String("NUMBER"),
 	})
 
 	s.True(len(dataSourceObjectHandler.DataObjects) > 0)
