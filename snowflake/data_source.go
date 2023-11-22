@@ -224,6 +224,7 @@ func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbNa
 			Description:      comment,
 			ParentExternalId: schemaFullName + "." + column.Table,
 			Tags:             tagMap[fullName],
+			DataType:         &column.DataType,
 		}
 
 		return dataSourceHandler.AddDataObjects(&do)

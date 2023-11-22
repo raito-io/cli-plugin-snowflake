@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/matoous/go-nanoid/v2 v2.0.0
-	github.com/raito-io/cli v0.55.0-dev0
+	github.com/raito-io/cli v0.55.0-dev1
 	github.com/raito-io/golang-set v0.0.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/snowflakedb/gosnowflake v1.6.24
