@@ -595,6 +595,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 					DisplayName: "HASH (sha256)",
 					ExternalId:  SHA256MaskId,
 					Description: "Returns the SHA-256 hash of the column value.",
+					DataTypes:   []string{"varchar", "char", "string", "text"},
 				},
 			},
 			DefaultMaskExternalName: NullMaskId,
