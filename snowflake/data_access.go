@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/raito-io/cli/base/access_provider"
 
@@ -1413,7 +1414,17 @@ func createComment(ap *importer.AccessProvider, update bool) string {
 }
 
 func raitoMaskName(name string) string {
-	return fmt.Sprintf("%s%s", maskPrefix, strings.ReplaceAll(strings.ToUpper(name), " ", "_"))
+	result := fmt.Sprintf("%s%s", maskPrefix, strings.ReplaceAll(strings.ToUpper(name), " ", "_"))
+
+	var validMaskName []rune
+
+	for _, r := range result {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
+			validMaskName = append(validMaskName, r)
+		}
+	}
+
+	return string(validMaskName)
 }
 
 func raitoMaskUniqueName(name string) string {
