@@ -225,6 +225,18 @@ func (repo *SnowflakeRepository) DropRole(roleName string) error {
 	return err
 }
 
+func (repo *SnowflakeRepository) RenameRole(oldName, newName string) error {
+	if repo.isProtectedRoleName(oldName) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", oldName))
+		return nil
+	}
+
+	q := common.FormatQuery(`ALTER ROLE IF EXISTS %s RENAME TO %s`, oldName, newName)
+	_, _, err := repo.query(q)
+
+	return err
+}
+
 func (repo *SnowflakeRepository) GetGrantsOfRole(roleName string) ([]GrantOfRole, error) {
 	q := common.FormatQuery(`SHOW GRANTS OF ROLE %s`, roleName)
 

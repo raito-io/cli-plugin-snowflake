@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/raito-io/cli/base/access_provider"
+	"github.com/raito-io/golang-set/set"
 
 	"github.com/aws/smithy-go/ptr"
 	gonanoid "github.com/matoous/go-nanoid/v2"
@@ -55,6 +56,7 @@ type dataAccessRepository interface {
 	GetDataBases() ([]DbEntity, error)
 	GetWarehouses() ([]DbEntity, error)
 	CommentRoleIfExists(comment, objectName string) error
+	RenameRole(oldName, newName string) error
 	GrantUsersToRole(ctx context.Context, role string, users ...string) error
 	RevokeUsersFromRole(ctx context.Context, role string, users ...string) error
 	GrantRolesToRole(ctx context.Context, role string, roles ...string) error
@@ -148,12 +150,19 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, apTo
 		return err
 	}
 
-	existingRoles, err := s.findRoles("", apMap, repo)
+	renameMap := make(map[string]string)
+	for roleName, ap := range apMap {
+		if ap.ActualName != nil && *ap.ActualName != roleName {
+			renameMap[roleName] = *ap.ActualName
+		}
+	}
+
+	existingRoles, err := s.findRoles("", repo)
 	if err != nil {
 		return err
 	}
 
-	err = s.generateAccessControls(ctx, apMap, existingRoles, repo, configMap, feedbackHandler)
+	err = s.generateAccessControls(ctx, apMap, existingRoles, renameMap, repo, configMap, feedbackHandler)
 	if err != nil {
 		return err
 	}
@@ -224,15 +233,16 @@ func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, access map[
 		repo.Close()
 	}()
 
-	existingRoles, err := s.findRoles(prefix, access, repo)
+	existingRoles, err := s.findRoles(prefix, repo)
 	if err != nil {
 		return err
 	}
 
 	rolesToRemove := make(map[string]*importer.AccessProvider, 0)
 
-	for role, toKeep := range existingRoles {
-		if !toKeep {
+	for _, role := range existingRoles.Slice() {
+		// If the existing role is not found in the roles to handle, we need to remove it.
+		if _, f := access[role]; !f {
 			rolesToRemove[role] = &importer.AccessProvider{Id: role, ActualName: ptr.String(role)}
 		}
 	}
@@ -242,7 +252,7 @@ func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, access map[
 		return err
 	}
 
-	err = s.generateAccessControls(ctx, access, existingRoles, repo, configMap, &dummyFeedbackHandler{})
+	err = s.generateAccessControls(ctx, access, existingRoles, map[string]string{}, repo, configMap, &dummyFeedbackHandler{})
 	if err != nil {
 		return err
 	}
@@ -616,9 +626,9 @@ func isNotInternizableRole(role string) bool {
 	return false
 }
 
-// findRoles returns a map where the keys are all the roles that exist in Snowflake right now and the value indicates if it was found in apMap or not.
-func (s *AccessSyncer) findRoles(prefix string, apMap map[string]*importer.AccessProvider, repo dataAccessRepository) (map[string]bool, error) {
-	foundRoles := make(map[string]bool)
+// findRoles returns the set of existing roles with the given prefix
+func (s *AccessSyncer) findRoles(prefix string, repo dataAccessRepository) (set.Set[string], error) {
+	existingRoles := set.NewSet[string]()
 
 	roleEntities, err := repo.GetRolesWithPrefix(prefix)
 	if err != nil {
@@ -626,11 +636,10 @@ func (s *AccessSyncer) findRoles(prefix string, apMap map[string]*importer.Acces
 	}
 
 	for _, roleEntity := range roleEntities {
-		_, f := apMap[roleEntity.Name]
-		foundRoles[roleEntity.Name] = f
+		existingRoles.Add(roleEntity.Name)
 	}
 
-	return foundRoles, nil
+	return existingRoles, nil
 }
 
 func buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
@@ -649,7 +658,7 @@ func buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
 }
 
 //nolint:gocyclo
-func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, rolesCreated map[string]interface{}, repo dataAccessRepository, metaData map[string]map[string]struct{}) error {
+func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMap map[string]*importer.AccessProvider, existingRoles set.Set[string], renameMap map[string]string, rolesCreated map[string]interface{}, repo dataAccessRepository, metaData map[string]map[string]struct{}) error {
 	accessProvider := apMap[rn]
 
 	ignoreWho := accessProvider.WhoLocked != nil && *accessProvider.WhoLocked
@@ -738,8 +747,43 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 
 	var foundGrants []Grant
 
+	// If we find this role name in the rename map, this means we have to rename it.
+	if oldName, f := renameMap[rn]; f {
+		if !existingRoles.Contains(rn) && existingRoles.Contains(oldName) {
+			if _, oldFound := apMap[oldName]; oldFound {
+				// In this case the old is already taken by another access provider.
+				// For example in the case where R2 was renamed to R3 and R1 was then renamed to R2.
+				// Therefor, we only log a message for this special case
+				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", rn, oldName))
+			} else {
+				// The old name exists and the new one doesn't exist yet, so we have to do the rename
+				err := repo.RenameRole(oldName, rn)
+				if err != nil {
+					return fmt.Errorf("error while renaming role %q to %q: %s", oldName, rn, err.Error())
+				}
+
+				existingRoles.Add(rn)
+			}
+		} else if existingRoles.Contains(rn) && existingRoles.Contains(oldName) {
+			if _, oldFound := apMap[oldName]; oldFound {
+				// In this case the old is already taken by another access provider.
+				// For example in the case where R2 was renamed to R3 and R1 was then renamed to R2.
+				// Therefor, we only log a message for this special case
+				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", rn, oldName))
+			} else {
+				// The old name exists but also the new one already exists. This is a weird case, but we'll delete the old one in this case and the new one will be updated in the next step of this method.
+				err := repo.DropRole(oldName)
+				if err != nil {
+					return fmt.Errorf("error while dropping role (%s) which was the old name of access provider %q: %s", oldName, accessProvider.Name, err.Error())
+				}
+
+				existingRoles.Remove(oldName)
+			}
+		}
+	}
+
 	// If the role already exists in the system
-	if _, f := existingRoles[rn]; f {
+	if existingRoles.Contains(rn) {
 		logger.Info(fmt.Sprintf("Merging role %q", rn))
 
 		err2 := repo.CommentRoleIfExists(createComment(accessProvider, true), rn)
@@ -896,7 +940,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 	return nil
 }
 
-func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles map[string]bool, repo dataAccessRepository, configMap *config.ConfigMap, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
+func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles set.Set[string], renameMap map[string]string, repo dataAccessRepository, configMap *config.ConfigMap, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
 	// We always need the meta data
 	syncer := DataSourceSyncer{}
 	md, err := syncer.GetDataSourceMetaData(ctx, configMap)
@@ -920,7 +964,7 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 			Type:           &apType,
 		}
 
-		err2 := s.handleAccessProvider(ctx, rn, apMap, existingRoles, rolesCreated, repo, metaData)
+		err2 := s.handleAccessProvider(ctx, rn, apMap, existingRoles, renameMap, rolesCreated, repo, metaData)
 
 		err3 := s.handleAccessProviderFeedback(feedbackHandler, &fi, err2)
 		if err3 != nil {

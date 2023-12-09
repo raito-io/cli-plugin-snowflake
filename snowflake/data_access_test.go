@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/raito-io/golang-set/set"
 
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
@@ -1074,7 +1075,7 @@ func generateAccessControls_table(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1115,7 +1116,7 @@ func generateAccessControls_view(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1166,7 +1167,7 @@ func generateAccessControls_schema(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1207,7 +1208,7 @@ func generateAccessControls_schema_noverify(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1261,7 +1262,7 @@ func generateAccessControls_existing_schema(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"RoleName1": true}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("RoleName1"), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1300,7 +1301,7 @@ func generateAccessControls_sharedDatabase(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1355,7 +1356,7 @@ func generateAccessControls_database(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1415,7 +1416,7 @@ func generateAccessControls_existing_database(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"RoleName1": true}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("RoleName1"), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1455,7 +1456,7 @@ func generateAccessControls_warehouse(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1494,7 +1495,7 @@ func generateAccessControls_datasource(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1560,7 +1561,7 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{"existingRole1": true}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("existingRole1"), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -1637,7 +1638,123 @@ func TestAccessSyncer_generateAccessControls_inheritance(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, map[string]bool{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+
+	//Then
+	assert.NoError(t, err)
+}
+
+// Testing the normal rename case where we need to rename the role to the new name and then update stuff.
+func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
+	//Given
+	repoMock := newMockDataAccessRepository(t)
+
+	expectGrantUsersToRole(repoMock, "NewRoleName", "User1")
+	repoMock.EXPECT().CommentRoleIfExists(mock.Anything, "NewRoleName").Return(nil).Once()
+	repoMock.EXPECT().RenameRole("OldRoleName", "NewRoleName").Return(nil).Once()
+	repoMock.EXPECT().GetGrantsOfRole("NewRoleName").Return([]GrantOfRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToRole("NewRoleName").Return([]GrantToRole{}, nil).Once()
+
+	syncer := AccessSyncer{
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
+			return nil, nil
+		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
+	}
+
+	access := map[string]*importer.AccessProvider{
+		"NewRoleName": {
+			Id:   "AccessProviderId2",
+			Name: "AccessProvider2",
+			Who: importer.WhoItem{
+				Users: []string{"User1"},
+			},
+		},
+	}
+
+	//When
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName"), map[string]string{"NewRoleName": "OldRoleName"}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+
+	//Then
+	assert.NoError(t, err)
+}
+
+// Testing the rename of APs where the new role name already exists (but not needed), so the old should get dropped
+func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
+	//Given
+	repoMock := newMockDataAccessRepository(t)
+
+	expectGrantUsersToRole(repoMock, "NewRoleName", "User1")
+	repoMock.EXPECT().CommentRoleIfExists(mock.Anything, "NewRoleName").Return(nil).Once()
+	repoMock.EXPECT().DropRole("OldRoleName").Return(nil).Once()
+	repoMock.EXPECT().GetGrantsOfRole("NewRoleName").Return([]GrantOfRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToRole("NewRoleName").Return([]GrantToRole{}, nil).Once()
+
+	syncer := AccessSyncer{
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
+			return nil, nil
+		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
+	}
+
+	access := map[string]*importer.AccessProvider{
+		"NewRoleName": {
+			Id:   "AccessProviderId2",
+			Name: "AccessProvider2",
+			Who: importer.WhoItem{
+				Users: []string{"User1"},
+			},
+		},
+	}
+
+	//When
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName", "NewRoleName"), map[string]string{"NewRoleName": "OldRoleName"}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+
+	//Then
+	assert.NoError(t, err)
+}
+
+// Testing the rename of APs where the old role name is already taken by another AP in the meanwhile.
+// So it should not get dropped but updated instead.
+// The new role name should be created from scratch.
+func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T) {
+	//Given
+	repoMock := newMockDataAccessRepository(t)
+
+	repoMock.EXPECT().CreateRole("NewRoleName").Return(nil).Once()
+	expectGrantUsersToRole(repoMock, "NewRoleName", "User1")
+	repoMock.EXPECT().CommentRoleIfExists(mock.Anything, "NewRoleName").Return(nil).Once()
+	repoMock.EXPECT().CommentRoleIfExists(mock.Anything, "OldRoleName").Return(nil).Once()
+	repoMock.EXPECT().GetGrantsOfRole("OldRoleName").Return([]GrantOfRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToRole("OldRoleName").Return([]GrantToRole{}, nil).Once()
+	repoMock.EXPECT().GrantRolesToRole(mock.Anything, "NewRoleName").Return(nil).Once()
+
+	syncer := AccessSyncer{
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
+			return nil, nil
+		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
+	}
+
+	access := map[string]*importer.AccessProvider{
+		"NewRoleName": {
+			Id:   "AccessProviderId2",
+			Name: "AccessProvider2",
+			Who: importer.WhoItem{
+				Users: []string{"User1"},
+			},
+		},
+		"OldRoleName": {
+			Id:   "AccessProviderId3",
+			Name: "AccessProvider3",
+		},
+	}
+
+	//When
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName"), map[string]string{"NewRoleName": "OldRoleName"}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
