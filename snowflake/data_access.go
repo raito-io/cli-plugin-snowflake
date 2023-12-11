@@ -151,6 +151,7 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, apTo
 	}
 
 	renameMap := make(map[string]string)
+
 	for roleName, ap := range apMap {
 		if ap.ActualName != nil && *ap.ActualName != roleName {
 			renameMap[roleName] = *ap.ActualName
