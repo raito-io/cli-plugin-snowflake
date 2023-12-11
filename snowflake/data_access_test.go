@@ -1648,6 +1648,7 @@ func TestAccessSyncer_generateAccessControls_inheritance(t *testing.T) {
 func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
+	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
 
 	expectGrantUsersToRole(repoMock, "NewRoleName", "User1")
 	repoMock.EXPECT().CommentRoleIfExists(mock.Anything, "NewRoleName").Return(nil).Once()
@@ -1665,8 +1666,8 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 
 	access := map[string]*importer.AccessProvider{
 		"NewRoleName": {
-			Id:   "AccessProviderId2",
-			Name: "AccessProvider2",
+			Id:   "AccessProviderId",
+			Name: "AccessProvider",
 			Who: importer.WhoItem{
 				Users: []string{"User1"},
 			},
@@ -1674,16 +1675,26 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName"), map[string]string{"NewRoleName": "OldRoleName"}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName"), map[string]string{"NewRoleName": "OldRoleName"}, repoMock, &config.ConfigMap{}, feedbackHandler)
 
 	//Then
 	assert.NoError(t, err)
+	assert.Len(t, feedbackHandler.AccessProviderFeedback, 1)
+	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
+		{
+			AccessProvider: "AccessProviderId",
+			ActualName:     "NewRoleName",
+			ExternalId:     ptr.String("NewRoleName"),
+			Type:           ptr.String("role"),
+		},
+	})
 }
 
 // Testing the rename of APs where the new role name already exists (but not needed), so the old should get dropped
 func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
+	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
 
 	expectGrantUsersToRole(repoMock, "NewRoleName", "User1")
 	repoMock.EXPECT().CommentRoleIfExists(mock.Anything, "NewRoleName").Return(nil).Once()
@@ -1701,8 +1712,8 @@ func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
 
 	access := map[string]*importer.AccessProvider{
 		"NewRoleName": {
-			Id:   "AccessProviderId2",
-			Name: "AccessProvider2",
+			Id:   "AccessProviderId",
+			Name: "AccessProvider",
 			Who: importer.WhoItem{
 				Users: []string{"User1"},
 			},
@@ -1710,10 +1721,19 @@ func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName", "NewRoleName"), map[string]string{"NewRoleName": "OldRoleName"}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName", "NewRoleName"), map[string]string{"NewRoleName": "OldRoleName"}, repoMock, &config.ConfigMap{}, feedbackHandler)
 
 	//Then
 	assert.NoError(t, err)
+	assert.Len(t, feedbackHandler.AccessProviderFeedback, 1)
+	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
+		{
+			AccessProvider: "AccessProviderId",
+			ActualName:     "NewRoleName",
+			ExternalId:     ptr.String("NewRoleName"),
+			Type:           ptr.String("role"),
+		},
+	})
 }
 
 // Testing the rename of APs where the old role name is already taken by another AP in the meanwhile.
@@ -1722,6 +1742,7 @@ func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
 func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
+	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
 
 	repoMock.EXPECT().CreateRole("NewRoleName").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "NewRoleName", "User1")
@@ -1741,23 +1762,38 @@ func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T)
 
 	access := map[string]*importer.AccessProvider{
 		"NewRoleName": {
-			Id:   "AccessProviderId2",
-			Name: "AccessProvider2",
+			Id:   "AccessProviderId",
+			Name: "AccessProvider",
 			Who: importer.WhoItem{
 				Users: []string{"User1"},
 			},
 		},
 		"OldRoleName": {
-			Id:   "AccessProviderId3",
-			Name: "AccessProvider3",
+			Id:   "AccessProviderId2",
+			Name: "AccessProvider2",
 		},
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName"), map[string]string{"NewRoleName": "OldRoleName"}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName"), map[string]string{"NewRoleName": "OldRoleName"}, repoMock, &config.ConfigMap{}, feedbackHandler)
 
 	//Then
 	assert.NoError(t, err)
+	assert.Len(t, feedbackHandler.AccessProviderFeedback, 2)
+	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
+		{
+			AccessProvider: "AccessProviderId",
+			ActualName:     "NewRoleName",
+			ExternalId:     ptr.String("NewRoleName"),
+			Type:           ptr.String("role"),
+		},
+		{
+			AccessProvider: "AccessProviderId2",
+			ActualName:     "OldRoleName",
+			ExternalId:     ptr.String("OldRoleName"),
+			Type:           ptr.String("role"),
+		},
+	})
 }
 
 func expectGrantUsersToRole(repoMock *mockDataAccessRepository, roleName string, users ...string) {
