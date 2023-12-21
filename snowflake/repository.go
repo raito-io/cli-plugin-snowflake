@@ -8,11 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raito-io/cli/base/tag"
-	"github.com/raito-io/golang-set/set"
-
 	"github.com/blockloop/scan"
 	"github.com/hashicorp/go-multierror"
+	"github.com/raito-io/cli/base/tag"
+	"github.com/raito-io/golang-set/set"
 	sf "github.com/snowflakedb/gosnowflake"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
@@ -193,6 +192,37 @@ func (repo *SnowflakeRepository) GetRolesWithPrefix(prefix string) ([]RoleEntity
 	return roleEntities, nil
 }
 
+func (repo *SnowflakeRepository) GetDatabaseRoles(database string) ([]RoleEntity, error) {
+	q := common.FormatQuery(`SHOW DATABASE ROLES IN DATABASE %s`, database)
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	var roleEntities []RoleEntity
+
+	err = scan.Rows(&roleEntities, rows)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching all roles: %s", err.Error())
+	}
+
+	err = CheckSFLimitExceeded(q, len(roleEntities))
+	if err != nil {
+		return nil, fmt.Errorf("error while finding existing roles: %s", err.Error())
+	}
+
+	// filter out role used to sync snowflake to raito
+	for i, roleEntity := range roleEntities {
+		if repo.isProtectedRoleName(roleEntity.Name) {
+			roleEntities[i] = roleEntities[len(roleEntities)-1]
+			return roleEntities[:len(roleEntities)-1], nil
+		}
+	}
+
+	return roleEntities, nil
+}
+
 func (repo *SnowflakeRepository) CreateRole(roleName string) error {
 	if repo.isProtectedRoleName(roleName) {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", roleName))
@@ -240,7 +270,17 @@ func (repo *SnowflakeRepository) RenameRole(oldName, newName string) error {
 func (repo *SnowflakeRepository) GetGrantsOfRole(roleName string) ([]GrantOfRole, error) {
 	q := common.FormatQuery(`SHOW GRANTS OF ROLE %s`, roleName)
 
-	rows, _, err := repo.query(q)
+	return repo.grantsOfRoleMapper(q)
+}
+
+func (repo *SnowflakeRepository) GetGrantsOfDatabaseRole(roleName string, database string) ([]GrantOfRole, error) {
+	q := common.FormatQuery(`SHOW GRANTS OF DATABASE ROLE %s.%s`, database, roleName)
+
+	return repo.grantsOfRoleMapper(q)
+}
+
+func (repo *SnowflakeRepository) grantsOfRoleMapper(query string) ([]GrantOfRole, error) {
+	rows, _, err := repo.query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +300,17 @@ func (repo *SnowflakeRepository) GetGrantsOfRole(roleName string) ([]GrantOfRole
 func (repo *SnowflakeRepository) GetGrantsToRole(roleName string) ([]GrantToRole, error) {
 	q := common.FormatQuery(`SHOW GRANTS TO ROLE %s`, roleName)
 
-	rows, _, err := repo.query(q)
+	return repo.grantToRoleMapper(q)
+}
+
+func (repo *SnowflakeRepository) GetGrantsToDatabaseRole(roleName string, database string) ([]GrantToRole, error) {
+	q := common.FormatQuery(`SHOW GRANTS TO DATABASE ROLE %s.%s`, database, roleName)
+
+	return repo.grantToRoleMapper(q)
+}
+
+func (repo *SnowflakeRepository) grantToRoleMapper(query string) ([]GrantToRole, error) {
+	rows, _, err := repo.query(query)
 	if err != nil {
 		return nil, err
 	}
