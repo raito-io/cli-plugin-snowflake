@@ -300,8 +300,6 @@ func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, ap
 	for table, filters := range updateGroupedFilters {
 		filterName, externalId, createErr := s.updateOrCreateFilter(ctx, repo, table, filters, roleNameMap)
 
-		// TODO remove old versions of filters
-
 		ferr := feedbackFn(filters, &filterName, externalId, createErr)
 		if ferr != nil {
 			return ferr
