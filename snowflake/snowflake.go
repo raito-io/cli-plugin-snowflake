@@ -1,6 +1,7 @@
 package snowflake
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net/url"
@@ -59,6 +60,15 @@ func QuerySnowflake(conn *sql.DB, query string, args ...any) (*sql.Rows, error) 
 	}
 
 	return rows, nil
+}
+
+func ExecuteSnowflake(ctx context.Context, conn *sql.DB, query string, args ...any) error {
+	_, err := conn.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("error while executing Snowflake with query '%s': %s", query, err.Error())
+	}
+
+	return nil
 }
 
 func CheckSFLimitExceeded(query string, size int) error {

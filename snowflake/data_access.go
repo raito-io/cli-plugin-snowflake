@@ -2,12 +2,16 @@ package snowflake
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/raito-io/cli/base/access_provider"
+	"github.com/raito-io/cli/base/wrappers/role_based"
 	"github.com/raito-io/golang-set/set"
 
 	"github.com/aws/smithy-go/ptr"
@@ -64,7 +68,11 @@ type dataAccessRepository interface {
 	CreateRole(roleName string) error
 	CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) error
 	DropMaskingPolicy(databaseName string, schema string, maskName string) (err error)
+	UpdateFilter(databaseName string, schema string, tableName string, filterName string, argumentNames []string, expression string) error
+	DropFilter(databaseName string, schema string, tableName string, filterName string) error
 }
+
+var _ role_based.AccessProviderRoleSyncer = (*AccessSyncer)(nil)
 
 type AccessSyncer struct {
 	repoProvider            func(params map[string]string, role string) (dataAccessRepository, error)
@@ -215,6 +223,118 @@ func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apTo
 		err = feedbackHandler.AddAccessProviderFeedback(fi)
 		if err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+	if configMap.GetBoolWithDefault(SfStandardEdition, false) {
+		if len(apToRemoveMap) > 0 || len(apMap) > 0 {
+			logger.Error("Skipping filter policies due to Snowflake Standard Edition.")
+		}
+
+		return nil
+	}
+
+	logger.Info(fmt.Sprintf("Configuring access provider as filters in Snowflake. Update %d masks remove %d masks", len(apMap), len(apToRemoveMap)))
+
+	repo, err := s.repoProvider(configMap.Parameters, "")
+	if err != nil {
+		return err
+	}
+
+	//Groups filters by table
+	updateGroupedFilters, err := groupFiltersByTable(apMap, feedbackHandler)
+	if err != nil {
+		return err
+	}
+
+	removeGroupedFilters, err := groupFiltersByTable(apToRemoveMap, feedbackHandler)
+	if err != nil {
+		return err
+	}
+
+	feedbackFn := func(aps []*importer.AccessProvider, actualName *string, externalId *string, err error) error {
+		var feedbackErr error
+
+		var errorMessages []string
+
+		if err != nil {
+			errorMessages = []string{err.Error()}
+		}
+
+		for _, ap := range aps {
+			var actualNameStr string
+			if actualName != nil {
+				actualNameStr = *actualName
+			} else if ap.ActualName != nil {
+				actualNameStr = *ap.ActualName
+			}
+
+			var apExternalId *string
+			if externalId != nil {
+				apExternalId = externalId
+			} else {
+				apExternalId = ap.ExternalId
+			}
+
+			ferr := feedbackHandler.AddAccessProviderFeedback(importer.AccessProviderSyncFeedback{
+				AccessProvider: ap.Id,
+				ActualName:     actualNameStr,
+				ExternalId:     apExternalId,
+				Errors:         errorMessages,
+			})
+			if ferr != nil {
+				feedbackErr = multierror.Append(feedbackErr, ferr)
+			}
+		}
+
+		return feedbackErr
+	}
+
+	//Create or update filters per table
+	updatedTables := set.NewSet[string]()
+
+	for table, filters := range updateGroupedFilters {
+		filterName, externalId, createErr := s.updateOrCreateFilter(ctx, repo, table, filters, roleNameMap)
+
+		// TODO remove old versions of filters
+
+		ferr := feedbackFn(filters, &filterName, externalId, createErr)
+		if ferr != nil {
+			return ferr
+		}
+
+		if createErr != nil {
+			updatedTables.Add(table)
+		}
+	}
+
+	// Remove old filters per table
+	for table, filters := range removeGroupedFilters {
+		if _, found := updateGroupedFilters[table]; found {
+			if updatedTables.Contains(table) {
+				deleteErr := s.deleteFilter(repo, table, filters)
+
+				ferr := feedbackFn(filters, nil, nil, deleteErr)
+				if ferr != nil {
+					return ferr
+				}
+			} else {
+				ferr := feedbackFn(filters, nil, nil, fmt.Errorf("prevent deletion of filter because unable to create new filter"))
+				if ferr != nil {
+					return ferr
+				}
+			}
+		} else {
+			deleteErr := s.deleteFilter(repo, table, filters)
+
+			ferr := feedbackFn(filters, nil, nil, deleteErr)
+			if ferr != nil {
+				return ferr
+			}
 		}
 	}
 
@@ -530,7 +650,7 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 		if !strings.HasPrefix(strings.Replace(policy.Kind, "_", " ", -1), policyType) {
 			logger.Warn(fmt.Sprintf("Skipping policy %s of kind %s, expected: %s", policy.Name, policyType, policy.Kind))
 			continue
-		} else if policyType == "MASKING" && strings.HasPrefix(policy.Name, maskPrefix) {
+		} else if strings.HasPrefix(policy.Name, maskPrefix) {
 			logger.Debug(fmt.Sprintf("Masking policy %s defined by RAITO. Not exporting this", policy.Name))
 			continue
 		}
@@ -1411,6 +1531,182 @@ func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permiss
 	}
 
 	return grants, nil
+}
+
+func (s *AccessSyncer) updateOrCreateFilter(ctx context.Context, repo dataAccessRepository, tableFullName string, aps []*importer.AccessProvider, roleNameMap map[string]string) (string, *string, error) {
+	tableFullnameSplit := strings.Split(tableFullName, ".")
+	database := tableFullnameSplit[0]
+	schema := tableFullnameSplit[1]
+	table := tableFullnameSplit[2]
+
+	filterExpressions := make([]string, 0, len(aps))
+	arguments := set.NewSet[string]()
+
+	for _, ap := range aps {
+		fExpression, apArguments, err := filterExpression(ctx, ap)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to generate filter expression for access provider %s: %w", ap.Name, err)
+		}
+
+		whoExpressionPart, hasWho := filterWhoExpression(ap, roleNameMap)
+
+		if !hasWho {
+			continue
+		}
+
+		filterExpressions = append(filterExpressions, fmt.Sprintf("(%s) AND (%s)", whoExpressionPart, fExpression))
+
+		arguments.Add(apArguments...)
+
+		logger.Info(fmt.Sprintf("Filter expression for access provider %s: %s (%+v)", ap.Name, fExpression, apArguments))
+	}
+
+	if len(filterExpressions) == 0 {
+		// No filter expression for example when no who was defined for the filter
+		logger.Info("No filter expressions found for table %s.", tableFullName)
+
+		filterExpressions = append(filterExpressions, "FALSE")
+	}
+
+	filterName := fmt.Sprintf("raito_%s_%s_%s_filter", schema, table, gonanoid.MustGenerate(idAlphabet, 8))
+
+	err := repo.UpdateFilter(database, schema, table, filterName, arguments.Slice(), strings.Join(filterExpressions, " OR "))
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to update filter %s: %w", filterName, err)
+	}
+
+	return filterName, ptr.String(fmt.Sprintf("%s.%s", tableFullName, filterName)), nil
+}
+
+func (s *AccessSyncer) deleteFilter(repo dataAccessRepository, tableFullName string, aps []*importer.AccessProvider) error {
+	tableFullnameSplit := strings.Split(tableFullName, ".")
+	database := tableFullnameSplit[0]
+	schema := tableFullnameSplit[1]
+	table := tableFullnameSplit[2]
+
+	filterNames := set.NewSet[string]()
+
+	for _, ap := range aps {
+		if ap.ExternalId != nil {
+			externalIdSplit := strings.Split(*ap.ExternalId, ".")
+			filterNames.Add(externalIdSplit[3])
+		}
+	}
+
+	var err error
+
+	for filterName := range filterNames {
+		deleteErr := repo.DropFilter(database, schema, table, filterName)
+		if deleteErr != nil {
+			err = multierror.Append(err, fmt.Errorf("failed to delete filter %s: %w", filterName, deleteErr))
+		}
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func filterExpression(ctx context.Context, ap *importer.AccessProvider) (string, []string, error) {
+	if ap.FilterCriteria != nil {
+		filterQueryBuilder := NewFilterCriteriaBuilder()
+
+		err := ap.FilterCriteria.Accept(ctx, filterQueryBuilder)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to generate filter expression for access provider %s: %w", ap.Name, err)
+		}
+
+		query, arguments := filterQueryBuilder.GetQueryAndArguments()
+
+		return query, arguments.Slice(), nil
+	} else if ap.PolicyRule != nil {
+		query, arguments := filterExpressionOfPolicyRule(*ap.PolicyRule)
+
+		return query, arguments, nil
+	}
+
+	return "", nil, errors.New("no filter criteria or policy rule")
+}
+
+func filterExpressionOfPolicyRule(policyRule string) (string, []string) {
+	argumentRegexp := regexp.MustCompile(`\{([a-zA-Z0-9]+)\}`)
+
+	argumentsSubMatches := argumentRegexp.FindAllStringSubmatch(policyRule, -1)
+	query := argumentRegexp.ReplaceAllString(policyRule, "$1")
+
+	arguments := make([]string, 0, len(argumentsSubMatches))
+	for _, match := range argumentsSubMatches {
+		arguments = append(arguments, match[1])
+	}
+
+	return query, arguments
+}
+
+func filterWhoExpression(ap *importer.AccessProvider, roleNameMap map[string]string) (string, bool) {
+	whoExpressionParts := make([]string, 0, 2)
+
+	{
+		users := make([]string, 0, len(ap.Who.Users))
+
+		for _, user := range ap.Who.Users {
+			users = append(users, fmt.Sprintf("'%s'", user))
+		}
+
+		if len(users) > 0 {
+			whoExpressionParts = append(whoExpressionParts, fmt.Sprintf("current_user() IN (%s)", strings.Join(users, ", ")))
+		}
+	}
+
+	{
+		roles := make([]string, 0, len(ap.Who.InheritFrom))
+
+		for _, role := range ap.Who.InheritFrom {
+			if strings.HasPrefix(role, "ID:") {
+				if roleName, found := roleNameMap[role[3:]]; found {
+					roles = append(roles, fmt.Sprintf("'%s'", roleName))
+				}
+			} else {
+				roles = append(roles, fmt.Sprintf("'%s'", role))
+			}
+		}
+
+		if len(roles) > 0 {
+			whoExpressionParts = append(whoExpressionParts, fmt.Sprintf("current_role() IN (%s)", strings.Join(roles, ", ")))
+		}
+	}
+
+	if len(whoExpressionParts) == 0 {
+		return "FALSE", false
+	}
+
+	return strings.Join(whoExpressionParts, " OR "), true
+}
+
+func groupFiltersByTable(aps map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler) (map[string][]*importer.AccessProvider, error) {
+	groupedFilters := make(map[string][]*importer.AccessProvider)
+
+	for key, filter := range aps {
+		if len(filter.What) != 1 || filter.What[0].DataObject.Type != ds.Table {
+			err := feedbackHandler.AddAccessProviderFeedback(importer.AccessProviderSyncFeedback{
+				AccessProvider: filter.Id,
+				Errors:         []string{"Filters can only be applied to a single table."},
+			})
+
+			if err != nil {
+				return nil, fmt.Errorf("failed to add access provider feedback: %w", err)
+			}
+
+			continue
+		}
+
+		table := filter.What[0].DataObject.FullName
+
+		groupedFilters[table] = append(groupedFilters[table], aps[key])
+	}
+
+	return groupedFilters, nil
 }
 
 func mergeGrants(repo dataAccessRepository, role string, found []Grant, expected []Grant, metaData map[string]map[string]struct{}) error {
