@@ -114,6 +114,52 @@ func (_c *mockDataAccessRepository_CommentRoleIfExists_Call) RunAndReturn(run fu
 	return _c
 }
 
+// CreateAccountRole provides a mock function with given fields: roleName
+func (_m *mockDataAccessRepository) CreateAccountRole(roleName string) error {
+	ret := _m.Called(roleName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateAccountRole")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(roleName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_CreateAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateAccountRole'
+type mockDataAccessRepository_CreateAccountRole_Call struct {
+	*mock.Call
+}
+
+// CreateAccountRole is a helper method to define mock.On call
+//   - roleName string
+func (_e *mockDataAccessRepository_Expecter) CreateAccountRole(roleName interface{}) *mockDataAccessRepository_CreateAccountRole_Call {
+	return &mockDataAccessRepository_CreateAccountRole_Call{Call: _e.mock.On("CreateAccountRole", roleName)}
+}
+
+func (_c *mockDataAccessRepository_CreateAccountRole_Call) Run(run func(roleName string)) *mockDataAccessRepository_CreateAccountRole_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_CreateAccountRole_Call) Return(_a0 error) *mockDataAccessRepository_CreateAccountRole_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_CreateAccountRole_Call) RunAndReturn(run func(string) error) *mockDataAccessRepository_CreateAccountRole_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateMaskPolicy provides a mock function with given fields: databaseName, schema, maskName, columnsFullName, maskType, beneficiaries
 func (_m *mockDataAccessRepository) CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) error {
 	ret := _m.Called(databaseName, schema, maskName, columnsFullName, maskType, beneficiaries)
@@ -161,52 +207,6 @@ func (_c *mockDataAccessRepository_CreateMaskPolicy_Call) Return(_a0 error) *moc
 }
 
 func (_c *mockDataAccessRepository_CreateMaskPolicy_Call) RunAndReturn(run func(string, string, string, []string, *string, *MaskingBeneficiaries) error) *mockDataAccessRepository_CreateMaskPolicy_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// CreateRole provides a mock function with given fields: roleName
-func (_m *mockDataAccessRepository) CreateRole(roleName string) error {
-	ret := _m.Called(roleName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreateRole")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(roleName)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockDataAccessRepository_CreateRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateRole'
-type mockDataAccessRepository_CreateRole_Call struct {
-	*mock.Call
-}
-
-// CreateRole is a helper method to define mock.On call
-//   - roleName string
-func (_e *mockDataAccessRepository_Expecter) CreateRole(roleName interface{}) *mockDataAccessRepository_CreateRole_Call {
-	return &mockDataAccessRepository_CreateRole_Call{Call: _e.mock.On("CreateRole", roleName)}
-}
-
-func (_c *mockDataAccessRepository_CreateRole_Call) Run(run func(roleName string)) *mockDataAccessRepository_CreateRole_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_CreateRole_Call) Return(_a0 error) *mockDataAccessRepository_CreateRole_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_CreateRole_Call) RunAndReturn(run func(string) error) *mockDataAccessRepository_CreateRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -268,6 +268,52 @@ func (_c *mockDataAccessRepository_DescribePolicy_Call) Return(_a0 []describePol
 }
 
 func (_c *mockDataAccessRepository_DescribePolicy_Call) RunAndReturn(run func(string, string, string, string) ([]describePolicyEntity, error)) *mockDataAccessRepository_DescribePolicy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DropAccountRole provides a mock function with given fields: roleName
+func (_m *mockDataAccessRepository) DropAccountRole(roleName string) error {
+	ret := _m.Called(roleName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DropAccountRole")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(roleName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_DropAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DropAccountRole'
+type mockDataAccessRepository_DropAccountRole_Call struct {
+	*mock.Call
+}
+
+// DropAccountRole is a helper method to define mock.On call
+//   - roleName string
+func (_e *mockDataAccessRepository_Expecter) DropAccountRole(roleName interface{}) *mockDataAccessRepository_DropAccountRole_Call {
+	return &mockDataAccessRepository_DropAccountRole_Call{Call: _e.mock.On("DropAccountRole", roleName)}
+}
+
+func (_c *mockDataAccessRepository_DropAccountRole_Call) Run(run func(roleName string)) *mockDataAccessRepository_DropAccountRole_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_DropAccountRole_Call) Return(_a0 error) *mockDataAccessRepository_DropAccountRole_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_DropAccountRole_Call) RunAndReturn(run func(string) error) *mockDataAccessRepository_DropAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -369,17 +415,17 @@ func (_c *mockDataAccessRepository_DropMaskingPolicy_Call) RunAndReturn(run func
 	return _c
 }
 
-// DropRole provides a mock function with given fields: roleName
-func (_m *mockDataAccessRepository) DropRole(roleName string) error {
-	ret := _m.Called(roleName)
+// ExecuteGrantOnAccountRole provides a mock function with given fields: perm, on, role
+func (_m *mockDataAccessRepository) ExecuteGrantOnAccountRole(perm string, on string, role string) error {
+	ret := _m.Called(perm, on, role)
 
 	if len(ret) == 0 {
-		panic("no return value specified for DropRole")
+		panic("no return value specified for ExecuteGrantOnAccountRole")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(roleName)
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(perm, on, role)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -387,126 +433,195 @@ func (_m *mockDataAccessRepository) DropRole(roleName string) error {
 	return r0
 }
 
-// mockDataAccessRepository_DropRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DropRole'
-type mockDataAccessRepository_DropRole_Call struct {
+// mockDataAccessRepository_ExecuteGrantOnAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteGrantOnAccountRole'
+type mockDataAccessRepository_ExecuteGrantOnAccountRole_Call struct {
 	*mock.Call
 }
 
-// DropRole is a helper method to define mock.On call
-//   - roleName string
-func (_e *mockDataAccessRepository_Expecter) DropRole(roleName interface{}) *mockDataAccessRepository_DropRole_Call {
-	return &mockDataAccessRepository_DropRole_Call{Call: _e.mock.On("DropRole", roleName)}
+// ExecuteGrantOnAccountRole is a helper method to define mock.On call
+//   - perm string
+//   - on string
+//   - role string
+func (_e *mockDataAccessRepository_Expecter) ExecuteGrantOnAccountRole(perm interface{}, on interface{}, role interface{}) *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call {
+	return &mockDataAccessRepository_ExecuteGrantOnAccountRole_Call{Call: _e.mock.On("ExecuteGrantOnAccountRole", perm, on, role)}
 }
 
-func (_c *mockDataAccessRepository_DropRole_Call) Run(run func(roleName string)) *mockDataAccessRepository_DropRole_Call {
+func (_c *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call) Run(run func(perm string, on string, role string)) *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call) Return(_a0 error) *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call) RunAndReturn(run func(string, string, string) error) *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ExecuteRevokeOnAccountRole provides a mock function with given fields: perm, on, role
+func (_m *mockDataAccessRepository) ExecuteRevokeOnAccountRole(perm string, on string, role string) error {
+	ret := _m.Called(perm, on, role)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExecuteRevokeOnAccountRole")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(perm, on, role)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteRevokeOnAccountRole'
+type mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call struct {
+	*mock.Call
+}
+
+// ExecuteRevokeOnAccountRole is a helper method to define mock.On call
+//   - perm string
+//   - on string
+//   - role string
+func (_e *mockDataAccessRepository_Expecter) ExecuteRevokeOnAccountRole(perm interface{}, on interface{}, role interface{}) *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call {
+	return &mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call{Call: _e.mock.On("ExecuteRevokeOnAccountRole", perm, on, role)}
+}
+
+func (_c *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call) Run(run func(perm string, on string, role string)) *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call) Return(_a0 error) *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call) RunAndReturn(run func(string, string, string) error) *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAccountRoles provides a mock function with given fields:
+func (_m *mockDataAccessRepository) GetAccountRoles() ([]RoleEntity, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountRoles")
+	}
+
+	var r0 []RoleEntity
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]RoleEntity, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []RoleEntity); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]RoleEntity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataAccessRepository_GetAccountRoles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAccountRoles'
+type mockDataAccessRepository_GetAccountRoles_Call struct {
+	*mock.Call
+}
+
+// GetAccountRoles is a helper method to define mock.On call
+func (_e *mockDataAccessRepository_Expecter) GetAccountRoles() *mockDataAccessRepository_GetAccountRoles_Call {
+	return &mockDataAccessRepository_GetAccountRoles_Call{Call: _e.mock.On("GetAccountRoles")}
+}
+
+func (_c *mockDataAccessRepository_GetAccountRoles_Call) Run(run func()) *mockDataAccessRepository_GetAccountRoles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetAccountRoles_Call) Return(_a0 []RoleEntity, _a1 error) *mockDataAccessRepository_GetAccountRoles_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetAccountRoles_Call) RunAndReturn(run func() ([]RoleEntity, error)) *mockDataAccessRepository_GetAccountRoles_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAccountRolesWithPrefix provides a mock function with given fields: prefix
+func (_m *mockDataAccessRepository) GetAccountRolesWithPrefix(prefix string) ([]RoleEntity, error) {
+	ret := _m.Called(prefix)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountRolesWithPrefix")
+	}
+
+	var r0 []RoleEntity
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) ([]RoleEntity, error)); ok {
+		return rf(prefix)
+	}
+	if rf, ok := ret.Get(0).(func(string) []RoleEntity); ok {
+		r0 = rf(prefix)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]RoleEntity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(prefix)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataAccessRepository_GetAccountRolesWithPrefix_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAccountRolesWithPrefix'
+type mockDataAccessRepository_GetAccountRolesWithPrefix_Call struct {
+	*mock.Call
+}
+
+// GetAccountRolesWithPrefix is a helper method to define mock.On call
+//   - prefix string
+func (_e *mockDataAccessRepository_Expecter) GetAccountRolesWithPrefix(prefix interface{}) *mockDataAccessRepository_GetAccountRolesWithPrefix_Call {
+	return &mockDataAccessRepository_GetAccountRolesWithPrefix_Call{Call: _e.mock.On("GetAccountRolesWithPrefix", prefix)}
+}
+
+func (_c *mockDataAccessRepository_GetAccountRolesWithPrefix_Call) Run(run func(prefix string)) *mockDataAccessRepository_GetAccountRolesWithPrefix_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string))
 	})
 	return _c
 }
 
-func (_c *mockDataAccessRepository_DropRole_Call) Return(_a0 error) *mockDataAccessRepository_DropRole_Call {
-	_c.Call.Return(_a0)
+func (_c *mockDataAccessRepository_GetAccountRolesWithPrefix_Call) Return(_a0 []RoleEntity, _a1 error) *mockDataAccessRepository_GetAccountRolesWithPrefix_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_DropRole_Call) RunAndReturn(run func(string) error) *mockDataAccessRepository_DropRole_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ExecuteGrant provides a mock function with given fields: perm, on, role
-func (_m *mockDataAccessRepository) ExecuteGrant(perm string, on string, role string) error {
-	ret := _m.Called(perm, on, role)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ExecuteGrant")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(perm, on, role)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockDataAccessRepository_ExecuteGrant_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteGrant'
-type mockDataAccessRepository_ExecuteGrant_Call struct {
-	*mock.Call
-}
-
-// ExecuteGrant is a helper method to define mock.On call
-//   - perm string
-//   - on string
-//   - role string
-func (_e *mockDataAccessRepository_Expecter) ExecuteGrant(perm interface{}, on interface{}, role interface{}) *mockDataAccessRepository_ExecuteGrant_Call {
-	return &mockDataAccessRepository_ExecuteGrant_Call{Call: _e.mock.On("ExecuteGrant", perm, on, role)}
-}
-
-func (_c *mockDataAccessRepository_ExecuteGrant_Call) Run(run func(perm string, on string, role string)) *mockDataAccessRepository_ExecuteGrant_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_ExecuteGrant_Call) Return(_a0 error) *mockDataAccessRepository_ExecuteGrant_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_ExecuteGrant_Call) RunAndReturn(run func(string, string, string) error) *mockDataAccessRepository_ExecuteGrant_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ExecuteRevoke provides a mock function with given fields: perm, on, role
-func (_m *mockDataAccessRepository) ExecuteRevoke(perm string, on string, role string) error {
-	ret := _m.Called(perm, on, role)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ExecuteRevoke")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(perm, on, role)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockDataAccessRepository_ExecuteRevoke_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteRevoke'
-type mockDataAccessRepository_ExecuteRevoke_Call struct {
-	*mock.Call
-}
-
-// ExecuteRevoke is a helper method to define mock.On call
-//   - perm string
-//   - on string
-//   - role string
-func (_e *mockDataAccessRepository_Expecter) ExecuteRevoke(perm interface{}, on interface{}, role interface{}) *mockDataAccessRepository_ExecuteRevoke_Call {
-	return &mockDataAccessRepository_ExecuteRevoke_Call{Call: _e.mock.On("ExecuteRevoke", perm, on, role)}
-}
-
-func (_c *mockDataAccessRepository_ExecuteRevoke_Call) Run(run func(perm string, on string, role string)) *mockDataAccessRepository_ExecuteRevoke_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_ExecuteRevoke_Call) Return(_a0 error) *mockDataAccessRepository_ExecuteRevoke_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_ExecuteRevoke_Call) RunAndReturn(run func(string, string, string) error) *mockDataAccessRepository_ExecuteRevoke_Call {
+func (_c *mockDataAccessRepository_GetAccountRolesWithPrefix_Call) RunAndReturn(run func(string) ([]RoleEntity, error)) *mockDataAccessRepository_GetAccountRolesWithPrefix_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -568,12 +683,12 @@ func (_c *mockDataAccessRepository_GetDataBases_Call) RunAndReturn(run func() ([
 	return _c
 }
 
-// GetGrantsOfRole provides a mock function with given fields: roleName
-func (_m *mockDataAccessRepository) GetGrantsOfRole(roleName string) ([]GrantOfRole, error) {
+// GetGrantsOfAccountRole provides a mock function with given fields: roleName
+func (_m *mockDataAccessRepository) GetGrantsOfAccountRole(roleName string) ([]GrantOfRole, error) {
 	ret := _m.Called(roleName)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetGrantsOfRole")
+		panic("no return value specified for GetGrantsOfAccountRole")
 	}
 
 	var r0 []GrantOfRole
@@ -598,40 +713,40 @@ func (_m *mockDataAccessRepository) GetGrantsOfRole(roleName string) ([]GrantOfR
 	return r0, r1
 }
 
-// mockDataAccessRepository_GetGrantsOfRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetGrantsOfRole'
-type mockDataAccessRepository_GetGrantsOfRole_Call struct {
+// mockDataAccessRepository_GetGrantsOfAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetGrantsOfAccountRole'
+type mockDataAccessRepository_GetGrantsOfAccountRole_Call struct {
 	*mock.Call
 }
 
-// GetGrantsOfRole is a helper method to define mock.On call
+// GetGrantsOfAccountRole is a helper method to define mock.On call
 //   - roleName string
-func (_e *mockDataAccessRepository_Expecter) GetGrantsOfRole(roleName interface{}) *mockDataAccessRepository_GetGrantsOfRole_Call {
-	return &mockDataAccessRepository_GetGrantsOfRole_Call{Call: _e.mock.On("GetGrantsOfRole", roleName)}
+func (_e *mockDataAccessRepository_Expecter) GetGrantsOfAccountRole(roleName interface{}) *mockDataAccessRepository_GetGrantsOfAccountRole_Call {
+	return &mockDataAccessRepository_GetGrantsOfAccountRole_Call{Call: _e.mock.On("GetGrantsOfAccountRole", roleName)}
 }
 
-func (_c *mockDataAccessRepository_GetGrantsOfRole_Call) Run(run func(roleName string)) *mockDataAccessRepository_GetGrantsOfRole_Call {
+func (_c *mockDataAccessRepository_GetGrantsOfAccountRole_Call) Run(run func(roleName string)) *mockDataAccessRepository_GetGrantsOfAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string))
 	})
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetGrantsOfRole_Call) Return(_a0 []GrantOfRole, _a1 error) *mockDataAccessRepository_GetGrantsOfRole_Call {
+func (_c *mockDataAccessRepository_GetGrantsOfAccountRole_Call) Return(_a0 []GrantOfRole, _a1 error) *mockDataAccessRepository_GetGrantsOfAccountRole_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetGrantsOfRole_Call) RunAndReturn(run func(string) ([]GrantOfRole, error)) *mockDataAccessRepository_GetGrantsOfRole_Call {
+func (_c *mockDataAccessRepository_GetGrantsOfAccountRole_Call) RunAndReturn(run func(string) ([]GrantOfRole, error)) *mockDataAccessRepository_GetGrantsOfAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetGrantsToRole provides a mock function with given fields: roleName
-func (_m *mockDataAccessRepository) GetGrantsToRole(roleName string) ([]GrantToRole, error) {
+// GetGrantsToAccountRole provides a mock function with given fields: roleName
+func (_m *mockDataAccessRepository) GetGrantsToAccountRole(roleName string) ([]GrantToRole, error) {
 	ret := _m.Called(roleName)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetGrantsToRole")
+		panic("no return value specified for GetGrantsToAccountRole")
 	}
 
 	var r0 []GrantToRole
@@ -656,30 +771,30 @@ func (_m *mockDataAccessRepository) GetGrantsToRole(roleName string) ([]GrantToR
 	return r0, r1
 }
 
-// mockDataAccessRepository_GetGrantsToRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetGrantsToRole'
-type mockDataAccessRepository_GetGrantsToRole_Call struct {
+// mockDataAccessRepository_GetGrantsToAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetGrantsToAccountRole'
+type mockDataAccessRepository_GetGrantsToAccountRole_Call struct {
 	*mock.Call
 }
 
-// GetGrantsToRole is a helper method to define mock.On call
+// GetGrantsToAccountRole is a helper method to define mock.On call
 //   - roleName string
-func (_e *mockDataAccessRepository_Expecter) GetGrantsToRole(roleName interface{}) *mockDataAccessRepository_GetGrantsToRole_Call {
-	return &mockDataAccessRepository_GetGrantsToRole_Call{Call: _e.mock.On("GetGrantsToRole", roleName)}
+func (_e *mockDataAccessRepository_Expecter) GetGrantsToAccountRole(roleName interface{}) *mockDataAccessRepository_GetGrantsToAccountRole_Call {
+	return &mockDataAccessRepository_GetGrantsToAccountRole_Call{Call: _e.mock.On("GetGrantsToAccountRole", roleName)}
 }
 
-func (_c *mockDataAccessRepository_GetGrantsToRole_Call) Run(run func(roleName string)) *mockDataAccessRepository_GetGrantsToRole_Call {
+func (_c *mockDataAccessRepository_GetGrantsToAccountRole_Call) Run(run func(roleName string)) *mockDataAccessRepository_GetGrantsToAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string))
 	})
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetGrantsToRole_Call) Return(_a0 []GrantToRole, _a1 error) *mockDataAccessRepository_GetGrantsToRole_Call {
+func (_c *mockDataAccessRepository_GetGrantsToAccountRole_Call) Return(_a0 []GrantToRole, _a1 error) *mockDataAccessRepository_GetGrantsToAccountRole_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetGrantsToRole_Call) RunAndReturn(run func(string) ([]GrantToRole, error)) *mockDataAccessRepository_GetGrantsToRole_Call {
+func (_c *mockDataAccessRepository_GetGrantsToAccountRole_Call) RunAndReturn(run func(string) ([]GrantToRole, error)) *mockDataAccessRepository_GetGrantsToAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -857,121 +972,6 @@ func (_c *mockDataAccessRepository_GetPolicyReferences_Call) Return(_a0 []policy
 }
 
 func (_c *mockDataAccessRepository_GetPolicyReferences_Call) RunAndReturn(run func(string, string, string) ([]policyReferenceEntity, error)) *mockDataAccessRepository_GetPolicyReferences_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetRoles provides a mock function with given fields:
-func (_m *mockDataAccessRepository) GetRoles() ([]RoleEntity, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetRoles")
-	}
-
-	var r0 []RoleEntity
-	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]RoleEntity, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() []RoleEntity); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]RoleEntity)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockDataAccessRepository_GetRoles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRoles'
-type mockDataAccessRepository_GetRoles_Call struct {
-	*mock.Call
-}
-
-// GetRoles is a helper method to define mock.On call
-func (_e *mockDataAccessRepository_Expecter) GetRoles() *mockDataAccessRepository_GetRoles_Call {
-	return &mockDataAccessRepository_GetRoles_Call{Call: _e.mock.On("GetRoles")}
-}
-
-func (_c *mockDataAccessRepository_GetRoles_Call) Run(run func()) *mockDataAccessRepository_GetRoles_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetRoles_Call) Return(_a0 []RoleEntity, _a1 error) *mockDataAccessRepository_GetRoles_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetRoles_Call) RunAndReturn(run func() ([]RoleEntity, error)) *mockDataAccessRepository_GetRoles_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetRolesWithPrefix provides a mock function with given fields: prefix
-func (_m *mockDataAccessRepository) GetRolesWithPrefix(prefix string) ([]RoleEntity, error) {
-	ret := _m.Called(prefix)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetRolesWithPrefix")
-	}
-
-	var r0 []RoleEntity
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]RoleEntity, error)); ok {
-		return rf(prefix)
-	}
-	if rf, ok := ret.Get(0).(func(string) []RoleEntity); ok {
-		r0 = rf(prefix)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]RoleEntity)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(prefix)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockDataAccessRepository_GetRolesWithPrefix_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRolesWithPrefix'
-type mockDataAccessRepository_GetRolesWithPrefix_Call struct {
-	*mock.Call
-}
-
-// GetRolesWithPrefix is a helper method to define mock.On call
-//   - prefix string
-func (_e *mockDataAccessRepository_Expecter) GetRolesWithPrefix(prefix interface{}) *mockDataAccessRepository_GetRolesWithPrefix_Call {
-	return &mockDataAccessRepository_GetRolesWithPrefix_Call{Call: _e.mock.On("GetRolesWithPrefix", prefix)}
-}
-
-func (_c *mockDataAccessRepository_GetRolesWithPrefix_Call) Run(run func(prefix string)) *mockDataAccessRepository_GetRolesWithPrefix_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetRolesWithPrefix_Call) Return(_a0 []RoleEntity, _a1 error) *mockDataAccessRepository_GetRolesWithPrefix_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetRolesWithPrefix_Call) RunAndReturn(run func(string) ([]RoleEntity, error)) *mockDataAccessRepository_GetRolesWithPrefix_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1185,8 +1185,8 @@ func (_c *mockDataAccessRepository_GetWarehouses_Call) RunAndReturn(run func() (
 	return _c
 }
 
-// GrantRolesToRole provides a mock function with given fields: ctx, role, roles
-func (_m *mockDataAccessRepository) GrantRolesToRole(ctx context.Context, role string, roles ...string) error {
+// GrantAccountRolesToAccountRole provides a mock function with given fields: ctx, role, roles
+func (_m *mockDataAccessRepository) GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error {
 	_va := make([]interface{}, len(roles))
 	for _i := range roles {
 		_va[_i] = roles[_i]
@@ -1197,7 +1197,7 @@ func (_m *mockDataAccessRepository) GrantRolesToRole(ctx context.Context, role s
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GrantRolesToRole")
+		panic("no return value specified for GrantAccountRolesToAccountRole")
 	}
 
 	var r0 error
@@ -1210,21 +1210,21 @@ func (_m *mockDataAccessRepository) GrantRolesToRole(ctx context.Context, role s
 	return r0
 }
 
-// mockDataAccessRepository_GrantRolesToRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GrantRolesToRole'
-type mockDataAccessRepository_GrantRolesToRole_Call struct {
+// mockDataAccessRepository_GrantAccountRolesToAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GrantAccountRolesToAccountRole'
+type mockDataAccessRepository_GrantAccountRolesToAccountRole_Call struct {
 	*mock.Call
 }
 
-// GrantRolesToRole is a helper method to define mock.On call
+// GrantAccountRolesToAccountRole is a helper method to define mock.On call
 //   - ctx context.Context
 //   - role string
 //   - roles ...string
-func (_e *mockDataAccessRepository_Expecter) GrantRolesToRole(ctx interface{}, role interface{}, roles ...interface{}) *mockDataAccessRepository_GrantRolesToRole_Call {
-	return &mockDataAccessRepository_GrantRolesToRole_Call{Call: _e.mock.On("GrantRolesToRole",
+func (_e *mockDataAccessRepository_Expecter) GrantAccountRolesToAccountRole(ctx interface{}, role interface{}, roles ...interface{}) *mockDataAccessRepository_GrantAccountRolesToAccountRole_Call {
+	return &mockDataAccessRepository_GrantAccountRolesToAccountRole_Call{Call: _e.mock.On("GrantAccountRolesToAccountRole",
 		append([]interface{}{ctx, role}, roles...)...)}
 }
 
-func (_c *mockDataAccessRepository_GrantRolesToRole_Call) Run(run func(ctx context.Context, role string, roles ...string)) *mockDataAccessRepository_GrantRolesToRole_Call {
+func (_c *mockDataAccessRepository_GrantAccountRolesToAccountRole_Call) Run(run func(ctx context.Context, role string, roles ...string)) *mockDataAccessRepository_GrantAccountRolesToAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		variadicArgs := make([]string, len(args)-2)
 		for i, a := range args[2:] {
@@ -1237,18 +1237,18 @@ func (_c *mockDataAccessRepository_GrantRolesToRole_Call) Run(run func(ctx conte
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GrantRolesToRole_Call) Return(_a0 error) *mockDataAccessRepository_GrantRolesToRole_Call {
+func (_c *mockDataAccessRepository_GrantAccountRolesToAccountRole_Call) Return(_a0 error) *mockDataAccessRepository_GrantAccountRolesToAccountRole_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GrantRolesToRole_Call) RunAndReturn(run func(context.Context, string, ...string) error) *mockDataAccessRepository_GrantRolesToRole_Call {
+func (_c *mockDataAccessRepository_GrantAccountRolesToAccountRole_Call) RunAndReturn(run func(context.Context, string, ...string) error) *mockDataAccessRepository_GrantAccountRolesToAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GrantUsersToRole provides a mock function with given fields: ctx, role, users
-func (_m *mockDataAccessRepository) GrantUsersToRole(ctx context.Context, role string, users ...string) error {
+// GrantUsersToAccountRole provides a mock function with given fields: ctx, role, users
+func (_m *mockDataAccessRepository) GrantUsersToAccountRole(ctx context.Context, role string, users ...string) error {
 	_va := make([]interface{}, len(users))
 	for _i := range users {
 		_va[_i] = users[_i]
@@ -1259,7 +1259,7 @@ func (_m *mockDataAccessRepository) GrantUsersToRole(ctx context.Context, role s
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GrantUsersToRole")
+		panic("no return value specified for GrantUsersToAccountRole")
 	}
 
 	var r0 error
@@ -1272,21 +1272,21 @@ func (_m *mockDataAccessRepository) GrantUsersToRole(ctx context.Context, role s
 	return r0
 }
 
-// mockDataAccessRepository_GrantUsersToRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GrantUsersToRole'
-type mockDataAccessRepository_GrantUsersToRole_Call struct {
+// mockDataAccessRepository_GrantUsersToAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GrantUsersToAccountRole'
+type mockDataAccessRepository_GrantUsersToAccountRole_Call struct {
 	*mock.Call
 }
 
-// GrantUsersToRole is a helper method to define mock.On call
+// GrantUsersToAccountRole is a helper method to define mock.On call
 //   - ctx context.Context
 //   - role string
 //   - users ...string
-func (_e *mockDataAccessRepository_Expecter) GrantUsersToRole(ctx interface{}, role interface{}, users ...interface{}) *mockDataAccessRepository_GrantUsersToRole_Call {
-	return &mockDataAccessRepository_GrantUsersToRole_Call{Call: _e.mock.On("GrantUsersToRole",
+func (_e *mockDataAccessRepository_Expecter) GrantUsersToAccountRole(ctx interface{}, role interface{}, users ...interface{}) *mockDataAccessRepository_GrantUsersToAccountRole_Call {
+	return &mockDataAccessRepository_GrantUsersToAccountRole_Call{Call: _e.mock.On("GrantUsersToAccountRole",
 		append([]interface{}{ctx, role}, users...)...)}
 }
 
-func (_c *mockDataAccessRepository_GrantUsersToRole_Call) Run(run func(ctx context.Context, role string, users ...string)) *mockDataAccessRepository_GrantUsersToRole_Call {
+func (_c *mockDataAccessRepository_GrantUsersToAccountRole_Call) Run(run func(ctx context.Context, role string, users ...string)) *mockDataAccessRepository_GrantUsersToAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		variadicArgs := make([]string, len(args)-2)
 		for i, a := range args[2:] {
@@ -1299,22 +1299,22 @@ func (_c *mockDataAccessRepository_GrantUsersToRole_Call) Run(run func(ctx conte
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GrantUsersToRole_Call) Return(_a0 error) *mockDataAccessRepository_GrantUsersToRole_Call {
+func (_c *mockDataAccessRepository_GrantUsersToAccountRole_Call) Return(_a0 error) *mockDataAccessRepository_GrantUsersToAccountRole_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GrantUsersToRole_Call) RunAndReturn(run func(context.Context, string, ...string) error) *mockDataAccessRepository_GrantUsersToRole_Call {
+func (_c *mockDataAccessRepository_GrantUsersToAccountRole_Call) RunAndReturn(run func(context.Context, string, ...string) error) *mockDataAccessRepository_GrantUsersToAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// RenameRole provides a mock function with given fields: oldName, newName
-func (_m *mockDataAccessRepository) RenameRole(oldName string, newName string) error {
+// RenameAccountRole provides a mock function with given fields: oldName, newName
+func (_m *mockDataAccessRepository) RenameAccountRole(oldName string, newName string) error {
 	ret := _m.Called(oldName, newName)
 
 	if len(ret) == 0 {
-		panic("no return value specified for RenameRole")
+		panic("no return value specified for RenameAccountRole")
 	}
 
 	var r0 error
@@ -1327,37 +1327,37 @@ func (_m *mockDataAccessRepository) RenameRole(oldName string, newName string) e
 	return r0
 }
 
-// mockDataAccessRepository_RenameRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RenameRole'
-type mockDataAccessRepository_RenameRole_Call struct {
+// mockDataAccessRepository_RenameAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RenameAccountRole'
+type mockDataAccessRepository_RenameAccountRole_Call struct {
 	*mock.Call
 }
 
-// RenameRole is a helper method to define mock.On call
+// RenameAccountRole is a helper method to define mock.On call
 //   - oldName string
 //   - newName string
-func (_e *mockDataAccessRepository_Expecter) RenameRole(oldName interface{}, newName interface{}) *mockDataAccessRepository_RenameRole_Call {
-	return &mockDataAccessRepository_RenameRole_Call{Call: _e.mock.On("RenameRole", oldName, newName)}
+func (_e *mockDataAccessRepository_Expecter) RenameAccountRole(oldName interface{}, newName interface{}) *mockDataAccessRepository_RenameAccountRole_Call {
+	return &mockDataAccessRepository_RenameAccountRole_Call{Call: _e.mock.On("RenameAccountRole", oldName, newName)}
 }
 
-func (_c *mockDataAccessRepository_RenameRole_Call) Run(run func(oldName string, newName string)) *mockDataAccessRepository_RenameRole_Call {
+func (_c *mockDataAccessRepository_RenameAccountRole_Call) Run(run func(oldName string, newName string)) *mockDataAccessRepository_RenameAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *mockDataAccessRepository_RenameRole_Call) Return(_a0 error) *mockDataAccessRepository_RenameRole_Call {
+func (_c *mockDataAccessRepository_RenameAccountRole_Call) Return(_a0 error) *mockDataAccessRepository_RenameAccountRole_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_RenameRole_Call) RunAndReturn(run func(string, string) error) *mockDataAccessRepository_RenameRole_Call {
+func (_c *mockDataAccessRepository_RenameAccountRole_Call) RunAndReturn(run func(string, string) error) *mockDataAccessRepository_RenameAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// RevokeRolesFromRole provides a mock function with given fields: ctx, role, roles
-func (_m *mockDataAccessRepository) RevokeRolesFromRole(ctx context.Context, role string, roles ...string) error {
+// RevokeAccountRolesFromAccountRole provides a mock function with given fields: ctx, role, roles
+func (_m *mockDataAccessRepository) RevokeAccountRolesFromAccountRole(ctx context.Context, role string, roles ...string) error {
 	_va := make([]interface{}, len(roles))
 	for _i := range roles {
 		_va[_i] = roles[_i]
@@ -1368,7 +1368,7 @@ func (_m *mockDataAccessRepository) RevokeRolesFromRole(ctx context.Context, rol
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for RevokeRolesFromRole")
+		panic("no return value specified for RevokeAccountRolesFromAccountRole")
 	}
 
 	var r0 error
@@ -1381,21 +1381,21 @@ func (_m *mockDataAccessRepository) RevokeRolesFromRole(ctx context.Context, rol
 	return r0
 }
 
-// mockDataAccessRepository_RevokeRolesFromRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeRolesFromRole'
-type mockDataAccessRepository_RevokeRolesFromRole_Call struct {
+// mockDataAccessRepository_RevokeAccountRolesFromAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeAccountRolesFromAccountRole'
+type mockDataAccessRepository_RevokeAccountRolesFromAccountRole_Call struct {
 	*mock.Call
 }
 
-// RevokeRolesFromRole is a helper method to define mock.On call
+// RevokeAccountRolesFromAccountRole is a helper method to define mock.On call
 //   - ctx context.Context
 //   - role string
 //   - roles ...string
-func (_e *mockDataAccessRepository_Expecter) RevokeRolesFromRole(ctx interface{}, role interface{}, roles ...interface{}) *mockDataAccessRepository_RevokeRolesFromRole_Call {
-	return &mockDataAccessRepository_RevokeRolesFromRole_Call{Call: _e.mock.On("RevokeRolesFromRole",
+func (_e *mockDataAccessRepository_Expecter) RevokeAccountRolesFromAccountRole(ctx interface{}, role interface{}, roles ...interface{}) *mockDataAccessRepository_RevokeAccountRolesFromAccountRole_Call {
+	return &mockDataAccessRepository_RevokeAccountRolesFromAccountRole_Call{Call: _e.mock.On("RevokeAccountRolesFromAccountRole",
 		append([]interface{}{ctx, role}, roles...)...)}
 }
 
-func (_c *mockDataAccessRepository_RevokeRolesFromRole_Call) Run(run func(ctx context.Context, role string, roles ...string)) *mockDataAccessRepository_RevokeRolesFromRole_Call {
+func (_c *mockDataAccessRepository_RevokeAccountRolesFromAccountRole_Call) Run(run func(ctx context.Context, role string, roles ...string)) *mockDataAccessRepository_RevokeAccountRolesFromAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		variadicArgs := make([]string, len(args)-2)
 		for i, a := range args[2:] {
@@ -1408,18 +1408,18 @@ func (_c *mockDataAccessRepository_RevokeRolesFromRole_Call) Run(run func(ctx co
 	return _c
 }
 
-func (_c *mockDataAccessRepository_RevokeRolesFromRole_Call) Return(_a0 error) *mockDataAccessRepository_RevokeRolesFromRole_Call {
+func (_c *mockDataAccessRepository_RevokeAccountRolesFromAccountRole_Call) Return(_a0 error) *mockDataAccessRepository_RevokeAccountRolesFromAccountRole_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_RevokeRolesFromRole_Call) RunAndReturn(run func(context.Context, string, ...string) error) *mockDataAccessRepository_RevokeRolesFromRole_Call {
+func (_c *mockDataAccessRepository_RevokeAccountRolesFromAccountRole_Call) RunAndReturn(run func(context.Context, string, ...string) error) *mockDataAccessRepository_RevokeAccountRolesFromAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// RevokeUsersFromRole provides a mock function with given fields: ctx, role, users
-func (_m *mockDataAccessRepository) RevokeUsersFromRole(ctx context.Context, role string, users ...string) error {
+// RevokeUsersFromAccountRole provides a mock function with given fields: ctx, role, users
+func (_m *mockDataAccessRepository) RevokeUsersFromAccountRole(ctx context.Context, role string, users ...string) error {
 	_va := make([]interface{}, len(users))
 	for _i := range users {
 		_va[_i] = users[_i]
@@ -1430,7 +1430,7 @@ func (_m *mockDataAccessRepository) RevokeUsersFromRole(ctx context.Context, rol
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for RevokeUsersFromRole")
+		panic("no return value specified for RevokeUsersFromAccountRole")
 	}
 
 	var r0 error
@@ -1443,21 +1443,21 @@ func (_m *mockDataAccessRepository) RevokeUsersFromRole(ctx context.Context, rol
 	return r0
 }
 
-// mockDataAccessRepository_RevokeUsersFromRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeUsersFromRole'
-type mockDataAccessRepository_RevokeUsersFromRole_Call struct {
+// mockDataAccessRepository_RevokeUsersFromAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeUsersFromAccountRole'
+type mockDataAccessRepository_RevokeUsersFromAccountRole_Call struct {
 	*mock.Call
 }
 
-// RevokeUsersFromRole is a helper method to define mock.On call
+// RevokeUsersFromAccountRole is a helper method to define mock.On call
 //   - ctx context.Context
 //   - role string
 //   - users ...string
-func (_e *mockDataAccessRepository_Expecter) RevokeUsersFromRole(ctx interface{}, role interface{}, users ...interface{}) *mockDataAccessRepository_RevokeUsersFromRole_Call {
-	return &mockDataAccessRepository_RevokeUsersFromRole_Call{Call: _e.mock.On("RevokeUsersFromRole",
+func (_e *mockDataAccessRepository_Expecter) RevokeUsersFromAccountRole(ctx interface{}, role interface{}, users ...interface{}) *mockDataAccessRepository_RevokeUsersFromAccountRole_Call {
+	return &mockDataAccessRepository_RevokeUsersFromAccountRole_Call{Call: _e.mock.On("RevokeUsersFromAccountRole",
 		append([]interface{}{ctx, role}, users...)...)}
 }
 
-func (_c *mockDataAccessRepository_RevokeUsersFromRole_Call) Run(run func(ctx context.Context, role string, users ...string)) *mockDataAccessRepository_RevokeUsersFromRole_Call {
+func (_c *mockDataAccessRepository_RevokeUsersFromAccountRole_Call) Run(run func(ctx context.Context, role string, users ...string)) *mockDataAccessRepository_RevokeUsersFromAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		variadicArgs := make([]string, len(args)-2)
 		for i, a := range args[2:] {
@@ -1470,12 +1470,12 @@ func (_c *mockDataAccessRepository_RevokeUsersFromRole_Call) Run(run func(ctx co
 	return _c
 }
 
-func (_c *mockDataAccessRepository_RevokeUsersFromRole_Call) Return(_a0 error) *mockDataAccessRepository_RevokeUsersFromRole_Call {
+func (_c *mockDataAccessRepository_RevokeUsersFromAccountRole_Call) Return(_a0 error) *mockDataAccessRepository_RevokeUsersFromAccountRole_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_RevokeUsersFromRole_Call) RunAndReturn(run func(context.Context, string, ...string) error) *mockDataAccessRepository_RevokeUsersFromRole_Call {
+func (_c *mockDataAccessRepository_RevokeUsersFromAccountRole_Call) RunAndReturn(run func(context.Context, string, ...string) error) *mockDataAccessRepository_RevokeUsersFromAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }

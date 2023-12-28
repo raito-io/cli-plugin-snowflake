@@ -9,11 +9,10 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/raito-io/cli/base/tag"
-	"github.com/raito-io/golang-set/set"
-
 	"github.com/blockloop/scan"
 	"github.com/hashicorp/go-multierror"
+	"github.com/raito-io/cli/base/tag"
+	"github.com/raito-io/golang-set/set"
 	sf "github.com/snowflakedb/gosnowflake"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
@@ -155,11 +154,11 @@ func (repo *SnowflakeRepository) CheckAccessHistoryAvailability(historyTable str
 	return false, nil
 }
 
-func (repo *SnowflakeRepository) GetRoles() ([]RoleEntity, error) {
-	return repo.GetRolesWithPrefix("")
+func (repo *SnowflakeRepository) GetAccountRoles() ([]RoleEntity, error) {
+	return repo.GetAccountRolesWithPrefix("")
 }
 
-func (repo *SnowflakeRepository) GetRolesWithPrefix(prefix string) ([]RoleEntity, error) {
+func (repo *SnowflakeRepository) GetAccountRolesWithPrefix(prefix string) ([]RoleEntity, error) {
 	q := "SHOW ROLES"
 
 	if prefix != "" {
@@ -194,7 +193,7 @@ func (repo *SnowflakeRepository) GetRolesWithPrefix(prefix string) ([]RoleEntity
 	return roleEntities, nil
 }
 
-func (repo *SnowflakeRepository) CreateRole(roleName string) error {
+func (repo *SnowflakeRepository) CreateAccountRole(roleName string) error {
 	if repo.isProtectedRoleName(roleName) {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", roleName))
 		return nil
@@ -207,7 +206,7 @@ func (repo *SnowflakeRepository) CreateRole(roleName string) error {
 	return err
 }
 
-func (repo *SnowflakeRepository) DropRole(roleName string) error {
+func (repo *SnowflakeRepository) DropAccountRole(roleName string) error {
 	if repo.isProtectedRoleName(roleName) {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", roleName))
 		return nil
@@ -226,7 +225,7 @@ func (repo *SnowflakeRepository) DropRole(roleName string) error {
 	return err
 }
 
-func (repo *SnowflakeRepository) RenameRole(oldName, newName string) error {
+func (repo *SnowflakeRepository) RenameAccountRole(oldName, newName string) error {
 	if repo.isProtectedRoleName(oldName) {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", oldName))
 		return nil
@@ -238,10 +237,20 @@ func (repo *SnowflakeRepository) RenameRole(oldName, newName string) error {
 	return err
 }
 
-func (repo *SnowflakeRepository) GetGrantsOfRole(roleName string) ([]GrantOfRole, error) {
+func (repo *SnowflakeRepository) GetGrantsOfAccountRole(roleName string) ([]GrantOfRole, error) {
 	q := common.FormatQuery(`SHOW GRANTS OF ROLE %s`, roleName)
 
-	rows, _, err := repo.query(q)
+	return repo.grantsOfRoleMapper(q)
+}
+
+func (repo *SnowflakeRepository) GetGrantsToAccountRole(roleName string) ([]GrantToRole, error) {
+	q := common.FormatQuery(`SHOW GRANTS TO ROLE %s`, roleName)
+
+	return repo.grantToRoleMapper(q)
+}
+
+func (repo *SnowflakeRepository) grantsOfRoleMapper(query string) ([]GrantOfRole, error) {
+	rows, _, err := repo.query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -258,10 +267,8 @@ func (repo *SnowflakeRepository) GetGrantsOfRole(roleName string) ([]GrantOfRole
 	return grantOfEntities, nil
 }
 
-func (repo *SnowflakeRepository) GetGrantsToRole(roleName string) ([]GrantToRole, error) {
-	q := common.FormatQuery(`SHOW GRANTS TO ROLE %s`, roleName)
-
-	rows, _, err := repo.query(q)
+func (repo *SnowflakeRepository) grantToRoleMapper(query string) ([]GrantToRole, error) {
+	rows, _, err := repo.query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +285,7 @@ func (repo *SnowflakeRepository) GetGrantsToRole(roleName string) ([]GrantToRole
 	return grantToEntities, nil
 }
 
-func (repo *SnowflakeRepository) GrantRolesToRole(ctx context.Context, role string, roles ...string) error {
+func (repo *SnowflakeRepository) GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error {
 	statementChan, done := repo.execMultiStatements(ctx)
 
 	for _, otherRole := range roles {
@@ -294,16 +301,16 @@ func (repo *SnowflakeRepository) GrantRolesToRole(ctx context.Context, role stri
 	return <-done
 }
 
-func (repo *SnowflakeRepository) RevokeRolesFromRole(ctx context.Context, role string, roles ...string) error {
-	if repo.isProtectedRoleName(role) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
+func (repo *SnowflakeRepository) RevokeAccountRolesFromAccountRole(ctx context.Context, accountRole string, accountRoles ...string) error {
+	if repo.isProtectedRoleName(accountRole) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
 		return nil
 	}
 
 	statementChan, done := repo.execMultiStatements(ctx)
 
-	for _, otherRole := range roles {
-		q := common.FormatQuery(`REVOKE ROLE %s FROM ROLE %s`, role, otherRole)
+	for _, otherRole := range accountRoles {
+		q := common.FormatQuery(`REVOKE ROLE %s FROM ROLE %s`, accountRole, otherRole)
 		statementChan <- q
 	}
 
@@ -312,7 +319,7 @@ func (repo *SnowflakeRepository) RevokeRolesFromRole(ctx context.Context, role s
 	return <-done
 }
 
-func (repo *SnowflakeRepository) GrantUsersToRole(ctx context.Context, role string, users ...string) error {
+func (repo *SnowflakeRepository) GrantUsersToAccountRole(ctx context.Context, role string, users ...string) error {
 	statementChan, done := repo.execMultiStatements(ctx)
 
 	for _, user := range users {
@@ -325,7 +332,7 @@ func (repo *SnowflakeRepository) GrantUsersToRole(ctx context.Context, role stri
 	return <-done
 }
 
-func (repo *SnowflakeRepository) RevokeUsersFromRole(ctx context.Context, role string, users ...string) error {
+func (repo *SnowflakeRepository) RevokeUsersFromAccountRole(ctx context.Context, role string, users ...string) error {
 	if repo.isProtectedRoleName(role) {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
 		return nil
@@ -343,39 +350,39 @@ func (repo *SnowflakeRepository) RevokeUsersFromRole(ctx context.Context, role s
 	return <-done
 }
 
-func (repo *SnowflakeRepository) ExecuteGrant(perm, on, role string) error {
-	if repo.isProtectedRoleName(role) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "REFERENCES") {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
+func (repo *SnowflakeRepository) ExecuteGrantOnAccountRole(perm, on, accountRole string) error {
+	if repo.isProtectedRoleName(accountRole) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "REFERENCES") {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
 		return nil
 	}
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
-	q := fmt.Sprintf(`GRANT %s ON %s TO ROLE %s`, perm, on, role)
+	q := fmt.Sprintf(`GRANT %s ON %s TO ROLE %q`, perm, on, accountRole)
 	logger.Debug("Executing grant query", "query", q)
 
 	_, _, err := repo.query(q)
 
 	if err != nil {
-		return fmt.Errorf("error while executing grant query on Snowflake for role %q: %s", role, err.Error())
+		return fmt.Errorf("error while executing grant query on Snowflake for role %q: %s", accountRole, err.Error())
 	}
 
 	return nil
 }
 
-func (repo *SnowflakeRepository) ExecuteRevoke(perm, on, role string) error {
-	if repo.isProtectedRoleName(role) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "SELECT") {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
+func (repo *SnowflakeRepository) ExecuteRevokeOnAccountRole(perm, on, accountRole string) error {
+	if repo.isProtectedRoleName(accountRole) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "SELECT") {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
 		return nil
 	}
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
 	// q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
-	q := fmt.Sprintf(`REVOKE %s ON %s FROM ROLE %s`, perm, on, role)
+	q := fmt.Sprintf(`REVOKE %s ON %s FROM ROLE %q`, perm, on, accountRole)
 	logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
 
 	_, _, err := repo.query(q)
 	if err != nil {
-		return fmt.Errorf("error while executing revoke query on Snowflake for role %q: %s", role, err.Error())
+		return fmt.Errorf("error while executing revoke query on Snowflake for role %q: %s", accountRole, err.Error())
 	}
 
 	return nil
@@ -444,13 +451,13 @@ func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, poli
 func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error) {
 	// to fetch policy references we need to have USAGE on dbName and schema
 	if !strings.EqualFold(repo.role, "ACCOUNTADMIN") && repo.role != "" {
-		err := repo.ExecuteGrant("USAGE", fmt.Sprintf("DATABASE %s", dbName), repo.role)
+		err := repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("DATABASE %s", dbName), repo.role)
 
 		if err != nil {
 			return nil, err
 		}
 
-		err = repo.ExecuteGrant("USAGE", fmt.Sprintf("SCHEMA %s.%s", dbName, schema), repo.role)
+		err = repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("SCHEMA %s.%s", dbName, schema), repo.role)
 
 		if err != nil {
 			return nil, err

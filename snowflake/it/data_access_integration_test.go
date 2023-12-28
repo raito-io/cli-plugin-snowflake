@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
-
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/wrappers/mocks"
@@ -121,7 +120,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		},
 	}, accessProviderFeedback)
 
-	roles, err := s.sfRepo.GetRoles()
+	roles, err := s.sfRepo.GetAccountRoles()
 	s.NoError(err)
 	s.Contains(roles, snowflake.RoleEntity{
 		Name:            actualRoleName,
@@ -150,7 +149,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		},
 	})
 
-	roles, err = s.sfRepo.GetRoles()
+	roles, err = s.sfRepo.GetAccountRoles()
 	s.NoError(err)
 	s.NotContains(roles, snowflake.RoleEntity{
 		Name:            actualRoleName,
@@ -200,7 +199,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	//Then
 	s.NoError(err)
 
-	roles, err := s.sfRepo.GetRoles()
+	roles, err := s.sfRepo.GetAccountRoles()
 	s.NoError(err)
 	s.Contains(roles, snowflake.RoleEntity{
 		Name:            actualRoleName,
@@ -219,7 +218,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	//Then
 	s.NoError(err)
 
-	roles, err = s.sfRepo.GetRoles()
+	roles, err = s.sfRepo.GetAccountRoles()
 	s.NoError(err)
 	s.NotContains(roles, snowflake.RoleEntity{
 		Name:            actualRoleName,

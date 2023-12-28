@@ -6,12 +6,11 @@ import (
 	"strings"
 	"time"
 
+	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/tag"
+	"github.com/raito-io/cli/base/wrappers"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
-
-	ds "github.com/raito-io/cli/base/data_source"
-	"github.com/raito-io/cli/base/wrappers"
 )
 
 const AccountAdmin = "ACCOUNTADMIN"
@@ -28,8 +27,7 @@ type dataSourceRepository interface {
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTags(databaseName string) (map[string][]*tag.Tag, error)
-	ExecuteGrant(perm, on, role string) error
-	ExecuteRevoke(perm, on, role string) error
+	ExecuteGrantOnAccountRole(perm, on, role string) error
 }
 
 type DataSourceSyncer struct {
@@ -314,10 +312,10 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSch
 func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, db DbEntity) error {
 	// grant the SYNC role USAGE/IMPORTED PRIVILEGES on each database so it can query the INFORMATION_SCHEMA
 	if s.SfSyncRole != AccountAdmin {
-		err := repo.ExecuteGrant("USAGE", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+		err := repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 		if err != nil && strings.Contains(err.Error(), "IMPORTED PRIVILEGES") {
-			err2 := repo.ExecuteGrant("IMPORTED PRIVILEGES", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 := repo.ExecuteGrantOnAccountRole("IMPORTED PRIVILEGES", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
@@ -325,31 +323,31 @@ func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, d
 		} else if err != nil {
 			return err
 		} else {
-			err2 := repo.ExecuteGrant("USAGE", fmt.Sprintf("ALL SCHEMAS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 := repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("ALL SCHEMAS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrant("REFERENCES", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrant("REFERENCES", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrant("REFERENCES", fmt.Sprintf("ALL VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrant("REFERENCES", fmt.Sprintf("ALL MATERIALIZED VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL MATERIALIZED VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
