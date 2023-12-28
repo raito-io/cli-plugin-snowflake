@@ -9,9 +9,6 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/raito-io/cli/base/tag"
-	"github.com/raito-io/golang-set/set"
-
 	"github.com/blockloop/scan"
 	"github.com/hashicorp/go-multierror"
 	"github.com/raito-io/cli/base/tag"

@@ -10,9 +10,6 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/bexpression"
 	"github.com/raito-io/bexpression/datacomparison"
-	"github.com/raito-io/golang-set/set"
-	"github.com/stretchr/testify/require"
-
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/data_source"
@@ -21,6 +18,7 @@ import (
 	"github.com/raito-io/golang-set/set"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {

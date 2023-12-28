@@ -122,10 +122,6 @@ func (_m *mockDataAccessRepository) CreateAccountRole(roleName string) error {
 		panic("no return value specified for CreateAccountRole")
 	}
 
-	if len(ret) == 0 {
-		panic("no return value specified for CreateMaskPolicy")
-	}
-
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string) error); ok {
 		r0 = rf(roleName)
@@ -170,10 +166,6 @@ func (_m *mockDataAccessRepository) CreateMaskPolicy(databaseName string, schema
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateMaskPolicy")
-	}
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreateRole")
 	}
 
 	var r0 error
@@ -326,6 +318,55 @@ func (_c *mockDataAccessRepository_DropAccountRole_Call) RunAndReturn(run func(s
 	return _c
 }
 
+// DropFilter provides a mock function with given fields: databaseName, schema, tableName, filterName
+func (_m *mockDataAccessRepository) DropFilter(databaseName string, schema string, tableName string, filterName string) error {
+	ret := _m.Called(databaseName, schema, tableName, filterName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DropFilter")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
+		r0 = rf(databaseName, schema, tableName, filterName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_DropFilter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DropFilter'
+type mockDataAccessRepository_DropFilter_Call struct {
+	*mock.Call
+}
+
+// DropFilter is a helper method to define mock.On call
+//   - databaseName string
+//   - schema string
+//   - tableName string
+//   - filterName string
+func (_e *mockDataAccessRepository_Expecter) DropFilter(databaseName interface{}, schema interface{}, tableName interface{}, filterName interface{}) *mockDataAccessRepository_DropFilter_Call {
+	return &mockDataAccessRepository_DropFilter_Call{Call: _e.mock.On("DropFilter", databaseName, schema, tableName, filterName)}
+}
+
+func (_c *mockDataAccessRepository_DropFilter_Call) Run(run func(databaseName string, schema string, tableName string, filterName string)) *mockDataAccessRepository_DropFilter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_DropFilter_Call) Return(_a0 error) *mockDataAccessRepository_DropFilter_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_DropFilter_Call) RunAndReturn(run func(string, string, string, string) error) *mockDataAccessRepository_DropFilter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DropMaskingPolicy provides a mock function with given fields: databaseName, schema, maskName
 func (_m *mockDataAccessRepository) DropMaskingPolicy(databaseName string, schema string, maskName string) error {
 	ret := _m.Called(databaseName, schema, maskName)
@@ -382,10 +423,6 @@ func (_m *mockDataAccessRepository) ExecuteGrantOnAccountRole(perm string, on st
 		panic("no return value specified for ExecuteGrantOnAccountRole")
 	}
 
-	if len(ret) == 0 {
-		panic("no return value specified for DropRole")
-	}
-
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
 		r0 = rf(perm, on, role)
@@ -431,7 +468,7 @@ func (_m *mockDataAccessRepository) ExecuteRevokeOnAccountRole(perm string, on s
 	ret := _m.Called(perm, on, role)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ExecuteGrant")
+		panic("no return value specified for ExecuteRevokeOnAccountRole")
 	}
 
 	var r0 error
@@ -479,12 +516,16 @@ func (_m *mockDataAccessRepository) GetAccountRoles() ([]RoleEntity, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for ExecuteRevoke")
+		panic("no return value specified for GetAccountRoles")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(perm, on, role)
+	var r0 []RoleEntity
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]RoleEntity, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []RoleEntity); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]RoleEntity)
@@ -647,7 +688,7 @@ func (_m *mockDataAccessRepository) GetGrantsOfAccountRole(roleName string) ([]G
 	ret := _m.Called(roleName)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetGrantsOfRole")
+		panic("no return value specified for GetGrantsOfAccountRole")
 	}
 
 	var r0 []GrantOfRole
@@ -705,7 +746,7 @@ func (_m *mockDataAccessRepository) GetGrantsToAccountRole(roleName string) ([]G
 	ret := _m.Called(roleName)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetGrantsToRole")
+		panic("no return value specified for GetGrantsToAccountRole")
 	}
 
 	var r0 []GrantToRole
@@ -935,121 +976,6 @@ func (_c *mockDataAccessRepository_GetPolicyReferences_Call) RunAndReturn(run fu
 	return _c
 }
 
-// GetRoles provides a mock function with given fields:
-func (_m *mockDataAccessRepository) GetRoles() ([]RoleEntity, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetRoles")
-	}
-
-	var r0 []RoleEntity
-	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]RoleEntity, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() []RoleEntity); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]RoleEntity)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockDataAccessRepository_GetRoles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRoles'
-type mockDataAccessRepository_GetRoles_Call struct {
-	*mock.Call
-}
-
-// GetRoles is a helper method to define mock.On call
-func (_e *mockDataAccessRepository_Expecter) GetRoles() *mockDataAccessRepository_GetRoles_Call {
-	return &mockDataAccessRepository_GetRoles_Call{Call: _e.mock.On("GetRoles")}
-}
-
-func (_c *mockDataAccessRepository_GetRoles_Call) Run(run func()) *mockDataAccessRepository_GetRoles_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetRoles_Call) Return(_a0 []RoleEntity, _a1 error) *mockDataAccessRepository_GetRoles_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetRoles_Call) RunAndReturn(run func() ([]RoleEntity, error)) *mockDataAccessRepository_GetRoles_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetRolesWithPrefix provides a mock function with given fields: prefix
-func (_m *mockDataAccessRepository) GetRolesWithPrefix(prefix string) ([]RoleEntity, error) {
-	ret := _m.Called(prefix)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetRolesWithPrefix")
-	}
-
-	var r0 []RoleEntity
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]RoleEntity, error)); ok {
-		return rf(prefix)
-	}
-	if rf, ok := ret.Get(0).(func(string) []RoleEntity); ok {
-		r0 = rf(prefix)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]RoleEntity)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(prefix)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockDataAccessRepository_GetRolesWithPrefix_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRolesWithPrefix'
-type mockDataAccessRepository_GetRolesWithPrefix_Call struct {
-	*mock.Call
-}
-
-// GetRolesWithPrefix is a helper method to define mock.On call
-//   - prefix string
-func (_e *mockDataAccessRepository_Expecter) GetRolesWithPrefix(prefix interface{}) *mockDataAccessRepository_GetRolesWithPrefix_Call {
-	return &mockDataAccessRepository_GetRolesWithPrefix_Call{Call: _e.mock.On("GetRolesWithPrefix", prefix)}
-}
-
-func (_c *mockDataAccessRepository_GetRolesWithPrefix_Call) Run(run func(prefix string)) *mockDataAccessRepository_GetRolesWithPrefix_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetRolesWithPrefix_Call) Return(_a0 []RoleEntity, _a1 error) *mockDataAccessRepository_GetRolesWithPrefix_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetRolesWithPrefix_Call) RunAndReturn(run func(string) ([]RoleEntity, error)) *mockDataAccessRepository_GetRolesWithPrefix_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetSchemasInDatabase provides a mock function with given fields: databaseName, handleEntity
 func (_m *mockDataAccessRepository) GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error {
 	ret := _m.Called(databaseName, handleEntity)
@@ -1271,7 +1197,7 @@ func (_m *mockDataAccessRepository) GrantAccountRolesToAccountRole(ctx context.C
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GrantRolesToRole")
+		panic("no return value specified for GrantAccountRolesToAccountRole")
 	}
 
 	var r0 error
@@ -1333,7 +1259,7 @@ func (_m *mockDataAccessRepository) GrantUsersToAccountRole(ctx context.Context,
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GrantUsersToRole")
+		panic("no return value specified for GrantUsersToAccountRole")
 	}
 
 	var r0 error
@@ -1388,7 +1314,7 @@ func (_m *mockDataAccessRepository) RenameAccountRole(oldName string, newName st
 	ret := _m.Called(oldName, newName)
 
 	if len(ret) == 0 {
-		panic("no return value specified for RenameRole")
+		panic("no return value specified for RenameAccountRole")
 	}
 
 	var r0 error
@@ -1442,7 +1368,7 @@ func (_m *mockDataAccessRepository) RevokeAccountRolesFromAccountRole(ctx contex
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for RevokeRolesFromRole")
+		panic("no return value specified for RevokeAccountRolesFromAccountRole")
 	}
 
 	var r0 error
@@ -1504,7 +1430,7 @@ func (_m *mockDataAccessRepository) RevokeUsersFromAccountRole(ctx context.Conte
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for RevokeUsersFromRole")
+		panic("no return value specified for RevokeUsersFromAccountRole")
 	}
 
 	var r0 error

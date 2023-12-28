@@ -9,12 +9,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/raito-io/cli/base/access_provider"
-	"github.com/raito-io/cli/base/wrappers/role_based"
-	"github.com/raito-io/golang-set/set"
-
 	"github.com/aws/smithy-go/ptr"
+	"github.com/hashicorp/go-multierror"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/raito-io/cli/base/access_provider"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
@@ -23,6 +19,7 @@ import (
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/util/slice"
 	"github.com/raito-io/cli/base/wrappers"
+	"github.com/raito-io/cli/base/wrappers/role_based"
 	"github.com/raito-io/golang-set/set"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
