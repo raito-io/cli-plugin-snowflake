@@ -591,7 +591,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				CanBeCreated:                  false,
 				CanBeAssumed:                  false,
 				CanAssumeMultiple:             false,
-				AllowedWhoAccessProviderTypes: []string{access_provider.Role},
+				AllowedWhoAccessProviderTypes: []string{DatabaseRole},
 			},
 		},
 		MaskingMetadata: &ds.MaskingMetadata{

@@ -67,12 +67,12 @@ func (_c *mockDataSourceRepository_Close_Call) RunAndReturn(run func() error) *m
 	return _c
 }
 
-// ExecuteGrant provides a mock function with given fields: perm, on, role
-func (_m *mockDataSourceRepository) ExecuteGrant(perm string, on string, role string) error {
+// ExecuteGrantOnAccountRole provides a mock function with given fields: perm, on, role
+func (_m *mockDataSourceRepository) ExecuteGrantOnAccountRole(perm string, on string, role string) error {
 	ret := _m.Called(perm, on, role)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ExecuteGrant")
+		panic("no return value specified for ExecuteGrantOnAccountRole")
 	}
 
 	var r0 error
@@ -85,80 +85,32 @@ func (_m *mockDataSourceRepository) ExecuteGrant(perm string, on string, role st
 	return r0
 }
 
-// mockDataSourceRepository_ExecuteGrant_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteGrant'
-type mockDataSourceRepository_ExecuteGrant_Call struct {
+// mockDataSourceRepository_ExecuteGrantOnAccountRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteGrantOnAccountRole'
+type mockDataSourceRepository_ExecuteGrantOnAccountRole_Call struct {
 	*mock.Call
 }
 
-// ExecuteGrant is a helper method to define mock.On call
+// ExecuteGrantOnAccountRole is a helper method to define mock.On call
 //   - perm string
 //   - on string
 //   - role string
-func (_e *mockDataSourceRepository_Expecter) ExecuteGrant(perm interface{}, on interface{}, role interface{}) *mockDataSourceRepository_ExecuteGrant_Call {
-	return &mockDataSourceRepository_ExecuteGrant_Call{Call: _e.mock.On("ExecuteGrant", perm, on, role)}
+func (_e *mockDataSourceRepository_Expecter) ExecuteGrantOnAccountRole(perm interface{}, on interface{}, role interface{}) *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call {
+	return &mockDataSourceRepository_ExecuteGrantOnAccountRole_Call{Call: _e.mock.On("ExecuteGrantOnAccountRole", perm, on, role)}
 }
 
-func (_c *mockDataSourceRepository_ExecuteGrant_Call) Run(run func(perm string, on string, role string)) *mockDataSourceRepository_ExecuteGrant_Call {
+func (_c *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call) Run(run func(perm string, on string, role string)) *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string), args[1].(string), args[2].(string))
 	})
 	return _c
 }
 
-func (_c *mockDataSourceRepository_ExecuteGrant_Call) Return(_a0 error) *mockDataSourceRepository_ExecuteGrant_Call {
+func (_c *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call) Return(_a0 error) *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockDataSourceRepository_ExecuteGrant_Call) RunAndReturn(run func(string, string, string) error) *mockDataSourceRepository_ExecuteGrant_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ExecuteRevoke provides a mock function with given fields: perm, on, role
-func (_m *mockDataSourceRepository) ExecuteRevoke(perm string, on string, role string) error {
-	ret := _m.Called(perm, on, role)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ExecuteRevoke")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(perm, on, role)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockDataSourceRepository_ExecuteRevoke_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteRevoke'
-type mockDataSourceRepository_ExecuteRevoke_Call struct {
-	*mock.Call
-}
-
-// ExecuteRevoke is a helper method to define mock.On call
-//   - perm string
-//   - on string
-//   - role string
-func (_e *mockDataSourceRepository_Expecter) ExecuteRevoke(perm interface{}, on interface{}, role interface{}) *mockDataSourceRepository_ExecuteRevoke_Call {
-	return &mockDataSourceRepository_ExecuteRevoke_Call{Call: _e.mock.On("ExecuteRevoke", perm, on, role)}
-}
-
-func (_c *mockDataSourceRepository_ExecuteRevoke_Call) Run(run func(perm string, on string, role string)) *mockDataSourceRepository_ExecuteRevoke_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *mockDataSourceRepository_ExecuteRevoke_Call) Return(_a0 error) *mockDataSourceRepository_ExecuteRevoke_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockDataSourceRepository_ExecuteRevoke_Call) RunAndReturn(run func(string, string, string) error) *mockDataSourceRepository_ExecuteRevoke_Call {
+func (_c *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call) RunAndReturn(run func(string, string, string) error) *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
