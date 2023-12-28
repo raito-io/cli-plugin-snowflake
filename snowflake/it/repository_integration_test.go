@@ -112,7 +112,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CheckAccessHistoryAvailabi
 	s.False(result)
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GetRoles() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_GetAccountRoles() {
 	//When
 	roles, err := s.repo.GetAccountRoles()
 
@@ -153,7 +153,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetAccountRolesWithPrefix(
 	s.Contains(roleNames, "SYSADMIN")
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateRole() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateAccountRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_CREATE_ROLE_TEST", testId)
 
@@ -174,7 +174,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateRole() {
 	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_DropRole() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_DropAccountRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_CREATE_ROLE_TEST", testId)
 	err := s.repo.CreateAccountRole(roleName)
@@ -196,7 +196,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_DropRole() {
 	s.NotContains(roleNames, roleName)
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToRole() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToAccountRole() {
 	//When
 	grantsToRole, err := s.repo.GetGrantsToAccountRole("PUBLIC")
 
@@ -221,7 +221,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToRole() {
 	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsOfRole() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsOfAccountRole() {
 	//When
 	grantsOfRolePublic, err := s.repo.GetGrantsOfAccountRole("ACCOUNTADMIN")
 
@@ -234,7 +234,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsOfRole() {
 	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantRolesToRole() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantAccountRolesToAccountRole() {
 	//When
 	originalRoleName := fmt.Sprintf("%s_REPO_TEST_GRANT_R2R", testId)
 	rolesToGrants := make([]string, 0, 5)
@@ -267,7 +267,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantRolesToRole() {
 	s.Equal(grants, expectedGrants)
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeRolesFromRole() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeAccountRolesFromAccountRole() {
 	//When
 	originalRoleName := fmt.Sprintf("%s_REPO_TEST_REVOKE_R2R", testId)
 	rolesToGrants := make([]string, 0, 5)
@@ -293,7 +293,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeRolesFromRole() {
 	s.Empty(grants)
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantUsersToRole() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantUsersToAccountRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_GRANT_USER_TEST", testId)
 	err := s.repo.CreateAccountRole(roleName)
@@ -317,7 +317,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantUsersToRole() {
 	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeUsersFromRole() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeUsersFromAccountRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_GRANT_USER_TEST", testId)
 	err := s.repo.CreateAccountRole(roleName)
@@ -337,7 +337,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeUsersFromRole() {
 	s.Empty(grants)
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrant() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnAccountRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_GRANT_TEST", testId)
 	err := s.repo.CreateAccountRole(roleName)
@@ -361,7 +361,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrant() {
 	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevoke() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevokeOnAccountRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_REVOKE_TEST", testId)
 	err := s.repo.CreateAccountRole(roleName)
