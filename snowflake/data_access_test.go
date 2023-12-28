@@ -3,10 +3,16 @@ package snowflake
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/raito-io/bexpression"
+	"github.com/raito-io/bexpression/datacomparison"
+	"github.com/raito-io/golang-set/set"
+	"github.com/stretchr/testify/require"
+
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/data_source"
@@ -784,6 +790,164 @@ func TestAccessSyncer_SyncAccessProviderMasksToTarget(t *testing.T) {
 	// Then
 	assert.NoError(t, err)
 	assert.Len(t, fileCreator.AccessProviderFeedback, 3)
+}
+
+func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
+	// Given
+	configParams := config.ConfigMap{
+		Parameters: map[string]string{"key": "value"},
+	}
+
+	repo := newMockDataAccessRepository(t)
+	fileCreator := mocks.NewSimpleAccessProviderFeedbackHandler(t)
+
+	repo.EXPECT().UpdateFilter("DB1", "Schema1", "Table1", mock.AnythingOfType("string"), mock.AnythingOfType("[]string"),
+		mock.AnythingOfType("string")).RunAndReturn(func(_ string, _ string, _ string, filterName string, arguments []string, query string) error {
+		assert.True(t, strings.HasPrefix(filterName, "raito_Schema1_Table1_"))
+		assert.ElementsMatch(t, []string{"Column1", "state"}, arguments)
+
+		queryPart1 := "(current_user() IN ('User2') OR current_role() IN ('Role3')) AND ((100 >= Column1))"
+		queryPart2 := "(current_user() IN ('User1', 'User2') OR current_role() IN ('Role1')) AND (state = 'NJ')"
+
+		queryOption1 := fmt.Sprintf("%s OR %s", queryPart1, queryPart2)
+		queryOption2 := fmt.Sprintf("%s OR %s", queryPart2, queryPart1)
+
+		assert.True(t, query == queryOption1 || query == queryOption2)
+
+		return nil
+	})
+
+	repo.EXPECT().UpdateFilter("DB1", "Schema2", "Table1", mock.AnythingOfType("string"), []string{}, "FALSE").RunAndReturn(func(_ string, _ string, _ string, filterName string, _ []string, _ string) error {
+		assert.True(t, strings.HasPrefix(filterName, "raito_Schema2_Table1_"))
+
+		return nil
+	})
+
+	repo.EXPECT().DropFilter("DB1", "Schema1", "Table3", "RAITO_FILTERTOREMOVE2").Return(nil)
+
+	masksToRemove := map[string]*importer.AccessProvider{
+		"RAITO_FILTERTOREMOVE1": {
+			Id:         "FilterToRemove1",
+			Action:     importer.Filtered,
+			ActualName: ptr.String("RAITO_FILTERTOREMOVE1"),
+			ExternalId: ptr.String("DB1.Schema1.RAITO_FILTERTOREMOVE1"),
+			What: []importer.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.Schema1.Table1",
+						Type:     data_source.Table,
+					},
+				},
+			},
+		},
+		"RAITO_FILTERTOREMOVE2": {
+			Id:         "FilterToRemove2",
+			Action:     importer.Filtered,
+			ActualName: ptr.String("RAITO_FILTERTOREMOVE2"),
+			ExternalId: ptr.String("DB1.Schema1.Table3.RAITO_FILTERTOREMOVE2"),
+			What: []importer.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.Schema1.Table3",
+						Type:     data_source.Table,
+					},
+				},
+			},
+		},
+	}
+
+	apMap := map[string]*importer.AccessProvider{
+		"RAITO_FILTER1": {
+			Id:     "RAITO_FILTER1",
+			Name:   "RAITO_FILTER1",
+			Action: importer.Filtered,
+			What: []importer.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.Schema1.Table1",
+						Type:     data_source.Table,
+					},
+				},
+			},
+			Who: importer.WhoItem{
+				Users:       []string{"User1", "User2"},
+				InheritFrom: []string{"Role1"},
+			},
+			PolicyRule: ptr.String("{state} = 'NJ'"),
+		},
+		"RAITO_FILTER2": {
+			Id:     "RAITO_FILTER2",
+			Name:   "RAITO_FILTER2",
+			Action: importer.Filtered,
+			What: []importer.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.Schema1.Table1",
+						Type:     data_source.Table,
+					},
+				},
+			},
+			Who: importer.WhoItem{
+				Users:       []string{"User2"},
+				InheritFrom: []string{"ID:Role3-ID"},
+			},
+			FilterCriteria: &bexpression.DataComparisonExpression{
+				Comparison: &datacomparison.DataComparison{
+					Operator: datacomparison.ComparisonOperatorGreaterThanOrEqual,
+					LeftOperand: datacomparison.Operand{
+						Literal: &datacomparison.Literal{Int: ptr.Int(100)},
+					},
+					RightOperand: datacomparison.Operand{
+						Reference: &datacomparison.Reference{
+							EntityType: datacomparison.EntityTypeDataObject,
+							EntityID:   `{"fullName":"DB1.Schema1.Table1.Column1","id":"JJGSpyjrssv94KPk9dNuI","type":"column"}`,
+						},
+					},
+				},
+			},
+		},
+		"RAITO_FILTER3": {
+			Id:     "RAITO_FILTER3",
+			Name:   "RAITO_FILTER3",
+			Action: importer.Filtered,
+			What: []importer.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.Schema2.Table1",
+						Type:     data_source.Table,
+					},
+				},
+			},
+			Who: importer.WhoItem{},
+			FilterCriteria: &bexpression.DataComparisonExpression{
+				Comparison: &datacomparison.DataComparison{
+					Operator: datacomparison.ComparisonOperatorGreaterThanOrEqual,
+					LeftOperand: datacomparison.Operand{
+						Literal: &datacomparison.Literal{Int: ptr.Int(100)},
+					},
+					RightOperand: datacomparison.Operand{
+						Reference: &datacomparison.Reference{
+							EntityType: datacomparison.EntityTypeDataObject,
+							EntityID:   `{"fullName":"DB1.Schema1.Table1.Column1","id":"JJGSpyjrssv94KPk9dNuI","type":"column"}`,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	syncer := AccessSyncer{
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
+			return repo, nil
+		},
+	}
+
+	// When
+	err := syncer.SyncAccessProviderFiltersToTarget(context.Background(), masksToRemove, apMap, map[string]string{"Role3-ID": "Role3"}, fileCreator, &configParams)
+
+	// Then
+	require.NoError(t, err)
+	assert.Len(t, fileCreator.AccessProviderFeedback, 5)
 }
 
 func TestAccessSyncer_removeRolesToRemove_NoRoles(t *testing.T) {
@@ -1793,6 +1957,54 @@ func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T)
 			Type:           ptr.String("role"),
 		},
 	})
+}
+
+func TestAccessSyncer_updateOrCreateFilter(t *testing.T) {
+
+}
+
+func Test_filterExpressionOfPolicyRule(t *testing.T) {
+	type args struct {
+		policyRule string
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  string
+		want1 []string
+	}{
+		{
+			name: "empty policy rule",
+			args: args{
+				policyRule: "",
+			},
+			want:  "",
+			want1: []string{},
+		},
+		{
+			name: "simple policy rule, without references",
+			args: args{
+				policyRule: "SELECT * FROM table1 WHERE column1 = 'value1'",
+			},
+			want:  "SELECT * FROM table1 WHERE column1 = 'value1'",
+			want1: []string{},
+		},
+		{
+			name: "simple policy rule, with references",
+			args: args{
+				policyRule: "{column1} = 'value1'",
+			},
+			want:  "column1 = 'value1'",
+			want1: []string{"column1"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := filterExpressionOfPolicyRule(tt.args.policyRule)
+			assert.Equalf(t, tt.want, got, "filterExpressionOfPolicyRule(%v)", tt.args.policyRule)
+			assert.Equalf(t, tt.want1, got1, "filterExpressionOfPolicyRule(%v)", tt.args.policyRule)
+		})
+	}
 }
 
 func expectGrantUsersToRole(repoMock *mockDataAccessRepository, roleName string, users ...string) {

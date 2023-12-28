@@ -8,6 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
+	"github.com/raito-io/cli/base/tag"
+	"github.com/raito-io/golang-set/set"
+
 	"github.com/blockloop/scan"
 	"github.com/hashicorp/go-multierror"
 	"github.com/raito-io/cli/base/tag"
@@ -598,24 +602,12 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 	dataObjectTypeMap := map[string][]string{}
 	columnTypes := set.Set[string]{}
 
-	columnLiterats := make([]string, 0, len(columnsFullName))
-	for _, fullName := range columnsFullName {
-		columnLiterats = append(columnLiterats, fmt.Sprintf("'%s'", fullName))
-	}
-
-	// Get all column types
-	q := fmt.Sprintf("SELECT * FROM %s.INFORMATION_SCHEMA.COLUMNS WHERE CONCAT_WS('.', TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME) IN (%s)", databaseName, strings.Join(columnLiterats, ", ")) //nolint:gosec
-
-	err = handleDbEntities(repo, q, func() interface{} { return &ColumnEntity{} }, func(entity interface{}) error {
-		columnEntity := entity.(*ColumnEntity)
-
-		fullName := strings.Join([]string{columnEntity.Database, columnEntity.Schema, columnEntity.Table, columnEntity.Name}, ".")
-		dataObjectTypeMap[columnEntity.DataType] = append(dataObjectTypeMap[columnEntity.DataType], fullName)
-		columnTypes.Add(columnEntity.DataType)
+	err = repo.getColumnInformation(databaseName, columnsFullName, func(columnName string, dataType string) error {
+		dataObjectTypeMap[dataType] = append(dataObjectTypeMap[dataType], columnName)
+		columnTypes.Add(dataType)
 
 		return nil
 	})
-
 	if err != nil {
 		return err
 	}
@@ -661,7 +653,7 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 		for _, column := range columns {
 			fullnameSplit := strings.Split(column, ".")
 
-			q = fmt.Sprintf("ALTER TABLE %s.%s.%s ALTER COLUMN %s SET MASKING POLICY %s FORCE", fullnameSplit[0], fullnameSplit[1], fullnameSplit[2], fullnameSplit[3], maskingName)
+			q := fmt.Sprintf("ALTER TABLE %s.%s.%s ALTER COLUMN %s SET MASKING POLICY %s FORCE", fullnameSplit[0], fullnameSplit[1], fullnameSplit[2], fullnameSplit[3], maskingName)
 
 			logger.Debug(fmt.Sprintf("Execute query to assign mask %s to column %s: '%s'", maskingName, column, q))
 
@@ -743,6 +735,103 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 	return nil
 }
 
+func (repo *SnowflakeRepository) UpdateFilter(databaseName string, schema string, tableName string, filterName string, argumentNames []string, expression string) error {
+	columnNames := make([]string, 0, len(argumentNames))
+
+	for _, argumentName := range argumentNames {
+		columnNames = append(columnNames, fmt.Sprintf("%s.%s.%s.%s", databaseName, schema, tableName, argumentName))
+	}
+
+	functionArguments := make([]string, 0, len(argumentNames))
+
+	err := repo.getColumnInformation(databaseName, columnNames, func(columnName string, dataType string) error {
+		argumentName := strings.Split(columnName, ".")
+		functionArguments = append(functionArguments, fmt.Sprintf("%s %s", argumentName[3], dataType))
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(functionArguments) != len(argumentNames) {
+		return fmt.Errorf("number of function arguments (%d) does not match number of argument names (%d)", len(functionArguments), len(argumentNames))
+	}
+
+	existingPolicy, err := repo.getRowFilterForTableIfExists(databaseName, schema, tableName)
+	if err != nil {
+		return fmt.Errorf("load possible existing row filter: %w", err)
+	}
+
+	var dropOldPolicy string
+	var deleteOldPolicy *string
+
+	if existingPolicy != nil {
+		dropOldPolicy = fmt.Sprintf("DROP ROW ACCESS POLICY %s.%s.%s,", databaseName, schema, *existingPolicy)
+		deleteOldPolicy = ptr.String(fmt.Sprintf("DROP ROW ACCESS POLICY IF EXISTS %s.%s.%s;", databaseName, schema, *existingPolicy))
+	}
+
+	q := make([]string, 0, 3)
+	q = append(q, fmt.Sprintf(`CREATE ROW ACCESS POLICY %s.%s.%s AS (%s) returns boolean -> 
+			%s;`, databaseName, schema, filterName, strings.Join(functionArguments, ", "), expression),
+		fmt.Sprintf("ALTER TABLE %[1]s.%[2]s.%[3]s %[4]s ADD ROW ACCESS POLICY %[1]s.%[2]s.%[5]s on (%[6]s);", databaseName, schema, tableName, dropOldPolicy, filterName, strings.Join(argumentNames, ", ")))
+
+	if deleteOldPolicy != nil {
+		q = append(q, *deleteOldPolicy)
+	}
+
+	err = repo.execute(q...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (repo *SnowflakeRepository) DropFilter(databaseName string, schema string, tableName string, filterName string) error {
+	existingPolicy, err := repo.getRowFilterForTableIfExists(databaseName, schema, tableName)
+	if err != nil {
+		return fmt.Errorf("load possible existing row filter: %w", err)
+	}
+
+	err = repo.execute(
+		fmt.Sprintf("ALTER TABLE %[1]s.%[2]s.%[3]s DROP ROW ACCESS POLICY %[1]s.%[2]s.%[4]s;", databaseName, schema, tableName, *existingPolicy),
+		fmt.Sprintf(`DROP ROW ACCESS POLICY IF EXISTS %s.%s.%s;`, databaseName, schema, filterName),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (repo *SnowflakeRepository) getRowFilterForTableIfExists(databaseName string, schema string, tableName string) (*string, error) {
+	_, _, err := repo.query(fmt.Sprintf("USE DATABASE %s;", databaseName))
+	if err != nil {
+		return nil, fmt.Errorf("connect to database %s: %w", databaseName, err)
+	}
+
+	q := fmt.Sprintf(`select POLICY_NAME from table(%s.information_schema.policy_references(REF_ENTITY_NAME => '%s.%s.%s', REF_ENTITY_DOMAIN => 'table')) WHERE POLICY_KIND = 'ROW_ACCESS_POLICY'`, databaseName, databaseName, schema, tableName)
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, fmt.Errorf("query error: %w", err)
+	}
+
+	if !rows.Next() {
+		return nil, nil
+	}
+
+	var policyName string
+
+	err = rows.Scan(&policyName)
+	if err != nil {
+		return nil, fmt.Errorf("error while scanning row: %w", err)
+	}
+
+	return &policyName, nil
+}
+
 func (repo *SnowflakeRepository) getDbEntities(query string) ([]DbEntity, error) {
 	rows, _, err := repo.query(query)
 	if err != nil {
@@ -796,6 +885,28 @@ func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, 
 	repo.queryTime += sec
 
 	return result, sec, err
+}
+
+func (repo *SnowflakeRepository) execute(query ...string) error {
+	logger.Debug(fmt.Sprintf("Sending query execution: %v", query))
+
+	for i := range query {
+		if !strings.HasSuffix(query[i], ";") {
+			query[i] += ";"
+		}
+	}
+
+	ctx, err := sf.WithMultiStatement(context.Background(), len(query))
+	if err != nil {
+		return err
+	}
+
+	startQuery := time.Now()
+	err = ExecuteSnowflake(ctx, repo.conn, strings.Join(query, "\n"))
+	sec := time.Since(startQuery).Round(time.Millisecond)
+	repo.queryTime += sec
+
+	return err
 }
 
 func (repo *SnowflakeRepository) execMultiStatements(ctx context.Context) (chan string, chan error) {
@@ -859,6 +970,27 @@ func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []s
 	repo.queryTime += sec
 
 	return sec, err
+}
+
+func (repo *SnowflakeRepository) getColumnInformation(databaseName string, columnFullNames []string, fn func(columnName string, dataType string) error) error {
+	columnLiterats := make([]string, 0, len(columnFullNames))
+	for _, fullName := range columnFullNames {
+		columnLiterats = append(columnLiterats, fmt.Sprintf("'%s'", fullName))
+	}
+
+	q := fmt.Sprintf("SELECT * FROM %s.INFORMATION_SCHEMA.COLUMNS WHERE CONCAT_WS('.', TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME) IN (%s)", databaseName, strings.Join(columnLiterats, ", "))
+
+	err := handleDbEntities(repo, q, func() interface{} { return &ColumnEntity{} }, func(entity interface{}) error {
+		columnEntity := entity.(*ColumnEntity)
+		fullName := strings.Join([]string{columnEntity.Database, columnEntity.Schema, columnEntity.Table, columnEntity.Name}, ".")
+
+		return fn(fullName, columnEntity.DataType)
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func getSchemasInDatabaseQuery(dbName string) string {
