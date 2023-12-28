@@ -582,7 +582,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				CanBeAssumed:                  true,
 				CanAssumeMultiple:             true,
 				AllowedWhoAccessProviderTypes: []string{access_provider.Role},
-			}
+			},
 		},
 		MaskingMetadata: &ds.MaskingMetadata{
 			MaskTypes: []*ds.MaskingType{
