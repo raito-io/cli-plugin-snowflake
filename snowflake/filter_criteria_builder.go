@@ -92,13 +92,21 @@ func (f *FilterCriteriaBuilder) Literal(_ context.Context, l interface{}) error 
 
 		f.stringBuilder.WriteString("NOT ")
 	case *datacomparison.Reference:
-		if node.EntityType != datacomparison.EntityTypeDataObject {
-			return fmt.Errorf("unsupported reference entity type: %s", node.EntityType)
+		err := f.visitReference(node)
+		if err != nil {
+			return err
 		}
+	}
 
+	return nil
+}
+
+func (f *FilterCriteriaBuilder) visitReference(ref *datacomparison.Reference) error {
+	switch ref.EntityType {
+	case datacomparison.EntityTypeDataObject:
 		var object ds.DataObjectReference
 
-		err := json.Unmarshal([]byte(node.EntityID), &object)
+		err := json.Unmarshal([]byte(ref.EntityID), &object)
 		if err != nil {
 			return fmt.Errorf("unmarshal reference entity id: %w", err)
 		}
@@ -114,6 +122,11 @@ func (f *FilterCriteriaBuilder) Literal(_ context.Context, l interface{}) error 
 
 		f.stringBuilder.WriteString(parsedDataObject[3])
 		f.arguments.Add(parsedDataObject[3])
+	case datacomparison.EntityTypeColumnReferenceByName:
+		f.stringBuilder.WriteString(ref.EntityID)
+		f.arguments.Add(ref.EntityID)
+	default:
+		return fmt.Errorf("unsupported reference entity type: %s", ref.EntityType)
 	}
 
 	return nil

@@ -34,7 +34,7 @@ func TestFilterCriteriaBuilder(t *testing.T) {
 			wantError: assert.NoError,
 		},
 		{
-			name: "Comparison binary expression",
+			name: "Comparison binary expression - data object reference",
 			args: bexpression.DataComparisonExpression{
 				Comparison: &datacomparison.DataComparison{
 					Operator: datacomparison.ComparisonOperatorGreaterThan,
@@ -42,6 +42,30 @@ func TestFilterCriteriaBuilder(t *testing.T) {
 						Reference: &datacomparison.Reference{
 							EntityType: datacomparison.EntityTypeDataObject,
 							EntityID:   `{"fullName":"RAITO_DEMO.ORDERING.LINEITEM.QUANTITY","id":"JJGSpyjrssv94KPk9dNuI","type":"column"}`,
+						},
+					},
+					RightOperand: datacomparison.Operand{
+						Literal: &datacomparison.Literal{
+							Int: ptr.Int(2020),
+						},
+					},
+				},
+			},
+			want: want{
+				query:     "(QUANTITY > 2020)",
+				arguments: []string{"QUANTITY"},
+			},
+			wantError: assert.NoError,
+		},
+		{
+			name: "Comparison binary expression - column name reference",
+			args: bexpression.DataComparisonExpression{
+				Comparison: &datacomparison.DataComparison{
+					Operator: datacomparison.ComparisonOperatorGreaterThan,
+					LeftOperand: datacomparison.Operand{
+						Reference: &datacomparison.Reference{
+							EntityType: datacomparison.EntityTypeColumnReferenceByName,
+							EntityID:   `QUANTITY`,
 						},
 					},
 					RightOperand: datacomparison.Operand{
@@ -75,8 +99,8 @@ func TestFilterCriteriaBuilder(t *testing.T) {
 											Operator: datacomparison.ComparisonOperatorEqual,
 											LeftOperand: datacomparison.Operand{
 												Reference: &datacomparison.Reference{
-													EntityType: datacomparison.EntityTypeDataObject,
-													EntityID:   `{"fullName":"RAITO_DEMO.ORDERING.LINEITEM.STATE","id":"JJGSpyjrssv94KPk9dNuS","type":"column"}`,
+													EntityType: datacomparison.EntityTypeColumnReferenceByName,
+													EntityID:   `STATE`,
 												},
 											},
 											RightOperand: datacomparison.Operand{
@@ -94,8 +118,8 @@ func TestFilterCriteriaBuilder(t *testing.T) {
 													Operator: datacomparison.ComparisonOperatorLessThan,
 													LeftOperand: datacomparison.Operand{
 														Reference: &datacomparison.Reference{
-															EntityType: datacomparison.EntityTypeDataObject,
-															EntityID:   `{"fullName":"RAITO_DEMO.ORDERING.LINEITEM.QUANTITY","id":"JJGSpyjrssv94KPk9dNuJ","type":"column"}`,
+															EntityType: datacomparison.EntityTypeColumnReferenceByName,
+															EntityID:   `QUANTITY`,
 														},
 													},
 													RightOperand: datacomparison.Operand{
