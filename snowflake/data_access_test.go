@@ -897,8 +897,8 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 					},
 					RightOperand: datacomparison.Operand{
 						Reference: &datacomparison.Reference{
-							EntityType: datacomparison.EntityTypeDataObject,
-							EntityID:   `{"fullName":"DB1.Schema1.Table1.Column1","id":"JJGSpyjrssv94KPk9dNuI","type":"column"}`,
+							EntityType: datacomparison.EntityTypeColumnReferenceByName,
+							EntityID:   `Column1`,
 						},
 					},
 				},
