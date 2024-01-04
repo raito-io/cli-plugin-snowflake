@@ -64,6 +64,8 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	s.Contains(externalIds, "SECURITYADMIN")
 	s.Contains(externalIds, "USERADMIN")
 	s.Contains(externalIds, "PUBLIC")
+	s.Contains(externalIds, "SNOWFLAKE_INTEGRATION_TEST.IT_TEST_ROLE1")
+	s.Contains(externalIds, "SNOWFLAKE_INTEGRATION_TEST.IT_TEST_ROLE2")
 }
 
 func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {

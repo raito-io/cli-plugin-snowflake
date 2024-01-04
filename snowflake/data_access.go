@@ -888,7 +888,7 @@ func isNotInternalizableRole(role string) bool {
 	if isDatabaseRole(role) {
 		_, parsedRoleName, err := parseDatabaseRoleName(role)
 		if err != nil {
-			return false
+			return true
 		}
 
 		searchForRole = parsedRoleName
@@ -924,7 +924,7 @@ func (s *AccessSyncer) findRoles(prefix string, repo dataAccessRepository) (set.
 
 	for i := range databases {
 		// Get all database roles for database
-		roleEntities, err := repo.GetDatabaseRoles(databases[i].Name)
+		roleEntities, err := repo.GetDatabaseRolesWithPrefix(databases[i].Name, prefix)
 		if err != nil {
 			return nil, err
 		}
@@ -1103,6 +1103,8 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 					usersOfRole = append(usersOfRole, gor.GranteeName)
 				} else if strings.EqualFold(gor.GrantedTo, "ROLE") {
 					rolesOfRole = append(rolesOfRole, gor.GranteeName)
+				} else if strings.EqualFold(gor.GrantedTo, "DATABASE_ROLE") {
+					rolesOfRole = append(rolesOfRole, DatabaseRoleActualNameGenerator(cleanDoubleQuotes(gor.GranteeName)))
 				}
 			}
 
@@ -1221,7 +1223,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 			rolesCreated[rn] = struct{}{}
 		}
 
-		if !ignoreWho {
+		if !ignoreWho && len(accessProvider.Who.Users) > 0 {
 			if isDatabaseRole(rn) {
 				return fmt.Errorf("error can not assign users to a database role %q", rn)
 			}
@@ -1262,19 +1264,6 @@ func (s *AccessSyncer) getGrantsToRole(roleName string, repo dataAccessRepositor
 
 	return repo.GetGrantsToAccountRole(roleName)
 }
-
-// func (s *AccessSyncer) getGrantsOfRole(roleName string, repo dataAccessRepository) ([]GrantOfRole, error) {
-// 	if isDatabaseRole(roleName) {
-// 		database, parsedRoleName, err := parseDatabaseRoleName(roleName)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-
-// 		return repo.GetGrantsOfDatabaseRole(parsedRoleName, database)
-// 	}
-
-// 	return repo.GetGrantsOfAccountRole(roleName)
-// }
 
 func (s *AccessSyncer) grantRolesToRole(ctx context.Context, repo dataAccessRepository, targetRoleName string, roles ...string) error {
 	toAddDatabaseRoles := []string{}
@@ -1367,9 +1356,9 @@ func (s *AccessSyncer) dropRole(roleName string, repo dataAccessRepository) erro
 }
 
 func (s *AccessSyncer) renameRole(oldName, newName string, repo dataAccessRepository) error {
-	if isDatabaseRole(oldName) {
-		if !isDatabaseRole(newName) {
-			return fmt.Errorf("expected new roleName %q to have the expected databaseRole structure just like the old roleName %q", newName, oldName)
+	if isDatabaseRole(oldName) || isDatabaseRole(newName) {
+		if !isDatabaseRole(newName) || !isDatabaseRole(oldName) {
+			return fmt.Errorf("both roles should be a database role newName:%q - oldName:%q", newName, oldName)
 		}
 
 		oldDatabase, oldRoleName, err := parseDatabaseRoleName(oldName)
@@ -1418,10 +1407,14 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 
 	rolesCreated := make(map[string]interface{})
 
-	apType := access_provider.Role
-
 	for rn, accessProvider := range apMap {
 		externalId := rn
+		apType := access_provider.Role
+
+		if accessProvider.Type != nil {
+			apType = *accessProvider.Type
+		}
+
 		fi := importer.AccessProviderSyncFeedback{
 			AccessProvider: accessProvider.Id,
 			ActualName:     rn,
@@ -2154,6 +2147,10 @@ func parseDatabaseRoleName(roleName string) (database string, cleanedRoleName st
 	roleNameWithoutPrefix := strings.TrimPrefix(roleName, databaseRolePrefix)
 
 	parts := strings.Split(roleNameWithoutPrefix, ".")
+	if (parts == nil) || (len(parts) < 2) {
+		return "", "", fmt.Errorf("role %q is not a database role", roleName)
+	}
+
 	database = parts[0]
 	cleanedRoleName = parts[1]
 
