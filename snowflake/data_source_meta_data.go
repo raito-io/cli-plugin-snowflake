@@ -8,6 +8,7 @@ import (
 	"github.com/raito-io/cli/base/util/config"
 )
 
+const DatabaseRole = "DATABASE_ROLE"
 const ExternalTable = "external-" + ds.Table
 const MaterializedView = "materialized-" + ds.View
 
@@ -581,7 +582,16 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				CanBeCreated:                  true,
 				CanBeAssumed:                  true,
 				CanAssumeMultiple:             true,
-				AllowedWhoAccessProviderTypes: []string{access_provider.Role},
+				AllowedWhoAccessProviderTypes: []string{access_provider.Role, DatabaseRole},
+			},
+			{
+				Type:                          DatabaseRole,
+				Label:                         DatabaseRole,
+				IsNamedEntity:                 true,
+				CanBeCreated:                  false,
+				CanBeAssumed:                  false,
+				CanAssumeMultiple:             false,
+				AllowedWhoAccessProviderTypes: []string{DatabaseRole},
 			},
 		},
 		MaskingMetadata: &ds.MaskingMetadata{

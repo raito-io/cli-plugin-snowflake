@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raito-io/cli/base/tag"
-
 	"github.com/raito-io/cli/base/data_source"
+	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +48,7 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	repoMock.EXPECT().GetShares().Return([]DbEntity{
 		{Name: "Share1"},
 	}, nil).Once()
-	repoMock.EXPECT().GetDataBases().Return([]DbEntity{
+	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
 		{Name: "Database1"}, {Name: "Database2"},
 	}, nil).Once()
 
@@ -295,7 +294,7 @@ func TestDataSourceSyncer_SyncDataSource_readDatabases(t *testing.T) {
 
 	excludedDatabases := "ExcludeDatabase1,ExcludeDatabase2"
 
-	repoMock.EXPECT().GetDataBases().Return([]DbEntity{
+	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
 		{Name: "DB1"}, {Name: "ExcludeDatabase1"}, {Name: "DB2"}, {Name: "ExcludeDatabase2"},
 	}, nil).Once()
 
@@ -382,7 +381,7 @@ func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
 	repoMock.EXPECT().GetShares().Return([]DbEntity{
 		{Name: "Share1"},
 	}, nil).Once()
-	repoMock.EXPECT().GetDataBases().Return([]DbEntity{
+	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
 		{Name: "Database1"}, {Name: "Database2"},
 	}, nil).Once()
 

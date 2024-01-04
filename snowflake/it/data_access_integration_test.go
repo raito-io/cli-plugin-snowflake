@@ -189,6 +189,10 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 		},
 	}
 
+	// for key, generatedAp := range generateDefaultDatabaseRolesSnowflake() {
+	// 	access[key] = generatedAp
+	// }
+
 	dataAccessSyncer := snowflake.NewDataAccessSyncer()
 
 	config := s.getConfig()
@@ -362,4 +366,47 @@ func filterFeedbackInformation(feedbackInformation []sync_to_target.AccessProvid
 	}
 
 	return result
+}
+
+func generateDefaultDatabaseRolesSnowflake() map[string]*sync_to_target.AccessProvider {
+
+	expectedDatabase := "SNOWFLAKE"
+	expectedDatabaseRoles := []string{
+		"ALERT_VIEWER",
+		"BUDGET_CREATOR",
+		"CLASSIFICATION_ADMIN",
+		"CORE_VIEWER",
+		"DATA_PRIVACY_VIEWER",
+		"GOVERNANCE_ADMIN",
+		"GOVERNANCE_VIEWER",
+		"ML_USER",
+		"MONITORING_VIEWER",
+		"OBJECT_VIEWER",
+		"ORGANIZATION_ACCOUNTS_VIEWER",
+		"ORGANIZATION_BILLING_VIEWER",
+		"ORGANIZATION_GOVERNANCE_VIEWER",
+		"ORGANIZATION_USAGE_VIEWER",
+		"READER_USAGE_VIEWER",
+		"SECURITY_VIEWER",
+		"SHARING_USAGE_VIEWER",
+		"USAGE_VIEWER",
+	}
+
+	aps := map[string]*sync_to_target.AccessProvider{}
+
+	for _, role := range expectedDatabaseRoles {
+		databaseRoleName := snowflake.DatabaseRoleNameGenerator(role, expectedDatabase)
+		actualName := snowflake.DatabaseRoleActualNameGenerator(databaseRoleName)
+
+		aps[actualName] = &sync_to_target.AccessProvider{
+			Id:     actualName,
+			Name:   role,
+			Action: sync_to_target.Grant,
+			Delete: false,
+			Who:    sync_to_target.WhoItem{},
+			What:   []sync_to_target.WhatItem{},
+		}
+	}
+
+	return aps
 }

@@ -25,7 +25,7 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
-var RolesNotinternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
+var RolesNotInternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
 var AcceptedTypes = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "VIEW": {}, "COLUMN": {}, "SHARED-DATABASE": {}, "EXTERNAL_TABLE": {}, "MATERIALIZED_VIEW": {}}
 
 const (
@@ -35,6 +35,11 @@ const (
 	deleteLockedReason      = "This Snowflake role cannot be deleted because it was imported from an external identity store"
 	maskPrefix              = "RAITO_"
 	idAlphabet              = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	databaseRoleWhoLockedReason  = "The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"
+	databaseRoleWhatLockedReason = "The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"
+
+	databaseRolePrefix = "DATABASEROLE###"
 )
 
 //go:generate go run github.com/vektra/mockery/v2 --name=dataAccessRepository --with-expecter --inpackage
@@ -44,26 +49,40 @@ type dataAccessRepository interface {
 	GetShares() ([]DbEntity, error)
 	GetAccountRoles() ([]RoleEntity, error)
 	GetAccountRolesWithPrefix(prefix string) ([]RoleEntity, error)
+	GetDatabaseRoles(database string) ([]RoleEntity, error)
+	GetDatabaseRolesWithPrefix(database string, prefix string) ([]RoleEntity, error)
 	GetGrantsOfAccountRole(roleName string) ([]GrantOfRole, error)
 	GetGrantsToAccountRole(roleName string) ([]GrantToRole, error)
+	GetGrantsOfDatabaseRole(roleName, database string) ([]GrantOfRole, error)
+	GetGrantsToDatabaseRole(roleName, database string) ([]GrantToRole, error)
 	GetPolicies(policy string) ([]PolicyEntity, error)
 	GetPoliciesLike(policy string, like string) ([]PolicyEntity, error)
 	DescribePolicy(policyType, dbName, schema, policyName string) ([]describePolicyEntity, error)
 	GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error)
 	DropAccountRole(roleName string) error
+	DropDatabaseRole(roleName string, targetDatabase string) error
 	ExecuteGrantOnAccountRole(perm, on, role string) error
 	ExecuteRevokeOnAccountRole(perm, on, role string) error
+	ExecuteGrantOnDatabaseRole(perm, on, database, databaseRole string) error
+	ExecuteRevokeOnDatabaseRole(perm, on, database, databaseRole string) error
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
-	GetDataBases() ([]DbEntity, error)
+	GetDatabases() ([]DbEntity, error)
 	GetWarehouses() ([]DbEntity, error)
-	CommentRoleIfExists(comment, objectName string) error
+	CommentAccountRoleIfExists(comment, objectName string) error
+	CommentDatabaseRoleIfExists(comment, roleName, database string) error
 	RenameAccountRole(oldName, newName string) error
+	RenameDatabaseRole(oldName, newName, database string) error
 	GrantUsersToAccountRole(ctx context.Context, role string, users ...string) error
+	GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
+	GrantDatabaseRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
 	RevokeUsersFromAccountRole(ctx context.Context, role string, users ...string) error
 	GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error
 	RevokeAccountRolesFromAccountRole(ctx context.Context, role string, roles ...string) error
+	RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
+	RevokeDatabaseRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
 	CreateAccountRole(roleName string) error
+	CreateDatabaseRole(roleName string, database string) error
 	CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) error
 	DropMaskingPolicy(databaseName string, schema string, maskName string) (err error)
 	UpdateFilter(databaseName string, schema string, tableName string, filterName string, argumentNames []string, expression string) error
@@ -403,7 +422,7 @@ func (s *AccessSyncer) removeRolesToRemove(rolesToRemove map[string]*importer.Ac
 				ExternalId:     &externalId,
 			}
 
-			err := repo.DropAccountRole(roleToRemove)
+			err := s.dropRole(roleToRemove, repo)
 			// If an error occurs (and not already deleted), we send an error back as feedback
 			if err != nil && !strings.Contains(err.Error(), "does not exist") {
 				logger.Error(fmt.Sprintf("unable to drop role %q: %s", roleToRemove, err.Error()))
@@ -423,7 +442,7 @@ func (s *AccessSyncer) removeRolesToRemove(rolesToRemove map[string]*importer.Ac
 	return nil
 }
 
-func getShareNames(repo dataAccessRepository) (map[string]struct{}, error) {
+func (s *AccessSyncer) getShareNames(repo dataAccessRepository) (map[string]struct{}, error) {
 	dbShares, err := repo.GetShares()
 	if err != nil {
 		return nil, err
@@ -456,7 +475,7 @@ func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProvide
 		}
 	}
 
-	shares, err := getShareNames(repo)
+	shares, err := s.getShareNames(repo)
 	if err != nil {
 		return err
 	}
@@ -475,18 +494,42 @@ func (s *AccessSyncer) importAccess(accessProviderHandler wrappers.AccessProvide
 			continue
 		}
 
-		err = s.importAccessForRole(roleEntity, externalGroupOwners, linkToExternalIdentityStoreGroups, repo, accessProviderMap, shares, accessProviderHandler)
+		err = s.importAccessForAccountRole(roleEntity, externalGroupOwners, linkToExternalIdentityStoreGroups, repo, accessProviderMap, shares, accessProviderHandler)
 		if err != nil {
 			return err
+		}
+	}
+
+	//Get all database roles for each database and import them
+	databases, err := s.getDatabases(repo)
+	if err != nil {
+		return err
+	}
+
+	for i := range databases {
+		// Get all database roles for database
+		roleEntities, err := repo.GetDatabaseRoles(databases[i].Name)
+		if err != nil {
+			return err
+		}
+
+		for _, roleEntity := range roleEntities {
+			if _, exclude := excludedRoles[roleEntity.Name]; exclude {
+				logger.Info("Skipping SnowFlake DATABASE ROLE " + roleEntity.Name)
+				continue
+			}
+
+			err = s.importAccessForDatabaseRole(databases[i].Name, roleEntity, externalGroupOwners, linkToExternalIdentityStoreGroups, repo, accessProviderMap, shares, accessProviderHandler)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupOwners string, linkToExternalIdentityStoreGroups bool, repo dataAccessRepository, accessProviderMap map[string]*exporter.AccessProvider, shares map[string]struct{}, accessProviderHandler wrappers.AccessProviderHandler) error {
-	logger.Info(fmt.Sprintf("Reading SnowFlake ROLE %s", roleEntity.Name))
-
+func (s *AccessSyncer) comesFromExternalIdentityStore(roleEntity RoleEntity, externalGroupOwners string) bool {
 	fromExternalIS := false
 
 	// check if Role Owner is part of the ones that should be (partially) locked
@@ -496,14 +539,23 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 		}
 	}
 
-	users, groups, accessProviders, err := s.retrieveWhoEntitiesForRole(repo, roleEntity, fromExternalIS, linkToExternalIdentityStoreGroups)
+	return fromExternalIS
+}
+
+func (s *AccessSyncer) importAccessForAccountRole(roleEntity RoleEntity, externalGroupOwners string, linkToExternalIdentityStoreGroups bool, repo dataAccessRepository, accessProviderMap map[string]*exporter.AccessProvider, shares map[string]struct{}, accessProviderHandler wrappers.AccessProviderHandler) error {
+	logger.Info(fmt.Sprintf("Reading SnowFlake ROLE %s", roleEntity.Name))
+
+	actualName := roleEntity.Name
+	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, externalGroupOwners)
+
+	users, groups, accessProviders, err := s.retrieveWhoEntitiesForRole(actualName, fromExternalIS, linkToExternalIdentityStoreGroups, repo)
 	if err != nil {
 		return err
 	}
 
-	ap, f := accessProviderMap[roleEntity.Name]
+	ap, f := accessProviderMap[actualName]
 	if !f {
-		accessProviderMap[roleEntity.Name] = &exporter.AccessProvider{
+		accessProviderMap[actualName] = &exporter.AccessProvider{
 			ExternalId: roleEntity.Name,
 			Name:       roleEntity.Name,
 			NamingHint: roleEntity.Name,
@@ -513,10 +565,10 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 				AccessProviders: accessProviders,
 				Groups:          groups,
 			},
-			ActualName: roleEntity.Name,
+			ActualName: actualName,
 			What:       make([]exporter.WhatItem, 0),
 		}
-		ap = accessProviderMap[roleEntity.Name]
+		ap = accessProviderMap[actualName]
 
 		if fromExternalIS {
 			if linkToExternalIdentityStoreGroups {
@@ -541,15 +593,77 @@ func (s *AccessSyncer) importAccessForRole(roleEntity RoleEntity, externalGroupO
 	}
 
 	// get objects granted TO role
-	grantToEntities, err := repo.GetGrantsToAccountRole(roleEntity.Name)
+	grantToEntities, err := s.getGrantsToRole(actualName, repo)
 	if err != nil {
 		return fmt.Errorf("error retrieving grants for role: %s", err.Error())
 	}
 
-	retrievedWhatItems := s.mapGrantToRoleToWhatItems(grantToEntities, shares)
-	ap.What = append(ap.What, retrievedWhatItems...)
+	ap.What = append(ap.What, s.mapGrantToRoleToWhatItems(grantToEntities, shares)...)
 
-	if isNotInternizableRole(ap.Name) {
+	if isNotInternalizableRole(ap.Name) {
+		logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", ap.Name))
+		ap.NotInternalizable = true
+	}
+
+	err = accessProviderHandler.AddAccessProviders(ap)
+	if err != nil {
+		return fmt.Errorf("error adding access provider to import file: %s", err.Error())
+	}
+
+	return nil
+}
+
+func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity RoleEntity, externalGroupOwners string, linkToExternalIdentityStoreGroups bool, repo dataAccessRepository, accessProviderMap map[string]*exporter.AccessProvider, shares map[string]struct{}, accessProviderHandler wrappers.AccessProviderHandler) error {
+	logger.Info(fmt.Sprintf("Reading SnowFlake DATABASE ROLE %s inside %s", roleEntity.Name, database))
+
+	databaseRoleName := DatabaseRoleNameGenerator(roleEntity.Name, database)
+	actualName := DatabaseRoleActualNameGenerator(databaseRoleName)
+	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, externalGroupOwners)
+
+	users, groups, accessProviders, err := s.retrieveWhoEntitiesForRole(actualName, fromExternalIS, linkToExternalIdentityStoreGroups, repo)
+	if err != nil {
+		return err
+	}
+
+	ap, f := accessProviderMap[actualName]
+	if !f {
+		accessProviderMap[actualName] = &exporter.AccessProvider{
+			Type:       ptr.String(DatabaseRole),
+			ExternalId: databaseRoleName,
+			Name:       databaseRoleName,
+			NamingHint: databaseRoleName,
+			ActualName: actualName,
+			Action:     exporter.Grant,
+			Who: &exporter.WhoItem{
+				Users:           users,
+				AccessProviders: accessProviders,
+				Groups:          groups,
+			},
+			What: make([]exporter.WhatItem, 0),
+
+			// In a first implementation, we lock the who and what side for a database role
+			// Who side will always be locked as you can't directly grant access to a database role from a user
+			WhoLocked:        ptr.Bool(true),
+			WhoLockedReason:  ptr.String(databaseRoleWhoLockedReason),
+			WhatLocked:       ptr.Bool(true),
+			WhatLockedReason: ptr.String(databaseRoleWhatLockedReason),
+		}
+		ap = accessProviderMap[actualName]
+	} else {
+		ap.Who.Users = users
+		ap.Who.AccessProviders = accessProviders
+		ap.Who.Groups = groups
+	}
+
+	// get objects granted TO role
+	grantToEntities, err := s.getGrantsToRole(actualName, repo)
+	if err != nil {
+		return fmt.Errorf("error retrieving grants for role: %s", err.Error())
+	}
+
+	ap.What = append(ap.What, s.mapGrantToRoleToWhatItems(grantToEntities, shares)...)
+
+	if isNotInternalizableRole(ap.Name) {
 		logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", ap.Name))
 		ap.NotInternalizable = true
 	}
@@ -623,18 +737,15 @@ func (s *AccessSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole, 
 	return whatItems
 }
 
-func (s *AccessSyncer) retrieveWhoEntitiesForRole(repo dataAccessRepository, roleEntity RoleEntity, fromExternalIS bool, linkToExternalIdentityStoreGroups bool) (users []string, groups []string, accessProviders []string, err error) {
+func (s *AccessSyncer) retrieveWhoEntitiesForRole(roleName string, fromExternalIS bool, linkToExternalIdentityStoreGroups bool, repo dataAccessRepository) (users []string, groups []string, accessProviders []string, err error) {
 	users = make([]string, 0)
 	accessProviders = make([]string, 0)
 	groups = make([]string, 0)
 
 	if fromExternalIS && linkToExternalIdentityStoreGroups {
-		groups = append(groups, roleEntity.Name)
+		groups = append(groups, roleName)
 	} else {
-		var grantOfEntities []GrantOfRole
-
-		grantOfEntities, err = repo.GetGrantsOfAccountRole(roleEntity.Name)
-
+		grantOfEntities, err := s.retrieveGrantsOfRole(roleName, repo)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -644,12 +755,30 @@ func (s *AccessSyncer) retrieveWhoEntitiesForRole(repo dataAccessRepository, rol
 				users = append(users, cleanDoubleQuotes(grantee.GranteeName))
 			} else if grantee.GrantedTo == "ROLE" {
 				accessProviders = append(accessProviders, cleanDoubleQuotes(grantee.GranteeName))
+			} else if grantee.GrantedTo == "DATABASE_ROLE" {
+				accessProviders = append(accessProviders, DatabaseRoleActualNameGenerator(cleanDoubleQuotes(grantee.GranteeName)))
 			}
 		}
 	}
 
 	return users, groups, accessProviders, nil
 }
+
+func (s *AccessSyncer) retrieveGrantsOfRole(roleName string, repo dataAccessRepository) (grantOfEntities []GrantOfRole, err error) {
+	if isDatabaseRole(roleName) {
+		database, parsedRoleName, err2 := parseDatabaseRoleName(roleName)
+		if err2 != nil {
+			return nil, err2
+		}
+
+		grantOfEntities, err = repo.GetGrantsOfDatabaseRole(parsedRoleName, database)
+	} else {
+		grantOfEntities, err = repo.GetGrantsOfAccountRole(roleName)
+	}
+
+	return grantOfEntities, err
+}
+
 func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, policyType string, action exporter.Action) error {
 	policyEntities, err := repo.GetPolicies(policyType)
 	if err != nil {
@@ -753,9 +882,20 @@ func (s *AccessSyncer) importRowAccessPolicies(accessProviderHandler wrappers.Ac
 	return s.importPoliciesOfType(accessProviderHandler, repo, "ROW ACCESS", exporter.Filtered)
 }
 
-func isNotInternizableRole(role string) bool {
-	for _, r := range RolesNotinternalizable {
-		if strings.EqualFold(r, role) {
+func isNotInternalizableRole(role string) bool {
+	searchForRole := role
+
+	if isDatabaseRole(role) {
+		_, parsedRoleName, err := parseDatabaseRoleName(role)
+		if err != nil {
+			return false
+		}
+
+		searchForRole = parsedRoleName
+	}
+
+	for _, r := range RolesNotInternalizable {
+		if strings.EqualFold(r, searchForRole) {
 			return true
 		}
 	}
@@ -776,10 +916,28 @@ func (s *AccessSyncer) findRoles(prefix string, repo dataAccessRepository) (set.
 		existingRoles.Add(roleEntity.Name)
 	}
 
+	//Get all database roles for each database and add database roles to existing roles
+	databases, err := s.getDatabases(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range databases {
+		// Get all database roles for database
+		roleEntities, err := repo.GetDatabaseRoles(databases[i].Name)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, roleEntity := range roleEntities {
+			existingRoles.Add(DatabaseRoleActualNameGenerator(DatabaseRoleNameGenerator(roleEntity.Name, databases[i].Name)))
+		}
+	}
+
 	return existingRoles, nil
 }
 
-func buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
+func (s *AccessSyncer) buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
 	metaDataMap := make(map[string]map[string]struct{})
 
 	for _, dot := range metaData.DataObjectTypes {
@@ -894,7 +1052,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", rn, oldName))
 			} else {
 				// The old name exists and the new one doesn't exist yet, so we have to do the rename
-				err := repo.RenameAccountRole(oldName, rn)
+				err := s.renameRole(oldName, rn, repo)
 				if err != nil {
 					return fmt.Errorf("error while renaming role %q to %q: %s", oldName, rn, err.Error())
 				}
@@ -909,7 +1067,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", rn, oldName))
 			} else {
 				// The old name exists but also the new one already exists. This is a weird case, but we'll delete the old one in this case and the new one will be updated in the next step of this method.
-				err := repo.DropAccountRole(oldName)
+				err := s.dropRole(oldName, repo)
 				if err != nil {
 					return fmt.Errorf("error while dropping role (%s) which was the old name of access provider %q: %s", oldName, accessProvider.Name, err.Error())
 				}
@@ -925,14 +1083,14 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 
 		// Only update the comment if we have full control over the role (who and what not ignored)
 		if !ignoreWho && !ignoreWhat {
-			err2 := repo.CommentRoleIfExists(createComment(accessProvider, true), rn)
+			err2 := s.commentOnRoleIfExists(createComment(accessProvider, true), rn, repo)
 			if err2 != nil {
 				return fmt.Errorf("error while updating comment on role %q: %s", rn, err2.Error())
 			}
 		}
 
 		if !ignoreWho || !ignoreInheritance {
-			grantsOfRole, err3 := repo.GetGrantsOfAccountRole(rn)
+			grantsOfRole, err3 := s.retrieveGrantsOfRole(rn, repo)
 			if err3 != nil {
 				return err3
 			}
@@ -954,6 +1112,10 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 				logger.Info(fmt.Sprintf("Identified %d users to add and %d users to remove from role %q", len(toAdd), len(toRemove), rn))
 
 				if len(toAdd) > 0 {
+					if isDatabaseRole(rn) {
+						return fmt.Errorf("error can not assign users to a database role %q", rn)
+					}
+
 					e := repo.GrantUsersToAccountRole(ctx, rn, toAdd...)
 					if e != nil {
 						return fmt.Errorf("error while assigning users to role %q: %s", rn, e.Error())
@@ -961,6 +1123,10 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 				}
 
 				if len(toRemove) > 0 {
+					if isDatabaseRole(rn) {
+						return fmt.Errorf("error can not unassign users from a database role %q", rn)
+					}
+
 					e := repo.RevokeUsersFromAccountRole(ctx, rn, toRemove...)
 					if e != nil {
 						return fmt.Errorf("error while unassigning users from role %q: %s", rn, e.Error())
@@ -974,14 +1140,14 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 				logger.Info(fmt.Sprintf("Identified %d roles to add and %d roles to remove from role %q", len(toAdd), len(toRemove), rn))
 
 				if len(toAdd) > 0 {
-					e := repo.GrantAccountRolesToAccountRole(ctx, rn, toAdd...)
+					e := s.grantRolesToRole(ctx, repo, rn, toAdd...)
 					if e != nil {
 						return fmt.Errorf("error while assigning role to role %q: %s", rn, e.Error())
 					}
 				}
 
 				if len(toRemove) > 0 {
-					e := repo.RevokeAccountRolesFromAccountRole(ctx, rn, toRemove...)
+					e := s.revokeRolesFromRole(ctx, repo, rn, toRemove...)
 					if e != nil {
 						return fmt.Errorf("error while unassigning role from role %q: %s", rn, e.Error())
 					}
@@ -995,24 +1161,24 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 			// We assume nobody manually added others to this role manually.
 			for _, what := range accessProvider.What {
 				if what.DataObject.Type == "database" {
-					e := repo.ExecuteRevokeOnAccountRole("ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), rn)
+					e := s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), rn, repo)
 					if e != nil {
 						return fmt.Errorf("error while assigning future schema grants in database %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
 					}
 
-					e = repo.ExecuteRevokeOnAccountRole("ALL", common.FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), rn)
+					e = s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), rn, repo)
 					if e != nil {
 						return fmt.Errorf("error while assigning future table grants in database %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
 					}
 				} else if what.DataObject.Type == "schema" {
-					e := repo.ExecuteRevokeOnAccountRole("ALL", fmt.Sprintf("FUTURE TABLES IN SCHEMA %s", what.DataObject.FullName), rn)
+					e := s.executeRevokeOnRole("ALL", fmt.Sprintf("FUTURE TABLES IN SCHEMA %s", what.DataObject.FullName), rn, repo)
 					if e != nil {
 						return fmt.Errorf("error while assigning future table grants in schema %q to role %q: %s", what.DataObject.FullName, rn, e.Error())
 					}
 				}
 			}
 
-			grantsToRole, err3 := repo.GetGrantsToAccountRole(rn)
+			grantsToRole, err3 := s.getGrantsToRole(rn, repo)
 			if err3 != nil {
 				return err3
 			}
@@ -1042,13 +1208,13 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 
 		if _, rf := rolesCreated[rn]; !rf {
 			// Create the role if not exists
-			err := repo.CreateAccountRole(rn)
+			err := s.createRole(rn, repo)
 			if err != nil {
 				return fmt.Errorf("error while creating role %q: %s", rn, err.Error())
 			}
 
 			// Updating the comment (independent of creation)
-			err = repo.CommentRoleIfExists(createComment(accessProvider, false), rn)
+			err = s.commentOnRoleIfExists(createComment(accessProvider, false), rn, repo)
 			if err != nil {
 				return fmt.Errorf("error while updating comment on role %q: %s", rn, err.Error())
 			}
@@ -1056,6 +1222,10 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 		}
 
 		if !ignoreWho {
+			if isDatabaseRole(rn) {
+				return fmt.Errorf("error can not assign users to a database role %q", rn)
+			}
+
 			err := repo.GrantUsersToAccountRole(ctx, rn, accessProvider.Who.Users...)
 			if err != nil {
 				return fmt.Errorf("error while assigning users to role %q: %s", rn, err.Error())
@@ -1063,7 +1233,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 		}
 
 		if !ignoreInheritance {
-			err := repo.GrantAccountRolesToAccountRole(ctx, rn, inheritedRoles...)
+			err := s.grantRolesToRole(ctx, repo, rn, inheritedRoles...)
 			if err != nil {
 				return fmt.Errorf("error while assigning roles to role %q: %s", rn, err.Error())
 			}
@@ -1071,13 +1241,168 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, rn string, apMa
 	}
 
 	if !ignoreWhat {
-		err := mergeGrants(repo, rn, foundGrants, expectedGrants, metaData)
+		err := s.mergeGrants(repo, rn, foundGrants, expectedGrants, metaData)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (s *AccessSyncer) getGrantsToRole(roleName string, repo dataAccessRepository) ([]GrantToRole, error) {
+	if isDatabaseRole(roleName) {
+		database, parsedRoleName, err := parseDatabaseRoleName(roleName)
+		if err != nil {
+			return nil, err
+		}
+
+		return repo.GetGrantsToDatabaseRole(parsedRoleName, database)
+	}
+
+	return repo.GetGrantsToAccountRole(roleName)
+}
+
+// func (s *AccessSyncer) getGrantsOfRole(roleName string, repo dataAccessRepository) ([]GrantOfRole, error) {
+// 	if isDatabaseRole(roleName) {
+// 		database, parsedRoleName, err := parseDatabaseRoleName(roleName)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+
+// 		return repo.GetGrantsOfDatabaseRole(parsedRoleName, database)
+// 	}
+
+// 	return repo.GetGrantsOfAccountRole(roleName)
+// }
+
+func (s *AccessSyncer) grantRolesToRole(ctx context.Context, repo dataAccessRepository, targetRoleName string, roles ...string) error {
+	toAddDatabaseRoles := []string{}
+
+	for _, role := range roles {
+		if isDatabaseRole(role) {
+			toAddDatabaseRoles = append(toAddDatabaseRoles, role)
+		}
+	}
+
+	toAddAccountRoles := slice.SliceDifference(roles, toAddDatabaseRoles)
+
+	if isDatabaseRole(targetRoleName) {
+		database, parsedRoleName, err := parseDatabaseRoleName(targetRoleName)
+		if err != nil {
+			return err
+		}
+
+		err = repo.GrantDatabaseRolesToDatabaseRole(ctx, database, parsedRoleName, toAddDatabaseRoles...)
+		if err != nil {
+			return err
+		}
+
+		return repo.GrantAccountRolesToDatabaseRole(ctx, database, parsedRoleName, toAddAccountRoles...)
+	}
+
+	if len(toAddDatabaseRoles) > 0 {
+		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetRoleName, toAddAccountRoles)
+	}
+
+	return repo.GrantAccountRolesToAccountRole(ctx, targetRoleName, toAddAccountRoles...)
+}
+
+func (s *AccessSyncer) revokeRolesFromRole(ctx context.Context, repo dataAccessRepository, targetRoleName string, roles ...string) error {
+	toAddDatabaseRoles := []string{}
+
+	for _, role := range roles {
+		if isDatabaseRole(role) {
+			toAddDatabaseRoles = append(toAddDatabaseRoles, role)
+		}
+	}
+
+	toAddAccountRoles := slice.SliceDifference(roles, toAddDatabaseRoles)
+
+	if isDatabaseRole(targetRoleName) {
+		database, parsedRoleName, err := parseDatabaseRoleName(targetRoleName)
+		if err != nil {
+			return err
+		}
+
+		err = repo.RevokeDatabaseRolesFromDatabaseRole(ctx, database, parsedRoleName, toAddDatabaseRoles...)
+		if err != nil {
+			return err
+		}
+
+		return repo.RevokeAccountRolesFromDatabaseRole(ctx, database, parsedRoleName, toAddAccountRoles...)
+	}
+
+	if len(toAddDatabaseRoles) > 0 {
+		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetRoleName, toAddAccountRoles)
+	}
+
+	return repo.RevokeAccountRolesFromAccountRole(ctx, targetRoleName, toAddAccountRoles...)
+}
+
+func (s *AccessSyncer) createRole(roleName string, repo dataAccessRepository) error {
+	if isDatabaseRole(roleName) {
+		database, cleanedRoleName, err := parseDatabaseRoleName(roleName)
+		if err != nil {
+			return err
+		}
+
+		return repo.CreateDatabaseRole(cleanedRoleName, database)
+	}
+
+	return repo.CreateAccountRole(roleName)
+}
+
+func (s *AccessSyncer) dropRole(roleName string, repo dataAccessRepository) error {
+	if isDatabaseRole(roleName) {
+		database, cleanedRoleName, err := parseDatabaseRoleName(roleName)
+		if err != nil {
+			return err
+		}
+
+		return repo.DropDatabaseRole(cleanedRoleName, database)
+	}
+
+	return repo.DropAccountRole(roleName)
+}
+
+func (s *AccessSyncer) renameRole(oldName, newName string, repo dataAccessRepository) error {
+	if isDatabaseRole(oldName) {
+		if !isDatabaseRole(newName) {
+			return fmt.Errorf("expected new roleName %q to have the expected databaseRole structure just like the old roleName %q", newName, oldName)
+		}
+
+		oldDatabase, oldRoleName, err := parseDatabaseRoleName(oldName)
+		if err != nil {
+			return err
+		}
+
+		newDatabase, newRoleName, err := parseDatabaseRoleName(newName)
+		if err != nil {
+			return err
+		}
+
+		if oldDatabase != newDatabase {
+			return fmt.Errorf("expected new roleName %q pointing to the same database as old roleName %q", newName, oldName)
+		}
+
+		return repo.RenameDatabaseRole(oldRoleName, newRoleName, oldDatabase)
+	}
+
+	return repo.RenameAccountRole(oldName, newName)
+}
+
+func (s *AccessSyncer) commentOnRoleIfExists(comment, roleName string, repo dataAccessRepository) error {
+	if isDatabaseRole(roleName) {
+		database, cleanedRoleName, err := parseDatabaseRoleName(roleName)
+		if err != nil {
+			return err
+		}
+
+		return repo.CommentDatabaseRoleIfExists(comment, cleanedRoleName, database)
+	}
+
+	return repo.CommentAccountRoleIfExists(comment, roleName)
 }
 
 func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[string]*importer.AccessProvider, existingRoles set.Set[string], renameMap map[string]string, repo dataAccessRepository, configMap *config.ConfigMap, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
@@ -1089,7 +1414,7 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, apMap map[str
 		return err
 	}
 
-	metaData := buildMetaDataMap(md)
+	metaData := s.buildMetaDataMap(md)
 
 	rolesCreated := make(map[string]interface{})
 
@@ -1294,7 +1619,7 @@ func (s *AccessSyncer) getDatabases(repo dataAccessRepository) ([]DbEntity, erro
 	}
 
 	var err error
-	s.databasesCache, err = repo.GetDataBases()
+	s.databasesCache, err = repo.GetDatabases()
 
 	if err != nil {
 		s.databasesCache = nil
@@ -1509,7 +1834,7 @@ func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permiss
 				}
 			}
 
-			shareNames, err := getShareNames(repo)
+			shareNames, err := s.getShareNames(repo)
 			if err != nil {
 				return nil, err
 			}
@@ -1625,6 +1950,59 @@ func (s *AccessSyncer) deleteFilter(repo dataAccessRepository, tableFullName str
 	return nil
 }
 
+func (s *AccessSyncer) executeGrantOnRole(perm, on, roleName string, repo dataAccessRepository) error {
+	if isDatabaseRole(roleName) {
+		database, parsedRoleName, err := parseDatabaseRoleName(roleName)
+		if err != nil {
+			return err
+		}
+
+		return repo.ExecuteGrantOnDatabaseRole(perm, on, database, parsedRoleName)
+	}
+
+	return repo.ExecuteGrantOnAccountRole(perm, on, roleName)
+}
+
+func (s *AccessSyncer) executeRevokeOnRole(perm, on, roleName string, repo dataAccessRepository) error {
+	if isDatabaseRole(roleName) {
+		database, parsedRoleName, err := parseDatabaseRoleName(roleName)
+		if err != nil {
+			return err
+		}
+
+		return repo.ExecuteRevokeOnDatabaseRole(perm, on, database, parsedRoleName)
+	}
+
+	return repo.ExecuteRevokeOnAccountRole(perm, on, roleName)
+}
+
+func (s *AccessSyncer) mergeGrants(repo dataAccessRepository, role string, found []Grant, expected []Grant, metaData map[string]map[string]struct{}) error {
+	toAdd := slice.SliceDifference(expected, found)
+	toRemove := slice.SliceDifference(found, expected)
+
+	logger.Info(fmt.Sprintf("Found %d grants to add and %d grants to remove for role %q", len(toAdd), len(toRemove), role))
+
+	for _, grant := range toAdd {
+		if verifyGrant(grant, metaData) {
+			err := s.executeGrantOnRole(grant.Permissions, grant.GetGrantOnType()+" "+grant.On, role, repo)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, grant := range toRemove {
+		if verifyGrant(grant, metaData) {
+			err := s.executeRevokeOnRole(grant.Permissions, grant.GetGrantOnType()+" "+grant.On, role, repo)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func filterExpression(ctx context.Context, ap *importer.AccessProvider) (string, []string, error) {
 	if ap.FilterCriteria != nil {
 		filterQueryBuilder := NewFilterCriteriaBuilder()
@@ -1725,33 +2103,6 @@ func groupFiltersByTable(aps map[string]*importer.AccessProvider, feedbackHandle
 	return groupedFilters, nil
 }
 
-func mergeGrants(repo dataAccessRepository, role string, found []Grant, expected []Grant, metaData map[string]map[string]struct{}) error {
-	toAdd := slice.SliceDifference(expected, found)
-	toRemove := slice.SliceDifference(found, expected)
-
-	logger.Info(fmt.Sprintf("Found %d grants to add and %d grants to remove for role %q", len(toAdd), len(toRemove), role))
-
-	for _, grant := range toAdd {
-		if verifyGrant(grant, metaData) {
-			err := repo.ExecuteGrantOnAccountRole(grant.Permissions, grant.GetGrantOnType()+" "+grant.On, role)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	for _, grant := range toRemove {
-		if verifyGrant(grant, metaData) {
-			err := repo.ExecuteRevokeOnAccountRole(grant.Permissions, grant.GetGrantOnType()+" "+grant.On, role)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 func verifyGrant(grant Grant, metaData map[string]map[string]struct{}) bool {
 	if tmd, f := metaData[grant.OnType]; f {
 		if _, f2 := tmd[grant.Permissions]; f2 {
@@ -1789,4 +2140,30 @@ func raitoMaskName(name string) string {
 
 func raitoMaskUniqueName(name string) string {
 	return raitoMaskName(name) + "_" + gonanoid.MustGenerate(idAlphabet, 8)
+}
+
+func isDatabaseRole(roleName string) bool {
+	return strings.HasPrefix(roleName, databaseRolePrefix)
+}
+
+func parseDatabaseRoleName(roleName string) (database string, cleanedRoleName string, err error) {
+	if !isDatabaseRole(roleName) {
+		return "", "", fmt.Errorf("role %q is not a database role", roleName)
+	}
+
+	roleNameWithoutPrefix := strings.TrimPrefix(roleName, databaseRolePrefix)
+
+	parts := strings.Split(roleNameWithoutPrefix, ".")
+	database = parts[0]
+	cleanedRoleName = parts[1]
+
+	return database, cleanedRoleName, nil
+}
+
+func DatabaseRoleActualNameGenerator(databaseRoleName string) string {
+	return fmt.Sprintf("%s%s", databaseRolePrefix, databaseRoleName)
+}
+
+func DatabaseRoleNameGenerator(roleName string, database string) string {
+	return fmt.Sprintf("%s.%s", database, roleName)
 }

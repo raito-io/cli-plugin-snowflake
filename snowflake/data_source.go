@@ -22,7 +22,7 @@ type dataSourceRepository interface {
 	GetSnowFlakeAccountName() (string, error)
 	GetWarehouses() ([]DbEntity, error)
 	GetShares() ([]DbEntity, error)
-	GetDataBases() ([]DbEntity, error)
+	GetDatabases() ([]DbEntity, error)
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
@@ -359,7 +359,7 @@ func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, d
 }
 
 func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler, shares map[string]struct{}) ([]DbEntity, error) {
-	databases, err := repo.GetDataBases()
+	databases, err := repo.GetDatabases()
 	if err != nil {
 		return nil, err
 	}

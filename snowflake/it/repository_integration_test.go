@@ -499,9 +499,9 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetShares() {
 	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDataBases() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabases() {
 	//When
-	databases, err := s.repo.GetDataBases()
+	databases, err := s.repo.GetDatabases()
 
 	//Then
 	s.NoError(err)
@@ -701,7 +701,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_NonExistin
 	roleName := fmt.Sprintf("%s_REPO_TEST_COMMENT_NON_EXISTING_ROLE", testId)
 
 	//When
-	err := s.repo.CommentRoleIfExists("SomeComment", roleName)
+	err := s.repo.CommentAccountRoleIfExists("SomeComment", roleName)
 
 	//Then
 	s.NoError(err)
@@ -715,7 +715,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_Role() {
 	comment := "Some comment"
 
 	//When
-	err = s.repo.CommentRoleIfExists(comment, roleName)
+	err = s.repo.CommentAccountRoleIfExists(comment, roleName)
 
 	//Then
 	s.NoError(err)

@@ -162,12 +162,12 @@ func (_c *mockDataSourceRepository_GetColumnsInDatabase_Call) RunAndReturn(run f
 	return _c
 }
 
-// GetDataBases provides a mock function with given fields:
-func (_m *mockDataSourceRepository) GetDataBases() ([]DbEntity, error) {
+// GetDatabases provides a mock function with given fields:
+func (_m *mockDataSourceRepository) GetDatabases() ([]DbEntity, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetDataBases")
+		panic("no return value specified for GetDatabases")
 	}
 
 	var r0 []DbEntity
@@ -192,29 +192,29 @@ func (_m *mockDataSourceRepository) GetDataBases() ([]DbEntity, error) {
 	return r0, r1
 }
 
-// mockDataSourceRepository_GetDataBases_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDataBases'
-type mockDataSourceRepository_GetDataBases_Call struct {
+// mockDataSourceRepository_GetDatabases_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDatabases'
+type mockDataSourceRepository_GetDatabases_Call struct {
 	*mock.Call
 }
 
-// GetDataBases is a helper method to define mock.On call
-func (_e *mockDataSourceRepository_Expecter) GetDataBases() *mockDataSourceRepository_GetDataBases_Call {
-	return &mockDataSourceRepository_GetDataBases_Call{Call: _e.mock.On("GetDataBases")}
+// GetDatabases is a helper method to define mock.On call
+func (_e *mockDataSourceRepository_Expecter) GetDatabases() *mockDataSourceRepository_GetDatabases_Call {
+	return &mockDataSourceRepository_GetDatabases_Call{Call: _e.mock.On("GetDatabases")}
 }
 
-func (_c *mockDataSourceRepository_GetDataBases_Call) Run(run func()) *mockDataSourceRepository_GetDataBases_Call {
+func (_c *mockDataSourceRepository_GetDatabases_Call) Run(run func()) *mockDataSourceRepository_GetDatabases_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetDataBases_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetDataBases_Call {
+func (_c *mockDataSourceRepository_GetDatabases_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetDatabases_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetDataBases_Call) RunAndReturn(run func() ([]DbEntity, error)) *mockDataSourceRepository_GetDataBases_Call {
+func (_c *mockDataSourceRepository_GetDatabases_Call) RunAndReturn(run func() ([]DbEntity, error)) *mockDataSourceRepository_GetDatabases_Call {
 	_c.Call.Return(run)
 	return _c
 }
