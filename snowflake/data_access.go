@@ -45,48 +45,48 @@ const (
 //go:generate go run github.com/vektra/mockery/v2 --name=dataAccessRepository --with-expecter --inpackage
 type dataAccessRepository interface {
 	Close() error
-	TotalQueryTime() time.Duration
-	GetShares() ([]DbEntity, error)
+	CommentAccountRoleIfExists(comment, objectName string) error
+	CommentDatabaseRoleIfExists(comment, database, roleName string) error
+	CreateAccountRole(roleName string) error
+	CreateDatabaseRole(database, roleName string) error
+	CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) error
+	DescribePolicy(policyType, dbName, schema, policyName string) ([]describePolicyEntity, error)
+	DropAccountRole(roleName string) error
+	DropDatabaseRole(database string, roleName string) error
+	DropFilter(databaseName string, schema string, tableName string, filterName string) error
+	DropMaskingPolicy(databaseName string, schema string, maskName string) (err error)
+	ExecuteGrantOnAccountRole(perm, on, role string) error
+	ExecuteGrantOnDatabaseRole(perm, on, database, databaseRole string) error
+	ExecuteRevokeOnAccountRole(perm, on, role string) error
+	ExecuteRevokeOnDatabaseRole(perm, on, database, databaseRole string) error
 	GetAccountRoles() ([]RoleEntity, error)
 	GetAccountRolesWithPrefix(prefix string) ([]RoleEntity, error)
 	GetDatabaseRoles(database string) ([]RoleEntity, error)
 	GetDatabaseRolesWithPrefix(database string, prefix string) ([]RoleEntity, error)
+	GetDatabases() ([]DbEntity, error)
 	GetGrantsOfAccountRole(roleName string) ([]GrantOfRole, error)
+	GetGrantsOfDatabaseRole(database, roleName string) ([]GrantOfRole, error)
 	GetGrantsToAccountRole(roleName string) ([]GrantToRole, error)
-	GetGrantsOfDatabaseRole(roleName, database string) ([]GrantOfRole, error)
-	GetGrantsToDatabaseRole(roleName, database string) ([]GrantToRole, error)
+	GetGrantsToDatabaseRole(database, roleName string) ([]GrantToRole, error)
 	GetPolicies(policy string) ([]PolicyEntity, error)
 	GetPoliciesLike(policy string, like string) ([]PolicyEntity, error)
-	DescribePolicy(policyType, dbName, schema, policyName string) ([]describePolicyEntity, error)
 	GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error)
-	DropAccountRole(roleName string) error
-	DropDatabaseRole(roleName string, targetDatabase string) error
-	ExecuteGrantOnAccountRole(perm, on, role string) error
-	ExecuteRevokeOnAccountRole(perm, on, role string) error
-	ExecuteGrantOnDatabaseRole(perm, on, database, databaseRole string) error
-	ExecuteRevokeOnDatabaseRole(perm, on, database, databaseRole string) error
-	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
-	GetDatabases() ([]DbEntity, error)
+	GetShares() ([]DbEntity, error)
+	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetWarehouses() ([]DbEntity, error)
-	CommentAccountRoleIfExists(comment, objectName string) error
-	CommentDatabaseRoleIfExists(comment, roleName, database string) error
-	RenameAccountRole(oldName, newName string) error
-	RenameDatabaseRole(oldName, newName, database string) error
-	GrantUsersToAccountRole(ctx context.Context, role string, users ...string) error
+	GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error
 	GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
 	GrantDatabaseRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
-	RevokeUsersFromAccountRole(ctx context.Context, role string, users ...string) error
-	GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error
+	GrantUsersToAccountRole(ctx context.Context, role string, users ...string) error
+	RenameAccountRole(oldName, newName string) error
+	RenameDatabaseRole(database, oldName, newName string) error
 	RevokeAccountRolesFromAccountRole(ctx context.Context, role string, roles ...string) error
 	RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
 	RevokeDatabaseRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
-	CreateAccountRole(roleName string) error
-	CreateDatabaseRole(roleName string, database string) error
-	CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) error
-	DropMaskingPolicy(databaseName string, schema string, maskName string) (err error)
+	RevokeUsersFromAccountRole(ctx context.Context, role string, users ...string) error
+	TotalQueryTime() time.Duration
 	UpdateFilter(databaseName string, schema string, tableName string, filterName string, argumentNames []string, expression string) error
-	DropFilter(databaseName string, schema string, tableName string, filterName string) error
 }
 
 var _ role_based.AccessProviderRoleSyncer = (*AccessSyncer)(nil)
@@ -616,7 +616,7 @@ func (s *AccessSyncer) importAccessForAccountRole(roleEntity RoleEntity, externa
 func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity RoleEntity, externalGroupOwners string, linkToExternalIdentityStoreGroups bool, repo dataAccessRepository, accessProviderMap map[string]*exporter.AccessProvider, shares map[string]struct{}, accessProviderHandler wrappers.AccessProviderHandler) error {
 	logger.Info(fmt.Sprintf("Reading SnowFlake DATABASE ROLE %s inside %s", roleEntity.Name, database))
 
-	databaseRoleName := DatabaseRoleNameGenerator(roleEntity.Name, database)
+	databaseRoleName := DatabaseRoleNameGenerator(database, roleEntity.Name)
 	actualName := DatabaseRoleActualNameGenerator(databaseRoleName)
 	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, externalGroupOwners)
 
@@ -771,7 +771,7 @@ func (s *AccessSyncer) retrieveGrantsOfRole(roleName string, repo dataAccessRepo
 			return nil, err2
 		}
 
-		grantOfEntities, err = repo.GetGrantsOfDatabaseRole(parsedRoleName, database)
+		grantOfEntities, err = repo.GetGrantsOfDatabaseRole(database, parsedRoleName)
 	} else {
 		grantOfEntities, err = repo.GetGrantsOfAccountRole(roleName)
 	}
@@ -888,7 +888,7 @@ func isNotInternalizableRole(role string) bool {
 	if isDatabaseRole(role) {
 		_, parsedRoleName, err := parseDatabaseRoleName(role)
 		if err != nil {
-			return true
+			return false
 		}
 
 		searchForRole = parsedRoleName
@@ -1259,7 +1259,7 @@ func (s *AccessSyncer) getGrantsToRole(roleName string, repo dataAccessRepositor
 			return nil, err
 		}
 
-		return repo.GetGrantsToDatabaseRole(parsedRoleName, database)
+		return repo.GetGrantsToDatabaseRole(database, parsedRoleName)
 	}
 
 	return repo.GetGrantsToAccountRole(roleName)
@@ -1336,7 +1336,7 @@ func (s *AccessSyncer) createRole(roleName string, repo dataAccessRepository) er
 			return err
 		}
 
-		return repo.CreateDatabaseRole(cleanedRoleName, database)
+		return repo.CreateDatabaseRole(database, cleanedRoleName)
 	}
 
 	return repo.CreateAccountRole(roleName)
@@ -1349,16 +1349,16 @@ func (s *AccessSyncer) dropRole(roleName string, repo dataAccessRepository) erro
 			return err
 		}
 
-		return repo.DropDatabaseRole(cleanedRoleName, database)
+		return repo.DropDatabaseRole(database, cleanedRoleName)
 	}
 
 	return repo.DropAccountRole(roleName)
 }
 
 func (s *AccessSyncer) renameRole(oldName, newName string, repo dataAccessRepository) error {
-	if isDatabaseRole(oldName) || isDatabaseRole(newName) {
-		if !isDatabaseRole(newName) || !isDatabaseRole(oldName) {
-			return fmt.Errorf("both roles should be a database role newName:%q - oldName:%q", newName, oldName)
+	if isDatabaseRole(oldName) {
+		if !isDatabaseRole(newName) {
+			return fmt.Errorf("expected new roleName %q to have the expected databaseRole structure just like the old roleName %q", newName, oldName)
 		}
 
 		oldDatabase, oldRoleName, err := parseDatabaseRoleName(oldName)
@@ -1375,7 +1375,7 @@ func (s *AccessSyncer) renameRole(oldName, newName string, repo dataAccessReposi
 			return fmt.Errorf("expected new roleName %q pointing to the same database as old roleName %q", newName, oldName)
 		}
 
-		return repo.RenameDatabaseRole(oldRoleName, newRoleName, oldDatabase)
+		return repo.RenameDatabaseRole(oldDatabase, oldRoleName, newRoleName)
 	}
 
 	return repo.RenameAccountRole(oldName, newName)
@@ -1388,7 +1388,7 @@ func (s *AccessSyncer) commentOnRoleIfExists(comment, roleName string, repo data
 			return err
 		}
 
-		return repo.CommentDatabaseRoleIfExists(comment, cleanedRoleName, database)
+		return repo.CommentDatabaseRoleIfExists(comment, database, cleanedRoleName)
 	}
 
 	return repo.CommentAccountRoleIfExists(comment, roleName)
@@ -2147,10 +2147,6 @@ func parseDatabaseRoleName(roleName string) (database string, cleanedRoleName st
 	roleNameWithoutPrefix := strings.TrimPrefix(roleName, databaseRolePrefix)
 
 	parts := strings.Split(roleNameWithoutPrefix, ".")
-	if (parts == nil) || (len(parts) < 2) {
-		return "", "", fmt.Errorf("role %q is not a database role", roleName)
-	}
-
 	database = parts[0]
 	cleanedRoleName = parts[1]
 
@@ -2161,6 +2157,6 @@ func DatabaseRoleActualNameGenerator(databaseRoleName string) string {
 	return fmt.Sprintf("%s%s", databaseRolePrefix, databaseRoleName)
 }
 
-func DatabaseRoleNameGenerator(roleName string, database string) string {
+func DatabaseRoleNameGenerator(database, roleName string) string {
 	return fmt.Sprintf("%s.%s", database, roleName)
 }

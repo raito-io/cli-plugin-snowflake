@@ -195,55 +195,6 @@ func (repo *SnowflakeRepository) GetAccountRolesWithPrefix(prefix string) ([]Rol
 	return roleEntities, nil
 }
 
-func (repo *SnowflakeRepository) GetDatabaseRoles(database string) ([]RoleEntity, error) {
-	return repo.GetDatabaseRolesWithPrefix(database, "")
-}
-
-func (repo *SnowflakeRepository) GetDatabaseRolesWithPrefix(database string, prefix string) ([]RoleEntity, error) {
-	var roleEntities []RoleEntity
-
-	if isIgnoredForDatabaseRoles(database) {
-		return roleEntities, nil
-	}
-
-	q := common.FormatQuery(`SHOW DATABASE ROLES IN DATABASE %s`, database)
-
-	if prefix != "" {
-		orgQuery, _, err := repo.query(q)
-		if err != nil {
-			return nil, err
-		}
-
-		orgQuery.Close()
-		q = fmt.Sprintf(`SELECT * FROM table(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" like '%s' ORDER BY "created_on" DESC;`, prefix+"%")
-	}
-
-	rows, _, err := repo.query(q)
-	if err != nil {
-		return nil, err
-	}
-
-	err = scan.Rows(&roleEntities, rows)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching all roles: %s", err.Error())
-	}
-
-	err = CheckSFLimitExceeded(q, len(roleEntities))
-	if err != nil {
-		return nil, fmt.Errorf("error while finding existing roles: %s", err.Error())
-	}
-
-	// filter out role used to sync snowflake to raito
-	for i, roleEntity := range roleEntities {
-		if repo.isProtectedRoleName(roleEntity.Name) {
-			roleEntities[i] = roleEntities[len(roleEntities)-1]
-			return roleEntities[:len(roleEntities)-1], nil
-		}
-	}
-
-	return roleEntities, nil
-}
-
 func (repo *SnowflakeRepository) CreateAccountRole(roleName string) error {
 	if repo.isProtectedRoleName(roleName) {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", roleName))
@@ -300,92 +251,6 @@ func (repo *SnowflakeRepository) GetGrantsToAccountRole(roleName string) ([]Gran
 	return repo.grantsToRoleMapper(q)
 }
 
-func (repo *SnowflakeRepository) CreateDatabaseRole(roleName string, database string) error {
-	if repo.isProtectedRoleName(roleName) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, roleName))
-		return nil
-	}
-
-	q := common.FormatQuery(`CREATE DATABASE ROLE IF NOT EXISTS %s.%s`, database, roleName)
-
-	_, _, err := repo.query(q)
-
-	return err
-}
-
-func (repo *SnowflakeRepository) DropDatabaseRole(roleName string, database string) error {
-	q := common.FormatQuery(`GRANT OWNERSHIP ON DATABASE ROLE %s.%s TO ROLE %s`, database, roleName, repo.role)
-	_, _, err := repo.query(q)
-
-	if err != nil {
-		return err
-	}
-
-	q = common.FormatQuery(`DROP DATABASE ROLE %s.%s`, database, roleName)
-	_, _, err = repo.query(q)
-
-	return err
-}
-func (repo *SnowflakeRepository) RenameDatabaseRole(oldName, newName, database string) error {
-	if repo.isProtectedRoleName(oldName) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, oldName))
-		return nil
-	}
-
-	q := common.FormatQuery(`ALTER DATABASE ROLE IF EXISTS %s.%s RENAME TO %s.%s`, database, oldName, database, newName)
-	_, _, err := repo.query(q)
-
-	return err
-}
-
-func (repo *SnowflakeRepository) GetGrantsOfDatabaseRole(roleName, database string) ([]GrantOfRole, error) {
-	q := common.FormatQuery(`SHOW GRANTS OF DATABASE ROLE %s.%s`, database, roleName)
-
-	return repo.grantsOfRoleMapper(q)
-}
-
-func (repo *SnowflakeRepository) GetGrantsToDatabaseRole(roleName, database string) ([]GrantToRole, error) {
-	q := common.FormatQuery(`SHOW GRANTS TO DATABASE ROLE %s.%s`, database, roleName)
-
-	return repo.grantsToRoleMapper(q)
-}
-
-func (repo *SnowflakeRepository) grantsOfRoleMapper(query string) ([]GrantOfRole, error) {
-	rows, _, err := repo.query(query)
-	if err != nil {
-		return nil, err
-	}
-
-	grantOfEntities := make([]GrantOfRole, 0)
-
-	err = scan.Rows(&grantOfEntities, rows)
-	if err != nil {
-		logger.Error(err.Error())
-
-		return nil, fmt.Errorf("error fetching grants of role: %s", err.Error())
-	}
-
-	return grantOfEntities, nil
-}
-
-func (repo *SnowflakeRepository) grantsToRoleMapper(query string) ([]GrantToRole, error) {
-	rows, _, err := repo.query(query)
-	if err != nil {
-		return nil, err
-	}
-
-	grantToEntities := make([]GrantToRole, 0)
-
-	err = scan.Rows(&grantToEntities, rows)
-	if err != nil {
-		logger.Error(err.Error())
-
-		return nil, fmt.Errorf("error fetching grants of role: %s", err.Error())
-	}
-
-	return grantToEntities, nil
-}
-
 func (repo *SnowflakeRepository) GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error {
 	statementChan, done := repo.execMultiStatements(ctx)
 
@@ -394,38 +259,6 @@ func (repo *SnowflakeRepository) GrantAccountRolesToAccountRole(ctx context.Cont
 		statementChan <- q
 
 		q = common.FormatQuery(`GRANT ROLE %s TO ROLE %s`, role, otherRole)
-		statementChan <- q
-	}
-
-	close(statementChan)
-
-	return <-done
-}
-
-func (repo *SnowflakeRepository) GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error {
-	statementChan, done := repo.execMultiStatements(ctx)
-
-	for _, otherAccountRole := range accountRoles {
-		q := common.FormatQuery(`CREATE ROLE IF NOT EXISTS %s`, otherAccountRole)
-		statementChan <- q
-
-		q = common.FormatQuery(`GRANT DATABASE ROLE %s.%s TO ROLE %s`, database, databaseRole, otherAccountRole)
-		statementChan <- q
-	}
-
-	close(statementChan)
-
-	return <-done
-}
-
-func (repo *SnowflakeRepository) GrantDatabaseRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error {
-	statementChan, done := repo.execMultiStatements(ctx)
-
-	for _, otherDatabaseRole := range databaseRoles {
-		q := common.FormatQuery(`CREATE DATABASE ROLE IF NOT EXISTS %s.%s`, database, otherDatabaseRole)
-		statementChan <- q
-
-		q = common.FormatQuery(`GRANT DATABASE ROLE %s.%s TO DATABASE ROLE %s.%s`, database, databaseRole, database, otherDatabaseRole)
 		statementChan <- q
 	}
 
@@ -444,42 +277,6 @@ func (repo *SnowflakeRepository) RevokeAccountRolesFromAccountRole(ctx context.C
 
 	for _, otherRole := range accountRoles {
 		q := common.FormatQuery(`REVOKE ROLE %s FROM ROLE %s`, accountRole, otherRole)
-		statementChan <- q
-	}
-
-	close(statementChan)
-
-	return <-done
-}
-
-func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error {
-	if repo.isProtectedRoleName(databaseRole) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
-		return nil
-	}
-
-	statementChan, done := repo.execMultiStatements(ctx)
-
-	for _, otherRole := range accountRoles {
-		q := common.FormatQuery(`REVOKE DATABASE ROLE %s.%s FROM ROLE %s`, database, databaseRole, otherRole)
-		statementChan <- q
-	}
-
-	close(statementChan)
-
-	return <-done
-}
-
-func (repo *SnowflakeRepository) RevokeDatabaseRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error {
-	if repo.isProtectedRoleName(databaseRole) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
-		return nil
-	}
-
-	statementChan, done := repo.execMultiStatements(ctx)
-
-	for _, otherRole := range databaseRoles {
-		q := common.FormatQuery(`REVOKE DATABASE ROLE %s.%s FROM DATABASE ROLE %s.%s`, database, databaseRole, database, otherRole)
 		statementChan <- q
 	}
 
@@ -557,6 +354,173 @@ func (repo *SnowflakeRepository) ExecuteRevokeOnAccountRole(perm, on, accountRol
 	return nil
 }
 
+func (repo *SnowflakeRepository) GetDatabaseRoles(database string) ([]RoleEntity, error) {
+	return repo.GetDatabaseRolesWithPrefix(database, "")
+}
+
+func (repo *SnowflakeRepository) GetDatabaseRolesWithPrefix(database string, prefix string) ([]RoleEntity, error) {
+	var roleEntities []RoleEntity
+
+	if isIgnoredForDatabaseRoles(database) {
+		return roleEntities, nil
+	}
+
+	q := common.FormatQuery(`SHOW DATABASE ROLES IN DATABASE %s`, database)
+
+	if prefix != "" {
+		orgQuery, _, err := repo.query(q)
+		if err != nil {
+			return nil, err
+		}
+
+		orgQuery.Close()
+		q = fmt.Sprintf(`SELECT * FROM table(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" like '%s' ORDER BY "created_on" DESC;`, prefix+"%")
+	}
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	err = scan.Rows(&roleEntities, rows)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching all roles: %s", err.Error())
+	}
+
+	err = CheckSFLimitExceeded(q, len(roleEntities))
+	if err != nil {
+		return nil, fmt.Errorf("error while finding existing roles: %s", err.Error())
+	}
+
+	// filter out role used to sync snowflake to raito
+	for i, roleEntity := range roleEntities {
+		if repo.isProtectedRoleName(roleEntity.Name) {
+			roleEntities[i] = roleEntities[len(roleEntities)-1]
+			return roleEntities[:len(roleEntities)-1], nil
+		}
+	}
+
+	return roleEntities, nil
+}
+
+func (repo *SnowflakeRepository) CreateDatabaseRole(database string, roleName string) error {
+	if repo.isProtectedRoleName(roleName) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, roleName))
+		return nil
+	}
+
+	q := common.FormatQuery(`CREATE DATABASE ROLE IF NOT EXISTS %s.%s`, database, roleName)
+
+	_, _, err := repo.query(q)
+
+	return err
+}
+
+func (repo *SnowflakeRepository) DropDatabaseRole(database string, roleName string) error {
+	q := common.FormatQuery(`GRANT OWNERSHIP ON DATABASE ROLE %s.%s TO ROLE %s`, database, roleName, repo.role)
+	_, _, err := repo.query(q)
+
+	if err != nil {
+		return err
+	}
+
+	q = common.FormatQuery(`DROP DATABASE ROLE %s.%s`, database, roleName)
+	_, _, err = repo.query(q)
+
+	return err
+}
+func (repo *SnowflakeRepository) RenameDatabaseRole(database, oldName, newName string) error {
+	if repo.isProtectedRoleName(oldName) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, oldName))
+		return nil
+	}
+
+	q := common.FormatQuery(`ALTER DATABASE ROLE IF EXISTS %s.%s RENAME TO %s.%s`, database, oldName, database, newName)
+	_, _, err := repo.query(q)
+
+	return err
+}
+
+func (repo *SnowflakeRepository) GetGrantsOfDatabaseRole(database, roleName string) ([]GrantOfRole, error) {
+	q := common.FormatQuery(`SHOW GRANTS OF DATABASE ROLE %s.%s`, database, roleName)
+
+	return repo.grantsOfRoleMapper(q)
+}
+
+func (repo *SnowflakeRepository) GetGrantsToDatabaseRole(database, roleName string) ([]GrantToRole, error) {
+	q := common.FormatQuery(`SHOW GRANTS TO DATABASE ROLE %s.%s`, database, roleName)
+
+	return repo.grantsToRoleMapper(q)
+}
+
+func (repo *SnowflakeRepository) GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error {
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, otherAccountRole := range accountRoles {
+		q := common.FormatQuery(`CREATE ROLE IF NOT EXISTS %s`, otherAccountRole)
+		statementChan <- q
+
+		q = common.FormatQuery(`GRANT DATABASE ROLE %s.%s TO ROLE %s`, database, databaseRole, otherAccountRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) GrantDatabaseRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error {
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, otherDatabaseRole := range databaseRoles {
+		q := common.FormatQuery(`CREATE DATABASE ROLE IF NOT EXISTS %s.%s`, database, otherDatabaseRole)
+		statementChan <- q
+
+		q = common.FormatQuery(`GRANT DATABASE ROLE %s.%s TO DATABASE ROLE %s.%s`, database, databaseRole, database, otherDatabaseRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error {
+	if repo.isProtectedRoleName(databaseRole) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
+		return nil
+	}
+
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, otherRole := range accountRoles {
+		q := common.FormatQuery(`REVOKE DATABASE ROLE %s.%s FROM ROLE %s`, database, databaseRole, otherRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) RevokeDatabaseRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error {
+	if repo.isProtectedRoleName(databaseRole) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
+		return nil
+	}
+
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, otherRole := range databaseRoles {
+		q := common.FormatQuery(`REVOKE DATABASE ROLE %s.%s FROM DATABASE ROLE %s.%s`, database, databaseRole, database, otherRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
 func (repo *SnowflakeRepository) ExecuteGrantOnDatabaseRole(perm, on, database, databaseRole string) error {
 	if repo.isProtectedRoleName(databaseRole) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "REFERENCES") {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
@@ -593,6 +557,42 @@ func (repo *SnowflakeRepository) ExecuteRevokeOnDatabaseRole(perm, on, database,
 	}
 
 	return nil
+}
+
+func (repo *SnowflakeRepository) grantsOfRoleMapper(query string) ([]GrantOfRole, error) {
+	rows, _, err := repo.query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	grantOfEntities := make([]GrantOfRole, 0)
+
+	err = scan.Rows(&grantOfEntities, rows)
+	if err != nil {
+		logger.Error(err.Error())
+
+		return nil, fmt.Errorf("error fetching grants of role: %s", err.Error())
+	}
+
+	return grantOfEntities, nil
+}
+
+func (repo *SnowflakeRepository) grantsToRoleMapper(query string) ([]GrantToRole, error) {
+	rows, _, err := repo.query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	grantToEntities := make([]GrantToRole, 0)
+
+	err = scan.Rows(&grantToEntities, rows)
+	if err != nil {
+		logger.Error(err.Error())
+
+		return nil, fmt.Errorf("error fetching grants of role: %s", err.Error())
+	}
+
+	return grantToEntities, nil
 }
 
 func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
@@ -801,7 +801,7 @@ func (repo *SnowflakeRepository) CommentAccountRoleIfExists(comment, objectName 
 
 	return err
 }
-func (repo *SnowflakeRepository) CommentDatabaseRoleIfExists(comment, roleName, database string) error {
+func (repo *SnowflakeRepository) CommentDatabaseRoleIfExists(comment, database, roleName string) error {
 	q := fmt.Sprintf(`COMMENT IF EXISTS ON DATABASE ROLE %s.%s IS '%s'`, database, roleName, strings.Replace(comment, "'", "", -1))
 	_, _, err := repo.query(q)
 
@@ -1076,30 +1076,6 @@ func (repo *SnowflakeRepository) getDbEntities(query string) ([]DbEntity, error)
 	return dbs, nil
 }
 
-func handleDbEntities(repo *SnowflakeRepository, query string, createEntity EntityCreator, handleEntity EntityHandler) error {
-	rows, _, err := repo.query(query)
-	if err != nil {
-		return err
-	}
-
-	for rows.Next() {
-		entity := createEntity()
-
-		err = scanRow(rows, entity)
-
-		if err != nil {
-			return err
-		}
-
-		err = handleEntity(entity)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, error) {
 	logger.Debug(fmt.Sprintf("Sending query: %s", query))
 	startQuery := time.Now()
@@ -1211,6 +1187,30 @@ func (repo *SnowflakeRepository) getColumnInformation(databaseName string, colum
 	})
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func handleDbEntities(repo *SnowflakeRepository, query string, createEntity EntityCreator, handleEntity EntityHandler) error {
+	rows, _, err := repo.query(query)
+	if err != nil {
+		return err
+	}
+
+	for rows.Next() {
+		entity := createEntity()
+
+		err = scanRow(rows, entity)
+
+		if err != nil {
+			return err
+		}
+
+		err = handleEntity(entity)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

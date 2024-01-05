@@ -114,9 +114,9 @@ func (_c *mockDataAccessRepository_CommentAccountRoleIfExists_Call) RunAndReturn
 	return _c
 }
 
-// CommentDatabaseRoleIfExists provides a mock function with given fields: comment, roleName, database
-func (_m *mockDataAccessRepository) CommentDatabaseRoleIfExists(comment string, roleName string, database string) error {
-	ret := _m.Called(comment, roleName, database)
+// CommentDatabaseRoleIfExists provides a mock function with given fields: comment, database, roleName
+func (_m *mockDataAccessRepository) CommentDatabaseRoleIfExists(comment string, database string, roleName string) error {
+	ret := _m.Called(comment, database, roleName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CommentDatabaseRoleIfExists")
@@ -124,7 +124,7 @@ func (_m *mockDataAccessRepository) CommentDatabaseRoleIfExists(comment string, 
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(comment, roleName, database)
+		r0 = rf(comment, database, roleName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -139,13 +139,13 @@ type mockDataAccessRepository_CommentDatabaseRoleIfExists_Call struct {
 
 // CommentDatabaseRoleIfExists is a helper method to define mock.On call
 //   - comment string
-//   - roleName string
 //   - database string
-func (_e *mockDataAccessRepository_Expecter) CommentDatabaseRoleIfExists(comment interface{}, roleName interface{}, database interface{}) *mockDataAccessRepository_CommentDatabaseRoleIfExists_Call {
-	return &mockDataAccessRepository_CommentDatabaseRoleIfExists_Call{Call: _e.mock.On("CommentDatabaseRoleIfExists", comment, roleName, database)}
+//   - roleName string
+func (_e *mockDataAccessRepository_Expecter) CommentDatabaseRoleIfExists(comment interface{}, database interface{}, roleName interface{}) *mockDataAccessRepository_CommentDatabaseRoleIfExists_Call {
+	return &mockDataAccessRepository_CommentDatabaseRoleIfExists_Call{Call: _e.mock.On("CommentDatabaseRoleIfExists", comment, database, roleName)}
 }
 
-func (_c *mockDataAccessRepository_CommentDatabaseRoleIfExists_Call) Run(run func(comment string, roleName string, database string)) *mockDataAccessRepository_CommentDatabaseRoleIfExists_Call {
+func (_c *mockDataAccessRepository_CommentDatabaseRoleIfExists_Call) Run(run func(comment string, database string, roleName string)) *mockDataAccessRepository_CommentDatabaseRoleIfExists_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string), args[1].(string), args[2].(string))
 	})
@@ -208,9 +208,9 @@ func (_c *mockDataAccessRepository_CreateAccountRole_Call) RunAndReturn(run func
 	return _c
 }
 
-// CreateDatabaseRole provides a mock function with given fields: roleName, database
-func (_m *mockDataAccessRepository) CreateDatabaseRole(roleName string, database string) error {
-	ret := _m.Called(roleName, database)
+// CreateDatabaseRole provides a mock function with given fields: database, roleName
+func (_m *mockDataAccessRepository) CreateDatabaseRole(database string, roleName string) error {
+	ret := _m.Called(database, roleName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateDatabaseRole")
@@ -218,7 +218,7 @@ func (_m *mockDataAccessRepository) CreateDatabaseRole(roleName string, database
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(roleName, database)
+		r0 = rf(database, roleName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -232,13 +232,13 @@ type mockDataAccessRepository_CreateDatabaseRole_Call struct {
 }
 
 // CreateDatabaseRole is a helper method to define mock.On call
-//   - roleName string
 //   - database string
-func (_e *mockDataAccessRepository_Expecter) CreateDatabaseRole(roleName interface{}, database interface{}) *mockDataAccessRepository_CreateDatabaseRole_Call {
-	return &mockDataAccessRepository_CreateDatabaseRole_Call{Call: _e.mock.On("CreateDatabaseRole", roleName, database)}
+//   - roleName string
+func (_e *mockDataAccessRepository_Expecter) CreateDatabaseRole(database interface{}, roleName interface{}) *mockDataAccessRepository_CreateDatabaseRole_Call {
+	return &mockDataAccessRepository_CreateDatabaseRole_Call{Call: _e.mock.On("CreateDatabaseRole", database, roleName)}
 }
 
-func (_c *mockDataAccessRepository_CreateDatabaseRole_Call) Run(run func(roleName string, database string)) *mockDataAccessRepository_CreateDatabaseRole_Call {
+func (_c *mockDataAccessRepository_CreateDatabaseRole_Call) Run(run func(database string, roleName string)) *mockDataAccessRepository_CreateDatabaseRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string), args[1].(string))
 	})
@@ -413,9 +413,9 @@ func (_c *mockDataAccessRepository_DropAccountRole_Call) RunAndReturn(run func(s
 	return _c
 }
 
-// DropDatabaseRole provides a mock function with given fields: roleName, targetDatabase
-func (_m *mockDataAccessRepository) DropDatabaseRole(roleName string, targetDatabase string) error {
-	ret := _m.Called(roleName, targetDatabase)
+// DropDatabaseRole provides a mock function with given fields: database, roleName
+func (_m *mockDataAccessRepository) DropDatabaseRole(database string, roleName string) error {
+	ret := _m.Called(database, roleName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DropDatabaseRole")
@@ -423,7 +423,7 @@ func (_m *mockDataAccessRepository) DropDatabaseRole(roleName string, targetData
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(roleName, targetDatabase)
+		r0 = rf(database, roleName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -437,13 +437,13 @@ type mockDataAccessRepository_DropDatabaseRole_Call struct {
 }
 
 // DropDatabaseRole is a helper method to define mock.On call
+//   - database string
 //   - roleName string
-//   - targetDatabase string
-func (_e *mockDataAccessRepository_Expecter) DropDatabaseRole(roleName interface{}, targetDatabase interface{}) *mockDataAccessRepository_DropDatabaseRole_Call {
-	return &mockDataAccessRepository_DropDatabaseRole_Call{Call: _e.mock.On("DropDatabaseRole", roleName, targetDatabase)}
+func (_e *mockDataAccessRepository_Expecter) DropDatabaseRole(database interface{}, roleName interface{}) *mockDataAccessRepository_DropDatabaseRole_Call {
+	return &mockDataAccessRepository_DropDatabaseRole_Call{Call: _e.mock.On("DropDatabaseRole", database, roleName)}
 }
 
-func (_c *mockDataAccessRepository_DropDatabaseRole_Call) Run(run func(roleName string, targetDatabase string)) *mockDataAccessRepository_DropDatabaseRole_Call {
+func (_c *mockDataAccessRepository_DropDatabaseRole_Call) Run(run func(database string, roleName string)) *mockDataAccessRepository_DropDatabaseRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string), args[1].(string))
 	})
@@ -1098,9 +1098,9 @@ func (_c *mockDataAccessRepository_GetGrantsOfAccountRole_Call) RunAndReturn(run
 	return _c
 }
 
-// GetGrantsOfDatabaseRole provides a mock function with given fields: roleName, database
-func (_m *mockDataAccessRepository) GetGrantsOfDatabaseRole(roleName string, database string) ([]GrantOfRole, error) {
-	ret := _m.Called(roleName, database)
+// GetGrantsOfDatabaseRole provides a mock function with given fields: database, roleName
+func (_m *mockDataAccessRepository) GetGrantsOfDatabaseRole(database string, roleName string) ([]GrantOfRole, error) {
+	ret := _m.Called(database, roleName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetGrantsOfDatabaseRole")
@@ -1109,10 +1109,10 @@ func (_m *mockDataAccessRepository) GetGrantsOfDatabaseRole(roleName string, dat
 	var r0 []GrantOfRole
 	var r1 error
 	if rf, ok := ret.Get(0).(func(string, string) ([]GrantOfRole, error)); ok {
-		return rf(roleName, database)
+		return rf(database, roleName)
 	}
 	if rf, ok := ret.Get(0).(func(string, string) []GrantOfRole); ok {
-		r0 = rf(roleName, database)
+		r0 = rf(database, roleName)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]GrantOfRole)
@@ -1120,7 +1120,7 @@ func (_m *mockDataAccessRepository) GetGrantsOfDatabaseRole(roleName string, dat
 	}
 
 	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(roleName, database)
+		r1 = rf(database, roleName)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1134,13 +1134,13 @@ type mockDataAccessRepository_GetGrantsOfDatabaseRole_Call struct {
 }
 
 // GetGrantsOfDatabaseRole is a helper method to define mock.On call
-//   - roleName string
 //   - database string
-func (_e *mockDataAccessRepository_Expecter) GetGrantsOfDatabaseRole(roleName interface{}, database interface{}) *mockDataAccessRepository_GetGrantsOfDatabaseRole_Call {
-	return &mockDataAccessRepository_GetGrantsOfDatabaseRole_Call{Call: _e.mock.On("GetGrantsOfDatabaseRole", roleName, database)}
+//   - roleName string
+func (_e *mockDataAccessRepository_Expecter) GetGrantsOfDatabaseRole(database interface{}, roleName interface{}) *mockDataAccessRepository_GetGrantsOfDatabaseRole_Call {
+	return &mockDataAccessRepository_GetGrantsOfDatabaseRole_Call{Call: _e.mock.On("GetGrantsOfDatabaseRole", database, roleName)}
 }
 
-func (_c *mockDataAccessRepository_GetGrantsOfDatabaseRole_Call) Run(run func(roleName string, database string)) *mockDataAccessRepository_GetGrantsOfDatabaseRole_Call {
+func (_c *mockDataAccessRepository_GetGrantsOfDatabaseRole_Call) Run(run func(database string, roleName string)) *mockDataAccessRepository_GetGrantsOfDatabaseRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string), args[1].(string))
 	})
@@ -1215,9 +1215,9 @@ func (_c *mockDataAccessRepository_GetGrantsToAccountRole_Call) RunAndReturn(run
 	return _c
 }
 
-// GetGrantsToDatabaseRole provides a mock function with given fields: roleName, database
-func (_m *mockDataAccessRepository) GetGrantsToDatabaseRole(roleName string, database string) ([]GrantToRole, error) {
-	ret := _m.Called(roleName, database)
+// GetGrantsToDatabaseRole provides a mock function with given fields: database, roleName
+func (_m *mockDataAccessRepository) GetGrantsToDatabaseRole(database string, roleName string) ([]GrantToRole, error) {
+	ret := _m.Called(database, roleName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetGrantsToDatabaseRole")
@@ -1226,10 +1226,10 @@ func (_m *mockDataAccessRepository) GetGrantsToDatabaseRole(roleName string, dat
 	var r0 []GrantToRole
 	var r1 error
 	if rf, ok := ret.Get(0).(func(string, string) ([]GrantToRole, error)); ok {
-		return rf(roleName, database)
+		return rf(database, roleName)
 	}
 	if rf, ok := ret.Get(0).(func(string, string) []GrantToRole); ok {
-		r0 = rf(roleName, database)
+		r0 = rf(database, roleName)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]GrantToRole)
@@ -1237,7 +1237,7 @@ func (_m *mockDataAccessRepository) GetGrantsToDatabaseRole(roleName string, dat
 	}
 
 	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(roleName, database)
+		r1 = rf(database, roleName)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1251,13 +1251,13 @@ type mockDataAccessRepository_GetGrantsToDatabaseRole_Call struct {
 }
 
 // GetGrantsToDatabaseRole is a helper method to define mock.On call
-//   - roleName string
 //   - database string
-func (_e *mockDataAccessRepository_Expecter) GetGrantsToDatabaseRole(roleName interface{}, database interface{}) *mockDataAccessRepository_GetGrantsToDatabaseRole_Call {
-	return &mockDataAccessRepository_GetGrantsToDatabaseRole_Call{Call: _e.mock.On("GetGrantsToDatabaseRole", roleName, database)}
+//   - roleName string
+func (_e *mockDataAccessRepository_Expecter) GetGrantsToDatabaseRole(database interface{}, roleName interface{}) *mockDataAccessRepository_GetGrantsToDatabaseRole_Call {
+	return &mockDataAccessRepository_GetGrantsToDatabaseRole_Call{Call: _e.mock.On("GetGrantsToDatabaseRole", database, roleName)}
 }
 
-func (_c *mockDataAccessRepository_GetGrantsToDatabaseRole_Call) Run(run func(roleName string, database string)) *mockDataAccessRepository_GetGrantsToDatabaseRole_Call {
+func (_c *mockDataAccessRepository_GetGrantsToDatabaseRole_Call) Run(run func(database string, roleName string)) *mockDataAccessRepository_GetGrantsToDatabaseRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string), args[1].(string))
 	})
@@ -1957,9 +1957,9 @@ func (_c *mockDataAccessRepository_RenameAccountRole_Call) RunAndReturn(run func
 	return _c
 }
 
-// RenameDatabaseRole provides a mock function with given fields: oldName, newName, database
-func (_m *mockDataAccessRepository) RenameDatabaseRole(oldName string, newName string, database string) error {
-	ret := _m.Called(oldName, newName, database)
+// RenameDatabaseRole provides a mock function with given fields: database, oldName, newName
+func (_m *mockDataAccessRepository) RenameDatabaseRole(database string, oldName string, newName string) error {
+	ret := _m.Called(database, oldName, newName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RenameDatabaseRole")
@@ -1967,7 +1967,7 @@ func (_m *mockDataAccessRepository) RenameDatabaseRole(oldName string, newName s
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(oldName, newName, database)
+		r0 = rf(database, oldName, newName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1981,14 +1981,14 @@ type mockDataAccessRepository_RenameDatabaseRole_Call struct {
 }
 
 // RenameDatabaseRole is a helper method to define mock.On call
+//   - database string
 //   - oldName string
 //   - newName string
-//   - database string
-func (_e *mockDataAccessRepository_Expecter) RenameDatabaseRole(oldName interface{}, newName interface{}, database interface{}) *mockDataAccessRepository_RenameDatabaseRole_Call {
-	return &mockDataAccessRepository_RenameDatabaseRole_Call{Call: _e.mock.On("RenameDatabaseRole", oldName, newName, database)}
+func (_e *mockDataAccessRepository_Expecter) RenameDatabaseRole(database interface{}, oldName interface{}, newName interface{}) *mockDataAccessRepository_RenameDatabaseRole_Call {
+	return &mockDataAccessRepository_RenameDatabaseRole_Call{Call: _e.mock.On("RenameDatabaseRole", database, oldName, newName)}
 }
 
-func (_c *mockDataAccessRepository_RenameDatabaseRole_Call) Run(run func(oldName string, newName string, database string)) *mockDataAccessRepository_RenameDatabaseRole_Call {
+func (_c *mockDataAccessRepository_RenameDatabaseRole_Call) Run(run func(database string, oldName string, newName string)) *mockDataAccessRepository_RenameDatabaseRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string), args[1].(string), args[2].(string))
 	})

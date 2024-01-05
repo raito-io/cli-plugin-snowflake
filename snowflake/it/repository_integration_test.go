@@ -430,7 +430,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateDatabaseRole() {
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 
 	//When
-	err := s.repo.CreateDatabaseRole(roleName, database)
+	err := s.repo.CreateDatabaseRole(database, roleName)
 
 	//Then
 	s.NoError(err)
@@ -452,7 +452,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_DropDatabaseRole() {
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 
 	//When
-	err := s.repo.CreateDatabaseRole(roleName, database)
+	err := s.repo.CreateDatabaseRole(database, roleName)
 	s.NoError(err)
 
 	//Then
@@ -467,7 +467,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_DropDatabaseRole() {
 	s.Contains(roleNames, roleName)
 
 	//When
-	err = s.repo.DropDatabaseRole(roleName, database)
+	err = s.repo.DropDatabaseRole(database, roleName)
 
 	//Then
 	s.NoError(err)
@@ -487,11 +487,11 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RenameDatabaseRole() {
 	originalRoleName := fmt.Sprintf("%s_REPO_TEST_RENAME_DATABASE_ROLE_TEST", testId)
 	newExpectedRoleName := fmt.Sprintf("%s_REPO_TEST_RENAME_ROLE_DATABASE_TEST_NEW", testId)
 	database := "SNOWFLAKE_INTEGRATION_TEST"
-	err := s.repo.CreateDatabaseRole(originalRoleName, database)
+	err := s.repo.CreateDatabaseRole(database, originalRoleName)
 	s.NoError(err)
 
 	//When
-	err = s.repo.RenameDatabaseRole(originalRoleName, newExpectedRoleName, database)
+	err = s.repo.RenameDatabaseRole(database, originalRoleName, newExpectedRoleName)
 
 	//Then
 	s.NoError(err)
@@ -538,7 +538,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToDatabaseRole() 
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 
 	//When
-	grantsToRole, err := s.repo.GetGrantsToDatabaseRole(roleName, database)
+	grantsToRole, err := s.repo.GetGrantsToDatabaseRole(database, roleName)
 
 	//Then
 	s.NoError(err)
@@ -562,7 +562,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsOfDatabaseRole() 
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 
 	//When
-	grantsOfRole, err := s.repo.GetGrantsOfDatabaseRole(roleName, database)
+	grantsOfRole, err := s.repo.GetGrantsOfDatabaseRole(database, roleName)
 
 	//Then
 	s.NoError(err)
@@ -585,7 +585,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantAccountRolesToDatabas
 		accountRolesToGrant = append(accountRolesToGrant, fmt.Sprintf("%s_REPO_TEST_GRANT_R2DBR_%d", testId, i))
 	}
 
-	err := s.repo.CreateDatabaseRole(originalRoleName, database)
+	err := s.repo.CreateDatabaseRole(database, originalRoleName)
 	s.NoError(err)
 
 	//When
@@ -594,7 +594,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantAccountRolesToDatabas
 	//Then
 	s.NoError(err)
 
-	grants, err := s.repo.GetGrantsOfDatabaseRole(originalRoleName, database)
+	grants, err := s.repo.GetGrantsOfDatabaseRole(database, originalRoleName)
 	s.NoError(err)
 
 	expectedGrants := make([]snowflake.GrantOfRole, 0, len(grants))
@@ -621,7 +621,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantDatabaseRolesToDataba
 		databaseRolesToGrant = append(databaseRolesToGrant, fmt.Sprintf("%s_REPO_TEST_GRANT_DBR2DBR_%d", testId, i))
 	}
 
-	err := s.repo.CreateDatabaseRole(originalRoleName, database)
+	err := s.repo.CreateDatabaseRole(database, originalRoleName)
 	s.NoError(err)
 
 	//When
@@ -630,7 +630,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantDatabaseRolesToDataba
 	//Then
 	s.NoError(err)
 
-	grants, err := s.repo.GetGrantsOfDatabaseRole(originalRoleName, database)
+	grants, err := s.repo.GetGrantsOfDatabaseRole(database, originalRoleName)
 	s.NoError(err)
 
 	expectedGrants := make([]snowflake.GrantOfRole, 0, len(grants))
@@ -655,7 +655,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeAccountRolesFromData
 		accountRolesToGrants = append(accountRolesToGrants, fmt.Sprintf("%s_REPO_TEST_REVOKE_R2DBR_%d", testId, i))
 	}
 
-	err := s.repo.CreateDatabaseRole(originalRoleName, database)
+	err := s.repo.CreateDatabaseRole(database, originalRoleName)
 	s.NoError(err)
 
 	err = s.repo.GrantAccountRolesToDatabaseRole(context.Background(), database, originalRoleName, accountRolesToGrants...)
@@ -667,7 +667,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeAccountRolesFromData
 	//Then
 	s.NoError(err)
 
-	grants, err := s.repo.GetGrantsOfDatabaseRole(originalRoleName, database)
+	grants, err := s.repo.GetGrantsOfDatabaseRole(database, originalRoleName)
 	s.NoError(err)
 	s.Empty(grants)
 }
@@ -682,7 +682,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeDatabaseRolesFromDat
 		databaseRolesToGrants = append(databaseRolesToGrants, fmt.Sprintf("%s_REPO_TEST_REVOKE_DBR2DBR_%d", testId, i))
 	}
 
-	err := s.repo.CreateDatabaseRole(originalRoleName, database)
+	err := s.repo.CreateDatabaseRole(database, originalRoleName)
 	s.NoError(err)
 
 	err = s.repo.GrantDatabaseRolesToDatabaseRole(context.Background(), database, originalRoleName, databaseRolesToGrants...)
@@ -694,7 +694,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeDatabaseRolesFromDat
 	//Then
 	s.NoError(err)
 
-	grants, err := s.repo.GetGrantsOfDatabaseRole(originalRoleName, database)
+	grants, err := s.repo.GetGrantsOfDatabaseRole(database, originalRoleName)
 	s.NoError(err)
 	s.Empty(grants)
 }
@@ -703,7 +703,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnDatabaseRole
 	//Given
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_GRANT_DATABASEROLE_TEST", testId)
-	err := s.repo.CreateDatabaseRole(roleName, database)
+	err := s.repo.CreateDatabaseRole(database, roleName)
 	s.NoError(err)
 
 	//When
@@ -712,7 +712,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnDatabaseRole
 	//Then
 	s.NoError(err)
 
-	grantsTo, err := s.repo.GetGrantsToDatabaseRole(roleName, database)
+	grantsTo, err := s.repo.GetGrantsToDatabaseRole(database, roleName)
 	s.NoError(err)
 
 	s.Equal(grantsTo, []snowflake.GrantToRole{
@@ -733,7 +733,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevokeOnDatabaseRol
 	//Given
 	database := "SNOWFLAKE_INTEGRATION_TEST"
 	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_REVOKE_DATABASEROLE_TEST", testId)
-	err := s.repo.CreateDatabaseRole(roleName, database)
+	err := s.repo.CreateDatabaseRole(database, roleName)
 	s.NoError(err)
 	err = s.repo.ExecuteGrantOnDatabaseRole("SELECT", "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS", database, roleName)
 	s.NoError(err)
@@ -744,7 +744,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevokeOnDatabaseRol
 	//Then
 	s.NoError(err)
 
-	grantsTo, err := s.repo.GetGrantsToDatabaseRole(roleName, database)
+	grantsTo, err := s.repo.GetGrantsToDatabaseRole(database, roleName)
 	s.NoError(err)
 	s.Equal(grantsTo, []snowflake.GrantToRole{
 		{
