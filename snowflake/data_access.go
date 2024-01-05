@@ -888,7 +888,7 @@ func isNotInternalizableRole(role string) bool {
 	if isDatabaseRole(role) {
 		_, parsedRoleName, err := parseDatabaseRoleName(role)
 		if err != nil {
-			return false
+			return true
 		}
 
 		searchForRole = parsedRoleName
@@ -930,7 +930,7 @@ func (s *AccessSyncer) findRoles(prefix string, repo dataAccessRepository) (set.
 		}
 
 		for _, roleEntity := range roleEntities {
-			existingRoles.Add(DatabaseRoleActualNameGenerator(DatabaseRoleNameGenerator(roleEntity.Name, databases[i].Name)))
+			existingRoles.Add(DatabaseRoleActualNameGenerator(DatabaseRoleNameGenerator(databases[i].Name, roleEntity.Name)))
 		}
 	}
 
@@ -1356,9 +1356,9 @@ func (s *AccessSyncer) dropRole(roleName string, repo dataAccessRepository) erro
 }
 
 func (s *AccessSyncer) renameRole(oldName, newName string, repo dataAccessRepository) error {
-	if isDatabaseRole(oldName) {
-		if !isDatabaseRole(newName) {
-			return fmt.Errorf("expected new roleName %q to have the expected databaseRole structure just like the old roleName %q", newName, oldName)
+	if isDatabaseRole(oldName) || isDatabaseRole(newName) {
+		if !isDatabaseRole(newName) || !isDatabaseRole(oldName) {
+			return fmt.Errorf("both roles should be a database role newName:%q - oldName:%q", newName, oldName)
 		}
 
 		oldDatabase, oldRoleName, err := parseDatabaseRoleName(oldName)
@@ -2147,6 +2147,10 @@ func parseDatabaseRoleName(roleName string) (database string, cleanedRoleName st
 	roleNameWithoutPrefix := strings.TrimPrefix(roleName, databaseRolePrefix)
 
 	parts := strings.Split(roleNameWithoutPrefix, ".")
+	if (parts == nil) || (len(parts) < 2) {
+		return "", "", fmt.Errorf("role %q is not a database role", roleName)
+	}
+
 	database = parts[0]
 	cleanedRoleName = parts[1]
 

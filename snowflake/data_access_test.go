@@ -76,23 +76,23 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("DatabaseRole1", "TEST_DB").Return([]GrantOfRole{
+	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantOfRole{
 		{GrantedTo: "ROLE", GranteeName: "GranteeDatabaseRole1Number2"},
 		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.DatabaseRole2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToDatabaseRole("DatabaseRole1", "TEST_DB").Return([]GrantToRole{
+	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantToRole{
 		{GrantedOn: "TABLE", Name: "TEST_DB.GranteeRole1Table", Privilege: "USAGE"},
 		{GrantedOn: "TABLE", Name: "TEST_DB.GranteeRole1Table", Privilege: "SELECT"},
 		{GrantedOn: "MATERIALIZED_VIEW", Name: "TEST_DB.GranteeRole1MatView", Privilege: "SELECT"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("DatabaseRole2", "TEST_DB").Return([]GrantOfRole{}, nil).Once()
-	repoMock.EXPECT().GetGrantsToDatabaseRole("DatabaseRole2", "TEST_DB").Return([]GrantToRole{
+	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantOfRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantToRole{
 		{GrantedOn: "GrandOnDatabaseRole2Number1", Name: "GranteeDatabaseRole2", Privilege: "USAGE"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("DatabaseRole3", "TEST_DB").Return([]GrantOfRole{}, nil).Once()
-	repoMock.EXPECT().GetGrantsToDatabaseRole("DatabaseRole3", "TEST_DB").Return([]GrantToRole{
+	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole3").Return([]GrantOfRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole3").Return([]GrantToRole{
 		{GrantedOn: "MATERIALIZED_VIEW", Name: "TEST_DB.GranteeRole3MatView", Privilege: "SELECT"},
 	}, nil).Once()
 
@@ -597,8 +597,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_Excludes(t *testing.T) {
 	repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{}, nil).Once()
 	repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{}, nil).Once()
 
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("DatabaseRole2", "TEST_DB").Return([]GrantOfRole{}, nil).Once()
-	repoMock.EXPECT().GetGrantsToDatabaseRole("DatabaseRole2", "TEST_DB").Return([]GrantToRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantOfRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantToRole{}, nil).Once()
 
 	repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{}, nil).Once()
 	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{}, nil).Once()
@@ -692,7 +692,7 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
 	repoMock.EXPECT().DropAccountRole("ToRemove1").Return(nil).Once()
 	repoMock.EXPECT().DropAccountRole("ToRemove2").Return(nil).Once()
-	repoMock.EXPECT().DropDatabaseRole("ToRemoveDatabaseRole1", "TEST_DB").Return(nil).Once()
+	repoMock.EXPECT().DropDatabaseRole("TEST_DB", "ToRemoveDatabaseRole1").Return(nil).Once()
 
 	repoMock.EXPECT().GetAccountRolesWithPrefix("").Return([]RoleEntity{
 		{Name: "ExistingRole1", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
@@ -709,12 +709,12 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
 	repoMock.EXPECT().CreateAccountRole("RoleName3").Return(nil).Once()
-	repoMock.EXPECT().CreateDatabaseRole("DatabaseRole2", "TEST_DB").Return(nil).Once()
+	repoMock.EXPECT().CreateDatabaseRole("TEST_DB", "DatabaseRole2").Return(nil).Once()
 	repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "RoleName3").Return(nil).Once()
 
-	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.Anything, "DatabaseRole1", "TEST_DB").Return(nil).Once()
-	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.Anything, "DatabaseRole2", "TEST_DB").Return(nil).Once()
+	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.Anything, "TEST_DB", "DatabaseRole1").Return(nil).Once()
+	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.Anything, "TEST_DB", "DatabaseRole2").Return(nil).Once()
 
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 
@@ -730,8 +730,8 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 	repoMock.EXPECT().GetGrantsOfAccountRole("ExistingRole1").Return([]GrantOfRole{}, nil).Once()
 	repoMock.EXPECT().GetGrantsToAccountRole("ExistingRole1").Return([]GrantToRole{}, nil).Once()
 
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("DatabaseRole1", "TEST_DB").Return([]GrantOfRole{}, nil).Once()
-	repoMock.EXPECT().GetGrantsToDatabaseRole("DatabaseRole1", "TEST_DB").Return([]GrantToRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantOfRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantToRole{}, nil).Once()
 
 	repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "ExistingRole1").Return(nil).Once()
 
@@ -921,8 +921,8 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
 	repoMock.EXPECT().DropAccountRole("R_ToRemove1").Return(nil).Once()
 	repoMock.EXPECT().DropAccountRole("R_ToRemove2").Return(nil).Once()
-	repoMock.EXPECT().DropDatabaseRole("R_ToRemoveDatabaseRole1", "TEST_DB").Return(nil).Once()
-	repoMock.EXPECT().DropDatabaseRole("R_ToRemoveDatabaseRole2", "TEST_DB").Return(nil).Once()
+	repoMock.EXPECT().DropDatabaseRole("TEST_DB", "R_ToRemoveDatabaseRole1").Return(nil).Once()
+	repoMock.EXPECT().DropDatabaseRole("TEST_DB", "R_ToRemoveDatabaseRole2").Return(nil).Once()
 	repoMock.EXPECT().GetAccountRolesWithPrefix("R_").Return([]RoleEntity{
 		{Name: "R_ToRemove1", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 		{Name: "R_ToRemove2", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
@@ -947,8 +947,8 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema1", "AccessProvider1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema1.Table1", "AccessProvider1").Return(nil).Once()
 
-	repoMock.EXPECT().CreateDatabaseRole("DatabaseRole1", "TEST_DB").Return(nil).Once()
-	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.Anything, "DatabaseRole1", "TEST_DB").Return(nil).Once()
+	repoMock.EXPECT().CreateDatabaseRole("TEST_DB", "DatabaseRole1").Return(nil).Once()
+	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.Anything, "TEST_DB", "DatabaseRole1").Return(nil).Once()
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, false, "TEST_DB", "DatabaseRole1", "AccessProviderId1")
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, true, "TEST_DB", "DatabaseRole1")
 
@@ -2000,13 +2000,13 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema1", "existingRole1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema1.Table1", "existingRole1").Return(nil).Once()
 
-	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.AnythingOfType("string"), "existingDBRole1", "TEST_DB").Return(nil).Once()
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("existingDBRole1", "TEST_DB").Return([]GrantOfRole{
+	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.AnythingOfType("string"), "TEST_DB", "existingDBRole1").Return(nil).Once()
+	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "existingDBRole1").Return([]GrantOfRole{
 		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role2"},
 		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role3"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetGrantsToDatabaseRole("existingDBRole1", "TEST_DB").Return([]GrantToRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "existingDBRole1").Return([]GrantToRole{}, nil).Once()
 
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, true, "TEST_DB", "existingDBRole1", "DATABASEROLE###TEST_DB.Role1")
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, false, "TEST_DB", "existingDBRole1")
@@ -2139,13 +2139,13 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 	repoMock.EXPECT().GetGrantsOfAccountRole("NewRoleName").Return([]GrantOfRole{}, nil).Once()
 	repoMock.EXPECT().GetGrantsToAccountRole("NewRoleName").Return([]GrantToRole{}, nil).Once()
 
-	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.AnythingOfType("string"), "newDBRole", "TEST_DB").Return(nil).Once()
-	repoMock.EXPECT().RenameDatabaseRole("oldDBRole", "newDBRole", "TEST_DB").Return(nil).Once()
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("newDBRole", "TEST_DB").Return([]GrantOfRole{
+	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.AnythingOfType("string"), "TEST_DB", "newDBRole").Return(nil).Once()
+	repoMock.EXPECT().RenameDatabaseRole("TEST_DB", "oldDBRole", "newDBRole").Return(nil).Once()
+	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "newDBRole").Return([]GrantOfRole{
 		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role1"},
 		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToDatabaseRole("newDBRole", "TEST_DB").Return([]GrantToRole{}, nil).Once()
+	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "newDBRole").Return([]GrantToRole{}, nil).Once()
 
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
@@ -2433,7 +2433,7 @@ func Test_RenameRole(t *testing.T) {
 			name: "database roles - basic",
 			fields: fields{
 				setup: func(repoMock *mockDataAccessRepository, feedbackHandlerMock *mocks.SimpleAccessProviderFeedbackHandler) {
-					repoMock.EXPECT().RenameDatabaseRole("oldDBRole", "newDBRole", "TEST_DB").Return(nil).Once()
+					repoMock.EXPECT().RenameDatabaseRole("TEST_DB", "oldDBRole", "newDBRole").Return(nil).Once()
 				},
 			},
 			args: args{
