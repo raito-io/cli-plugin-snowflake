@@ -1857,6 +1857,19 @@ func generateAccessControls_existing_database(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema2.Table3", "RoleName1").Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "VIEW DB1.Schema2.View3", "RoleName1").Return(nil).Once()
 
+	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.AnythingOfType("string"), "DB1", "DatabaseRole1").Return(nil).Once()
+
+	repoMock.EXPECT().GetGrantsOfDatabaseRole("DB1", "DatabaseRole1").Return([]GrantOfRole{}, nil)
+	repoMock.EXPECT().GetGrantsToDatabaseRole("DB1", "DatabaseRole1").Return([]GrantToRole{}, nil)
+
+	repoMock.EXPECT().ExecuteRevokeOnDatabaseRole("ALL", "FUTURE SCHEMAS IN DATABASE DB1", "DB1", "DatabaseRole1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteRevokeOnDatabaseRole("ALL", "FUTURE TABLES IN DATABASE DB1", "DB1", "DatabaseRole1").Return(nil).Once()
+
+	repoMock.EXPECT().ExecuteGrantOnDatabaseRole("USAGE", "DATABASE DB1", "DB1", "DatabaseRole1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrantOnDatabaseRole("USAGE", "SCHEMA DB1.Schema2", "DB1", "DatabaseRole1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrantOnDatabaseRole("SELECT", "TABLE DB1.Schema2.Table3", "DB1", "DatabaseRole1").Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrantOnDatabaseRole("SELECT", "VIEW DB1.Schema2.View3", "DB1", "DatabaseRole1").Return(nil).Once()
+
 	syncer := AccessSyncer{
 		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
 			return nil, nil
@@ -1876,10 +1889,18 @@ func generateAccessControls_existing_database(t *testing.T) {
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"SELECT"}},
 			},
 		},
+		"DATABASEROLE###DB1.DatabaseRole1": {
+			Id:   "DB1.DatabaseRole1",
+			Name: "DB1.DatabaseRole1",
+			Who:  importer.WhoItem{},
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"SELECT"}},
+			},
+		},
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("RoleName1"), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("RoleName1", "DATABASEROLE###DB1.DatabaseRole1"), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)

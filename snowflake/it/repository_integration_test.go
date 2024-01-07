@@ -1046,7 +1046,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_NonExistingRole() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentAccountRoleIfExists_NonExistingRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_COMMENT_NON_EXISTING_ROLE", testId)
 
@@ -1057,7 +1057,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_NonExistin
 	s.NoError(err)
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_Role() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentAccountRoleIfExists_Role() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_COMMENT_EXISTING_ROLE", testId)
 	err := s.repo.CreateAccountRole(roleName)
@@ -1066,6 +1066,33 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentIfExists_Role() {
 
 	//When
 	err = s.repo.CommentAccountRoleIfExists(comment, roleName)
+
+	//Then
+	s.NoError(err)
+}
+
+func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentDatabaseRoleIfExists_NonExistingRole() {
+	//Given
+	database := "SNOWFLAKE_INTEGRATION_TEST"
+	roleName := fmt.Sprintf("%s_REPO_TEST_COMMENT_NON_EXISTING_DB_ROLE", testId)
+
+	//When
+	err := s.repo.CommentDatabaseRoleIfExists("SomeComment", database, roleName)
+
+	//Then
+	s.NoError(err)
+}
+
+func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentDatabaseRoleIfExists_Role() {
+	//Given
+	database := "SNOWFLAKE_INTEGRATION_TEST"
+	roleName := fmt.Sprintf("%s_REPO_TEST_COMMENT_EXISTING_DB_ROLE", testId)
+	err := s.repo.CreateDatabaseRole(database, roleName)
+
+	comment := "Some comment"
+
+	//When
+	err = s.repo.CommentDatabaseRoleIfExists(comment, database, roleName)
 
 	//Then
 	s.NoError(err)
