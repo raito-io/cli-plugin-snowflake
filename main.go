@@ -24,7 +24,7 @@ var roleNameConstraints = naming_hint.NamingConstraints{
 	UpperCaseLetters:  true,
 	LowerCaseLetters:  false,
 	Numbers:           true,
-	SpecialCharacters: "_$",
+	SpecialCharacters: "_$#.",
 	MaxLength:         255,
 }
 
