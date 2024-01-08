@@ -92,7 +92,7 @@ func teardown() error {
 		return err
 	}
 
-	for _, role := range roleEntities {
+	for _, role := range databaseRoleEntities {
 		if strings.HasPrefix(role.Name, testId) {
 			_, err = connectAndQuery(config.Parameters, "", fmt.Sprintf("DROP DATABASE ROLE IF EXISTS %s.%s", database, role.Name))
 			if err != nil {
