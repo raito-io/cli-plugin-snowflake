@@ -80,8 +80,8 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	DatabaseRoleName1 := generateRole("TESTDATABASEROLE1", "")
 	DatabaseRoleName2 := generateRole("TESTDATABASEROLE2", "")
 
-	DatabaseRoleActualName1 := fmt.Sprintf("DATABASEROLE###SNOWFLAKE_INTEGRATION_TEST.%s", DatabaseRoleName1)
-	DatabaseRoleActualName2 := fmt.Sprintf("DATABASEROLE###SNOWFLAKE_INTEGRATION_TEST.%s", DatabaseRoleName2)
+	DatabaseRoleActualName1 := fmt.Sprintf("SNOWFLAKE_INTEGRATION_TEST.%s", DatabaseRoleName1)
+	DatabaseRoleActualName2 := fmt.Sprintf("SNOWFLAKE_INTEGRATION_TEST.%s", DatabaseRoleName2)
 
 	access := map[string]*sync_to_target.AccessProvider{
 		actualRoleName: {
@@ -113,7 +113,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			Delete:      false,
 			Description: fmt.Sprintf("Integration testing for test %s", testId),
 			Who:         sync_to_target.WhoItem{},
-			Type:        ptr.String("DATABASE_ROLE"),
+			Type:        ptr.String("databaseRole"),
 			What:        []sync_to_target.WhatItem{},
 			WhoLocked:   ptr.Bool(true),
 		},
@@ -130,7 +130,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 					fmt.Sprintf("ID:%s", AccountRoleId),
 				},
 			},
-			Type:      ptr.String("DATABASE_ROLE"),
+			Type:      ptr.String("databaseRole"),
 			What:      []sync_to_target.WhatItem{},
 			WhoLocked: ptr.Bool(true),
 		},
@@ -152,22 +152,20 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	s.Len(accessProviderFeedback, 3)
 	s.Equal([]sync_to_target.AccessProviderSyncFeedback{
 		{
-			ActualName:     actualRoleName,
 			AccessProvider: AccountRoleId,
 			ExternalId:     &actualRoleName,
-			Type:           ptr.String("role"),
 		},
 		{
-			ActualName:     DatabaseRoleActualName1,
 			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1_ID1", testId),
+			ActualName:     DatabaseRoleActualName1,
 			ExternalId:     &DatabaseRoleActualName1,
-			Type:           ptr.String("DATABASE_ROLE"),
+			Type:           ptr.String("databaseRole"),
 		},
 		{
-			ActualName:     DatabaseRoleActualName2,
 			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1_ID2", testId),
+			ActualName:     DatabaseRoleActualName2,
 			ExternalId:     &DatabaseRoleActualName2,
-			Type:           ptr.String("DATABASE_ROLE"),
+			Type:           ptr.String("databaseRole"),
 		},
 	}, accessProviderFeedback)
 
@@ -234,7 +232,8 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 				InheritFrom: []string{
 					fmt.Sprintf("ID:%s", AccountRoleId),
 				},
-			}, Type: ptr.String("DATABASE_ROLE"),
+			},
+			Type:      ptr.String("databaseRole"),
 			What:      []sync_to_target.WhatItem{},
 			WhoLocked: ptr.Bool(true),
 		}}
@@ -251,16 +250,14 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	s.Len(accessProviderFeedback, 2)
 	s.Equal([]sync_to_target.AccessProviderSyncFeedback{
 		{
-			ActualName:     actualRoleName,
 			AccessProvider: AccountRoleId,
 			ExternalId:     &actualRoleName,
-			Type:           ptr.String("role"),
 		},
 		{
-			ActualName:     DatabaseRoleActualName1,
 			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1_ID1", testId),
+			ActualName:     DatabaseRoleActualName1,
 			ExternalId:     &DatabaseRoleActualName1,
-			Type:           ptr.String("DATABASE_ROLE"),
+			Type:           ptr.String("databaseRole"),
 		},
 	}, accessProviderFeedback)
 
@@ -305,7 +302,6 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	s.ElementsMatch(dataAccessFeedbackHandler.AccessProviderFeedback, []sync_to_target.AccessProviderSyncFeedback{
 		{
 			AccessProvider: id,
-			ActualName:     actualRoleName,
 			ExternalId:     &actualRoleName,
 		},
 	})
@@ -349,11 +345,6 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 			},
 		},
 	}
-
-	// for key, generatedAp := range generateDefaultDatabaseRolesSnowflake() {
-	// 	access[key] = generatedAp
-	// }
-
 	dataAccessSyncer := snowflake.NewDataAccessSyncer()
 
 	config := s.getConfig()
@@ -527,47 +518,4 @@ func filterFeedbackInformation(feedbackInformation []sync_to_target.AccessProvid
 	}
 
 	return result
-}
-
-func generateDefaultDatabaseRolesSnowflake() map[string]*sync_to_target.AccessProvider {
-
-	expectedDatabase := "SNOWFLAKE"
-	expectedDatabaseRoles := []string{
-		"ALERT_VIEWER",
-		"BUDGET_CREATOR",
-		"CLASSIFICATION_ADMIN",
-		"CORE_VIEWER",
-		"DATA_PRIVACY_VIEWER",
-		"GOVERNANCE_ADMIN",
-		"GOVERNANCE_VIEWER",
-		"ML_USER",
-		"MONITORING_VIEWER",
-		"OBJECT_VIEWER",
-		"ORGANIZATION_ACCOUNTS_VIEWER",
-		"ORGANIZATION_BILLING_VIEWER",
-		"ORGANIZATION_GOVERNANCE_VIEWER",
-		"ORGANIZATION_USAGE_VIEWER",
-		"READER_USAGE_VIEWER",
-		"SECURITY_VIEWER",
-		"SHARING_USAGE_VIEWER",
-		"USAGE_VIEWER",
-	}
-
-	aps := map[string]*sync_to_target.AccessProvider{}
-
-	for _, role := range expectedDatabaseRoles {
-		databaseRoleName := snowflake.DatabaseRoleNameGenerator(role, expectedDatabase)
-		actualName := snowflake.DatabaseRoleActualNameGenerator(databaseRoleName)
-
-		aps[actualName] = &sync_to_target.AccessProvider{
-			Id:     actualName,
-			Name:   role,
-			Action: sync_to_target.Grant,
-			Delete: false,
-			Who:    sync_to_target.WhoItem{},
-			What:   []sync_to_target.WhatItem{},
-		}
-	}
-
-	return aps
 }

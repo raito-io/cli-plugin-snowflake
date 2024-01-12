@@ -10,6 +10,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/bexpression"
 	"github.com/raito-io/bexpression/datacomparison"
+	"github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/data_source"
@@ -25,6 +26,176 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
 		Parameters: map[string]string{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2"},
+	}
+
+	repoMock := newMockDataAccessRepository(t)
+	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
+
+	repoMock.EXPECT().Close().Return(nil).Once()
+	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+	repoMock.EXPECT().GetShares().Return([]DbEntity{
+		{Name: "Share1"}, {Name: "Share2"},
+	}, nil).Once()
+
+	repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
+		{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
+		{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
+		{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner1"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{
+		{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
+		{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
+		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
+		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
+		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
+		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
+		{GrantedOn: "MATERIALIZED_VIEW", Name: "DB1.GranteeRole1MatView", Privilege: "SELECT"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{
+		{GrantedTo: "USER", GranteeName: "GranteeRole2"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{
+		{GrantedOn: "GrandOnRole2Number1", Name: "GranteeRole2", Privilege: "USAGE"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsOfAccountRole("Role3").Return([]GrantOfRole{
+		{GrantedTo: "ROLE", GranteeName: "\"GranteeRole.3\""},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsToAccountRole("Role3").Return([]GrantToRole{
+		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
+	}, nil).Once()
+
+	repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{
+		{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING_POLICY"},
+	}, nil).Once()
+	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
+		{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
+	}, nil).Once()
+	repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
+		{Name: "DescribePolicy1", Body: "PolicyBody 1"},
+	}, nil).Once()
+	repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
+		{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
+	}, nil).Once()
+	repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
+		{POLICY_DB: "PolicyDB"},
+	}, nil).Once()
+	repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
+		{POLICY_DB: "PolicyDB"},
+	}, nil).Once()
+
+	syncer := &AccessSyncer{
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
+			return repoMock, nil
+		},
+		tablesPerSchemaCache:    make(map[string][]TableEntity),
+		schemasPerDataBaseCache: make(map[string][]SchemaEntity),
+	}
+
+	//When
+	err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &configParams)
+
+	//Then
+	assert.NoError(t, err)
+	assert.Equal(t, []sync_from_target.AccessProvider{
+		{
+			ExternalId:        "Role1",
+			NotInternalizable: false,
+			Name:              "Role1",
+			NamingHint:        "Role1",
+			Who: &sync_from_target.WhoItem{
+				Users:           []string{"GranteeRole1Number1"},
+				Groups:          []string{},
+				AccessProviders: []string{"GranteeRole1Number2"},
+			},
+			ActualName: "Role1",
+			Type:       ptr.String(access_provider.Role),
+			What: []sync_from_target.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "Share2.GranteeRole1Schema",
+						Type:     "",
+					},
+					Permissions: []string{"READ"},
+				},
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.GranteeRole1Table",
+						Type:     "",
+					},
+					Permissions: []string{"SELECT"},
+				},
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.GranteeRole1MatView",
+						Type:     "",
+					},
+					Permissions: []string{"SELECT"},
+				},
+			},
+			Action: 1,
+			Policy: "",
+		}, {
+			ExternalId:        "Role2",
+			NotInternalizable: false,
+			Name:              "Role2",
+			NamingHint:        "Role2",
+			Type:              ptr.String(access_provider.Role),
+			Who: &sync_from_target.WhoItem{
+				Users:           []string{"GranteeRole2"},
+				Groups:          []string{},
+				AccessProviders: []string{},
+			},
+			ActualName: "Role2",
+			What:       []sync_from_target.WhatItem{},
+			Action:     1,
+			Policy:     "",
+		}, {
+			ExternalId:        "Role3",
+			NotInternalizable: true,
+			Name:              "Role3",
+			NamingHint:        "Role3",
+			Type:              ptr.String(access_provider.Role),
+			Who: &sync_from_target.WhoItem{
+				Users:           []string{},
+				Groups:          []string{},
+				AccessProviders: []string{"GranteeRole.3"},
+			},
+			ActualName: "Role3",
+			What:       []sync_from_target.WhatItem{},
+			Action:     1,
+			Policy:     "",
+		},
+		{
+			ExternalId:        "DB-schema1-MaskingPolicy1",
+			NotInternalizable: true,
+			Name:              "DB-schema1-MaskingPolicy1",
+			NamingHint:        "MaskingPolicy1",
+			Who:               nil,
+			ActualName:        "DB-schema1-MaskingPolicy1",
+			What:              []sync_from_target.WhatItem{},
+			Action:            3,
+			Policy:            "PolicyBody 1",
+		},
+		{
+			ExternalId:        "DB-schema2-RowAccess1",
+			NotInternalizable: true,
+			Name:              "DB-schema2-RowAccess1",
+			NamingHint:        "RowAccess1",
+			Who:               nil,
+			ActualName:        "DB-schema2-RowAccess1",
+			What:              []sync_from_target.WhatItem{},
+			Action:            4,
+			Policy:            "Row Access Policy Body",
+		},
+	}, fileCreator.AccessProviders)
+}
+
+func TestAccessSyncer_SyncAccessProvidersFromTarget_WithDatabaseRoleSupport(t *testing.T) {
+	//Given
+	configParams := config.ConfigMap{
+		Parameters: map[string]string{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfDatabaseRoles: "true"},
 	}
 
 	repoMock := newMockDataAccessRepository(t)
@@ -140,6 +311,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 				AccessProviders: []string{"GranteeRole1Number2"},
 			},
 			ActualName: "Role1",
+			Type:       ptr.String(access_provider.Role),
 			What: []sync_from_target.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
@@ -170,6 +342,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			NotInternalizable: false,
 			Name:              "Role2",
 			NamingHint:        "Role2",
+			Type:              ptr.String(access_provider.Role),
 			Who: &sync_from_target.WhoItem{
 				Users:           []string{"GranteeRole2"},
 				Groups:          []string{},
@@ -184,6 +357,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			NotInternalizable: true,
 			Name:              "Role3",
 			NamingHint:        "Role3",
+			Type:              ptr.String(access_provider.Role),
 			Who: &sync_from_target.WhoItem{
 				Users:           []string{},
 				Groups:          []string{},
@@ -202,9 +376,9 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			Who: &sync_from_target.WhoItem{
 				Users:           []string{},
 				Groups:          []string{},
-				AccessProviders: []string{"GranteeDatabaseRole1Number2", "DATABASEROLE###TEST_DB.DatabaseRole2"},
+				AccessProviders: []string{"GranteeDatabaseRole1Number2", "TEST_DB.DatabaseRole2"},
 			},
-			ActualName: "DATABASEROLE###TEST_DB.DatabaseRole1",
+			ActualName: "TEST_DB.DatabaseRole1",
 			What: []sync_from_target.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
@@ -223,7 +397,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			Action:           sync_from_target.Grant,
 			Policy:           "",
-			Type:             ptr.String("DATABASE_ROLE"),
+			Type:             ptr.String("databaseRole"),
 			WhoLocked:        ptr.Bool(true),
 			WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
 			WhatLocked:       ptr.Bool(true),
@@ -238,11 +412,11 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 				Groups:          []string{},
 				AccessProviders: []string{},
 			},
-			ActualName:       "DATABASEROLE###TEST_DB.DatabaseRole2",
+			ActualName:       "TEST_DB.DatabaseRole2",
 			What:             []sync_from_target.WhatItem{},
 			Action:           1,
 			Policy:           "",
-			Type:             ptr.String("DATABASE_ROLE"),
+			Type:             ptr.String("databaseRole"),
 			WhoLocked:        ptr.Bool(true),
 			WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
 			WhatLocked:       ptr.Bool(true),
@@ -257,7 +431,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 				Groups:          []string{},
 				AccessProviders: []string{},
 			},
-			ActualName: "DATABASEROLE###TEST_DB.DatabaseRole3",
+			ActualName: "TEST_DB.DatabaseRole3",
 			What: []sync_from_target.WhatItem{
 
 				{
@@ -270,7 +444,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			Action:           1,
 			Policy:           "",
-			Type:             ptr.String("DATABASE_ROLE"),
+			Type:             ptr.String("databaseRole"),
 			WhoLocked:        ptr.Bool(true),
 			WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
 			WhatLocked:       ptr.Bool(true),
@@ -315,7 +489,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 	repoMock.EXPECT().GetShares().Return([]DbEntity{
 		{Name: "Share1"}, {Name: "Share2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetDatabases().Return([]DbEntity{}, nil).Once()
 	repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
 		{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
 		{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner1"},
@@ -368,6 +541,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 	assert.Equal(t, []sync_from_target.AccessProvider{
 		{
 			ExternalId:        "Role1",
+			Type:              ptr.String(access_provider.Role),
 			NotInternalizable: false,
 			Name:              "Role1",
 			NamingHint:        "Role1",
@@ -397,6 +571,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
 			Policy: "",
 		}, {
 			ExternalId:              "Role3",
+			Type:                    ptr.String(access_provider.Role),
 			NotInternalizable:       false,
 			WhoLocked:               ptr.Bool(true),
 			InheritanceLocked:       ptr.Bool(true),
@@ -458,7 +633,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 	repoMock.EXPECT().GetShares().Return([]DbEntity{
 		{Name: "Share1"}, {Name: "Share2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetDatabases().Return([]DbEntity{}, nil).Once()
 
 	repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
 		{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
@@ -504,6 +678,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 	assert.Equal(t, []sync_from_target.AccessProvider{
 		{
 			ExternalId:        "Role1",
+			Type:              ptr.String(access_provider.Role),
 			NotInternalizable: false,
 			Name:              "Role1",
 			NamingHint:        "Role1",
@@ -533,6 +708,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 			Policy: "",
 		}, {
 			ExternalId:        "Role2",
+			Type:              ptr.String(access_provider.Role),
 			NotInternalizable: false,
 			Name:              "Role2",
 			NamingHint:        "Role2",
@@ -547,6 +723,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 			Policy:     "",
 		}, {
 			ExternalId:        "Role3",
+			Type:              ptr.String(access_provider.Role),
 			NotInternalizable: true,
 			Name:              "Role3",
 			NamingHint:        "Role3",
@@ -570,7 +747,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 func TestAccessSyncer_SyncAccessProvidersFromTarget_Excludes(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]string{SfExcludedRoles: "Role1,DatabaseRole1"},
+		Parameters: map[string]string{SfExcludedRoles: "Role1,DatabaseRole1", SfDatabaseRoles: "true"},
 	}
 
 	repoMock := newMockDataAccessRepository(t)
@@ -619,6 +796,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_Excludes(t *testing.T) {
 	assert.Equal(t, []sync_from_target.AccessProvider{
 		{
 			ExternalId:        "Role2",
+			Type:              ptr.String(access_provider.Role),
 			NotInternalizable: false,
 			Name:              "Role2",
 			NamingHint:        "Role2",
@@ -633,6 +811,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_Excludes(t *testing.T) {
 			Policy:     "",
 		}, {
 			ExternalId:        "TEST_DB.DatabaseRole2",
+			Type:              ptr.String("databaseRole"),
 			NotInternalizable: false,
 			Name:              "TEST_DB.DatabaseRole2",
 			NamingHint:        "TEST_DB.DatabaseRole2",
@@ -641,11 +820,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_Excludes(t *testing.T) {
 				Groups:          []string{},
 				AccessProviders: []string{},
 			},
-			ActualName:       "DATABASEROLE###TEST_DB.DatabaseRole2",
+			ActualName:       "TEST_DB.DatabaseRole2",
 			What:             []sync_from_target.WhatItem{},
 			Action:           1,
 			Policy:           "",
-			Type:             ptr.String("DATABASE_ROLE"),
 			WhoLocked:        ptr.Bool(true),
 			WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
 			WhatLocked:       ptr.Bool(true),
@@ -680,10 +858,14 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_ErrorOnConnectingToRepo(t *t
 func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]string{"key": "value"},
+		Parameters: map[string]string{"key": "value", SfDatabaseRoles: "true"},
 	}
 
-	rolesToRemove := map[string]*importer.AccessProvider{"ToRemove1": {Id: "xxx"}, "ToRemove2": {Id: "yyy"}, "DATABASEROLE###TEST_DB.ToRemoveDatabaseRole1": {Id: "zzz"}}
+	rolesToRemove := map[string]*importer.AccessProvider{
+		"ToRemove1":                     {Id: "xxx", Type: ptr.String(access_provider.Role), ExternalId: ptr.String("ToRemove1")},
+		"ToRemove2":                     {Id: "yyy", Type: ptr.String(access_provider.Role), ExternalId: ptr.String("ToRemove2")},
+		"TEST_DB.ToRemoveDatabaseRole1": {Id: "zzz", Type: ptr.String("databaseRole"), ExternalId: ptr.String("TEST_DB.ToRemoveDatabaseRole1")},
+	}
 
 	repoMock := newMockDataAccessRepository(t)
 	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
@@ -718,7 +900,7 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 
-	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, true, "TEST_DB", "DatabaseRole1", "DATABASEROLE###TEST_DB.DatabaseRole2")
+	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, true, "TEST_DB", "DatabaseRole1", "TEST_DB.DatabaseRole2")
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, false, "TEST_DB", "DatabaseRole1")
 
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, true, "TEST_DB", "DatabaseRole2")
@@ -757,8 +939,9 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 	}
 
 	ap1 := &importer.AccessProvider{
-		Id:   "AccessProviderId1",
-		Name: "AccessProvider1",
+		Id:         "AccessProviderId1",
+		Name:       "AccessProvider1",
+		ActualName: ptr.String("AccessProvider1"),
 		Who: importer.WhoItem{
 			Users: []string{"User1", "User2"},
 		},
@@ -794,7 +977,7 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 		Name: "TEST_DB.DatabaseRole1",
 		Type: ptr.String("databaseRole"),
 		Who: importer.WhoItem{
-			InheritFrom: []string{"DATABASEROLE###TEST_DB.DatabaseRole2"},
+			InheritFrom: []string{"TEST_DB.DatabaseRole2"},
 		},
 		What: []importer.WhatItem{
 			{DataObject: &data_source.DataObjectReference{FullName: "TEST_DB.Schema2.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
@@ -812,11 +995,11 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 	}
 
 	access := map[string]*importer.AccessProvider{
-		"RoleName1":                            ap1,
-		"ExistingRole1":                        ap2,
-		"RoleName3":                            ap3,
-		"DATABASEROLE###TEST_DB.DatabaseRole1": apDatabaseRole1,
-		"DATABASEROLE###TEST_DB.DatabaseRole2": apDatabaseRole2,
+		"RoleName1":             ap1,
+		"ExistingRole1":         ap2,
+		"RoleName3":             ap3,
+		"TEST_DB.DatabaseRole1": apDatabaseRole1,
+		"TEST_DB.DatabaseRole2": apDatabaseRole2,
 	}
 
 	//When
@@ -826,47 +1009,37 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []importer.AccessProviderSyncFeedback{{
 		AccessProvider: "xxx",
-		ActualName:     "ToRemove1",
 		ExternalId:     ptr.String("ToRemove1"),
 	},
 		{
 			AccessProvider: "yyy",
-			ActualName:     "ToRemove2",
 			ExternalId:     ptr.String("ToRemove2"),
 		},
 		{
 			AccessProvider: "zzz",
-			ActualName:     "DATABASEROLE###TEST_DB.ToRemoveDatabaseRole1",
-			ExternalId:     ptr.String("DATABASEROLE###TEST_DB.ToRemoveDatabaseRole1"),
+			ExternalId:     ptr.String("TEST_DB.ToRemoveDatabaseRole1"),
 		},
 		{
 			AccessProvider: "AccessProviderId2",
-			ActualName:     "ExistingRole1",
 			ExternalId:     ptr.String("ExistingRole1"),
-			Type:           ptr.String("role"),
 		},
 		{
 			AccessProvider: "AccessProviderId3",
-			ActualName:     "RoleName3",
 			ExternalId:     ptr.String("RoleName3"),
-			Type:           ptr.String("role"),
 		},
 		{
 			AccessProvider: "AccessProviderId1",
-			ActualName:     "RoleName1",
+			ActualName:     "AccessProvider1",
 			ExternalId:     ptr.String("RoleName1"),
-			Type:           ptr.String("role"),
 		},
 		{
 			AccessProvider: "AccessProviderId4",
-			ActualName:     "DATABASEROLE###TEST_DB.DatabaseRole1",
-			ExternalId:     ptr.String("DATABASEROLE###TEST_DB.DatabaseRole1"),
+			ExternalId:     ptr.String("TEST_DB.DatabaseRole1"),
 			Type:           ptr.String("databaseRole"),
 		},
 		{
 			AccessProvider: "AccessProviderId5",
-			ActualName:     "DATABASEROLE###TEST_DB.DatabaseRole2",
-			ExternalId:     ptr.String("DATABASEROLE###TEST_DB.DatabaseRole2"),
+			ExternalId:     ptr.String("TEST_DB.DatabaseRole2"),
 			Type:           ptr.String("databaseRole"),
 		},
 	}, feedbackHandler.AccessProviderFeedback)
@@ -912,7 +1085,7 @@ func TestAccessSyncer_SyncAccessProvidersToTarget_ErrorOnConnectionToRepo(t *tes
 func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]string{"key": "value"},
+		Parameters: map[string]string{"key": "value", SfDatabaseRoles: "true"},
 	}
 
 	repoMock := newMockDataAccessRepository(t)
@@ -967,6 +1140,7 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 	access := map[string]*importer.AccessProvider{
 		"AccessProvider1": {
 			Id:   "AccessProviderId1",
+			Type: ptr.String(access_provider.Role),
 			Name: "AccessProvider1",
 			Who: importer.WhoItem{
 				Users: []string{"User1", "User2"},
@@ -975,8 +1149,9 @@ func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
 			},
 		},
-		"DATABASEROLE###TEST_DB.DatabaseRole1": {
+		"TEST_DB.DatabaseRole1": {
 			Id:   "AccessProviderId2",
+			Type: ptr.String("databaseRole"),
 			Name: "TEST_DB.DatabaseRole1",
 			Who: importer.WhoItem{
 				InheritFrom: []string{"AccessProviderId1"},
@@ -1325,12 +1500,10 @@ func TestAccessSyncer_removeRolesToRemove_error(t *testing.T) {
 	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
 		{
 			AccessProvider: "xxx",
-			ActualName:     "Role1",
 			ExternalId:     ptr.String("Role1"),
 		},
 		{
 			AccessProvider: "yyy",
-			ActualName:     "Role2",
 			ExternalId:     ptr.String("Role2"),
 			Errors:         []string{"unable to drop role \"Role2\": BOOM"},
 		},
@@ -1889,9 +2062,10 @@ func generateAccessControls_existing_database(t *testing.T) {
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"SELECT"}},
 			},
 		},
-		"DATABASEROLE###DB1.DatabaseRole1": {
+		"DB1.DatabaseRole1": {
 			Id:   "DB1.DatabaseRole1",
 			Name: "DB1.DatabaseRole1",
+			Type: ptr.String("databaseRole"),
 			Who:  importer.WhoItem{},
 			What: []importer.WhatItem{
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"SELECT"}},
@@ -1900,7 +2074,7 @@ func generateAccessControls_existing_database(t *testing.T) {
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("RoleName1", "DATABASEROLE###DB1.DatabaseRole1"), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("RoleName1", "DB1.DatabaseRole1"), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -2029,9 +2203,9 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 
 	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "existingDBRole1").Return([]GrantToRole{}, nil).Once()
 
-	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, true, "TEST_DB", "existingDBRole1", "DATABASEROLE###TEST_DB.Role1")
+	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, true, "TEST_DB", "existingDBRole1", "TEST_DB.Role1")
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, false, "TEST_DB", "existingDBRole1")
-	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1", "DATABASEROLE###TEST_DB.Role3").Return(nil).Once()
+	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1", "TEST_DB.Role3").Return(nil).Once()
 	repoMock.EXPECT().RevokeAccountRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1").Return(nil).Once()
 
 	syncer := AccessSyncer{
@@ -2054,20 +2228,20 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
 			},
 		},
-		"DATABASEROLE###TEST_DB.existingDBRole1": {
+		"TEST_DB.existingDBRole1": {
 			Id:         "TEST_DB_existingDBRole1",
 			Name:       "TEST_DB.existingDBRole1",
-			ActualName: ptr.String("DATABASEROLE###TEST_DB.existingDBRole1"),
+			ActualName: ptr.String("TEST_DB.existingDBRole1"),
 			Who: importer.WhoItem{
-				InheritFrom: []string{"DATABASEROLE###TEST_DB.Role1", "DATABASEROLE###TEST_DB.Role2"},
+				InheritFrom: []string{"TEST_DB.Role1", "TEST_DB.Role2"},
 			},
 			What: []importer.WhatItem{},
-			Type: ptr.String("DATABASE_ROLE"),
+			Type: ptr.String("databaseRole"),
 		},
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("existingRole1", "DATABASEROLE###TEST_DB.existingDBRole1"), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("existingRole1", "TEST_DB.existingDBRole1"), map[string]string{}, repoMock, &config.ConfigMap{}, &dummyFeedbackHandler{})
 
 	//Then
 	assert.NoError(t, err)
@@ -2184,19 +2358,20 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 				Users: []string{"User1"},
 			},
 		},
-		"DATABASEROLE###TEST_DB.newDBRole": {
-			Id:   "TEST_DB_DBRole",
-			Name: "TEST_DB.DBRole",
+		"TEST_DB.newDBRole": {
+			Id:         "TEST_DB_DBRole",
+			ActualName: ptr.String("anActualName"),
+			Name:       "TEST_DB.DBRole",
 			Who: importer.WhoItem{
-				InheritFrom: []string{"DATABASEROLE###TEST_DB.Role1", "DATABASEROLE###TEST_DB.Role2"},
+				InheritFrom: []string{"TEST_DB.Role1", "TEST_DB.Role2"},
 			},
 			What: []importer.WhatItem{},
-			Type: ptr.String("DATABASE_ROLE"),
+			Type: ptr.String("databaseRole"),
 		},
 	}
 
 	//When
-	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName", "DATABASEROLE###TEST_DB.oldDBRole"), map[string]string{"NewRoleName": "OldRoleName", "DATABASEROLE###TEST_DB.newDBRole": "DATABASEROLE###TEST_DB.oldDBRole"}, repoMock, &config.ConfigMap{}, feedbackHandler)
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName", "TEST_DB.oldDBRole"), map[string]string{"NewRoleName": "OldRoleName", "TEST_DB.newDBRole": "TEST_DB.oldDBRole"}, repoMock, &config.ConfigMap{}, feedbackHandler)
 
 	//Then
 	assert.NoError(t, err)
@@ -2204,14 +2379,12 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
 		{
 			AccessProvider: "AccessProviderId",
-			ActualName:     "NewRoleName",
 			ExternalId:     ptr.String("NewRoleName"),
-			Type:           ptr.String("role"),
 		}, {
 			AccessProvider: "TEST_DB_DBRole",
-			ActualName:     "DATABASEROLE###TEST_DB.newDBRole",
-			ExternalId:     ptr.String("DATABASEROLE###TEST_DB.newDBRole"),
-			Type:           ptr.String("DATABASE_ROLE"),
+			ActualName:     "anActualName",
+			ExternalId:     ptr.String("TEST_DB.newDBRole"),
+			Type:           ptr.String("databaseRole"),
 		},
 	})
 }
@@ -2240,6 +2413,7 @@ func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
 		"NewRoleName": {
 			Id:   "AccessProviderId",
 			Name: "AccessProvider",
+			Type: ptr.String(access_provider.Role),
 			Who: importer.WhoItem{
 				Users: []string{"User1"},
 			},
@@ -2255,9 +2429,8 @@ func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
 	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
 		{
 			AccessProvider: "AccessProviderId",
-			ActualName:     "NewRoleName",
 			ExternalId:     ptr.String("NewRoleName"),
-			Type:           ptr.String("role"),
+			Type:           ptr.String(access_provider.Role),
 		},
 	})
 }
@@ -2309,15 +2482,11 @@ func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T)
 	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
 		{
 			AccessProvider: "AccessProviderId",
-			ActualName:     "NewRoleName",
 			ExternalId:     ptr.String("NewRoleName"),
-			Type:           ptr.String("role"),
 		},
 		{
 			AccessProvider: "AccessProviderId2",
-			ActualName:     "OldRoleName",
 			ExternalId:     ptr.String("OldRoleName"),
-			Type:           ptr.String("role"),
 		},
 	})
 }
@@ -2371,8 +2540,12 @@ func Test_filterExpressionOfPolicyRule(t *testing.T) {
 }
 
 func Test_IsNotInternalizableRole(t *testing.T) {
+	apTypeAccountRole := ptr.String(access_provider.Role)
+	apTypeDatabaseRole := ptr.String("databaseRole")
+
 	type args struct {
 		roleName string
+		roleType *string
 	}
 	tests := []struct {
 		name string
@@ -2383,6 +2556,7 @@ func Test_IsNotInternalizableRole(t *testing.T) {
 			name: "account role - internalizable",
 			args: args{
 				roleName: "TEST",
+				roleType: apTypeAccountRole,
 			},
 			want: false,
 		},
@@ -2390,46 +2564,54 @@ func Test_IsNotInternalizableRole(t *testing.T) {
 			name: "account role - not internalizable",
 			args: args{
 				roleName: "ORGADMIN",
+				roleType: apTypeAccountRole,
 			},
 			want: true,
 		},
 		{
 			name: "database role - internalizable",
 			args: args{
-				roleName: "DATABASEROLE###TEST_DB.DatabaseRole1",
+				roleName: "TEST_DB.DatabaseRole1",
+				roleType: apTypeDatabaseRole,
 			},
 			want: false,
 		},
 		{
 			name: "database role - not internalizable",
 			args: args{
-				roleName: "DATABASEROLE###TEST_DB.SYSADMIN",
+				roleName: "TEST_DB.SYSADMIN",
+				roleType: apTypeDatabaseRole,
 			},
 			want: true,
 		},
 		{
 			name: "database role - invalid",
 			args: args{
-				roleName: "DATABASEROLE###BLAAT",
+				roleName: "BLAAT",
+				roleType: apTypeDatabaseRole,
 			},
 			want: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isNotInternalizableRole(tt.args.roleName)
+			got := isNotInternalizableRole(tt.args.roleName, tt.args.roleType)
 			assert.Equalf(t, tt.want, got, "isNotInternalizableRole(%v)", tt.args.roleName)
 		})
 	}
 }
 
 func Test_RenameRole(t *testing.T) {
+	apTypeAccountRole := ptr.String(access_provider.Role)
+	apTypeDatabaseRole := ptr.String("databaseRole")
+
 	type fields struct {
 		setup func(repoMock *mockDataAccessRepository, feedbackHandlerMock *mocks.SimpleAccessProviderFeedbackHandler)
 	}
 	type args struct {
 		oldName string
 		newName string
+		apType  *string
 	}
 	tests := []struct {
 		name    string
@@ -2447,6 +2629,7 @@ func Test_RenameRole(t *testing.T) {
 			args: args{
 				oldName: "test",
 				newName: "test2",
+				apType:  apTypeAccountRole,
 			},
 			wantErr: require.NoError,
 		},
@@ -2458,8 +2641,9 @@ func Test_RenameRole(t *testing.T) {
 				},
 			},
 			args: args{
-				oldName: "DATABASEROLE###TEST_DB.oldDBRole",
-				newName: "DATABASEROLE###TEST_DB.newDBRole",
+				oldName: "TEST_DB.oldDBRole",
+				newName: "TEST_DB.newDBRole",
+				apType:  apTypeDatabaseRole,
 			},
 			wantErr: require.NoError,
 		},
@@ -2470,8 +2654,9 @@ func Test_RenameRole(t *testing.T) {
 				},
 			},
 			args: args{
-				oldName: "DATABASEROLE###TEST_DB1.oldDBRole",
-				newName: "DATABASEROLE###TEST_DB2.newDBRole",
+				oldName: "TEST_DB1.oldDBRole",
+				newName: "TEST_DB2.newDBRole",
+				apType:  apTypeDatabaseRole,
 			},
 			wantErr: require.Error,
 		},
@@ -2482,8 +2667,9 @@ func Test_RenameRole(t *testing.T) {
 				},
 			},
 			args: args{
-				oldName: "DATABASEROLE###oldDBRole",
-				newName: "DATABASEROLE###TEST_DB.newDBRole",
+				oldName: "oldDBRole",
+				newName: "TEST_DB.newDBRole",
+				apType:  apTypeDatabaseRole,
 			},
 			wantErr: require.Error,
 		},
@@ -2494,8 +2680,9 @@ func Test_RenameRole(t *testing.T) {
 				},
 			},
 			args: args{
-				oldName: "DATABASEROLE###TEST_DB.oldDBRole",
-				newName: "DATABASEROLE###newDBRole",
+				oldName: "TEST_DB.oldDBRole",
+				newName: "newDBRole",
+				apType:  apTypeDatabaseRole,
 			},
 			wantErr: require.Error,
 		},
@@ -2506,8 +2693,9 @@ func Test_RenameRole(t *testing.T) {
 				},
 			},
 			args: args{
-				oldName: "DATABASEROLE###TEST_DB.oldDBRole",
+				oldName: "TEST_DB.oldDBRole",
 				newName: "newDBRole",
+				apType:  apTypeDatabaseRole,
 			},
 			wantErr: require.Error,
 		},
@@ -2519,7 +2707,8 @@ func Test_RenameRole(t *testing.T) {
 			},
 			args: args{
 				oldName: "oldDBRole",
-				newName: "DATABASEROLE###TEST_DB.newDBRole",
+				newName: "TEST_DB.newDBRole",
+				apType:  apTypeDatabaseRole,
 			},
 			wantErr: require.Error,
 		},
@@ -2542,7 +2731,7 @@ func Test_RenameRole(t *testing.T) {
 			}
 
 			// When
-			err := syncer.renameRole(tt.args.oldName, tt.args.newName, repoMock)
+			err := syncer.renameRole(tt.args.oldName, tt.args.newName, tt.args.apType, repoMock)
 
 			// Then
 			tt.wantErr(t, err)
