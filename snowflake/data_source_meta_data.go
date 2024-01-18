@@ -382,6 +382,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						Permission:             "REFERENCES",
 						Description:            "Enables referencing a table as the unique/primary key table for a foreign key constraint. Also enables viewing the structure of a table (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
 						UsageGlobalPermissions: []string{ds.Admin},
+						GlobalPermissions:      ds.AdminGlobalPermission().StringValues(),
 					},
 					{
 						Permission:             "OWNERSHIP",
