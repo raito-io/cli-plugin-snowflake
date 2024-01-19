@@ -1113,7 +1113,7 @@ func (s *AccessSyncer) createGrantsForTableOrView(doType string, permissions []s
 		if _, f := metaData[doType][strings.ToUpper(p)]; f {
 			grants = append(grants, Grant{p, doType, common.FormatQuery(`%s.%s.%s`, *sfObject.Database, *sfObject.Schema, *sfObject.Table)})
 		} else {
-			logger.Warn("Permission %q does not apply to type %s", p, strings.ToUpper(doType))
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(doType)))
 		}
 	}
 
@@ -1224,7 +1224,7 @@ func (s *AccessSyncer) createGrantsForSchema(repo dataAccessRepository, permissi
 		}
 
 		if !permissionMatchFound {
-			logger.Warn("Permission %q does not apply to type SCHEMA or any of its descendants. Skipping", p)
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type SCHEMA or any of its descendants. Skipping", p))
 		}
 	}
 
@@ -1341,7 +1341,7 @@ func (s *AccessSyncer) createGrantsForDatabase(repo dataAccessRepository, permis
 		}
 
 		if !databaseMatchFound {
-			logger.Warn("Permission %q does not apply to type DATABASE or any of its descendants. Skipping", p)
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type DATABASE or any of its descendants. Skipping", p))
 		}
 	}
 
@@ -1360,7 +1360,7 @@ func (s *AccessSyncer) createGrantsForWarehouse(permissions []string, warehouse 
 
 	for _, p := range permissions {
 		if _, f := metaData["warehouse"][strings.ToUpper(p)]; !f {
-			logger.Warn("Permission %q does not apply to type WAREHOUSE. Skipping", p)
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type WAREHOUSE. Skipping", p))
 			continue
 		}
 
@@ -1425,7 +1425,7 @@ func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permiss
 		}
 
 		if !matchFound {
-			logger.Warn("Permission %q does not apply to type ACCOUNT (datasource) or any of its descendants. Skipping", p)
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type ACCOUNT (datasource) or any of its descendants. Skipping", p))
 			continue
 		}
 	}

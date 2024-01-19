@@ -392,7 +392,8 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 					{
 						Permission:             "REFERENCES",
 						Description:            "Enables referencing a table as the unique/primary key table for a foreign key constraint. Also enables viewing the structure of a table (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
-						UsageGlobalPermissions: []string{ds.Admin},
+						UsageGlobalPermissions: []string{ds.Read},
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
 					},
 					{
 						Permission:             "OWNERSHIP",
@@ -442,6 +443,12 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
 						CannotBeGranted:        true,
 					},
+					{
+						Permission:             "REFERENCES",
+						Description:            "Enables referencing a table as the unique/primary key table for a foreign key constraint. Also enables viewing the structure of a table (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
+						UsageGlobalPermissions: []string{ds.Read},
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
+					},
 				},
 				Actions: []*ds.DataObjectTypeAction{
 					{
@@ -462,8 +469,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 					},
 					{
 						Permission:             "REFERENCES",
-						Description:            "Enables viewing the structure of a view (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
-						UsageGlobalPermissions: []string{ds.Admin},
+						Description:            "Enables referencing a table as the unique/primary key table for a foreign key constraint. Also enables viewing the structure of a table (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
+						UsageGlobalPermissions: []string{ds.Read},
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
 					},
 					{
 						Permission:             "OWNERSHIP",
@@ -493,8 +501,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 					},
 					{
 						Permission:             "REFERENCES",
-						Description:            "Enables viewing the structure of a view (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
-						UsageGlobalPermissions: []string{ds.Admin},
+						Description:            "Enables referencing a table as the unique/primary key table for a foreign key constraint. Also enables viewing the structure of a table (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
+						UsageGlobalPermissions: []string{ds.Read},
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
 					},
 					{
 						Permission:             "OWNERSHIP",
