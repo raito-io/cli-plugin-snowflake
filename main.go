@@ -6,11 +6,9 @@ import (
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/raito-io/cli/base"
 	"github.com/raito-io/cli/base/access_provider"
-	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	"github.com/raito-io/cli/base/info"
 	"github.com/raito-io/cli/base/util/plugin"
 	"github.com/raito-io/cli/base/wrappers"
-	"github.com/raito-io/cli/base/wrappers/role_based"
 
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
 )
@@ -19,15 +17,6 @@ var version = "0.0.0"
 
 var logger hclog.Logger
 
-// https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
-var roleNameConstraints = naming_hint.NamingConstraints{
-	UpperCaseLetters:  true,
-	LowerCaseLetters:  false,
-	Numbers:           true,
-	SpecialCharacters: "_$.",
-	MaxLength:         255,
-}
-
 func main() {
 	logger = base.Logger()
 	logger.SetLevel(hclog.Debug)
@@ -35,7 +24,7 @@ func main() {
 	err := base.RegisterPlugins(
 		wrappers.IdentityStoreSync(snowflake.NewIdentityStoreSyncer()),
 		wrappers.DataSourceSync(snowflake.NewDataSourceSyncer()),
-		role_based.AccessProviderRoleSync(snowflake.NewDataAccessSyncer(), roleNameConstraints, access_provider.WithSupportPartialSync()),
+		wrappers.DataAccessSync(snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints), access_provider.WithSupportPartialSync()),
 		wrappers.DataUsageSync(snowflake.NewDataUsageSyncer()),
 		&info.InfoImpl{
 			Info: &plugin.PluginInfo{

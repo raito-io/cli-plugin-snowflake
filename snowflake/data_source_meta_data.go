@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/raito-io/cli/base/access_provider"
+	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
 )
@@ -11,6 +12,15 @@ import (
 const apTypeDatabaseRole = "databaseRole"
 const ExternalTable = "external-" + ds.Table
 const MaterializedView = "materialized-" + ds.View
+
+// RoleNameConstraints is based onhttps://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
+var RoleNameConstraints = naming_hint.NamingConstraints{
+	UpperCaseLetters:  true,
+	LowerCaseLetters:  false,
+	Numbers:           true,
+	SpecialCharacters: "_$",
+	MaxLength:         255,
+}
 
 func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam *config.ConfigMap) (*ds.MetaData, error) {
 	logger.Debug("Returning meta data for Snowflake data source")

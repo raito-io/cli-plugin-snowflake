@@ -39,8 +39,8 @@ func TestDataAccessTestSuite(t *testing.T) {
 
 func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	//Given
-	dataAccessProviderHandler := mocks.NewSimpleAccessProviderHandler(s.T(), 1)
-	dataAccessSyncer := snowflake.NewDataAccessSyncer()
+	dataAccessProviderHandler := mocks.NewSimpleAccessProviderHandler(s.T(), 6)
+	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
 
 	config := s.getConfig()
 
@@ -64,8 +64,8 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	s.Contains(externalIds, "SECURITYADMIN")
 	s.Contains(externalIds, "USERADMIN")
 	s.Contains(externalIds, "PUBLIC")
-	s.Contains(externalIds, "SNOWFLAKE_INTEGRATION_TEST.IT_TEST_ROLE1")
-	s.Contains(externalIds, "SNOWFLAKE_INTEGRATION_TEST.IT_TEST_ROLE2")
+	s.Contains(externalIds, "DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:IT_TEST_ROLE1")
+	s.Contains(externalIds, "DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:IT_TEST_ROLE2")
 }
 
 func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
@@ -80,8 +80,8 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	DatabaseRoleName1 := generateRole("TESTDATABASEROLE1", "")
 	DatabaseRoleName2 := generateRole("TESTDATABASEROLE2", "")
 
-	DatabaseRoleActualName1 := fmt.Sprintf("SNOWFLAKE_INTEGRATION_TEST.%s", DatabaseRoleName1)
-	DatabaseRoleActualName2 := fmt.Sprintf("SNOWFLAKE_INTEGRATION_TEST.%s", DatabaseRoleName2)
+	DatabaseRoleActualName1 := fmt.Sprintf("DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:%s", DatabaseRoleName1)
+	DatabaseRoleActualName2 := fmt.Sprintf("DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:%s", DatabaseRoleName2)
 
 	access := map[string]*sync_to_target.AccessProvider{
 		actualRoleName: {
@@ -136,7 +136,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		},
 	}
 
-	dataAccessSyncer := snowflake.NewDataAccessSyncer()
+	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
 
 	config := s.getConfig()
 
@@ -150,7 +150,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
 
 	s.Len(accessProviderFeedback, 3)
-	s.Equal([]sync_to_target.AccessProviderSyncFeedback{
+	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
 		{
 			AccessProvider: AccountRoleId,
 			ExternalId:     &actualRoleName,
@@ -248,7 +248,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	accessProviderFeedback = filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
 
 	s.Len(accessProviderFeedback, 2)
-	s.Equal([]sync_to_target.AccessProviderSyncFeedback{
+	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
 		{
 			AccessProvider: AccountRoleId,
 			ExternalId:     &actualRoleName,
@@ -319,38 +319,41 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 
 func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	//Given
-	prefix := fmt.Sprintf("%s$AAC_", testId)
+	prefix := fmt.Sprintf("%s$AAC", testId)
 
-	actualRoleName := generateRole("TESTROLE1", prefix)
+	actualRoleName := "TESTROLE1"
+	actualRoleNamePrefixed := generateRole("TESTROLE1", prefix)
 
-	access := map[string]*sync_to_target.AccessProvider{
-		actualRoleName: {
-			Id:          fmt.Sprintf("%s_ap_id1", testId),
-			Name:        fmt.Sprintf("%s_ap1", testId),
-			Action:      sync_to_target.Grant,
-			NamingHint:  actualRoleName,
-			Delete:      false,
-			Description: fmt.Sprintf("Integration testing for test %s", testId),
-			Who: sync_to_target.WhoItem{
-				Users: []string{snowflakeUserName},
-			},
-			What: []sync_to_target.WhatItem{
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
-						Type:     "table",
+	apImport := &sync_to_target.AccessProviderImport{
+		AccessProviders: []*sync_to_target.AccessProvider{
+			{
+				Id:          fmt.Sprintf("%s_ap_id1", testId),
+				Name:        fmt.Sprintf("%s_ap1", testId),
+				Action:      sync_to_target.Grant,
+				NamingHint:  actualRoleName,
+				Delete:      false,
+				Description: fmt.Sprintf("Integration testing for test %s", testId),
+				Who: sync_to_target.WhoItem{
+					Users: []string{snowflakeUserName},
+				},
+				What: []sync_to_target.WhatItem{
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+							Type:     "table",
+						},
+						Permissions: []string{"SELECT"},
 					},
-					Permissions: []string{"SELECT"},
 				},
 			},
 		},
 	}
-	dataAccessSyncer := snowflake.NewDataAccessSyncer()
+	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
 
 	config := s.getConfig()
 
 	//When
-	err := dataAccessSyncer.SyncAccessAsCodeToTarget(context.Background(), access, prefix, config)
+	err := dataAccessSyncer.SyncAccessAsCodeToTarget(context.Background(), apImport, prefix, config)
 
 	//Then
 	s.NoError(err)
@@ -358,7 +361,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	roles, err := s.sfRepo.GetAccountRoles()
 	s.NoError(err)
 	s.Contains(roles, snowflake.RoleEntity{
-		Name:            actualRoleName,
+		Name:            actualRoleNamePrefixed,
 		AssignedToUsers: 1,
 		GrantedToRoles:  0,
 		GrantedRoles:    0,
@@ -366,10 +369,10 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	})
 
 	//Given
-	access = make(map[string]*sync_to_target.AccessProvider)
+	apImport.AccessProviders = []*sync_to_target.AccessProvider{}
 
 	//When
-	err = dataAccessSyncer.SyncAccessAsCodeToTarget(context.Background(), access, prefix, config)
+	err = dataAccessSyncer.SyncAccessAsCodeToTarget(context.Background(), apImport, prefix, config)
 
 	//Then
 	s.NoError(err)
@@ -377,7 +380,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessAsCodeToTarget() {
 	roles, err = s.sfRepo.GetAccountRoles()
 	s.NoError(err)
 	s.NotContains(roles, snowflake.RoleEntity{
-		Name:            actualRoleName,
+		Name:            actualRoleNamePrefixed,
 		AssignedToUsers: 1,
 		GrantedToRoles:  0,
 		GrantedRoles:    0,
@@ -423,7 +426,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 		},
 	}
 
-	dataAccessSyncer := snowflake.NewDataAccessSyncer()
+	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
 
 	config := s.getConfig()
 
