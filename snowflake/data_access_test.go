@@ -852,39 +852,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_ErrorOnShares(t *testing.T) 
 	assert.Error(t, err)
 }
 
-func TestAccessSyncer_SyncAccessProvidersToTarget_ErrorOnConnectionToRepo(t *testing.T) {
-	//Given
-	configParams := config.ConfigMap{
-		Parameters: map[string]string{"key": "value"},
-	}
-
-	repoMock := newMockDataAccessRepository(t)
-	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
-
-	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-		return nil, fmt.Errorf("boom")
-	})
-
-	access := map[string]*importer.AccessProvider{
-		"RoleName1": {
-			Id:   "AccessProviderId1",
-			Name: "AccessProvider1",
-			Who: importer.WhoItem{
-				Users: []string{"User1", "User2"},
-			},
-			What: []importer.WhatItem{
-				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "TABLE"}, Permissions: []string{"SELECT"}},
-			},
-		},
-	}
-
-	//When
-	err := syncer.SyncAccessProviderRolesToTarget(context.Background(), map[string]*importer.AccessProvider{"roleToRemove1": {Id: "xxx"}}, access, feedbackHandler, &configParams, repoMock)
-
-	//Then
-	assert.Error(t, err)
-}
-
 func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 	type fields struct {
 		setup             func(repoMock *mockDataAccessRepository, feedbackHandlerMock *mocks.SimpleAccessProviderFeedbackHandler)

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/bexpression"
@@ -38,8 +37,6 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 	repoMock := newMockDataAccessRepository(t)
 	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
 
-	repoMock.EXPECT().Close().Return(nil).Once()
-	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
 	repoMock.EXPECT().DropAccountRole("ToRemove1").Return(nil).Once()
 	repoMock.EXPECT().DropAccountRole("ToRemove2").Return(nil).Once()
 	repoMock.EXPECT().DropDatabaseRole("TEST_DB", "ToRemoveDatabaseRole1").Return(nil).Once()
