@@ -72,67 +72,67 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	//Given
 	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
-	rolesToRemove := map[string]*sync_to_target.AccessProvider{}
+	actualRoleName := generateRole("TESTROLE1", testId)
+	accountRoleId := fmt.Sprintf("%s_ACCOUNT_ID1", testId)
 
-	actualRoleName := generateRole("TESTROLE1", "")
-	AccountRoleId := fmt.Sprintf("%s_ACCOUNT_ID1", testId)
+	databaseRoleName1 := generateRole("TESTDATABASEROLE1", testId)
+	databaseRoleName2 := generateRole("TESTDATABASEROLE2", testId)
 
-	DatabaseRoleName1 := generateRole("TESTDATABASEROLE1", "")
-	DatabaseRoleName2 := generateRole("TESTDATABASEROLE2", "")
+	databaseRoleExternalId1 := fmt.Sprintf("DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:%s", databaseRoleName1)
+	databaseRoleExternalId2 := fmt.Sprintf("DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:%s", databaseRoleName2)
 
-	DatabaseRoleActualName1 := fmt.Sprintf("DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:%s", DatabaseRoleName1)
-	DatabaseRoleActualName2 := fmt.Sprintf("DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:%s", DatabaseRoleName2)
-
-	access := map[string]*sync_to_target.AccessProvider{
-		actualRoleName: {
-			Id:          AccountRoleId,
-			Name:        fmt.Sprintf("%s_ap1", testId),
-			Action:      sync_to_target.Grant,
-			NamingHint:  actualRoleName,
-			Delete:      false,
-			Description: fmt.Sprintf("Integration testing for test %s", testId),
-			Who: sync_to_target.WhoItem{
-				Users: []string{snowflakeUserName},
-			},
-			What: []sync_to_target.WhatItem{
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
-						Type:     "table",
+	accessProviderImport := &sync_to_target.AccessProviderImport{
+		AccessProviders: []*sync_to_target.AccessProvider{
+			{
+				Id:          accountRoleId,
+				Name:        fmt.Sprintf("%s_ap1", testId),
+				Action:      sync_to_target.Grant,
+				NamingHint:  actualRoleName,
+				Delete:      false,
+				Description: fmt.Sprintf("Integration testing for test %s", testId),
+				Who: sync_to_target.WhoItem{
+					Users: []string{snowflakeUserName},
+				},
+				What: []sync_to_target.WhatItem{
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+							Type:     "table",
+						},
+						Permissions: []string{"SELECT"},
 					},
-					Permissions: []string{"SELECT"},
 				},
 			},
-		},
-		DatabaseRoleActualName1: {
-			Id:          fmt.Sprintf("%s_TESTDATABASEROLE1_ID1", testId),
-			Name:        fmt.Sprintf("%s.TESTDATABASEROLE1_ID1", testId),
-			Action:      sync_to_target.Grant,
-			NamingHint:  DatabaseRoleActualName1,
-			ActualName:  &DatabaseRoleActualName1,
-			Delete:      false,
-			Description: fmt.Sprintf("Integration testing for test %s", testId),
-			Who:         sync_to_target.WhoItem{},
-			Type:        ptr.String("databaseRole"),
-			What:        []sync_to_target.WhatItem{},
-			WhoLocked:   ptr.Bool(true),
-		},
-		DatabaseRoleActualName2: {
-			Id:          fmt.Sprintf("%s_TESTDATABASEROLE1_ID2", testId),
-			Name:        fmt.Sprintf("%s.TESTDATABASEROLE1_ID2", testId),
-			Action:      sync_to_target.Grant,
-			NamingHint:  DatabaseRoleActualName2,
-			ActualName:  &DatabaseRoleActualName2,
-			Delete:      false,
-			Description: fmt.Sprintf("Integration testing for test %s", testId),
-			Who: sync_to_target.WhoItem{
-				InheritFrom: []string{
-					fmt.Sprintf("ID:%s", AccountRoleId),
-				},
+			{
+				Id:          databaseRoleName1,
+				Name:        databaseRoleName1,
+				Action:      sync_to_target.Grant,
+				NamingHint:  fmt.Sprintf("%s.%s", "SNOWFLAKE_INTEGRATION_TEST", databaseRoleName1),
+				ActualName:  ptr.String(databaseRoleName1),
+				Delete:      false,
+				Description: fmt.Sprintf("Integration testing for test %s", testId),
+				Who:         sync_to_target.WhoItem{},
+				Type:        ptr.String("databaseRole"),
+				What:        []sync_to_target.WhatItem{},
+				WhoLocked:   ptr.Bool(true),
 			},
-			Type:      ptr.String("databaseRole"),
-			What:      []sync_to_target.WhatItem{},
-			WhoLocked: ptr.Bool(true),
+			{
+				Id:          databaseRoleName2,
+				Name:        databaseRoleName2,
+				NamingHint:  fmt.Sprintf("%s.%s", "SNOWFLAKE_INTEGRATION_TEST", databaseRoleName2),
+				Action:      sync_to_target.Grant,
+				ActualName:  ptr.String(databaseRoleName2),
+				Delete:      false,
+				Description: fmt.Sprintf("Integration testing for test %s", testId),
+				Who: sync_to_target.WhoItem{
+					InheritFrom: []string{
+						fmt.Sprintf("ID:%s", accountRoleId),
+					},
+				},
+				Type:      ptr.String("databaseRole"),
+				What:      []sync_to_target.WhatItem{},
+				WhoLocked: ptr.Bool(true),
+			},
 		},
 	}
 
@@ -141,7 +141,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	config := s.getConfig()
 
 	//When
-	err := dataAccessSyncer.SyncAccessProviderRolesToTarget(context.Background(), rolesToRemove, access, dataAccessFeedbackHandler, config)
+	err := dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
@@ -152,19 +152,19 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	s.Len(accessProviderFeedback, 3)
 	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
 		{
-			AccessProvider: AccountRoleId,
+			AccessProvider: accountRoleId,
 			ExternalId:     &actualRoleName,
 		},
 		{
-			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1_ID1", testId),
-			ActualName:     DatabaseRoleActualName1,
-			ExternalId:     &DatabaseRoleActualName1,
+			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1", testId),
+			ActualName:     databaseRoleName1,
+			ExternalId:     &databaseRoleExternalId1,
 			Type:           ptr.String("databaseRole"),
 		},
 		{
-			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1_ID2", testId),
-			ActualName:     DatabaseRoleActualName2,
-			ExternalId:     &DatabaseRoleActualName2,
+			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE2", testId),
+			ActualName:     databaseRoleName2,
+			ExternalId:     &databaseRoleExternalId2,
 			Type:           ptr.String("databaseRole"),
 		},
 	}, accessProviderFeedback)
@@ -182,14 +182,14 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	databaseRoles, err := s.sfRepo.GetDatabaseRoles("SNOWFLAKE_INTEGRATION_TEST")
 	s.NoError(err)
 	s.Contains(databaseRoles, snowflake.RoleEntity{
-		Name:            DatabaseRoleName1,
+		Name:            databaseRoleName1,
 		AssignedToUsers: 0,
 		GrantedToRoles:  0,
 		GrantedRoles:    0,
 		Owner:           "ACCOUNTADMIN",
 	})
 	s.Contains(databaseRoles, snowflake.RoleEntity{
-		Name:            DatabaseRoleName2,
+		Name:            databaseRoleName2,
 		AssignedToUsers: 0,
 		GrantedToRoles:  1,
 		GrantedRoles:    0,
@@ -199,12 +199,13 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	//Update database role 1 to attach it to the account role
 	//Given
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
-	access = map[string]*sync_to_target.AccessProvider{
-		actualRoleName: {
-			Id:          AccountRoleId,
+	accessProviderImport.AccessProviders = []*sync_to_target.AccessProvider{
+		{
+			Id:          accountRoleId,
 			Name:        fmt.Sprintf("%s_ap1", testId),
 			Action:      sync_to_target.Grant,
 			NamingHint:  actualRoleName,
+			ExternalId:  &actualRoleName,
 			Delete:      false,
 			Description: fmt.Sprintf("Integration testing for test %s", testId),
 			Who: sync_to_target.WhoItem{
@@ -220,26 +221,29 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 				},
 			},
 		},
-		DatabaseRoleActualName1: {
-			Id:          fmt.Sprintf("%s_TESTDATABASEROLE1_ID1", testId),
-			Name:        fmt.Sprintf("%s.TESTDATABASEROLE1_ID1", testId),
+		{
+			Id:          databaseRoleName1,
+			Name:        databaseRoleName1,
 			Action:      sync_to_target.Grant,
-			NamingHint:  DatabaseRoleActualName1,
-			ActualName:  &DatabaseRoleActualName1,
+			ExternalId:  &databaseRoleExternalId1,
+			NamingHint:  fmt.Sprintf("%s.%s", "SNOWFLAKE_INTEGRATION_TEST", databaseRoleName1),
+			ActualName:  ptr.String(databaseRoleName1),
 			Delete:      false,
 			Description: fmt.Sprintf("Integration testing for test %s", testId),
 			Who: sync_to_target.WhoItem{
 				InheritFrom: []string{
-					fmt.Sprintf("ID:%s", AccountRoleId),
+					fmt.Sprintf("ID:%s", accountRoleId),
 				},
 			},
 			Type:      ptr.String("databaseRole"),
 			What:      []sync_to_target.WhatItem{},
 			WhoLocked: ptr.Bool(true),
-		}}
+		},
+	}
 
 	//When
-	err = dataAccessSyncer.SyncAccessProviderRolesToTarget(context.Background(), rolesToRemove, access, dataAccessFeedbackHandler, config)
+	dataAccessSyncer = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
+	err = dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
@@ -250,13 +254,13 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	s.Len(accessProviderFeedback, 2)
 	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
 		{
-			AccessProvider: AccountRoleId,
+			AccessProvider: accountRoleId,
 			ExternalId:     &actualRoleName,
 		},
 		{
-			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1_ID1", testId),
-			ActualName:     DatabaseRoleActualName1,
-			ExternalId:     &DatabaseRoleActualName1,
+			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1", testId),
+			ActualName:     databaseRoleName1,
+			ExternalId:     &databaseRoleExternalId1,
 			Type:           ptr.String("databaseRole"),
 		},
 	}, accessProviderFeedback)
@@ -274,14 +278,14 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	databaseRoles, err = s.sfRepo.GetDatabaseRoles("SNOWFLAKE_INTEGRATION_TEST")
 	s.NoError(err)
 	s.Contains(databaseRoles, snowflake.RoleEntity{
-		Name:            DatabaseRoleName1,
+		Name:            databaseRoleName1,
 		AssignedToUsers: 0,
 		GrantedToRoles:  1,
 		GrantedRoles:    0,
 		Owner:           "ACCOUNTADMIN",
 	})
 	s.Contains(databaseRoles, snowflake.RoleEntity{
-		Name:            DatabaseRoleName2,
+		Name:            databaseRoleName2,
 		AssignedToUsers: 0,
 		GrantedToRoles:  1,
 		GrantedRoles:    0,
@@ -289,13 +293,35 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	})
 
 	//Given
-	id := AccountRoleId
+	id := accountRoleId
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
-	rolesToRemove = map[string]*sync_to_target.AccessProvider{actualRoleName: {Id: id}}
-	access = make(map[string]*sync_to_target.AccessProvider)
+	accessProviderImport.AccessProviders = []*sync_to_target.AccessProvider{
+		{
+			Id:          accountRoleId,
+			Name:        fmt.Sprintf("%s_ap1", testId),
+			Action:      sync_to_target.Grant,
+			NamingHint:  actualRoleName,
+			ExternalId:  &actualRoleName,
+			Delete:      true,
+			Description: fmt.Sprintf("Integration testing for test %s", testId),
+			Who: sync_to_target.WhoItem{
+				Users: []string{snowflakeUserName},
+			},
+			What: []sync_to_target.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+						Type:     "table",
+					},
+					Permissions: []string{"SELECT"},
+				},
+			},
+		},
+	}
 
 	//When
-	err = dataAccessSyncer.SyncAccessProviderRolesToTarget(context.Background(), rolesToRemove, access, dataAccessFeedbackHandler, config)
+	dataAccessSyncer = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
+	err = dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
@@ -401,12 +427,10 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 
 	doFullname := fmt.Sprintf("%s.%s.%s.%s", database, schema, table, column)
 
-	masksToRemove := map[string]*sync_to_target.AccessProvider{}
-
 	maskName := fmt.Sprintf("%s_mask_id1", testId)
 
-	masks := map[string]*sync_to_target.AccessProvider{
-		maskName: {
+	accessProviderImport := &sync_to_target.AccessProviderImport{
+		AccessProviders: []*sync_to_target.AccessProvider{{
 			Id:          maskName,
 			Name:        maskName,
 			Action:      sync_to_target.Mask,
@@ -424,6 +448,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 				},
 			},
 		},
+		},
 	}
 
 	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
@@ -431,7 +456,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 	config := s.getConfig()
 
 	//When
-	err := dataAccessSyncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, map[string]string{}, dataAccessFeedbackHandler, config)
+	err := dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
@@ -456,7 +481,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
 	//When updating the mask will be recreated
-	err = dataAccessSyncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, map[string]string{}, dataAccessFeedbackHandler, config)
+	err = dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
@@ -480,13 +505,13 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 
 	//Given
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
-	masksToRemove["RAITO_"+maskName] = &sync_to_target.AccessProvider{}
-	masks = nil
+	// masksToRemove["RAITO_"+maskName] = &sync_to_target.AccessProvider{}
+	accessProviderImport.AccessProviders = []*sync_to_target.AccessProvider{}
 
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
 	//When
-	err = dataAccessSyncer.SyncAccessProviderMasksToTarget(context.Background(), masksToRemove, masks, map[string]string{}, dataAccessFeedbackHandler, config)
+	err = dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)

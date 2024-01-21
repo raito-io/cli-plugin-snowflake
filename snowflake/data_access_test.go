@@ -936,6 +936,7 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 				setup: func(repoMock *mockDataAccessRepository, feedbackHandlerMock *mocks.SimpleAccessProviderFeedbackHandler) {
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetAccountRolesWithPrefix("").Return([]RoleEntity{}, nil).Once()
 				},
 			},
 			args: args{
@@ -1010,6 +1011,7 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 				setup: func(repoMock *mockDataAccessRepository, feedbackHandlerMock *mocks.SimpleAccessProviderFeedbackHandler) {
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetAccountRolesWithPrefix("").Return([]RoleEntity{}, nil).Once()
 
 					repoMock.EXPECT().GetPoliciesLike("MASKING", "RAITO_MASK1%").Return(nil, nil).Once() //No existing masks
 					repoMock.EXPECT().CreateMaskPolicy("DB1", "Schema1", mock.AnythingOfType("string"), []string{"DB1.Schema1.Table1.Column1"}, ptr.String("SHA256"), &MaskingBeneficiaries{Users: []string{"User1", "User2"}, Roles: []string{"Role1"}}).Return(nil)

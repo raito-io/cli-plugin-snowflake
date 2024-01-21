@@ -236,11 +236,9 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 	}
 
 	// Step 3 then initiate all the roles
-	if len(rolesMap)+len(rolesToRemove) > 0 {
-		err = s.SyncAccessProviderRolesToTarget(ctx, rolesToRemove, rolesMap, accessProviderFeedbackHandler, configMap, repo)
-		if err != nil {
-			return fmt.Errorf("sync roles to target: %w", err)
-		}
+	err = s.SyncAccessProviderRolesToTarget(ctx, rolesToRemove, rolesMap, accessProviderFeedbackHandler, configMap, repo)
+	if err != nil {
+		return fmt.Errorf("sync roles to target: %w", err)
 	}
 
 	return nil
