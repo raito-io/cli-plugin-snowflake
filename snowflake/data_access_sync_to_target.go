@@ -126,6 +126,7 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRe
 
 func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
 	var err error
+
 	if configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		if len(apToRemoveMap) > 0 || len(apMap) > 0 {
 			logger.Error("Skipping masking policies due to Snowflake Standard Edition.")

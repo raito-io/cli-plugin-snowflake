@@ -242,6 +242,7 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 			return fmt.Errorf("sync roles to target: %w", err)
 		}
 	}
+
 	return nil
 }
 
