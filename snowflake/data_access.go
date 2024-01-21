@@ -172,7 +172,16 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 }
 
 func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessProviders *sync_to_target.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
-	var err error
+	repo, err := s.repoProvider(configMap.Parameters, "")
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
+		repo.Close()
+	}()
+
 	apList := accessProviders.AccessProviders
 	apIdNameMap := make(map[string]string)
 
@@ -190,12 +199,12 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 
 		switch ap.Action {
 		case sync_to_target.Mask:
-			_, masksMap, masksToRemove, err2 = s.handleAccessProvider_new(ap, masksMap, masksToRemove, accessProviderFeedbackHandler)
+			_, masksMap, masksToRemove, err2 = s.syncAccessProviderToTargetHandler(ap, masksMap, masksToRemove, accessProviderFeedbackHandler)
 		case sync_to_target.Filtered:
-			_, filtersMap, filtersToRemove, err2 = s.handleAccessProvider_new(ap, filtersMap, filtersToRemove, accessProviderFeedbackHandler)
+			_, filtersMap, filtersToRemove, err2 = s.syncAccessProviderToTargetHandler(ap, filtersMap, filtersToRemove, accessProviderFeedbackHandler)
 		case sync_to_target.Grant, sync_to_target.Purpose:
 			var externalId string
-			externalId, rolesMap, rolesToRemove, err2 = s.handleAccessProvider_new(ap, rolesMap, rolesToRemove, accessProviderFeedbackHandler)
+			externalId, rolesMap, rolesToRemove, err2 = s.syncAccessProviderToTargetHandler(ap, rolesMap, rolesToRemove, accessProviderFeedbackHandler)
 			apIdNameMap[ap.Id] = externalId
 		case sync_to_target.Deny, sync_to_target.Promise:
 		default:
@@ -211,31 +220,32 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 	}
 
 	// Step 1 first initiate all the masks
-	if len(masksMap) > 0 || len(masksToRemove) > 0 {
-		err = s.SyncAccessProviderMasksToTarget(ctx, masksToRemove, masksMap, apIdNameMap, accessProviderFeedbackHandler, configMap)
+	if len(masksMap)+len(masksToRemove) > 0 {
+		err = s.SyncAccessProviderMasksToTarget(ctx, masksToRemove, masksMap, apIdNameMap, accessProviderFeedbackHandler, configMap, repo)
 		if err != nil {
 			return fmt.Errorf("sync masks to target: %w", err)
 		}
 	}
 
 	// Step 2 then initialize all filters
-	if len(filtersMap) > 0 || len(filtersToRemove) > 0 {
-		err = s.SyncAccessProviderFiltersToTarget(ctx, filtersToRemove, filtersMap, apIdNameMap, accessProviderFeedbackHandler, configMap)
+	if len(filtersMap)+len(filtersToRemove) > 0 {
+		err = s.SyncAccessProviderFiltersToTarget(ctx, filtersToRemove, filtersMap, apIdNameMap, accessProviderFeedbackHandler, configMap, repo)
 		if err != nil {
 			return fmt.Errorf("sync filters to target: %w", err)
 		}
 	}
 
 	// Step 3 then initiate all the roles
-	err = s.SyncAccessProviderRolesToTarget(ctx, rolesToRemove, rolesMap, accessProviderFeedbackHandler, configMap)
-	if err != nil {
-		return fmt.Errorf("sync roles to target: %w", err)
+	if len(rolesMap)+len(rolesToRemove) > 0 {
+		err = s.SyncAccessProviderRolesToTarget(ctx, rolesToRemove, rolesMap, accessProviderFeedbackHandler, configMap, repo)
+		if err != nil {
+			return fmt.Errorf("sync roles to target: %w", err)
+		}
 	}
-
 	return nil
 }
 
-func (s *AccessSyncer) handleAccessProvider_new(ap *sync_to_target.AccessProvider, toProcessAps map[string]*sync_to_target.AccessProvider, apToRemoveMap map[string]*sync_to_target.AccessProvider, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler) (string, map[string]*sync_to_target.AccessProvider, map[string]*sync_to_target.AccessProvider, error) {
+func (s *AccessSyncer) syncAccessProviderToTargetHandler(ap *sync_to_target.AccessProvider, toProcessAps map[string]*sync_to_target.AccessProvider, apToRemoveMap map[string]*sync_to_target.AccessProvider, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler) (string, map[string]*sync_to_target.AccessProvider, map[string]*sync_to_target.AccessProvider, error) {
 	var externalId string
 
 	if ap.Delete {

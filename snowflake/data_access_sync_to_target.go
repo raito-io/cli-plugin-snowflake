@@ -93,22 +93,12 @@ func (s *AccessSyncer) getUniqueRoleNameGenerator(prefix string, database *strin
 	return s.uniqueRoleNameGeneratorsCache[database], nil
 }
 
-func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRemoveAps map[string]*importer.AccessProvider, toProcessAps map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRemoveAps map[string]*importer.AccessProvider, toProcessAps map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
 	logger.Info("Configuring access providers as roles in Snowflake")
 
 	databaseRoleSupportEnabled := configMap.GetBoolWithDefault(SfDatabaseRoles, false)
 
-	repo, err := s.repoProvider(configMap.Parameters, "")
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
-		repo.Close()
-	}()
-
-	err = s.removeRolesToRemove(toRemoveAps, repo, feedbackHandler)
+	err := s.removeRolesToRemove(toRemoveAps, repo, feedbackHandler)
 	if err != nil {
 		return err
 	}
@@ -134,7 +124,8 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRe
 	return nil
 }
 
-func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
+	var err error
 	if configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		if len(apToRemoveMap) > 0 || len(apMap) > 0 {
 			logger.Error("Skipping masking policies due to Snowflake Standard Edition.")
@@ -144,11 +135,6 @@ func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apTo
 	}
 
 	logger.Info(fmt.Sprintf("Configuring access provider as masks in Snowflake. Update %d masks remove %d masks", len(apMap), len(apToRemoveMap)))
-
-	repo, err := s.repoProvider(configMap.Parameters, "")
-	if err != nil {
-		return err
-	}
 
 	// Step 1: Update masks and create new masks
 	for _, mask := range apMap {
@@ -184,7 +170,7 @@ func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apTo
 	return nil
 }
 
-func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
+func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
 	if configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		if len(apToRemoveMap) > 0 || len(apMap) > 0 {
 			logger.Error("Skipping filter policies due to Snowflake Standard Edition.")
@@ -194,11 +180,6 @@ func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, ap
 	}
 
 	logger.Info(fmt.Sprintf("Configuring access provider as filters in Snowflake. Update %d masks remove %d masks", len(apMap), len(apToRemoveMap)))
-
-	repo, err := s.repoProvider(configMap.Parameters, "")
-	if err != nil {
-		return err
-	}
 
 	//Groups filters by table
 	updateGroupedFilters, err := groupFiltersByTable(apMap, feedbackHandler)
