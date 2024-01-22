@@ -25,13 +25,12 @@ import (
 
 func (s *AccessSyncer) generateUniqueExternalId(ap *importer.AccessProvider, prefix string) (string, error) {
 	if isDatabaseRole(ap.Type) {
-
 		sfRoleName := ap.Name
-		if sfRoleName != "" {
+		if ap.NamingHint != "" {
 			sfRoleName = ap.NamingHint
 		}
 
-		database, cleanedRoleName, err := parseDatabaseRoleRoleName(ap.NamingHint)
+		database, cleanedRoleName, err := parseDatabaseRoleRoleName(sfRoleName)
 		if err != nil {
 			return "", err
 		}
