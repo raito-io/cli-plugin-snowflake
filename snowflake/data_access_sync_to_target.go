@@ -25,31 +25,25 @@ import (
 
 func (s *AccessSyncer) generateUniqueExternalId(ap *importer.AccessProvider, prefix string) (string, error) {
 	if isDatabaseRole(ap.Type) {
-		var err error
 
-		var database string
-		var cleanedRoleName string
-
-		if ap.ExternalId != nil {
-			database, cleanedRoleName, err = parseDatabaseRoleExternalId(*ap.ExternalId)
-		} else if ap.NamingHint != "" {
-			database, cleanedRoleName, err = parseDatabaseRoleRoleName(ap.NamingHint)
-		} else {
-			database, cleanedRoleName, err = parseDatabaseRoleRoleName(ap.Name)
+		sfRoleName := ap.Name
+		if sfRoleName != "" {
+			sfRoleName = ap.NamingHint
 		}
 
+		database, cleanedRoleName, err := parseDatabaseRoleRoleName(ap.NamingHint)
 		if err != nil {
 			return "", err
 		}
-
-		oldNamingHint := ap.NamingHint
-
-		ap.NamingHint = cleanedRoleName
 
 		uniqueRoleNameGenerator, err := s.getUniqueRoleNameGenerator(prefix, &database)
 		if err != nil {
 			return "", err
 		}
+
+		// Temp updating namingHint to "resource only without database" as this is the way Generate will create a unique resource name
+		oldNamingHint := ap.NamingHint
+		ap.NamingHint = cleanedRoleName
 
 		roleName, err := uniqueRoleNameGenerator.Generate(ap)
 		if err != nil {

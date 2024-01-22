@@ -929,7 +929,77 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 			},
 			wantErr: require.NoError,
 		},
+		{
+			name: "basic - renaming grants",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository, feedbackHandlerMock *mocks.SimpleAccessProviderFeedbackHandler) {
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetAccountRolesWithPrefix("").Return([]RoleEntity{
+						{Name: "ACCESS_PROVIDER1_OLD"},
+						{Name: "DATABASEROLE###DATABASE:TEST_DB###ROLE:DATABASE_ROLE1_OLD"},
+					}, nil).Once()
 
+					repoMock.EXPECT().RenameAccountRole("ACCESS_PROVIDER1_OLD", "ACCESS_PROVIDER1").Return(nil).Once()
+					repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "ACCESS_PROVIDER1").Return(nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("ACCESS_PROVIDER1").Return([]GrantOfRole{}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("ACCESS_PROVIDER1").Return([]GrantToRole{}, nil).Once()
+
+					expectGrantUsersToRole(repoMock, "ACCESS_PROVIDER1", "User1", "User2")
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "ACCESS_PROVIDER1").Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema1", "ACCESS_PROVIDER1").Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema1.Table1", "ACCESS_PROVIDER1").Return(nil).Once()
+
+					repoMock.EXPECT().RenameDatabaseRole("TEST_DB", "DATABASE_ROLE1_OLD", "DATABASE_ROLE1").Return(nil).Once()
+					repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.Anything, "TEST_DB", "DATABASE_ROLE1").Return(nil).Once()
+					repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DATABASE_ROLE1").Return([]GrantOfRole{}, nil).Once()
+					repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DATABASE_ROLE1").Return([]GrantToRole{}, nil).Once()
+
+					expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, false, "TEST_DB", "DATABASE_ROLE1", "AccessProviderId1")
+					expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, true, "TEST_DB", "DATABASE_ROLE1")
+
+					repoMock.EXPECT().ExecuteGrantOnDatabaseRole("USAGE", "DATABASE TEST_DB", "TEST_DB", "DATABASE_ROLE1").Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnDatabaseRole("USAGE", "SCHEMA TEST_DB.Schema1", "TEST_DB", "DATABASE_ROLE1").Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnDatabaseRole("SELECT", "TABLE TEST_DB.Schema1.Table1", "TEST_DB", "DATABASE_ROLE1").Return(nil).Once()
+				},
+			},
+			args: args{
+				accessProviders: &sync_to_target.AccessProviderImport{
+					AccessProviders: []*importer.AccessProvider{
+						{
+							Id:         "AccessProviderId1",
+							ExternalId: ptr.String("ACCESS_PROVIDER1_OLD"),
+							Action:     importer.Grant,
+							Type:       ptr.String(access_provider.Role),
+							Name:       "AccessProvider1",
+							NamingHint: "AccessProvider1",
+							Who: importer.WhoItem{
+								Users: []string{"User1", "User2"},
+							},
+							What: []importer.WhatItem{
+								{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+							},
+						}, {
+							Id:         "AccessProviderId2",
+							Action:     importer.Grant,
+							ExternalId: ptr.String("DATABASEROLE###DATABASE:TEST_DB###ROLE:DATABASE_ROLE1_OLD"),
+							Type:       ptr.String("databaseRole"),
+							NamingHint: "TEST_DB.DatabaseRole1",
+							Who: importer.WhoItem{
+								InheritFrom: []string{"AccessProviderId1"},
+							},
+							What: []importer.WhatItem{
+								{DataObject: &data_source.DataObjectReference{FullName: "TEST_DB.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+							},
+						},
+					},
+				},
+				configMap: &config.ConfigMap{
+					Parameters: map[string]string{},
+				},
+			},
+			wantErr: require.NoError,
+		},
 		{
 			name: "basic - masks + filters on basic SF",
 			fields: fields{
@@ -1094,38 +1164,6 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 		})
 	}
 }
-
-// func TestAccessSyncer_SyncAccessProviderToTarget_ErrorOnRepoConnection(t *testing.T) {
-// 	//Given
-// 	configParams := config.ConfigMap{
-// 		Parameters: map[string]string{"key": "value"},
-// 	}
-
-// 	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-// 		return nil, fmt.Errorf("boom")
-// 	})
-
-// 	apImport := &sync_to_target.AccessProviderImport{
-// 		AccessProviders: []*importer.AccessProvider{
-// 			{
-// 				Id:   "AccessProviderId1",
-// 				Name: "AccessProvider1",
-// 				Who: importer.WhoItem{
-// 					Users: []string{"User1", "User2"},
-// 				},
-// 				What: []importer.WhatItem{
-// 					{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "TABLE"}, Permissions: []string{"SELECT"}},
-// 				},
-// 			},
-// 		},
-// 	}
-
-// 	//When
-// 	err := syncer.SyncAccessProviderToTarget(context.Background(), apImport, "R_", &configParams)
-
-// 	//Then
-// 	assert.Error(t, err)
-// }
 
 func TestAccessSyncer_SyncAccessAsCodeToTarget(t *testing.T) {
 	//Given
