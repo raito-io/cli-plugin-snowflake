@@ -201,7 +201,7 @@ func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity R
 			// Updated this because of https://github.com/raito-io/appserver/blob/587484940a2e356a486dd8779166852761885353/lambda/appserver/services/access_provider/importer/importer.go#L523
 			ActualName: roleName,
 
-			Name:       roleName,
+			Name:       fmt.Sprintf("%s.%s", database, roleName),
 			NamingHint: roleName,
 			Action:     exporter.Grant,
 			Who: &exporter.WhoItem{
