@@ -52,7 +52,7 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 		{Name: "Database1"}, {Name: "Database2"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetTags(mock.Anything).Return(map[string][]*tag.Tag{}, nil)
+	repoMock.EXPECT().GetTagsLinkedToDatabaseName(mock.Anything).Return(map[string][]*tag.Tag{}, nil)
 
 	repoMock.EXPECT().GetSchemasInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&SchemaEntity{Database: s, Name: "schema1"})
@@ -385,7 +385,7 @@ func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
 		{Name: "Database1"}, {Name: "Database2"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetTags(mock.Anything).Return(map[string][]*tag.Tag{}, nil)
+	repoMock.EXPECT().GetTagsLinkedToDatabaseName(mock.Anything).Return(map[string][]*tag.Tag{}, nil)
 
 	repoMock.EXPECT().GetSchemasInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&SchemaEntity{Database: s, Name: "schema1"})

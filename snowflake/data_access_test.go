@@ -13,6 +13,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/data_source"
+	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
@@ -21,835 +22,957 @@ import (
 )
 
 func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
-	//Given
-	configParams := config.ConfigMap{
-		Parameters: map[string]string{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2"},
+	type fields struct {
+		setup             func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler
+		repoProviderError error
+	}
+	type args struct {
+		repoCreateError error
+		configMap       config.ConfigMap
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantAps []sync_from_target.AccessProvider
+		wantErr require.ErrorAssertionFunc
+	}{
+		{
+			name: "basic",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
+					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 3)
+
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetShares().Return([]DbEntity{
+						{Name: "Share1"}, {Name: "Share2"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
+						{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
+						{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
+						{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner1"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{
+						{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
+						{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
+						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
+						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
+						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
+						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
+						{GrantedOn: "MATERIALIZED_VIEW", Name: "DB1.GranteeRole1MatView", Privilege: "SELECT"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{
+						{GrantedTo: "USER", GranteeName: "GranteeRole2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{
+						{GrantedOn: "GrandOnRole2Number1", Name: "GranteeRole2", Privilege: "USAGE"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role3").Return([]GrantOfRole{
+						{GrantedTo: "ROLE", GranteeName: "\"GranteeRole.3\""},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role3").Return([]GrantToRole{
+						{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{
+						{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING_POLICY"},
+					}, nil).Once()
+					repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
+						{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
+					}, nil).Once()
+					repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
+						{Name: "DescribePolicy1", Body: "PolicyBody 1"},
+					}, nil).Once()
+					repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
+						{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
+					}, nil).Once()
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
+						{POLICY_DB: "PolicyDB"},
+					}, nil).Once()
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
+						{POLICY_DB: "PolicyDB"},
+					}, nil).Once()
+
+					return fileCreator
+				},
+			},
+			args: args{
+				configMap: config.ConfigMap{
+					Parameters: map[string]string{SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2"},
+				},
+			},
+			wantAps: []sync_from_target.AccessProvider{
+				{
+					ExternalId:        "Role1",
+					NotInternalizable: false,
+					Name:              "Role1",
+					NamingHint:        "Role1",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{"GranteeRole1Number1"},
+						Groups:          []string{},
+						AccessProviders: []string{"GranteeRole1Number2"},
+					},
+					ActualName: "Role1",
+					Type:       ptr.String(access_provider.Role),
+					What: []sync_from_target.WhatItem{
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "Share2.GranteeRole1Schema",
+								Type:     "",
+							},
+							Permissions: []string{"READ"},
+						},
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "DB1.GranteeRole1Table",
+								Type:     "",
+							},
+							Permissions: []string{"SELECT"},
+						},
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "DB1.GranteeRole1MatView",
+								Type:     "",
+							},
+							Permissions: []string{"SELECT"},
+						},
+					},
+					Action: 1,
+					Policy: "",
+				}, {
+					ExternalId:        "Role2",
+					NotInternalizable: false,
+					Name:              "Role2",
+					NamingHint:        "Role2",
+					Type:              ptr.String(access_provider.Role),
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{"GranteeRole2"},
+						Groups:          []string{},
+						AccessProviders: []string{},
+					},
+					ActualName: "Role2",
+					What:       []sync_from_target.WhatItem{},
+					Action:     1,
+					Policy:     "",
+				}, {
+					ExternalId:        "Role3",
+					NotInternalizable: true,
+					Name:              "Role3",
+					NamingHint:        "Role3",
+					Type:              ptr.String(access_provider.Role),
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{"GranteeRole.3"},
+					},
+					ActualName: "Role3",
+					What:       []sync_from_target.WhatItem{},
+					Action:     1,
+					Policy:     "",
+				},
+				{
+					ExternalId:        "DB-schema1-MaskingPolicy1",
+					NotInternalizable: true,
+					Name:              "DB-schema1-MaskingPolicy1",
+					NamingHint:        "MaskingPolicy1",
+					Who:               nil,
+					ActualName:        "DB-schema1-MaskingPolicy1",
+					What:              []sync_from_target.WhatItem{},
+					Action:            3,
+					Policy:            "PolicyBody 1",
+				},
+				{
+					ExternalId:        "DB-schema2-RowAccess1",
+					NotInternalizable: true,
+					Name:              "DB-schema2-RowAccess1",
+					NamingHint:        "RowAccess1",
+					Who:               nil,
+					ActualName:        "DB-schema2-RowAccess1",
+					What:              []sync_from_target.WhatItem{},
+					Action:            4,
+					Policy:            "Row Access Policy Body",
+				},
+			},
+			wantErr: require.NoError,
+		},
+		{
+			name: "with database roles",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
+					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 3)
+
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetShares().Return([]DbEntity{
+						{Name: "Share1"}, {Name: "Share2"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetDatabases().Return([]DbEntity{
+						{Name: "SNOWFLAKE"},
+						{Name: "TEST_DB"},
+					}, nil).Once()
+					repoMock.EXPECT().GetDatabaseRoles("SNOWFLAKE").Return([]RoleEntity{}, nil).Once()
+					repoMock.EXPECT().GetDatabaseRoles("TEST_DB").Return([]RoleEntity{
+						{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 1, Owner: "Owner1"},
+						{Name: "DatabaseRole2", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
+						{Name: "DatabaseRole3", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
+						{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
+						{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
+						{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner1"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{
+						{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
+						{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
+						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
+						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
+						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
+						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
+						{GrantedOn: "MATERIALIZED_VIEW", Name: "DB1.GranteeRole1MatView", Privilege: "SELECT"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{
+						{GrantedTo: "USER", GranteeName: "GranteeRole2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{
+						{GrantedOn: "GrandOnRole2Number1", Name: "GranteeRole2", Privilege: "USAGE"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role3").Return([]GrantOfRole{
+						{GrantedTo: "ROLE", GranteeName: "\"GranteeRole.3\""},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role3").Return([]GrantToRole{
+						{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantOfRole{
+						{GrantedTo: "ROLE", GranteeName: "GranteeDatabaseRole1Number2"},
+						{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.DatabaseRole2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantToRole{
+						{GrantedOn: "TABLE", Name: "TEST_DB.GranteeRole1Table", Privilege: "USAGE"},
+						{GrantedOn: "TABLE", Name: "TEST_DB.GranteeRole1Table", Privilege: "SELECT"},
+						{GrantedOn: "MATERIALIZED_VIEW", Name: "TEST_DB.GranteeRole1MatView", Privilege: "SELECT"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantOfRole{}, nil).Once()
+					repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantToRole{
+						{GrantedOn: "GrandOnDatabaseRole2Number1", Name: "GranteeDatabaseRole2", Privilege: "USAGE"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole3").Return([]GrantOfRole{}, nil).Once()
+					repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole3").Return([]GrantToRole{
+						{GrantedOn: "MATERIALIZED_VIEW", Name: "TEST_DB.GranteeRole3MatView", Privilege: "SELECT"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{
+						{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING_POLICY"},
+					}, nil).Once()
+					repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
+						{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
+					}, nil).Once()
+					repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
+						{Name: "DescribePolicy1", Body: "PolicyBody 1"},
+					}, nil).Once()
+					repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
+						{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
+					}, nil).Once()
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
+						{POLICY_DB: "PolicyDB"},
+					}, nil).Once()
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
+						{POLICY_DB: "PolicyDB"},
+					}, nil).Once()
+
+					return fileCreator
+				},
+			},
+			args: args{
+				configMap: config.ConfigMap{
+					Parameters: map[string]string{SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfDatabaseRoles: "true"},
+				},
+			},
+			wantAps: []sync_from_target.AccessProvider{
+				{
+					ExternalId:        "Role1",
+					NotInternalizable: false,
+					Name:              "Role1",
+					NamingHint:        "Role1",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{"GranteeRole1Number1"},
+						Groups:          []string{},
+						AccessProviders: []string{"GranteeRole1Number2"},
+					},
+					ActualName: "Role1",
+					Type:       ptr.String(access_provider.Role),
+					What: []sync_from_target.WhatItem{
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "Share2.GranteeRole1Schema",
+								Type:     "",
+							},
+							Permissions: []string{"READ"},
+						},
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "DB1.GranteeRole1Table",
+								Type:     "",
+							},
+							Permissions: []string{"SELECT"},
+						},
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "DB1.GranteeRole1MatView",
+								Type:     "",
+							},
+							Permissions: []string{"SELECT"},
+						},
+					},
+					Action: 1,
+					Policy: "",
+				}, {
+					ExternalId:        "Role2",
+					NotInternalizable: false,
+					Name:              "Role2",
+					NamingHint:        "Role2",
+					Type:              ptr.String(access_provider.Role),
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{"GranteeRole2"},
+						Groups:          []string{},
+						AccessProviders: []string{},
+					},
+					ActualName: "Role2",
+					What:       []sync_from_target.WhatItem{},
+					Action:     1,
+					Policy:     "",
+				}, {
+					ExternalId:        "Role3",
+					NotInternalizable: true,
+					Name:              "Role3",
+					NamingHint:        "Role3",
+					Type:              ptr.String(access_provider.Role),
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{"GranteeRole.3"},
+					},
+					ActualName: "Role3",
+					What:       []sync_from_target.WhatItem{},
+					Action:     1,
+					Policy:     "",
+				},
+				{
+					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",
+					NotInternalizable: false,
+					Name:              "TEST_DB.DatabaseRole1",
+					NamingHint:        "DatabaseRole1",
+					ActualName:        "DatabaseRole1",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{"GranteeDatabaseRole1Number2", "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2"},
+					},
+					What: []sync_from_target.WhatItem{
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "TEST_DB.GranteeRole1Table",
+								Type:     "",
+							},
+							Permissions: []string{"SELECT"},
+						},
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "TEST_DB.GranteeRole1MatView",
+								Type:     "",
+							},
+							Permissions: []string{"SELECT"},
+						},
+					},
+					Action:           sync_from_target.Grant,
+					Policy:           "",
+					Type:             ptr.String("databaseRole"),
+					WhoLocked:        ptr.Bool(true),
+					WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					WhatLocked:       ptr.Bool(true),
+					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+				}, {
+					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2",
+					NotInternalizable: false,
+					Name:              "TEST_DB.DatabaseRole2",
+					NamingHint:        "DatabaseRole2",
+					ActualName:        "DatabaseRole2",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{},
+					},
+					What:             []sync_from_target.WhatItem{},
+					Action:           1,
+					Policy:           "",
+					Type:             ptr.String("databaseRole"),
+					WhoLocked:        ptr.Bool(true),
+					WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					WhatLocked:       ptr.Bool(true),
+					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+				}, {
+					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole3",
+					NotInternalizable: false,
+					Name:              "TEST_DB.DatabaseRole3",
+					NamingHint:        "DatabaseRole3",
+					ActualName:        "DatabaseRole3",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{},
+					},
+					What: []sync_from_target.WhatItem{
+
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "TEST_DB.GranteeRole3MatView",
+								Type:     "",
+							},
+							Permissions: []string{"SELECT"},
+						},
+					},
+					Action:           1,
+					Policy:           "",
+					Type:             ptr.String("databaseRole"),
+					WhoLocked:        ptr.Bool(true),
+					WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					WhatLocked:       ptr.Bool(true),
+					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+				},
+				{
+					ExternalId:        "DB-schema1-MaskingPolicy1",
+					NotInternalizable: true,
+					Name:              "DB-schema1-MaskingPolicy1",
+					NamingHint:        "MaskingPolicy1",
+					Who:               nil,
+					ActualName:        "DB-schema1-MaskingPolicy1",
+					What:              []sync_from_target.WhatItem{},
+					Action:            3,
+					Policy:            "PolicyBody 1",
+				},
+				{
+					ExternalId:        "DB-schema2-RowAccess1",
+					NotInternalizable: true,
+					Name:              "DB-schema2-RowAccess1",
+					NamingHint:        "RowAccess1",
+					Who:               nil,
+					ActualName:        "DB-schema2-RowAccess1",
+					What:              []sync_from_target.WhatItem{},
+					Action:            4,
+					Policy:            "Row Access Policy Body",
+				},
+			},
+			wantErr: require.NoError,
+		},
+		{
+			name: "no unpack",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
+					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 2)
+
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetShares().Return([]DbEntity{
+						{Name: "Share1"}, {Name: "Share2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
+						{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
+						{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner1"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{
+						{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
+						{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
+						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
+						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
+						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
+						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role3").Return([]GrantToRole{
+						{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
+					}, nil).Once()
+					repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{
+						{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING_POLICY"},
+					}, nil).Once()
+					repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
+						{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
+					}, nil).Once()
+					repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
+						{Name: "DescribePolicy1", Body: "PolicyBody 1"},
+					}, nil).Once()
+					repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
+						{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
+					}, nil).Once()
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
+						{POLICY_DB: "PolicyDB"},
+					}, nil).Once()
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
+						{POLICY_DB: "PolicyDB"},
+					}, nil).Once()
+
+					return fileCreator
+				},
+			},
+			args: args{
+				configMap: config.ConfigMap{
+					Parameters: map[string]string{SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfLinkToExternalIdentityStoreGroups: "true"},
+				},
+			},
+			wantAps: []sync_from_target.AccessProvider{
+				{
+					ExternalId:        "Role1",
+					Type:              ptr.String(access_provider.Role),
+					NotInternalizable: false,
+					Name:              "Role1",
+					NamingHint:        "Role1",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{"GranteeRole1Number1"},
+						Groups:          []string{},
+						AccessProviders: []string{"GranteeRole1Number2"},
+					},
+					ActualName: "Role1",
+					What: []sync_from_target.WhatItem{
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "Share2.GranteeRole1Schema",
+								Type:     "",
+							},
+							Permissions: []string{"READ"},
+						},
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "DB1.GranteeRole1Table",
+								Type:     "",
+							},
+							Permissions: []string{"SELECT"},
+						},
+					},
+					Action: 1,
+					Policy: "",
+				}, {
+					ExternalId:              "Role3",
+					Type:                    ptr.String(access_provider.Role),
+					NotInternalizable:       false,
+					WhoLocked:               ptr.Bool(true),
+					InheritanceLocked:       ptr.Bool(true),
+					NameLocked:              ptr.Bool(true),
+					DeleteLocked:            ptr.Bool(true),
+					WhoLockedReason:         ptr.String(whoLockedReason),
+					InheritanceLockedReason: ptr.String(inheritanceLockedReason),
+					NameLockedReason:        ptr.String(nameLockedReason),
+					DeleteLockedReason:      ptr.String(deleteLockedReason),
+					Name:                    "Role3",
+					NamingHint:              "Role3",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{"Role3"},
+						AccessProviders: []string{},
+					},
+					ActualName: "Role3",
+					What:       []sync_from_target.WhatItem{},
+					Action:     1,
+					Policy:     "",
+				},
+				{
+					ExternalId:        "DB-schema1-MaskingPolicy1",
+					NotInternalizable: true,
+					Name:              "DB-schema1-MaskingPolicy1",
+					NamingHint:        "MaskingPolicy1",
+					Who:               nil,
+					ActualName:        "DB-schema1-MaskingPolicy1",
+					What:              []sync_from_target.WhatItem{},
+					Action:            3,
+					Policy:            "PolicyBody 1",
+				},
+				{
+					ExternalId:        "DB-schema2-RowAccess1",
+					NotInternalizable: true,
+					Name:              "DB-schema2-RowAccess1",
+					NamingHint:        "RowAccess1",
+					Who:               nil,
+					ActualName:        "DB-schema2-RowAccess1",
+					What:              []sync_from_target.WhatItem{},
+					Action:            4,
+					Policy:            "Row Access Policy Body",
+				},
+			},
+			wantErr: require.NoError,
+		},
+		{
+			name: "SF standard edition",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
+					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 3)
+
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetShares().Return([]DbEntity{
+						{Name: "Share1"}, {Name: "Share2"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
+						{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
+						{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
+						{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{
+						{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
+						{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
+						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
+						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
+						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
+						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{
+						{GrantedTo: "USER", GranteeName: "GranteeRole2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{
+						{GrantedOn: "GrandOnRole2Number1", Name: "GranteeRole2", Privilege: "USAGE"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role3").Return([]GrantOfRole{
+						{GrantedTo: "ROLE", GranteeName: "GranteeRole3"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role3").Return([]GrantToRole{
+						{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
+					}, nil).Once()
+
+					repoMock.AssertNotCalled(t, "GetPolicies", "MASKING")
+					repoMock.AssertNotCalled(t, "GetPolicies", "ROW ACCESS")
+					repoMock.AssertNotCalled(t, "DescribePolicy", "MASKING", mock.Anything, mock.Anything, mock.Anything)
+					repoMock.AssertNotCalled(t, "GetPolicyReferences", mock.Anything, mock.Anything, mock.Anything)
+
+					return fileCreator
+				},
+			},
+			args: args{
+				configMap: config.ConfigMap{
+					Parameters: map[string]string{
+						SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2",
+						SfStandardEdition:             "true",
+					},
+				},
+			},
+			wantAps: []sync_from_target.AccessProvider{
+				{
+					ExternalId:        "Role1",
+					Type:              ptr.String(access_provider.Role),
+					NotInternalizable: false,
+					Name:              "Role1",
+					NamingHint:        "Role1",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{"GranteeRole1Number1"},
+						Groups:          []string{},
+						AccessProviders: []string{"GranteeRole1Number2"},
+					},
+					ActualName: "Role1",
+					What: []sync_from_target.WhatItem{
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "Share2.GranteeRole1Schema",
+								Type:     "",
+							},
+							Permissions: []string{"READ"},
+						},
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "DB1.GranteeRole1Table",
+								Type:     "",
+							},
+							Permissions: []string{"SELECT"},
+						},
+					},
+					Action: 1,
+					Policy: "",
+				}, {
+					ExternalId:        "Role2",
+					Type:              ptr.String(access_provider.Role),
+					NotInternalizable: false,
+					Name:              "Role2",
+					NamingHint:        "Role2",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{"GranteeRole2"},
+						Groups:          []string{},
+						AccessProviders: []string{},
+					},
+					ActualName: "Role2",
+					What:       []sync_from_target.WhatItem{},
+					Action:     1,
+					Policy:     "",
+				}, {
+					ExternalId:        "Role3",
+					Type:              ptr.String(access_provider.Role),
+					NotInternalizable: true,
+					Name:              "Role3",
+					NamingHint:        "Role3",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{"GranteeRole3"},
+					},
+					ActualName: "Role3",
+					What:       []sync_from_target.WhatItem{},
+					Action:     1,
+					Policy:     "",
+				},
+			},
+			wantErr: require.NoError,
+		},
+		{
+			name: "tags override enabled",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
+					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 3)
+
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Once()
+
+					repoMock.EXPECT().GetTagsByDomain("ROLE").Return(map[string][]*tag.Tag{
+						"Role1": {
+							{Key: "a_key", Value: "override_name"},
+							{Key: "an_other_key", Value: "...."},
+						},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetTagsByDomain("DATABASE ROLE").Return(map[string][]*tag.Tag{
+						"TEST_DB.DatabaseRole1": {
+							{Key: "a_key", Value: "override_name_2"},
+							{Key: "an_other_key", Value: "...."},
+						},
+					}, nil).Once()
+					repoMock.EXPECT().GetDatabases().Return([]DbEntity{
+						{Name: "TEST_DB"},
+					}, nil).Once()
+					repoMock.EXPECT().GetDatabaseRoles("TEST_DB").Return([]RoleEntity{
+						{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 0, Owner: "Owner1"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
+						{Name: "Role1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 0, Owner: "Owner1"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{}, nil).Once()
+
+					repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantOfRole{}, nil).Once()
+					repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantToRole{}, nil).Once()
+
+					repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{}, nil).Once()
+					repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{}, nil).Once()
+
+					return fileCreator
+				},
+			},
+			args: args{
+				configMap: config.ConfigMap{
+					Parameters: map[string]string{
+						SfStandardEdition:                     "false",
+						SfSkipTags:                            "false",
+						SfTagOverwriteKeyForAccessControlName: "a_key",
+						SfDatabaseRoles:                       "true",
+					},
+				},
+			},
+			wantAps: []sync_from_target.AccessProvider{
+				{
+					ExternalId:        "Role1",
+					Type:              ptr.String(access_provider.Role),
+					NotInternalizable: false,
+					Name:              "override_name",
+					NamingHint:        "Role1",
+					ActualName:        "Role1",
+
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{},
+					},
+					What: []sync_from_target.WhatItem{},
+
+					Action: 1,
+					Policy: "",
+
+					NameLocked:       ptr.Bool(true),
+					NameLockedReason: ptr.String("This Snowflake role cannot be renamed because it has a name tag override attached to it"),
+				},
+				{
+					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",
+					NotInternalizable: false,
+					Name:              "TEST_DB.override_name_2",
+					NamingHint:        "DatabaseRole1",
+					ActualName:        "DatabaseRole1",
+					Action:            sync_from_target.Grant,
+					Policy:            "",
+
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{},
+					},
+					What: []sync_from_target.WhatItem{},
+
+					Type:             ptr.String("databaseRole"),
+					WhoLocked:        ptr.Bool(true),
+					WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					WhatLocked:       ptr.Bool(true),
+					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+
+					NameLocked:       ptr.Bool(true),
+					NameLockedReason: ptr.String("This Snowflake role cannot be renamed because it has a name tag override attached to it"),
+				},
+			},
+			wantErr: require.NoError,
+		},
+		{
+			name: "excludes",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
+					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 2)
+
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Once()
+
+					repoMock.EXPECT().GetDatabases().Return([]DbEntity{
+						{Name: "SNOWFLAKE"},
+						{Name: "TEST_DB"},
+					}, nil).Once()
+					repoMock.EXPECT().GetDatabaseRoles("SNOWFLAKE").Return([]RoleEntity{}, nil).Once()
+					repoMock.EXPECT().GetDatabaseRoles("TEST_DB").Return([]RoleEntity{
+						{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 1, Owner: "Owner1"},
+						{Name: "DatabaseRole2", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
+						{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
+						{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{}, nil).Once()
+					repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{}, nil).Once()
+
+					repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantOfRole{}, nil).Once()
+					repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantToRole{}, nil).Once()
+
+					repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{}, nil).Once()
+					repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{}, nil).Once()
+
+					return fileCreator
+				},
+			},
+			args: args{
+				configMap: config.ConfigMap{
+					Parameters: map[string]string{
+						SfExcludedRoles: "Role1,TEST_DB.DatabaseRole1",
+						SfDatabaseRoles: "true",
+					},
+				},
+			},
+			wantAps: []sync_from_target.AccessProvider{
+				{
+					ExternalId:        "Role2",
+					Type:              ptr.String(access_provider.Role),
+					NotInternalizable: false,
+					Name:              "Role2",
+					NamingHint:        "Role2",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{},
+					},
+					ActualName: "Role2",
+					What:       []sync_from_target.WhatItem{},
+					Action:     1,
+					Policy:     "",
+				}, {
+					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2",
+					Type:              ptr.String("databaseRole"),
+					NotInternalizable: false,
+					Name:              "TEST_DB.DatabaseRole2",
+					NamingHint:        "DatabaseRole2",
+					ActualName:        "DatabaseRole2",
+					Who: &sync_from_target.WhoItem{
+						Users:           []string{},
+						Groups:          []string{},
+						AccessProviders: []string{},
+					},
+					What:             []sync_from_target.WhatItem{},
+					Action:           1,
+					Policy:           "",
+					WhoLocked:        ptr.Bool(true),
+					WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					WhatLocked:       ptr.Bool(true),
+					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+				},
+			},
+			wantErr: require.NoError,
+		},
+		{
+			name: "error on connecting to repo",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
+					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
+					return fileCreator
+				},
+			},
+			args: args{
+				repoCreateError: fmt.Errorf("BOOOM"),
+				configMap: config.ConfigMap{
+					Parameters: map[string]string{},
+				},
+			},
+			wantErr: require.Error,
+		},
+		{
+			name: "error on shares",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
+					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetShares().Return(nil, fmt.Errorf("boom")).Once()
+					return fileCreator
+				},
+			},
+			args: args{
+				configMap: config.ConfigMap{
+					Parameters: map[string]string{},
+				},
+			},
+			wantErr: require.Error,
+		},
 	}
 
-	repoMock := newMockDataAccessRepository(t)
-	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 3)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			repoMock := newMockDataAccessRepository(t)
+			fileCreator := tt.fields.setup(repoMock)
 
-	repoMock.EXPECT().Close().Return(nil).Once()
-	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-	repoMock.EXPECT().GetShares().Return([]DbEntity{
-		{Name: "Share1"}, {Name: "Share2"},
-	}, nil).Once()
+			syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
+				return repoMock, tt.args.repoCreateError
+			})
 
-	repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
-		{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
-		{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
-		{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner1"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{
-		{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
-		{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
-		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
-		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
-		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
-		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
-		{GrantedOn: "MATERIALIZED_VIEW", Name: "DB1.GranteeRole1MatView", Privilege: "SELECT"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{
-		{GrantedTo: "USER", GranteeName: "GranteeRole2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{
-		{GrantedOn: "GrandOnRole2Number1", Name: "GranteeRole2", Privilege: "USAGE"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role3").Return([]GrantOfRole{
-		{GrantedTo: "ROLE", GranteeName: "\"GranteeRole.3\""},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role3").Return([]GrantToRole{
-		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
-	}, nil).Once()
+			//When
+			err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &tt.args.configMap)
 
-	repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{
-		{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING_POLICY"},
-	}, nil).Once()
-	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
-		{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
-	}, nil).Once()
-	repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
-		{Name: "DescribePolicy1", Body: "PolicyBody 1"},
-	}, nil).Once()
-	repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
-		{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
-	}, nil).Once()
-	repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
-		{POLICY_DB: "PolicyDB"},
-	}, nil).Once()
-	repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
-		{POLICY_DB: "PolicyDB"},
-	}, nil).Once()
+			// Then
+			tt.wantErr(t, err)
 
-	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-		return repoMock, nil
-	})
-
-	//When
-	err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &configParams)
-
-	//Then
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, []sync_from_target.AccessProvider{
-		{
-			ExternalId:        "Role1",
-			NotInternalizable: false,
-			Name:              "Role1",
-			NamingHint:        "Role1",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{"GranteeRole1Number1"},
-				Groups:          []string{},
-				AccessProviders: []string{"GranteeRole1Number2"},
-			},
-			ActualName: "Role1",
-			Type:       ptr.String(access_provider.Role),
-			What: []sync_from_target.WhatItem{
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "Share2.GranteeRole1Schema",
-						Type:     "",
-					},
-					Permissions: []string{"READ"},
-				},
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "DB1.GranteeRole1Table",
-						Type:     "",
-					},
-					Permissions: []string{"SELECT"},
-				},
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "DB1.GranteeRole1MatView",
-						Type:     "",
-					},
-					Permissions: []string{"SELECT"},
-				},
-			},
-			Action: 1,
-			Policy: "",
-		}, {
-			ExternalId:        "Role2",
-			NotInternalizable: false,
-			Name:              "Role2",
-			NamingHint:        "Role2",
-			Type:              ptr.String(access_provider.Role),
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{"GranteeRole2"},
-				Groups:          []string{},
-				AccessProviders: []string{},
-			},
-			ActualName: "Role2",
-			What:       []sync_from_target.WhatItem{},
-			Action:     1,
-			Policy:     "",
-		}, {
-			ExternalId:        "Role3",
-			NotInternalizable: true,
-			Name:              "Role3",
-			NamingHint:        "Role3",
-			Type:              ptr.String(access_provider.Role),
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{},
-				Groups:          []string{},
-				AccessProviders: []string{"GranteeRole.3"},
-			},
-			ActualName: "Role3",
-			What:       []sync_from_target.WhatItem{},
-			Action:     1,
-			Policy:     "",
-		},
-		{
-			ExternalId:        "DB-schema1-MaskingPolicy1",
-			NotInternalizable: true,
-			Name:              "DB-schema1-MaskingPolicy1",
-			NamingHint:        "MaskingPolicy1",
-			Who:               nil,
-			ActualName:        "DB-schema1-MaskingPolicy1",
-			What:              []sync_from_target.WhatItem{},
-			Action:            3,
-			Policy:            "PolicyBody 1",
-		},
-		{
-			ExternalId:        "DB-schema2-RowAccess1",
-			NotInternalizable: true,
-			Name:              "DB-schema2-RowAccess1",
-			NamingHint:        "RowAccess1",
-			Who:               nil,
-			ActualName:        "DB-schema2-RowAccess1",
-			What:              []sync_from_target.WhatItem{},
-			Action:            4,
-			Policy:            "Row Access Policy Body",
-		},
-	}, fileCreator.AccessProviders)
-}
-
-func TestAccessSyncer_SyncAccessProvidersFromTarget_WithDatabaseRoleSupport(t *testing.T) {
-	//Given
-	configParams := config.ConfigMap{
-		Parameters: map[string]string{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfDatabaseRoles: "true"},
+			assert.ElementsMatch(t, tt.wantAps, fileCreator.AccessProviders)
+		})
 	}
-
-	repoMock := newMockDataAccessRepository(t)
-	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 3)
-
-	repoMock.EXPECT().Close().Return(nil).Once()
-	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-	repoMock.EXPECT().GetShares().Return([]DbEntity{
-		{Name: "Share1"}, {Name: "Share2"},
-	}, nil).Once()
-
-	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
-		{Name: "SNOWFLAKE"},
-		{Name: "TEST_DB"},
-	}, nil).Once()
-	repoMock.EXPECT().GetDatabaseRoles("SNOWFLAKE").Return([]RoleEntity{}, nil).Once()
-	repoMock.EXPECT().GetDatabaseRoles("TEST_DB").Return([]RoleEntity{
-		{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 1, Owner: "Owner1"},
-		{Name: "DatabaseRole2", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
-		{Name: "DatabaseRole3", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
-	}, nil).Once()
-
-	repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
-		{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
-		{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
-		{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner1"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{
-		{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
-		{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
-		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
-		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
-		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
-		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
-		{GrantedOn: "MATERIALIZED_VIEW", Name: "DB1.GranteeRole1MatView", Privilege: "SELECT"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{
-		{GrantedTo: "USER", GranteeName: "GranteeRole2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{
-		{GrantedOn: "GrandOnRole2Number1", Name: "GranteeRole2", Privilege: "USAGE"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role3").Return([]GrantOfRole{
-		{GrantedTo: "ROLE", GranteeName: "\"GranteeRole.3\""},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role3").Return([]GrantToRole{
-		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
-	}, nil).Once()
-
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantOfRole{
-		{GrantedTo: "ROLE", GranteeName: "GranteeDatabaseRole1Number2"},
-		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.DatabaseRole2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantToRole{
-		{GrantedOn: "TABLE", Name: "TEST_DB.GranteeRole1Table", Privilege: "USAGE"},
-		{GrantedOn: "TABLE", Name: "TEST_DB.GranteeRole1Table", Privilege: "SELECT"},
-		{GrantedOn: "MATERIALIZED_VIEW", Name: "TEST_DB.GranteeRole1MatView", Privilege: "SELECT"},
-	}, nil).Once()
-
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantOfRole{}, nil).Once()
-	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantToRole{
-		{GrantedOn: "GrandOnDatabaseRole2Number1", Name: "GranteeDatabaseRole2", Privilege: "USAGE"},
-	}, nil).Once()
-
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole3").Return([]GrantOfRole{}, nil).Once()
-	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole3").Return([]GrantToRole{
-		{GrantedOn: "MATERIALIZED_VIEW", Name: "TEST_DB.GranteeRole3MatView", Privilege: "SELECT"},
-	}, nil).Once()
-
-	repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{
-		{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING_POLICY"},
-	}, nil).Once()
-	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
-		{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
-	}, nil).Once()
-	repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
-		{Name: "DescribePolicy1", Body: "PolicyBody 1"},
-	}, nil).Once()
-	repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
-		{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
-	}, nil).Once()
-	repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
-		{POLICY_DB: "PolicyDB"},
-	}, nil).Once()
-	repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
-		{POLICY_DB: "PolicyDB"},
-	}, nil).Once()
-
-	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-		return repoMock, nil
-	})
-
-	//When
-	err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &configParams)
-
-	//Then
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, []sync_from_target.AccessProvider{
-		{
-			ExternalId:        "Role1",
-			NotInternalizable: false,
-			Name:              "Role1",
-			NamingHint:        "Role1",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{"GranteeRole1Number1"},
-				Groups:          []string{},
-				AccessProviders: []string{"GranteeRole1Number2"},
-			},
-			ActualName: "Role1",
-			Type:       ptr.String(access_provider.Role),
-			What: []sync_from_target.WhatItem{
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "Share2.GranteeRole1Schema",
-						Type:     "",
-					},
-					Permissions: []string{"READ"},
-				},
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "DB1.GranteeRole1Table",
-						Type:     "",
-					},
-					Permissions: []string{"SELECT"},
-				},
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "DB1.GranteeRole1MatView",
-						Type:     "",
-					},
-					Permissions: []string{"SELECT"},
-				},
-			},
-			Action: 1,
-			Policy: "",
-		}, {
-			ExternalId:        "Role2",
-			NotInternalizable: false,
-			Name:              "Role2",
-			NamingHint:        "Role2",
-			Type:              ptr.String(access_provider.Role),
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{"GranteeRole2"},
-				Groups:          []string{},
-				AccessProviders: []string{},
-			},
-			ActualName: "Role2",
-			What:       []sync_from_target.WhatItem{},
-			Action:     1,
-			Policy:     "",
-		}, {
-			ExternalId:        "Role3",
-			NotInternalizable: true,
-			Name:              "Role3",
-			NamingHint:        "Role3",
-			Type:              ptr.String(access_provider.Role),
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{},
-				Groups:          []string{},
-				AccessProviders: []string{"GranteeRole.3"},
-			},
-			ActualName: "Role3",
-			What:       []sync_from_target.WhatItem{},
-			Action:     1,
-			Policy:     "",
-		},
-		{
-			ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",
-			NotInternalizable: false,
-			Name:              "TEST_DB.DatabaseRole1",
-			NamingHint:        "DatabaseRole1",
-			ActualName:        "DatabaseRole1",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{},
-				Groups:          []string{},
-				AccessProviders: []string{"GranteeDatabaseRole1Number2", "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2"},
-			},
-			What: []sync_from_target.WhatItem{
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "TEST_DB.GranteeRole1Table",
-						Type:     "",
-					},
-					Permissions: []string{"SELECT"},
-				},
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "TEST_DB.GranteeRole1MatView",
-						Type:     "",
-					},
-					Permissions: []string{"SELECT"},
-				},
-			},
-			Action:           sync_from_target.Grant,
-			Policy:           "",
-			Type:             ptr.String("databaseRole"),
-			WhoLocked:        ptr.Bool(true),
-			WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
-			WhatLocked:       ptr.Bool(true),
-			WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
-		}, {
-			ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2",
-			NotInternalizable: false,
-			Name:              "TEST_DB.DatabaseRole2",
-			NamingHint:        "DatabaseRole2",
-			ActualName:        "DatabaseRole2",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{},
-				Groups:          []string{},
-				AccessProviders: []string{},
-			},
-			What:             []sync_from_target.WhatItem{},
-			Action:           1,
-			Policy:           "",
-			Type:             ptr.String("databaseRole"),
-			WhoLocked:        ptr.Bool(true),
-			WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
-			WhatLocked:       ptr.Bool(true),
-			WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
-		}, {
-			ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole3",
-			NotInternalizable: false,
-			Name:              "TEST_DB.DatabaseRole3",
-			NamingHint:        "DatabaseRole3",
-			ActualName:        "DatabaseRole3",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{},
-				Groups:          []string{},
-				AccessProviders: []string{},
-			},
-			What: []sync_from_target.WhatItem{
-
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "TEST_DB.GranteeRole3MatView",
-						Type:     "",
-					},
-					Permissions: []string{"SELECT"},
-				},
-			},
-			Action:           1,
-			Policy:           "",
-			Type:             ptr.String("databaseRole"),
-			WhoLocked:        ptr.Bool(true),
-			WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
-			WhatLocked:       ptr.Bool(true),
-			WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
-		},
-		{
-			ExternalId:        "DB-schema1-MaskingPolicy1",
-			NotInternalizable: true,
-			Name:              "DB-schema1-MaskingPolicy1",
-			NamingHint:        "MaskingPolicy1",
-			Who:               nil,
-			ActualName:        "DB-schema1-MaskingPolicy1",
-			What:              []sync_from_target.WhatItem{},
-			Action:            3,
-			Policy:            "PolicyBody 1",
-		},
-		{
-			ExternalId:        "DB-schema2-RowAccess1",
-			NotInternalizable: true,
-			Name:              "DB-schema2-RowAccess1",
-			NamingHint:        "RowAccess1",
-			Who:               nil,
-			ActualName:        "DB-schema2-RowAccess1",
-			What:              []sync_from_target.WhatItem{},
-			Action:            4,
-			Policy:            "Row Access Policy Body",
-		},
-	}, fileCreator.AccessProviders)
-}
-
-func TestAccessSyncer_SyncAccessProvidersFromTarget_NoUnpack(t *testing.T) {
-	//Given
-	configParams := config.ConfigMap{
-		Parameters: map[string]string{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfLinkToExternalIdentityStoreGroups: "true"},
-	}
-
-	repoMock := newMockDataAccessRepository(t)
-	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 2)
-
-	repoMock.EXPECT().Close().Return(nil).Once()
-	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-	repoMock.EXPECT().GetShares().Return([]DbEntity{
-		{Name: "Share1"}, {Name: "Share2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
-		{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
-		{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner1"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{
-		{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
-		{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
-		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
-		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
-		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
-		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role3").Return([]GrantToRole{
-		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
-	}, nil).Once()
-	repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{
-		{Name: "MaskingPolicy1", SchemaName: "schema1", DatabaseName: "DB", Owner: "MaskingOwner", Kind: "MASKING_POLICY"},
-	}, nil).Once()
-	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
-		{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
-	}, nil).Once()
-	repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
-		{Name: "DescribePolicy1", Body: "PolicyBody 1"},
-	}, nil).Once()
-	repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
-		{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
-	}, nil).Once()
-	repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
-		{POLICY_DB: "PolicyDB"},
-	}, nil).Once()
-	repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
-		{POLICY_DB: "PolicyDB"},
-	}, nil).Once()
-
-	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-		return repoMock, nil
-	})
-
-	//When
-	err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &configParams)
-
-	//Then
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, []sync_from_target.AccessProvider{
-		{
-			ExternalId:        "Role1",
-			Type:              ptr.String(access_provider.Role),
-			NotInternalizable: false,
-			Name:              "Role1",
-			NamingHint:        "Role1",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{"GranteeRole1Number1"},
-				Groups:          []string{},
-				AccessProviders: []string{"GranteeRole1Number2"},
-			},
-			ActualName: "Role1",
-			What: []sync_from_target.WhatItem{
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "Share2.GranteeRole1Schema",
-						Type:     "",
-					},
-					Permissions: []string{"READ"},
-				},
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "DB1.GranteeRole1Table",
-						Type:     "",
-					},
-					Permissions: []string{"SELECT"},
-				},
-			},
-			Action: 1,
-			Policy: "",
-		}, {
-			ExternalId:              "Role3",
-			Type:                    ptr.String(access_provider.Role),
-			NotInternalizable:       false,
-			WhoLocked:               ptr.Bool(true),
-			InheritanceLocked:       ptr.Bool(true),
-			NameLocked:              ptr.Bool(true),
-			DeleteLocked:            ptr.Bool(true),
-			WhoLockedReason:         ptr.String(whoLockedReason),
-			InheritanceLockedReason: ptr.String(inheritanceLockedReason),
-			NameLockedReason:        ptr.String(nameLockedReason),
-			DeleteLockedReason:      ptr.String(deleteLockedReason),
-			Name:                    "Role3",
-			NamingHint:              "Role3",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{},
-				Groups:          []string{"Role3"},
-				AccessProviders: []string{},
-			},
-			ActualName: "Role3",
-			What:       []sync_from_target.WhatItem{},
-			Action:     1,
-			Policy:     "",
-		},
-		{
-			ExternalId:        "DB-schema1-MaskingPolicy1",
-			NotInternalizable: true,
-			Name:              "DB-schema1-MaskingPolicy1",
-			NamingHint:        "MaskingPolicy1",
-			Who:               nil,
-			ActualName:        "DB-schema1-MaskingPolicy1",
-			What:              []sync_from_target.WhatItem{},
-			Action:            3,
-			Policy:            "PolicyBody 1",
-		},
-		{
-			ExternalId:        "DB-schema2-RowAccess1",
-			NotInternalizable: true,
-			Name:              "DB-schema2-RowAccess1",
-			NamingHint:        "RowAccess1",
-			Who:               nil,
-			ActualName:        "DB-schema2-RowAccess1",
-			What:              []sync_from_target.WhatItem{},
-			Action:            4,
-			Policy:            "Row Access Policy Body",
-		},
-	}, fileCreator.AccessProviders)
-}
-
-func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T) {
-	//Given
-	configParams := config.ConfigMap{
-		Parameters: map[string]string{"key": "value", SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2",
-			SfStandardEdition: "true"},
-	}
-
-	repoMock := newMockDataAccessRepository(t)
-	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 3)
-
-	repoMock.EXPECT().Close().Return(nil).Once()
-	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-	repoMock.EXPECT().GetShares().Return([]DbEntity{
-		{Name: "Share1"}, {Name: "Share2"},
-	}, nil).Once()
-
-	repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
-		{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
-		{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
-		{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{
-		{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
-		{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
-		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
-		{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
-		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
-		{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{
-		{GrantedTo: "USER", GranteeName: "GranteeRole2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{
-		{GrantedOn: "GrandOnRole2Number1", Name: "GranteeRole2", Privilege: "USAGE"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role3").Return([]GrantOfRole{
-		{GrantedTo: "ROLE", GranteeName: "GranteeRole3"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role3").Return([]GrantToRole{
-		{GrantedOn: "GrandOnRole3Number1", Name: "GranteeRole3", Privilege: "WRITE"},
-	}, nil).Once()
-
-	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-		return repoMock, nil
-	})
-
-	//When
-	err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &configParams)
-
-	//Then
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, []sync_from_target.AccessProvider{
-		{
-			ExternalId:        "Role1",
-			Type:              ptr.String(access_provider.Role),
-			NotInternalizable: false,
-			Name:              "Role1",
-			NamingHint:        "Role1",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{"GranteeRole1Number1"},
-				Groups:          []string{},
-				AccessProviders: []string{"GranteeRole1Number2"},
-			},
-			ActualName: "Role1",
-			What: []sync_from_target.WhatItem{
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "Share2.GranteeRole1Schema",
-						Type:     "",
-					},
-					Permissions: []string{"READ"},
-				},
-				{
-					DataObject: &data_source.DataObjectReference{
-						FullName: "DB1.GranteeRole1Table",
-						Type:     "",
-					},
-					Permissions: []string{"SELECT"},
-				},
-			},
-			Action: 1,
-			Policy: "",
-		}, {
-			ExternalId:        "Role2",
-			Type:              ptr.String(access_provider.Role),
-			NotInternalizable: false,
-			Name:              "Role2",
-			NamingHint:        "Role2",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{"GranteeRole2"},
-				Groups:          []string{},
-				AccessProviders: []string{},
-			},
-			ActualName: "Role2",
-			What:       []sync_from_target.WhatItem{},
-			Action:     1,
-			Policy:     "",
-		}, {
-			ExternalId:        "Role3",
-			Type:              ptr.String(access_provider.Role),
-			NotInternalizable: true,
-			Name:              "Role3",
-			NamingHint:        "Role3",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{},
-				Groups:          []string{},
-				AccessProviders: []string{"GranteeRole3"},
-			},
-			ActualName: "Role3",
-			What:       []sync_from_target.WhatItem{},
-			Action:     1,
-			Policy:     "",
-		},
-	}, fileCreator.AccessProviders)
-	repoMock.AssertNotCalled(t, "GetPolicies", "MASKING")
-	repoMock.AssertNotCalled(t, "GetPolicies", "ROW ACCESS")
-	repoMock.AssertNotCalled(t, "DescribePolicy", "MASKING", mock.Anything, mock.Anything, mock.Anything)
-	repoMock.AssertNotCalled(t, "GetPolicyReferences", mock.Anything, mock.Anything, mock.Anything)
-}
-
-func TestAccessSyncer_SyncAccessProvidersFromTarget_Excludes(t *testing.T) {
-	//Given
-	configParams := config.ConfigMap{
-		Parameters: map[string]string{SfExcludedRoles: "Role1,TEST_DB.DatabaseRole1", SfDatabaseRoles: "true"},
-	}
-
-	repoMock := newMockDataAccessRepository(t)
-	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 2)
-
-	repoMock.EXPECT().Close().Return(nil).Once()
-	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-	repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Once()
-
-	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
-		{Name: "SNOWFLAKE"},
-		{Name: "TEST_DB"},
-	}, nil).Once()
-	repoMock.EXPECT().GetDatabaseRoles("SNOWFLAKE").Return([]RoleEntity{}, nil).Once()
-	repoMock.EXPECT().GetDatabaseRoles("TEST_DB").Return([]RoleEntity{
-		{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 1, Owner: "Owner1"},
-		{Name: "DatabaseRole2", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
-	}, nil).Once()
-
-	repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
-		{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
-		{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
-	}, nil).Once()
-	repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{}, nil).Once()
-	repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{}, nil).Once()
-
-	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantOfRole{}, nil).Once()
-	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantToRole{}, nil).Once()
-
-	repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{}, nil).Once()
-	repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{}, nil).Once()
-
-	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-		return repoMock, nil
-	})
-
-	//When
-	err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &configParams)
-
-	//Then
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, []sync_from_target.AccessProvider{
-		{
-			ExternalId:        "Role2",
-			Type:              ptr.String(access_provider.Role),
-			NotInternalizable: false,
-			Name:              "Role2",
-			NamingHint:        "Role2",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{},
-				Groups:          []string{},
-				AccessProviders: []string{},
-			},
-			ActualName: "Role2",
-			What:       []sync_from_target.WhatItem{},
-			Action:     1,
-			Policy:     "",
-		}, {
-			ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2",
-			Type:              ptr.String("databaseRole"),
-			NotInternalizable: false,
-			Name:              "TEST_DB.DatabaseRole2",
-			NamingHint:        "DatabaseRole2",
-			ActualName:        "DatabaseRole2",
-			Who: &sync_from_target.WhoItem{
-				Users:           []string{},
-				Groups:          []string{},
-				AccessProviders: []string{},
-			},
-			What:             []sync_from_target.WhatItem{},
-			Action:           1,
-			Policy:           "",
-			WhoLocked:        ptr.Bool(true),
-			WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
-			WhatLocked:       ptr.Bool(true),
-			WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
-		},
-	}, fileCreator.AccessProviders)
-}
-
-func TestAccessSyncer_SyncAccessProvidersFromTarget_ErrorOnConnectingToRepo(t *testing.T) {
-	//Given
-	configParams := config.ConfigMap{
-		Parameters: map[string]string{"key": "value"},
-	}
-
-	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
-
-	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-		return nil, fmt.Errorf("boom")
-	})
-
-	//When
-	err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &configParams)
-
-	//Then
-	assert.Error(t, err)
-}
-
-func TestAccessSyncer_SyncAccessProvidersFromTarget_ErrorOnShares(t *testing.T) {
-	//Given
-	configParams := config.ConfigMap{
-		Parameters: map[string]string{"key": "value"},
-	}
-
-	repoMock := newMockDataAccessRepository(t)
-	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
-
-	repoMock.EXPECT().Close().Return(nil).Once()
-	repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-	repoMock.EXPECT().GetShares().Return(nil, fmt.Errorf("boom")).Once()
-	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-		return repoMock, nil
-	})
-
-	//When
-	err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &configParams)
-
-	//Then
-	assert.Error(t, err)
 }
 
 func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {

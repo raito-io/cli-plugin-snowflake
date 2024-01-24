@@ -9,13 +9,29 @@ import (
 	"github.com/raito-io/cli/base/access_provider"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	ds "github.com/raito-io/cli/base/data_source"
+	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
-func (s *AccessSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, externalGroupOwners string, excludedRoles map[string]struct{}, linkToExternalIdentityStoreGroups bool, shares []string) error {
+type tagApRetrievalConfig struct {
+	enabled           bool
+	availableTags     map[string][]*tag.Tag
+	tagKeyDisplayName string
+}
+
+func (s *AccessSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, shares []string, configMap *config.ConfigMap) error {
+	externalGroupOwners := configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
+	excludedRoles := s.extractExcludeRoleList(configMap)
+	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
+
+	tagRetrieval, err := s.shouldRetrieveTags(configMap, repo, "ROLE")
+	if err != nil {
+		return err
+	}
+
 	processedAps := make(map[string]*exporter.AccessProvider)
 
 	// Get all account roles and import them
@@ -30,7 +46,7 @@ func (s *AccessSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappe
 			continue
 		}
 
-		err = s.transformAccountRoleToAccessProvider(roleEntity, processedAps, linkToExternalIdentityStoreGroups, externalGroupOwners, shares, repo)
+		err = s.transformAccountRoleToAccessProvider(roleEntity, processedAps, linkToExternalIdentityStoreGroups, *tagRetrieval, externalGroupOwners, shares, repo)
 		if err != nil {
 			return err
 		}
@@ -43,8 +59,47 @@ func (s *AccessSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappe
 
 	return nil
 }
+func (s *AccessSyncer) shouldRetrieveTags(configMap *config.ConfigMap, repo dataAccessRepository, tagDomain string) (*tagApRetrievalConfig, error) {
+	standard := configMap.GetBoolWithDefault(SfStandardEdition, false)
+	skipTags := configMap.GetBoolWithDefault(SfSkipTags, false)
+	tagKeyForDisplayName := configMap.GetString(SfTagOverwriteKeyForAccessControlName)
+	availableTags := make(map[string][]*tag.Tag)
 
-func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntity, processedAps map[string]*exporter.AccessProvider, linkToExternalIdentityStoreGroups bool, externalGroupOwners string, shares []string, repo dataAccessRepository) error {
+	tagSupportEnabled := !standard && !skipTags && tagKeyForDisplayName != ""
+	if tagSupportEnabled {
+		var err error
+
+		availableTags, err = repo.GetTagsByDomain(tagDomain)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &tagApRetrievalConfig{
+		enabled:           tagSupportEnabled,
+		tagKeyDisplayName: tagKeyForDisplayName,
+		availableTags:     availableTags,
+	}, nil
+}
+
+func (s *AccessSyncer) extractNameFromTags(tags []*tag.Tag, tagKeyDisplayName string) *string {
+	if tagKeyDisplayName == "" {
+		return nil
+	}
+
+	var overwrittenName *string = nil
+
+	for _, tag := range tags {
+		if tag.Key == tagKeyDisplayName {
+			overwrittenName = ptr.String(tag.Value)
+			break
+		}
+	}
+
+	return overwrittenName
+}
+
+func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntity, processedAps map[string]*exporter.AccessProvider, linkToExternalIdentityStoreGroups bool, tagRetrieval tagApRetrievalConfig, externalGroupOwners string, shares []string, repo dataAccessRepository) error {
 	logger.Info(fmt.Sprintf("Reading SnowFlake ROLE %s", roleEntity.Name))
 
 	roleName := roleEntity.Name
@@ -110,6 +165,19 @@ func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntit
 		ap.NotInternalizable = true
 	}
 
+	if tagRetrieval.enabled && len(tagRetrieval.availableTags) > 0 && tagRetrieval.availableTags[ap.Name] != nil {
+		linkedTags := tagRetrieval.availableTags[ap.Name]
+
+		// Not available yet within our AP model yet
+		// ap.Tags = linkedTags
+
+		if overwrittenName := s.extractNameFromTags(linkedTags, tagRetrieval.tagKeyDisplayName); overwrittenName != nil {
+			ap.Name = *overwrittenName
+			ap.NameLocked = ptr.Bool(true)
+			ap.NameLockedReason = ptr.String(nameTagOverrideLockedReason)
+		}
+	}
+
 	return nil
 }
 
@@ -128,7 +196,16 @@ func (s *AccessSyncer) extractExcludeRoleList(configMap *config.ConfigMap) map[s
 	return excludedRoles
 }
 
-func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, externalGroupOwners string, excludedRoles map[string]struct{}, linkToExternalIdentityStoreGroups bool, shares []string) error {
+func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, shares []string, configMap *config.ConfigMap) error {
+	externalGroupOwners := configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
+	excludedRoles := s.extractExcludeRoleList(configMap)
+	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
+
+	tagRetrieval, err := s.shouldRetrieveTags(configMap, repo, "DATABASE ROLE")
+	if err != nil {
+		return err
+	}
+
 	//Get all database roles for each database and import them
 	databases, err := s.getDatabases(repo)
 	if err != nil {
@@ -152,7 +229,7 @@ func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrapp
 				continue
 			}
 
-			err = s.importAccessForDatabaseRole(database.Name, roleEntity, externalGroupOwners, linkToExternalIdentityStoreGroups, repo, processedAps, shares)
+			err = s.importAccessForDatabaseRole(database.Name, roleEntity, externalGroupOwners, linkToExternalIdentityStoreGroups, *tagRetrieval, repo, processedAps, shares)
 			if err != nil {
 				return err
 			}
@@ -180,7 +257,7 @@ func (s *AccessSyncer) comesFromExternalIdentityStore(roleEntity RoleEntity, ext
 	return fromExternalIS
 }
 
-func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity RoleEntity, externalGroupOwners string, linkToExternalIdentityStoreGroups bool, repo dataAccessRepository, processedAps map[string]*exporter.AccessProvider, shares []string) error {
+func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity RoleEntity, externalGroupOwners string, linkToExternalIdentityStoreGroups bool, tagRetrieval tagApRetrievalConfig, repo dataAccessRepository, processedAps map[string]*exporter.AccessProvider, shares []string) error {
 	logger.Info(fmt.Sprintf("Reading SnowFlake DATABASE ROLE %s inside %s", roleEntity.Name, database))
 
 	roleName := roleEntity.Name
@@ -236,6 +313,19 @@ func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity R
 	if isNotInternalizableRole(ap.ExternalId, ap.Type) {
 		logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", ap.ExternalId))
 		ap.NotInternalizable = true
+	}
+
+	if tagRetrieval.enabled && len(tagRetrieval.availableTags) > 0 && tagRetrieval.availableTags[ap.Name] != nil {
+		linkedTags := tagRetrieval.availableTags[ap.Name]
+
+		// Not available yet within our AP model yet
+		// ap.Tags = linkedTags
+
+		if overwrittenName := s.extractNameFromTags(linkedTags, tagRetrieval.tagKeyDisplayName); overwrittenName != nil {
+			ap.Name = fmt.Sprintf("%s.%s", database, *overwrittenName)
+			ap.NameLocked = ptr.Bool(true)
+			ap.NameLockedReason = ptr.String(nameTagOverrideLockedReason)
+		}
 	}
 
 	return nil

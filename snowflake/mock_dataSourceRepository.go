@@ -426,12 +426,12 @@ func (_c *mockDataSourceRepository_GetTablesInDatabase_Call) RunAndReturn(run fu
 	return _c
 }
 
-// GetTags provides a mock function with given fields: databaseName
-func (_m *mockDataSourceRepository) GetTags(databaseName string) (map[string][]*tag.Tag, error) {
+// GetTagsLinkedToDatabaseName provides a mock function with given fields: databaseName
+func (_m *mockDataSourceRepository) GetTagsLinkedToDatabaseName(databaseName string) (map[string][]*tag.Tag, error) {
 	ret := _m.Called(databaseName)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetTags")
+		panic("no return value specified for GetTagsLinkedToDatabaseName")
 	}
 
 	var r0 map[string][]*tag.Tag
@@ -456,30 +456,30 @@ func (_m *mockDataSourceRepository) GetTags(databaseName string) (map[string][]*
 	return r0, r1
 }
 
-// mockDataSourceRepository_GetTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTags'
-type mockDataSourceRepository_GetTags_Call struct {
+// mockDataSourceRepository_GetTagsLinkedToDatabaseName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTagsLinkedToDatabaseName'
+type mockDataSourceRepository_GetTagsLinkedToDatabaseName_Call struct {
 	*mock.Call
 }
 
-// GetTags is a helper method to define mock.On call
+// GetTagsLinkedToDatabaseName is a helper method to define mock.On call
 //   - databaseName string
-func (_e *mockDataSourceRepository_Expecter) GetTags(databaseName interface{}) *mockDataSourceRepository_GetTags_Call {
-	return &mockDataSourceRepository_GetTags_Call{Call: _e.mock.On("GetTags", databaseName)}
+func (_e *mockDataSourceRepository_Expecter) GetTagsLinkedToDatabaseName(databaseName interface{}) *mockDataSourceRepository_GetTagsLinkedToDatabaseName_Call {
+	return &mockDataSourceRepository_GetTagsLinkedToDatabaseName_Call{Call: _e.mock.On("GetTagsLinkedToDatabaseName", databaseName)}
 }
 
-func (_c *mockDataSourceRepository_GetTags_Call) Run(run func(databaseName string)) *mockDataSourceRepository_GetTags_Call {
+func (_c *mockDataSourceRepository_GetTagsLinkedToDatabaseName_Call) Run(run func(databaseName string)) *mockDataSourceRepository_GetTagsLinkedToDatabaseName_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string))
 	})
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetTags_Call) Return(_a0 map[string][]*tag.Tag, _a1 error) *mockDataSourceRepository_GetTags_Call {
+func (_c *mockDataSourceRepository_GetTagsLinkedToDatabaseName_Call) Return(_a0 map[string][]*tag.Tag, _a1 error) *mockDataSourceRepository_GetTagsLinkedToDatabaseName_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockDataSourceRepository_GetTags_Call) RunAndReturn(run func(string) (map[string][]*tag.Tag, error)) *mockDataSourceRepository_GetTags_Call {
+func (_c *mockDataSourceRepository_GetTagsLinkedToDatabaseName_Call) RunAndReturn(run func(string) (map[string][]*tag.Tag, error)) *mockDataSourceRepository_GetTagsLinkedToDatabaseName_Call {
 	_c.Call.Return(run)
 	return _c
 }

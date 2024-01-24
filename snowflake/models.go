@@ -25,7 +25,7 @@ type SchemaEntity struct {
 }
 
 type TagEntity struct {
-	Database string  `db:"OBJECT_DATABASE"`
+	Database *string `db:"OBJECT_DATABASE"`
 	Schema   *string `db:"OBJECT_SCHEMA"`
 	Name     string  `db:"OBJECT_NAME"`
 	Domain   string  `db:"DOMAIN"`
@@ -45,13 +45,17 @@ func (t *TagEntity) CreateTag() *tag.Tag {
 func (t *TagEntity) GetFullName() string {
 	switch strings.ToUpper(t.Domain) {
 	case "DATABASE":
-		return t.Database
+		return *t.Database
 	case "SCHEMA":
-		return t.Database + "." + t.Name
+		return *t.Database + "." + t.Name
 	case "TABLE":
-		return t.Database + "." + *t.Schema + "." + t.Name
+		return *t.Database + "." + *t.Schema + "." + t.Name
 	case "COLUMN":
-		return t.Database + "." + *t.Schema + "." + t.Name + "." + *t.Column
+		return *t.Database + "." + *t.Schema + "." + t.Name + "." + *t.Column
+	case "ROLE":
+		return t.Name
+	case "DATABASE ROLE":
+		return t.Name
 	}
 
 	return ""

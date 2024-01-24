@@ -10,6 +10,7 @@ import (
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
+	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
 )
@@ -18,12 +19,13 @@ var RolesNotInternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN
 var AcceptedTypes = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "VIEW": {}, "COLUMN": {}, "SHARED-DATABASE": {}, "EXTERNAL_TABLE": {}, "MATERIALIZED_VIEW": {}}
 
 const (
-	whoLockedReason         = "The 'who' for this Snowflake role cannot be changed because it was imported from an external identity store"
-	inheritanceLockedReason = "The inheritance for this Snowflake role cannot be changed because it was imported from an external identity store"
-	nameLockedReason        = "This Snowflake role cannot be renamed because it was imported from an external identity store"
-	deleteLockedReason      = "This Snowflake role cannot be deleted because it was imported from an external identity store"
-	maskPrefix              = "RAITO_"
-	idAlphabet              = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	whoLockedReason             = "The 'who' for this Snowflake role cannot be changed because it was imported from an external identity store"
+	inheritanceLockedReason     = "The inheritance for this Snowflake role cannot be changed because it was imported from an external identity store"
+	nameLockedReason            = "This Snowflake role cannot be renamed because it was imported from an external identity store"
+	deleteLockedReason          = "This Snowflake role cannot be deleted because it was imported from an external identity store"
+	maskPrefix                  = "RAITO_"
+	idAlphabet                  = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	nameTagOverrideLockedReason = "This Snowflake role cannot be renamed because it has a name tag override attached to it"
 
 	databaseRoleWhoLockedReason  = "The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"
 	databaseRoleWhatLockedReason = "The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"
@@ -61,6 +63,7 @@ type dataAccessRepository interface {
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetShares() ([]DbEntity, error)
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
+	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	GetWarehouses() ([]DbEntity, error)
 	GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error
 	GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
@@ -117,9 +120,6 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	}()
 
 	logger.Info("Reading account and database roles from Snowflake")
-	externalGroupOwners := configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
-	excludedRoles := s.extractExcludeRoleList(configMap)
-	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
 
 	shares, err := s.getShareNames(repo)
 	if err != nil {
@@ -128,7 +128,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 
 	logger.Info("Reading account roles from Snowflake")
 
-	err = s.importAllRolesOnAccountLevel(accessProviderHandler, repo, externalGroupOwners, excludedRoles, linkToExternalIdentityStoreGroups, shares)
+	err = s.importAllRolesOnAccountLevel(accessProviderHandler, repo, shares, configMap)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	if databaseRoleSupportEnabled {
 		logger.Info("Reading database roles from Snowflake")
 
-		err = s.importAllRolesOnDatabaseLevel(accessProviderHandler, repo, externalGroupOwners, excludedRoles, linkToExternalIdentityStoreGroups, shares)
+		err = s.importAllRolesOnDatabaseLevel(accessProviderHandler, repo, shares, configMap)
 		if err != nil {
 			return err
 		}
