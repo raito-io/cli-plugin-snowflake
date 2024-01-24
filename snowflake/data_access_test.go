@@ -361,7 +361,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_WithDatabaseRoleSupport(t *t
 		{
 			ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",
 			NotInternalizable: false,
-			Name:              "DatabaseRole1",
+			Name:              "TEST_DB.DatabaseRole1",
 			NamingHint:        "DatabaseRole1",
 			ActualName:        "DatabaseRole1",
 			Who: &sync_from_target.WhoItem{
@@ -395,7 +395,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_WithDatabaseRoleSupport(t *t
 		}, {
 			ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2",
 			NotInternalizable: false,
-			Name:              "DatabaseRole2",
+			Name:              "TEST_DB.DatabaseRole2",
 			NamingHint:        "DatabaseRole2",
 			ActualName:        "DatabaseRole2",
 			Who: &sync_from_target.WhoItem{
@@ -414,7 +414,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_WithDatabaseRoleSupport(t *t
 		}, {
 			ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole3",
 			NotInternalizable: false,
-			Name:              "DatabaseRole3",
+			Name:              "TEST_DB.DatabaseRole3",
 			NamingHint:        "DatabaseRole3",
 			ActualName:        "DatabaseRole3",
 			Who: &sync_from_target.WhoItem{
@@ -791,7 +791,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_Excludes(t *testing.T) {
 			ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2",
 			Type:              ptr.String("databaseRole"),
 			NotInternalizable: false,
-			Name:              "DatabaseRole2",
+			Name:              "TEST_DB.DatabaseRole2",
 			NamingHint:        "DatabaseRole2",
 			ActualName:        "DatabaseRole2",
 			Who: &sync_from_target.WhoItem{
