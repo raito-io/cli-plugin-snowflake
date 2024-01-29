@@ -9,6 +9,7 @@ import (
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/wrappers"
+	"github.com/raito-io/golang-set/set"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
@@ -116,30 +117,26 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 		excludedDatabases = v
 	}
 
+	dbExcludes := parseCommaSeparatedList(excludedDatabases)
+
 	excludedSchemaList := "INFORMATION_SCHEMA"
 	if v, ok := configParams.Parameters[SfExcludedSchemas]; ok {
 		excludedSchemaList += "," + v
 	}
 
-	excludedSchemas := make(map[string]struct{})
-
-	if excludedSchemaList != "" {
-		for _, e := range strings.Split(excludedSchemaList, ",") {
-			excludedSchemas[e] = struct{}{}
-		}
-	}
+	schemaExcludes := parseCommaSeparatedList(excludedSchemaList)
 
 	err = s.readWarehouses(repo, dataSourceHandler)
 	if err != nil {
 		return err
 	}
 
-	shares, sharesMap, err := s.readShares(repo, excludedDatabases, dataSourceHandler)
+	shares, sharesMap, err := s.readShares(repo, dbExcludes, dataSourceHandler)
 	if err != nil {
 		return err
 	}
 
-	databases, err := s.readDatabases(repo, excludedDatabases, dataSourceHandler, sharesMap)
+	databases, err := s.readDatabases(repo, dbExcludes, dataSourceHandler, sharesMap)
 	if err != nil {
 		return err
 	}
@@ -170,18 +167,18 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 			}
 		}
 
-		err = s.readSchemasInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix, tagMap)
+		err = s.readSchemasInDatabase(repo, database.Name, schemaExcludes, dataSourceHandler, doTypePrefix, tagMap)
 		if err != nil {
 			return err
 		}
 
-		err = s.readTablesInDatabase(database.Name, excludedSchemas, dataSourceHandler, doTypePrefix, repo.GetTablesInDatabase, tagMap)
+		err = s.readTablesInDatabase(database.Name, schemaExcludes, dataSourceHandler, doTypePrefix, repo.GetTablesInDatabase, tagMap)
 		if err != nil {
 			return err
 		}
 
 		if !skipColumns {
-			err = s.readColumnsInDatabase(repo, database.Name, excludedSchemas, dataSourceHandler, doTypePrefix, tagMap)
+			err = s.readColumnsInDatabase(repo, database.Name, schemaExcludes, dataSourceHandler, doTypePrefix, tagMap)
 			if err != nil {
 				return err
 			}
@@ -191,15 +188,31 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	return nil
 }
 
-func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
+func parseCommaSeparatedList(list string) set.Set[string] {
+	list = strings.TrimSpace(list)
+
+	if list == "" {
+		return set.NewSet[string]()
+	}
+
+	ret := set.NewSet[string]()
+
+	for _, v := range strings.Split(list, ",") {
+		ret.Add(strings.TrimSpace(v))
+	}
+
+	return ret
+}
+
+func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbName string, excludedSchemas set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
 	typeName := doTypePrefix + ds.Column
 
 	return repo.GetColumnsInDatabase(dbName, func(entity interface{}) error {
 		column := entity.(*ColumnEntity)
 		schemaName := column.Schema
 		schemaFullName := column.Database + "." + schemaName
-		_, ff := excludedSchemas[schemaFullName]
-		_, fs := excludedSchemas[schemaName]
+		ff := excludedSchemas.Contains(schemaFullName)
+		fs := excludedSchemas.Contains(schemaName)
 
 		fullName := schemaFullName + "." + column.Table + "." + column.Name
 
@@ -229,7 +242,7 @@ func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbNa
 	})
 }
 
-func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
+func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
 	typeName := doTypePrefix + ds.Schema
 
 	return repo.GetSchemasInDatabase(databaseName, func(entity interface{}) error {
@@ -237,8 +250,8 @@ func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, data
 
 		fullName := schema.Database + "." + schema.Name
 
-		_, ff := excludedSchemas[fullName]
-		_, fs := excludedSchemas[schema.Name]
+		ff := excludedSchemas.Contains(fullName)
+		fs := excludedSchemas.Contains(schema.Name)
 
 		if ff || fs || !s.shouldHandle(fullName) {
 			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
@@ -265,7 +278,7 @@ func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, data
 	})
 }
 
-func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSchemas map[string]struct{}, dataSourceHandler wrappers.DataSourceObjectHandler, typePrefix string, fetcher func(dbName string, schemaName string, entityHandler EntityHandler) error, tagMap map[string][]*tag.Tag) error {
+func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSchemas set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, typePrefix string, fetcher func(dbName string, schemaName string, entityHandler EntityHandler) error, tagMap map[string][]*tag.Tag) error {
 	return fetcher(databaseName, "", func(entity interface{}) error {
 		table := entity.(*TableEntity)
 
@@ -279,8 +292,8 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSch
 
 		schemaName := table.Schema
 		schemaFullName := table.Database + "." + schemaName
-		_, ff := excludedSchemas[schemaFullName]
-		_, fs := excludedSchemas[schemaName]
+		ff := excludedSchemas.Contains(schemaFullName)
+		fs := excludedSchemas.Contains(schemaName)
 
 		fullName := schemaFullName + "." + table.Name
 
@@ -358,26 +371,17 @@ func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, d
 	return nil
 }
 
-func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler, shares map[string]struct{}) ([]DbEntity, error) {
-	databases, err := repo.GetDatabases()
+func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludes set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, shares map[string]struct{}) ([]DbEntity, error) {
+	databases, err := repo.GetDataBases()
 	if err != nil {
 		return nil, err
-	}
-
-	excludes := make(map[string]struct{})
-
-	if excludedDatabases != "" {
-		for _, e := range strings.Split(excludedDatabases, ",") {
-			excludes[e] = struct{}{}
-		}
 	}
 
 	databases, err = s.addDbEntitiesToImporter(dataSourceHandler, databases, ds.Database, "",
 		func(name string) string { return name },
 		func(name, fullName string) bool {
 			_, shared := shares[fullName]
-			_, f := excludes[fullName]
-			return !f && !shared && s.shouldGoInto(fullName)
+			return !excludes.Contains(fullName) && !shared && s.shouldGoInto(fullName)
 		})
 	if err != nil {
 		return nil, err
@@ -386,7 +390,7 @@ func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludedData
 	return databases, nil
 }
 
-func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludedDatabases string, dataSourceHandler wrappers.DataSourceObjectHandler) ([]DbEntity, map[string]struct{}, error) {
+func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludes set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler) ([]DbEntity, map[string]struct{}, error) {
 	// main reason is that for export they can only have "IMPORTED PRIVILEGES" granted on the shared db level and nothing else.
 	// for now we can just exclude them but they need to be treated later on
 	shares, err := repo.GetShares()
@@ -394,19 +398,10 @@ func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludedDatabas
 		return nil, nil, err
 	}
 
-	excludes := make(map[string]struct{})
-
-	if excludedDatabases != "" {
-		for _, e := range strings.Split(excludedDatabases, ",") {
-			excludes[e] = struct{}{}
-		}
-	}
-
 	shares, err = s.addDbEntitiesToImporter(dataSourceHandler, shares, "shared-database", "",
 		func(name string) string { return name },
 		func(name, fullName string) bool {
-			_, f := excludes[fullName]
-			return !f && s.shouldGoInto(fullName)
+			return !excludes.Contains(fullName) && s.shouldGoInto(fullName)
 		})
 	if err != nil {
 		return nil, nil, err
@@ -416,10 +411,6 @@ func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludedDatabas
 
 	// exclude shares from database import as we treat them separately
 	for _, share := range shares {
-		if excludedDatabases != "" {
-			excludedDatabases += ","
-		}
-		excludedDatabases += share.Name
 		sharesMap[share.Name] = struct{}{}
 	}
 
