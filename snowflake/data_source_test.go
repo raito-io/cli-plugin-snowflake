@@ -6,13 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raito-io/cli/base/tag"
-	"github.com/raito-io/golang-set/set"
-
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers/mocks"
+	"github.com/raito-io/golang-set/set"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

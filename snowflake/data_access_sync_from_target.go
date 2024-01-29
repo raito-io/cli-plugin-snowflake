@@ -11,6 +11,7 @@ import (
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
+	"github.com/raito-io/golang-set/set"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
@@ -128,9 +129,9 @@ func (s *AccessSyncer) extractExcludeRoleList(configMap *config.ConfigMap) map[s
 	return excludedRoles
 }
 
-func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, externalGroupOwners string, excludedRoles map[string]struct{}, linkToExternalIdentityStoreGroups bool, shares []string) error {
+func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, excludedDatabases set.Set[string], externalGroupOwners string, excludedRoles map[string]struct{}, linkToExternalIdentityStoreGroups bool, shares []string) error {
 	//Get all database roles for each database and import them
-	databases, err := s.getDatabases(repo)
+	databases, err := s.getApplicableDatabases(repo, excludedDatabases)
 	if err != nil {
 		return err
 	}

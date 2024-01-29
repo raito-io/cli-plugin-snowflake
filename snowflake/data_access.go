@@ -12,6 +12,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
+	"github.com/raito-io/golang-set/set"
 )
 
 var RolesNotInternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
@@ -119,6 +120,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	logger.Info("Reading account and database roles from Snowflake")
 	externalGroupOwners := configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
 	excludedRoles := s.extractExcludeRoleList(configMap)
+
 	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
 
 	shares, err := s.getShareNames(repo)
@@ -137,7 +139,9 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	if databaseRoleSupportEnabled {
 		logger.Info("Reading database roles from Snowflake")
 
-		err = s.importAllRolesOnDatabaseLevel(accessProviderHandler, repo, externalGroupOwners, excludedRoles, linkToExternalIdentityStoreGroups, shares)
+		excludedDatabases := s.extractExcludeDatabases(configMap)
+
+		err = s.importAllRolesOnDatabaseLevel(accessProviderHandler, repo, excludedDatabases, externalGroupOwners, excludedRoles, linkToExternalIdentityStoreGroups, shares)
 		if err != nil {
 			return err
 		}
@@ -364,4 +368,46 @@ func raitoMaskName(roleName string) string {
 
 func raitoMaskUniqueName(name string) string {
 	return raitoMaskName(name) + "_" + gonanoid.MustGenerate(idAlphabet, 8)
+}
+
+func (s *AccessSyncer) getAllAvailableDatabases(repo dataAccessRepository) ([]DbEntity, error) {
+	if s.databasesCache != nil {
+		return s.databasesCache, nil
+	}
+
+	var err error
+	s.databasesCache, err = repo.GetDatabases()
+
+	if err != nil {
+		s.databasesCache = nil
+		return nil, err
+	}
+
+	return s.databasesCache, nil
+}
+
+func (s *AccessSyncer) getApplicableDatabases(repo dataAccessRepository, dbExcludes set.Set[string]) ([]DbEntity, error) {
+	allDatabases, err := s.getAllAvailableDatabases(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	filteredDatabases := make([]DbEntity, 0)
+
+	for _, db := range allDatabases {
+		if !dbExcludes.Contains(db.Name) {
+			filteredDatabases = append(filteredDatabases, db)
+		}
+	}
+
+	return filteredDatabases, nil
+}
+
+func (s *AccessSyncer) extractExcludeDatabases(configMap *config.ConfigMap) set.Set[string] {
+	excludedDatabases := "SNOWFLAKE"
+	if v, ok := configMap.Parameters[SfExcludedDatabases]; ok {
+		excludedDatabases = v
+	}
+
+	return parseCommaSeparatedList(excludedDatabases)
 }

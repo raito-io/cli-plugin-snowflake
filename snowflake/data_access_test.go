@@ -205,7 +205,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_WithDatabaseRoleSupport(t *t
 		{Name: "SNOWFLAKE"},
 		{Name: "TEST_DB"},
 	}, nil).Once()
-	repoMock.EXPECT().GetDatabaseRoles("SNOWFLAKE").Return([]RoleEntity{}, nil).Once()
 	repoMock.EXPECT().GetDatabaseRoles("TEST_DB").Return([]RoleEntity{
 		{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 1, Owner: "Owner1"},
 		{Name: "DatabaseRole2", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
@@ -729,7 +728,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_StandardEdition(t *testing.T
 func TestAccessSyncer_SyncAccessProvidersFromTarget_Excludes(t *testing.T) {
 	//Given
 	configParams := config.ConfigMap{
-		Parameters: map[string]string{SfExcludedRoles: "Role1,TEST_DB.DatabaseRole1", SfDatabaseRoles: "true"},
+		Parameters: map[string]string{SfExcludedRoles: "Role1,TEST_DB.DatabaseRole1", SfDatabaseRoles: "true", SfExcludedDatabases: "SNOWFLAKE,OTHER_DB"},
 	}
 
 	repoMock := newMockDataAccessRepository(t)
@@ -741,9 +740,9 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget_Excludes(t *testing.T) {
 
 	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
 		{Name: "SNOWFLAKE"},
+		{Name: "OTHER_DB"},
 		{Name: "TEST_DB"},
 	}, nil).Once()
-	repoMock.EXPECT().GetDatabaseRoles("SNOWFLAKE").Return([]RoleEntity{}, nil).Once()
 	repoMock.EXPECT().GetDatabaseRoles("TEST_DB").Return([]RoleEntity{
 		{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 1, Owner: "Owner1"},
 		{Name: "DatabaseRole2", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
