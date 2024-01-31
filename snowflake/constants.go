@@ -14,6 +14,7 @@ const (
 	SfSkipTags                          = "sf-skip-tags"
 	SfSkipColumns                       = "sf-skip-columns"
 	SfDataUsageWindow                   = "sf-data-usage-window"
+	SfDatabaseRoles                     = "sf-database-roles"
 
 	TagSource = "Snowflake"
 

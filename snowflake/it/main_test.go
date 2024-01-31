@@ -79,6 +79,28 @@ func teardown() error {
 		}
 	}
 
+	database := "SNOWFLAKE_INTEGRATION_TEST"
+	databaseRoles, err := connectAndQuery(config.Parameters, "", fmt.Sprintf("SHOW DATABASE ROLES IN DATABASE %s", database))
+	if err != nil {
+		return err
+	}
+
+	var databaseRoleEntities []snowflake.RoleEntity
+
+	err = scan.Rows(&databaseRoleEntities, databaseRoles)
+	if err != nil {
+		return err
+	}
+
+	for _, role := range databaseRoleEntities {
+		if strings.HasPrefix(role.Name, testId) {
+			_, err = connectAndQuery(config.Parameters, "", fmt.Sprintf("DROP DATABASE ROLE IF EXISTS %s.%s", database, role.Name))
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	_, err = connectAndQuery(config.Parameters, "", fmt.Sprintf("DROP USER IF EXISTS %s", snowflakeUserName))
 	if err != nil {
 		return err

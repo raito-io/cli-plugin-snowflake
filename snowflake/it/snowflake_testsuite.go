@@ -49,6 +49,7 @@ func readDatabaseConfig() *config.ConfigMap {
 			snowflake.SfPassword:        sfPassword,
 			snowflake.SfRole:            sfRole,
 			snowflake.SfStandardEdition: strconv.FormatBool(sfStandardEdition),
+			snowflake.SfDatabaseRoles:   "true",
 		},
 	}
 }

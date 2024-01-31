@@ -23,7 +23,7 @@ type dataSourceRepository interface {
 	GetSnowFlakeAccountName() (string, error)
 	GetWarehouses() ([]DbEntity, error)
 	GetShares() ([]DbEntity, error)
-	GetDataBases() ([]DbEntity, error)
+	GetDatabases() ([]DbEntity, error)
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
@@ -186,22 +186,6 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	}
 
 	return nil
-}
-
-func parseCommaSeparatedList(list string) set.Set[string] {
-	list = strings.TrimSpace(list)
-
-	if list == "" {
-		return set.NewSet[string]()
-	}
-
-	ret := set.NewSet[string]()
-
-	for _, v := range strings.Split(list, ",") {
-		ret.Add(strings.TrimSpace(v))
-	}
-
-	return ret
 }
 
 func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbName string, excludedSchemas set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
@@ -372,7 +356,7 @@ func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, d
 }
 
 func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludes set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, shares map[string]struct{}) ([]DbEntity, error) {
-	databases, err := repo.GetDataBases()
+	databases, err := repo.GetDatabases()
 	if err != nil {
 		return nil, err
 	}
