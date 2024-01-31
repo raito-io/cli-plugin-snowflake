@@ -13,19 +13,19 @@ import (
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
+	"github.com/raito-io/golang-set/set"
 )
 
 var RolesNotInternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
 var AcceptedTypes = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "VIEW": {}, "COLUMN": {}, "SHARED-DATABASE": {}, "EXTERNAL_TABLE": {}, "MATERIALIZED_VIEW": {}}
 
 const (
-	whoLockedReason             = "The 'who' for this Snowflake role cannot be changed because it was imported from an external identity store"
-	inheritanceLockedReason     = "The inheritance for this Snowflake role cannot be changed because it was imported from an external identity store"
-	nameLockedReason            = "This Snowflake role cannot be renamed because it was imported from an external identity store"
-	deleteLockedReason          = "This Snowflake role cannot be deleted because it was imported from an external identity store"
-	maskPrefix                  = "RAITO_"
-	idAlphabet                  = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	nameTagOverrideLockedReason = "This Snowflake role cannot be renamed because it has a name tag override attached to it"
+	whoLockedReason         = "The 'who' for this Snowflake role cannot be changed because it was imported from an external identity store"
+	inheritanceLockedReason = "The inheritance for this Snowflake role cannot be changed because it was imported from an external identity store"
+	nameLockedReason        = "This Snowflake role cannot be renamed because it was imported from an external identity store"
+	deleteLockedReason      = "This Snowflake role cannot be deleted because it was imported from an external identity store"
+	maskPrefix              = "RAITO_"
+	idAlphabet              = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 	databaseRoleWhoLockedReason  = "The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"
 	databaseRoleWhatLockedReason = "The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"
@@ -136,8 +136,9 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	databaseRoleSupportEnabled := configMap.GetBoolWithDefault(SfDatabaseRoles, false)
 	if databaseRoleSupportEnabled {
 		logger.Info("Reading database roles from Snowflake")
+		excludedDatabases := s.extractExcludeDatabases(configMap)
 
-		err = s.importAllRolesOnDatabaseLevel(accessProviderHandler, repo, shares, configMap)
+		err = s.importAllRolesOnDatabaseLevel(accessProviderHandler, repo, excludedDatabases, shares, configMap)
 		if err != nil {
 			return err
 		}
@@ -364,4 +365,46 @@ func raitoMaskName(roleName string) string {
 
 func raitoMaskUniqueName(name string) string {
 	return raitoMaskName(name) + "_" + gonanoid.MustGenerate(idAlphabet, 8)
+}
+
+func (s *AccessSyncer) getAllAvailableDatabases(repo dataAccessRepository) ([]DbEntity, error) {
+	if s.databasesCache != nil {
+		return s.databasesCache, nil
+	}
+
+	var err error
+	s.databasesCache, err = repo.GetDatabases()
+
+	if err != nil {
+		s.databasesCache = nil
+		return nil, err
+	}
+
+	return s.databasesCache, nil
+}
+
+func (s *AccessSyncer) getApplicableDatabases(repo dataAccessRepository, dbExcludes set.Set[string]) ([]DbEntity, error) {
+	allDatabases, err := s.getAllAvailableDatabases(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	filteredDatabases := make([]DbEntity, 0)
+
+	for _, db := range allDatabases {
+		if !dbExcludes.Contains(db.Name) {
+			filteredDatabases = append(filteredDatabases, db)
+		}
+	}
+
+	return filteredDatabases, nil
+}
+
+func (s *AccessSyncer) extractExcludeDatabases(configMap *config.ConfigMap) set.Set[string] {
+	excludedDatabases := "SNOWFLAKE"
+	if v, ok := configMap.Parameters[SfExcludedDatabases]; ok {
+		excludedDatabases = v
+	}
+
+	return parseCommaSeparatedList(excludedDatabases)
 }

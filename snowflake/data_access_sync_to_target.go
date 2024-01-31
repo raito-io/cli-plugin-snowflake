@@ -459,7 +459,7 @@ func (s *AccessSyncer) findRoles(prefix string, databaseRoleSupportEnabled bool,
 	}
 
 	//Get all database roles for each database and add database roles to existing roles
-	databases, err := s.getDatabases(repo)
+	databases, err := s.getAllAvailableDatabases(repo)
 	if err != nil {
 		return nil, err
 	}
@@ -1147,22 +1147,6 @@ func (s *AccessSyncer) getSchemasForDatabase(repo dataAccessRepository, database
 	return schemas, nil
 }
 
-func (s *AccessSyncer) getDatabases(repo dataAccessRepository) ([]DbEntity, error) {
-	if s.databasesCache != nil {
-		return s.databasesCache, nil
-	}
-
-	var err error
-	s.databasesCache, err = repo.GetDatabases()
-
-	if err != nil {
-		s.databasesCache = nil
-		return nil, err
-	}
-
-	return s.databasesCache, nil
-}
-
 func (s *AccessSyncer) getWarehouses(repo dataAccessRepository) ([]DbEntity, error) {
 	if s.warehousesCache != nil {
 		return s.warehousesCache, nil
@@ -1373,7 +1357,7 @@ func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permiss
 				return nil, err
 			}
 
-			databases, err := s.getDatabases(repo)
+			databases, err := s.getAllAvailableDatabases(repo)
 			if err != nil {
 				return nil, err
 			}

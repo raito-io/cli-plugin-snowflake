@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/raito-io/cli/base"
+	"github.com/raito-io/golang-set/set"
 )
 
 const (
@@ -76,4 +77,20 @@ func isDatabaseRoleByExternalId(externalId string) bool {
 	}
 
 	return false
+}
+
+func parseCommaSeparatedList(list string) set.Set[string] {
+	list = strings.TrimSpace(list)
+
+	if list == "" {
+		return set.NewSet[string]()
+	}
+
+	ret := set.NewSet[string]()
+
+	for _, v := range strings.Split(list, ",") {
+		ret.Add(strings.TrimSpace(v))
+	}
+
+	return ret
 }

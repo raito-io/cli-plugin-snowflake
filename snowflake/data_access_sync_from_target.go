@@ -12,6 +12,7 @@ import (
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
+	"github.com/raito-io/golang-set/set"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
@@ -77,23 +78,6 @@ func (s *AccessSyncer) shouldRetrieveTags(configMap *config.ConfigMap, repo data
 		enabled:       tagSupportEnabled,
 		availableTags: availableTags,
 	}, nil
-}
-
-func (s *AccessSyncer) extractNameFromTags(tags []*tag.Tag, tagKeyDisplayName string) *string {
-	if tagKeyDisplayName == "" {
-		return nil
-	}
-
-	var overwrittenName *string = nil
-
-	for _, tag := range tags {
-		if tag.Key == tagKeyDisplayName {
-			overwrittenName = ptr.String(tag.Value)
-			break
-		}
-	}
-
-	return overwrittenName
 }
 
 func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntity, processedAps map[string]*exporter.AccessProvider, linkToExternalIdentityStoreGroups bool, tagRetrieval tagApRetrievalConfig, externalGroupOwners string, shares []string, repo dataAccessRepository) error {
@@ -163,7 +147,8 @@ func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntit
 	}
 
 	if tagRetrieval.enabled && len(tagRetrieval.availableTags) > 0 && tagRetrieval.availableTags[ap.Name] != nil {
-		// ap.Tags = tagRetrieval.availableTags[ap.Name]
+		// ---- ap.Tags = tagRetrieval.availableTags[ap.Name]
+		logger.Debug(fmt.Sprintf("Going to add tags to AP %s", ap.ExternalId))
 	}
 
 	return nil
@@ -184,7 +169,7 @@ func (s *AccessSyncer) extractExcludeRoleList(configMap *config.ConfigMap) map[s
 	return excludedRoles
 }
 
-func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, shares []string, configMap *config.ConfigMap) error {
+func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, excludedDatabases set.Set[string], shares []string, configMap *config.ConfigMap) error {
 	externalGroupOwners := configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
 	excludedRoles := s.extractExcludeRoleList(configMap)
 	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
@@ -195,7 +180,7 @@ func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrapp
 	}
 
 	//Get all database roles for each database and import them
-	databases, err := s.getDatabases(repo)
+	databases, err := s.getApplicableDatabases(repo, excludedDatabases)
 	if err != nil {
 		return err
 	}
@@ -304,7 +289,8 @@ func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity R
 	}
 
 	if tagRetrieval.enabled && len(tagRetrieval.availableTags) > 0 && tagRetrieval.availableTags[ap.Name] != nil {
-		// ap.Tags = tagRetrieval.availableTags[ap.Name]
+		// ---- ap.Tags = tagRetrieval.availableTags[ap.Name]
+		logger.Debug(fmt.Sprintf("Going to add tags to AP %s", ap.ExternalId))
 	}
 
 	return nil

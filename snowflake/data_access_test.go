@@ -215,7 +215,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{Name: "SNOWFLAKE"},
 						{Name: "TEST_DB"},
 					}, nil).Once()
-					repoMock.EXPECT().GetDatabaseRoles("SNOWFLAKE").Return([]RoleEntity{}, nil).Once()
 					repoMock.EXPECT().GetDatabaseRoles("TEST_DB").Return([]RoleEntity{
 						{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 1, Owner: "Owner1"},
 						{Name: "DatabaseRole2", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
@@ -852,7 +851,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{Name: "SNOWFLAKE"},
 						{Name: "TEST_DB"},
 					}, nil).Once()
-					repoMock.EXPECT().GetDatabaseRoles("SNOWFLAKE").Return([]RoleEntity{}, nil).Once()
 					repoMock.EXPECT().GetDatabaseRoles("TEST_DB").Return([]RoleEntity{
 						{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 1, Owner: "Owner1"},
 						{Name: "DatabaseRole2", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},

@@ -10,6 +10,7 @@ import (
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers/mocks"
+	"github.com/raito-io/golang-set/set"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -256,7 +257,7 @@ func TestDataSourceSyncer_SyncDataSource_readShares(t *testing.T) {
 	repoMock := newMockDataSourceRepository(t)
 	dataSourceObjectHandlerMock := mocks.NewSimpleDataSourceObjectHandler(t, 1)
 
-	excludedDatabases := "ExcludeShare1,ExcludeShare2"
+	excludedDatabases := set.NewSet[string]("ExcludeShare1", "ExcludeShare2")
 
 	repoMock.EXPECT().GetShares().Return([]DbEntity{
 		{Name: "Share1"}, {Name: "ExcludeShare1"}, {Name: "Share2"}, {Name: "ExcludeShare2"},
@@ -292,7 +293,7 @@ func TestDataSourceSyncer_SyncDataSource_readDatabases(t *testing.T) {
 	repoMock := newMockDataSourceRepository(t)
 	dataSourceObjectHandlerMock := mocks.NewSimpleDataSourceObjectHandler(t, 1)
 
-	excludedDatabases := "ExcludeDatabase1,ExcludeDatabase2"
+	excludedDatabases := set.NewSet[string]("ExcludeDatabase1", "ExcludeDatabase2")
 
 	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
 		{Name: "DB1"}, {Name: "ExcludeDatabase1"}, {Name: "DB2"}, {Name: "ExcludeDatabase2"},
