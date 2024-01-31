@@ -95,16 +95,14 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 			args: args{
 				configMap: config.ConfigMap{
 					Parameters: map[string]string{
-						SfStandardEdition:                     "false",
-						SfSkipTags:                            "false",
-						SfTagOverwriteKeyForAccessControlName: "a_key",
+						SfStandardEdition: "false",
+						SfSkipTags:        "false",
 					},
 				},
 				tagDomain: "ROLE",
 			},
 			want: &tagApRetrievalConfig{
-				enabled:           true,
-				tagKeyDisplayName: "a_key",
+				enabled: true,
 				availableTags: map[string][]*tag.Tag{
 					"Role1": {
 						{Key: "a_key", Value: "override_name"},
@@ -122,17 +120,15 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 			args: args{
 				configMap: config.ConfigMap{
 					Parameters: map[string]string{
-						SfStandardEdition:                     "true",
-						SfSkipTags:                            "false",
-						SfTagOverwriteKeyForAccessControlName: "a_key",
+						SfStandardEdition: "true",
+						SfSkipTags:        "false",
 					},
 				},
 				tagDomain: "ROLE",
 			},
 			want: &tagApRetrievalConfig{
-				enabled:           false,
-				tagKeyDisplayName: "a_key",
-				availableTags:     map[string][]*tag.Tag{},
+				enabled:       false,
+				availableTags: map[string][]*tag.Tag{},
 			},
 			wantErr: require.NoError,
 		},
@@ -144,38 +140,15 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 			args: args{
 				configMap: config.ConfigMap{
 					Parameters: map[string]string{
-						SfStandardEdition:                     "false",
-						SfSkipTags:                            "true",
-						SfTagOverwriteKeyForAccessControlName: "a_key",
-					},
-				},
-				tagDomain: "ROLE",
-			},
-			want: &tagApRetrievalConfig{
-				enabled:           false,
-				tagKeyDisplayName: "a_key",
-				availableTags:     map[string][]*tag.Tag{},
-			},
-			wantErr: require.NoError,
-		},
-		{
-			name: "with no overwrite key defined ",
-			fields: fields{
-				setup: func(repoMock *mockDataAccessRepository) {},
-			},
-			args: args{
-				configMap: config.ConfigMap{
-					Parameters: map[string]string{
 						SfStandardEdition: "false",
-						SfSkipTags:        "false",
+						SfSkipTags:        "true",
 					},
 				},
 				tagDomain: "ROLE",
 			},
 			want: &tagApRetrievalConfig{
-				enabled:           false,
-				tagKeyDisplayName: "",
-				availableTags:     map[string][]*tag.Tag{},
+				enabled:       false,
+				availableTags: map[string][]*tag.Tag{},
 			},
 			wantErr: require.NoError,
 		},

@@ -102,7 +102,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			args: args{
 				configMap: config.ConfigMap{
-					Parameters: map[string]string{SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2"},
+					Parameters: map[string]string{SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfSkipTags: "true"},
 				},
 			},
 			wantAps: []sync_from_target.AccessProvider{
@@ -295,7 +295,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			args: args{
 				configMap: config.ConfigMap{
-					Parameters: map[string]string{SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfDatabaseRoles: "true"},
+					Parameters: map[string]string{SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfDatabaseRoles: "true", SfSkipTags: "true"},
 				},
 			},
 			wantAps: []sync_from_target.AccessProvider{
@@ -526,7 +526,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			args: args{
 				configMap: config.ConfigMap{
-					Parameters: map[string]string{SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfLinkToExternalIdentityStoreGroups: "true"},
+					Parameters: map[string]string{SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfLinkToExternalIdentityStoreGroups: "true", SfSkipTags: "true"},
 				},
 			},
 			wantAps: []sync_from_target.AccessProvider{
@@ -778,10 +778,9 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			args: args{
 				configMap: config.ConfigMap{
 					Parameters: map[string]string{
-						SfStandardEdition:                     "false",
-						SfSkipTags:                            "false",
-						SfTagOverwriteKeyForAccessControlName: "a_key",
-						SfDatabaseRoles:                       "true",
+						SfStandardEdition: "false",
+						SfSkipTags:        "false",
+						SfDatabaseRoles:   "true",
 					},
 				},
 			},
@@ -790,7 +789,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					ExternalId:        "Role1",
 					Type:              ptr.String(access_provider.Role),
 					NotInternalizable: false,
-					Name:              "override_name",
+					Name:              "Role1",
 					NamingHint:        "Role1",
 					ActualName:        "Role1",
 
@@ -804,13 +803,15 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					Action: 1,
 					Policy: "",
 
-					NameLocked:       ptr.Bool(true),
-					NameLockedReason: ptr.String("This Snowflake role cannot be renamed because it has a name tag override attached to it"),
+					Tags: []*tag.Tag{
+						{Key: "a_key", Value: "override_name"},
+						{Key: "an_other_key", Value: "...."},
+					},
 				},
 				{
 					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",
 					NotInternalizable: false,
-					Name:              "TEST_DB.override_name_2",
+					Name:              "TEST_DB.DatabaseRole1",
 					NamingHint:        "DatabaseRole1",
 					ActualName:        "DatabaseRole1",
 					Action:            sync_from_target.Grant,
@@ -829,8 +830,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					WhatLocked:       ptr.Bool(true),
 					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
 
-					NameLocked:       ptr.Bool(true),
-					NameLockedReason: ptr.String("This Snowflake role cannot be renamed because it has a name tag override attached to it"),
+					Tags: []*tag.Tag{
+						{Key: "a_key", Value: "override_name_2"},
+						{Key: "an_other_key", Value: "...."},
+					},
 				},
 			},
 			wantErr: require.NoError,
@@ -876,6 +879,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					Parameters: map[string]string{
 						SfExcludedRoles: "Role1,TEST_DB.DatabaseRole1",
 						SfDatabaseRoles: "true",
+						SfSkipTags:      "true",
 					},
 				},
 			},

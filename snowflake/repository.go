@@ -723,11 +723,11 @@ func (repo *SnowflakeRepository) getTags(domain *string, databaseName *string) (
 	additionalWhereItems := ""
 
 	if domain != nil {
-		query = append(query, common.FormatQuery("domain = %s", *domain))
+		query = append(query, common.FormatQuery(`domain = '%s'`, *domain))
 	}
 
 	if databaseName != nil {
-		query = append(query, common.FormatQuery("object_database = %s", *databaseName))
+		query = append(query, common.FormatQuery("object_database = '%s'", *databaseName))
 	}
 
 	if len(query) > 0 {

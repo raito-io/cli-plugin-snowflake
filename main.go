@@ -45,7 +45,6 @@ func main() {
 					{Name: snowflake.SfSkipColumns, Description: "If set, columns and column masking policies will not be imported.", Mandatory: false},
 					{Name: snowflake.SfDataUsageWindow, Description: "The maximum number of days of usage data to retrieve. Default is 90. Maximum is 90 days. ", Mandatory: false},
 					{Name: snowflake.SfDatabaseRoles, Description: "If set, database-roles for all databases will be fetched. ", Mandatory: false},
-					{Name: snowflake.SfTagOverwriteKeyForAccessControlName, Description: "If set, the name of an access control will be updated by the value from this tag if available.", Mandatory: false},
 				},
 			},
 		})

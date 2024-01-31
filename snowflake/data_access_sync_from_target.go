@@ -17,9 +17,8 @@ import (
 )
 
 type tagApRetrievalConfig struct {
-	enabled           bool
-	availableTags     map[string][]*tag.Tag
-	tagKeyDisplayName string
+	enabled       bool
+	availableTags map[string][]*tag.Tag
 }
 
 func (s *AccessSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, shares []string, configMap *config.ConfigMap) error {
@@ -62,10 +61,9 @@ func (s *AccessSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappe
 func (s *AccessSyncer) shouldRetrieveTags(configMap *config.ConfigMap, repo dataAccessRepository, tagDomain string) (*tagApRetrievalConfig, error) {
 	standard := configMap.GetBoolWithDefault(SfStandardEdition, false)
 	skipTags := configMap.GetBoolWithDefault(SfSkipTags, false)
-	tagKeyForDisplayName := configMap.GetString(SfTagOverwriteKeyForAccessControlName)
 	availableTags := make(map[string][]*tag.Tag)
 
-	tagSupportEnabled := !standard && !skipTags && tagKeyForDisplayName != ""
+	tagSupportEnabled := !standard && !skipTags
 	if tagSupportEnabled {
 		var err error
 
@@ -76,9 +74,8 @@ func (s *AccessSyncer) shouldRetrieveTags(configMap *config.ConfigMap, repo data
 	}
 
 	return &tagApRetrievalConfig{
-		enabled:           tagSupportEnabled,
-		tagKeyDisplayName: tagKeyForDisplayName,
-		availableTags:     availableTags,
+		enabled:       tagSupportEnabled,
+		availableTags: availableTags,
 	}, nil
 }
 
@@ -166,16 +163,7 @@ func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntit
 	}
 
 	if tagRetrieval.enabled && len(tagRetrieval.availableTags) > 0 && tagRetrieval.availableTags[ap.Name] != nil {
-		linkedTags := tagRetrieval.availableTags[ap.Name]
-
-		// Not available yet within our AP model yet
-		// ap.Tags = linkedTags
-
-		if overwrittenName := s.extractNameFromTags(linkedTags, tagRetrieval.tagKeyDisplayName); overwrittenName != nil {
-			ap.Name = *overwrittenName
-			ap.NameLocked = ptr.Bool(true)
-			ap.NameLockedReason = ptr.String(nameTagOverrideLockedReason)
-		}
+		ap.Tags = tagRetrieval.availableTags[ap.Name]
 	}
 
 	return nil
@@ -316,16 +304,7 @@ func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity R
 	}
 
 	if tagRetrieval.enabled && len(tagRetrieval.availableTags) > 0 && tagRetrieval.availableTags[ap.Name] != nil {
-		linkedTags := tagRetrieval.availableTags[ap.Name]
-
-		// Not available yet within our AP model yet
-		// ap.Tags = linkedTags
-
-		if overwrittenName := s.extractNameFromTags(linkedTags, tagRetrieval.tagKeyDisplayName); overwrittenName != nil {
-			ap.Name = fmt.Sprintf("%s.%s", database, *overwrittenName)
-			ap.NameLocked = ptr.Bool(true)
-			ap.NameLockedReason = ptr.String(nameTagOverrideLockedReason)
-		}
+		ap.Tags = tagRetrieval.availableTags[ap.Name]
 	}
 
 	return nil
