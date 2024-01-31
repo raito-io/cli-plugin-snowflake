@@ -163,7 +163,7 @@ func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntit
 	}
 
 	if tagRetrieval.enabled && len(tagRetrieval.availableTags) > 0 && tagRetrieval.availableTags[ap.Name] != nil {
-		ap.Tags = tagRetrieval.availableTags[ap.Name]
+		// ap.Tags = tagRetrieval.availableTags[ap.Name]
 	}
 
 	return nil
@@ -304,7 +304,7 @@ func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity R
 	}
 
 	if tagRetrieval.enabled && len(tagRetrieval.availableTags) > 0 && tagRetrieval.availableTags[ap.Name] != nil {
-		ap.Tags = tagRetrieval.availableTags[ap.Name]
+		// ap.Tags = tagRetrieval.availableTags[ap.Name]
 	}
 
 	return nil
