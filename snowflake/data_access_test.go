@@ -802,10 +802,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					Action: 1,
 					Policy: "",
 
-					// Tags: []*tag.Tag{
-					// 	{Key: "a_key", Value: "override_name"},
-					// 	{Key: "an_other_key", Value: "...."},
-					// },
+					Tags: []*tag.Tag{
+						{Key: "a_key", Value: "override_name"},
+						{Key: "an_other_key", Value: "...."},
+					},
 				},
 				{
 					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",
@@ -829,10 +829,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					WhatLocked:       ptr.Bool(true),
 					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
 
-					// Tags: []*tag.Tag{
-					// 	{Key: "a_key", Value: "override_name_2"},
-					// 	{Key: "an_other_key", Value: "...."},
-					// },
+					Tags: []*tag.Tag{
+						{Key: "a_key", Value: "override_name_2"},
+						{Key: "an_other_key", Value: "...."},
+					},
 				},
 			},
 			wantErr: require.NoError,
