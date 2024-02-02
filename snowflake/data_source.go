@@ -27,7 +27,7 @@ type dataSourceRepository interface {
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
-	GetTags(databaseName string) (map[string][]*tag.Tag, error)
+	GetTagsLinkedToDatabaseName(databaseName string) (map[string][]*tag.Tag, error)
 	ExecuteGrantOnAccountRole(perm, on, role string) error
 }
 
@@ -160,7 +160,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 
 		tagMap := make(map[string][]*tag.Tag)
 		if !standard && !skipTags {
-			tagMap, err = repo.GetTags(database.Name)
+			tagMap, err = repo.GetTagsLinkedToDatabaseName(database.Name)
 
 			if err != nil {
 				return err

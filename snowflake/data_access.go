@@ -10,6 +10,7 @@ import (
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
+	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
 	"github.com/raito-io/golang-set/set"
@@ -62,6 +63,7 @@ type dataAccessRepository interface {
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetShares() ([]DbEntity, error)
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
+	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	GetWarehouses() ([]DbEntity, error)
 	GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error
 	GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
@@ -118,10 +120,6 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	}()
 
 	logger.Info("Reading account and database roles from Snowflake")
-	externalGroupOwners := configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
-	excludedRoles := s.extractExcludeRoleList(configMap)
-
-	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
 
 	shares, err := s.getShareNames(repo)
 	if err != nil {
@@ -130,7 +128,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 
 	logger.Info("Reading account roles from Snowflake")
 
-	err = s.importAllRolesOnAccountLevel(accessProviderHandler, repo, externalGroupOwners, excludedRoles, linkToExternalIdentityStoreGroups, shares)
+	err = s.importAllRolesOnAccountLevel(accessProviderHandler, repo, shares, configMap)
 	if err != nil {
 		return err
 	}
@@ -138,10 +136,9 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	databaseRoleSupportEnabled := configMap.GetBoolWithDefault(SfDatabaseRoles, false)
 	if databaseRoleSupportEnabled {
 		logger.Info("Reading database roles from Snowflake")
-
 		excludedDatabases := s.extractExcludeDatabases(configMap)
 
-		err = s.importAllRolesOnDatabaseLevel(accessProviderHandler, repo, excludedDatabases, externalGroupOwners, excludedRoles, linkToExternalIdentityStoreGroups, shares)
+		err = s.importAllRolesOnDatabaseLevel(accessProviderHandler, repo, excludedDatabases, shares, configMap)
 		if err != nil {
 			return err
 		}

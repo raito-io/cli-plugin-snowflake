@@ -708,10 +708,33 @@ func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
 	return r[0], nil
 }
 
-func (repo *SnowflakeRepository) GetTags(databaseName string) (map[string][]*tag.Tag, error) {
+func (repo *SnowflakeRepository) GetTagsByDomain(domain string) (map[string][]*tag.Tag, error) {
+	return repo.getTags(ptr.String(domain), nil)
+}
+
+func (repo *SnowflakeRepository) GetTagsLinkedToDatabaseName(databaseName string) (map[string][]*tag.Tag, error) {
+	return repo.getTags(nil, ptr.String(databaseName))
+}
+
+func (repo *SnowflakeRepository) getTags(domain *string, databaseName *string) (map[string][]*tag.Tag, error) {
 	tagMap := make(map[string][]*tag.Tag)
 
-	rows, _, err := repo.query(fmt.Sprintf("select column_name, object_database, object_schema, object_name, domain, tag_name, tag_value from SNOWFLAKE.ACCOUNT_USAGE.tag_references where object_deleted is null and object_database = '%s';", databaseName))
+	query := []string{}
+	additionalWhereItems := ""
+
+	if domain != nil {
+		query = append(query, common.FormatQuery(`domain = '%s'`, *domain))
+	}
+
+	if databaseName != nil {
+		query = append(query, common.FormatQuery("object_database = '%s'", *databaseName))
+	}
+
+	if len(query) > 0 {
+		additionalWhereItems = fmt.Sprintf("AND %s", strings.Join(query, " AND "))
+	}
+
+	rows, _, err := repo.query(fmt.Sprintf("select column_name, object_database, object_schema, object_name, domain, tag_name, tag_value from SNOWFLAKE.ACCOUNT_USAGE.tag_references where object_deleted is null %s;", additionalWhereItems))
 	if err != nil {
 		return nil, err
 	}
