@@ -91,9 +91,6 @@ type AccessSyncer struct {
 	uniqueRoleNameGeneratorsCache map[*string]naming_hint.UniqueGenerator
 }
 
-type dummyFeedbackHandler struct {
-}
-
 func NewDataAccessSyncer(namingConstraints naming_hint.NamingConstraints) *AccessSyncer {
 	return &AccessSyncer{
 		repoProvider:                  newDataAccessSnowflakeRepo,
@@ -278,73 +275,6 @@ func (s *AccessSyncer) syncAccessProviderToTargetHandler(ap *sync_to_target.Acce
 	}
 
 	return externalId, toProcessAps, apToRemoveMap, nil
-}
-
-func (s *AccessSyncer) SyncAccessAsCodeToTarget(ctx context.Context, accessProviders *sync_to_target.AccessProviderImport, prefix string, configMap *config.ConfigMap) error {
-	logger.Info("Configuring access providers as roles in Snowflake")
-
-	repo, err := s.repoProvider(configMap.Parameters, "")
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
-		repo.Close()
-	}()
-
-	roleSeparator := string(s.namingConstraints.SplitCharacter())
-	if !strings.HasSuffix(prefix, roleSeparator) {
-		prefix += roleSeparator
-	}
-
-	logger.Info(fmt.Sprintf("Using prefix %q", prefix))
-
-	toProcessRoles := make(map[string]*sync_to_target.AccessProvider)
-	databaseRoleSupportEnabled := configMap.GetBoolWithDefault(SfDatabaseRoles, false)
-
-	for _, ap := range accessProviders.AccessProviders {
-		if !databaseRoleSupportEnabled && isDatabaseRole(ap.Type) {
-			return fmt.Errorf("received a database role (%s) but current sync has database role support disable, please have a look at you configuration", *ap.ExternalId)
-		}
-
-		var uniqueExternalId string
-
-		uniqueExternalId, err = s.generateUniqueExternalId(ap, prefix)
-		if err != nil {
-			return err
-		}
-
-		toProcessRoles[uniqueExternalId] = ap
-	}
-
-	existingRoles, err := s.findRoles(prefix, databaseRoleSupportEnabled, repo)
-	if err != nil {
-		return err
-	}
-
-	toRemoveRoles := make(map[string]*sync_to_target.AccessProvider, 0)
-
-	for _, externalId := range existingRoles.Slice() {
-		// If the existing role is not found in the roles to handle, we need to remove it.
-		if _, f := toProcessRoles[externalId]; !f {
-			toRemoveRoles[externalId] = nil
-		}
-	}
-
-	err = s.removeRolesToRemove(toRemoveRoles, repo, &dummyFeedbackHandler{})
-	if err != nil {
-		return err
-	}
-
-	toRenameRoles := make(map[string]string, 0)
-
-	err = s.generateAccessControls(ctx, toProcessRoles, existingRoles, toRenameRoles, repo, configMap, &dummyFeedbackHandler{})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func raitoMaskName(roleName string) string {
