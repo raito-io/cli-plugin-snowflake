@@ -276,7 +276,7 @@ func (s *AccessSyncer) removeRolesToRemove(toRemoveAps map[string]*importer.Acce
 			if ap == nil {
 				logger.Warn(fmt.Sprintf("no linked access provider found for %q, so just going to remove it from Snowflake", toRemoveExternalId))
 
-				_, err := s.dropRole(toRemoveExternalId, isDatabaseRoleByExternalId(toRemoveExternalId), repo)
+				err := s.dropRole(toRemoveExternalId, isDatabaseRoleByExternalId(toRemoveExternalId), repo)
 				if err != nil {
 					return err
 				}
@@ -289,8 +289,7 @@ func (s *AccessSyncer) removeRolesToRemove(toRemoveAps map[string]*importer.Acce
 				ExternalId:     ptr.String(toRemoveExternalId),
 			}
 
-			var err error
-			fi.ActualName, err = s.dropRole(toRemoveExternalId, isDatabaseRole(ap.Type), repo)
+			err := s.dropRole(toRemoveExternalId, isDatabaseRole(ap.Type), repo)
 			// If an error occurs (and not already deleted), we send an error back as feedback
 			if err != nil && !strings.Contains(err.Error(), "does not exist") {
 				logger.Error(fmt.Sprintf("unable to drop role %q: %s", toRemoveExternalId, err.Error()))
@@ -494,8 +493,15 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 	// Extract RoleNames from Access Providers that are among the whoList of this one
 	inheritedRoles := make([]string, 0)
 
-	// We start of the actual name the same as the externalId.
 	actualName := externalId
+	var err error
+
+	if isDatabaseRole(accessProvider.Type) {
+		_, actualName, err = parseDatabaseRoleExternalId(externalId)
+		if err != nil {
+			return actualName, err
+		}
+	}
 
 	if !ignoreInheritance {
 		for _, apWho := range accessProvider.Who.InheritFrom {
@@ -572,8 +578,6 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 		}
 	}
 
-	var err error
-
 	// If we find this role name in the rename map, this means we have to rename it.
 	if oldExternalId, f := toRenameAps[externalId]; f {
 		if !existingRoles.Contains(externalId) && existingRoles.Contains(oldExternalId) {
@@ -584,7 +588,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", externalId, oldExternalId))
 			} else {
 				// The old name exists and the new one doesn't exist yet, so we have to do the rename
-				actualName, err = s.renameRole(oldExternalId, externalId, accessProvider.Type, repo)
+				err = s.renameRole(oldExternalId, externalId, accessProvider.Type, repo)
 				if err != nil {
 					return actualName, fmt.Errorf("error while renaming role %q to %q: %s", oldExternalId, externalId, err.Error())
 				}
@@ -599,7 +603,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", externalId, oldExternalId))
 			} else {
 				// The old name exists but also the new one already exists. This is a weird case, but we'll delete the old one in this case and the new one will be updated in the next step of this method.
-				actualName, err = s.dropRole(oldExternalId, isDatabaseRoleByExternalId(oldExternalId), repo)
+				err = s.dropRole(oldExternalId, isDatabaseRoleByExternalId(oldExternalId), repo)
 				if err != nil {
 					return actualName, fmt.Errorf("error while dropping role (%s) which was the old name of access provider %q: %s", oldExternalId, accessProvider.Name, err.Error())
 				}
@@ -749,7 +753,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 
 		if _, rf := rolesCreated[externalId]; !rf {
 			// Create the role if not exists
-			actualName, err = s.createRole(externalId, accessProvider.Type, repo)
+			err = s.createRole(externalId, accessProvider.Type, repo)
 			if err != nil {
 				return actualName, fmt.Errorf("error while creating role %q: %s", externalId, err.Error())
 			}
@@ -767,14 +771,14 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				return actualName, fmt.Errorf("error can not assign users to a database role %q", externalId)
 			}
 
-			err := repo.GrantUsersToAccountRole(ctx, externalId, accessProvider.Who.Users...)
+			err = repo.GrantUsersToAccountRole(ctx, externalId, accessProvider.Who.Users...)
 			if err != nil {
 				return actualName, fmt.Errorf("error while assigning users to role %q: %s", externalId, err.Error())
 			}
 		}
 
 		if !ignoreInheritance {
-			err := s.grantRolesToRole(ctx, repo, externalId, accessProvider.Type, inheritedRoles...)
+			err = s.grantRolesToRole(ctx, repo, externalId, accessProvider.Type, inheritedRoles...)
 			if err != nil {
 				return actualName, fmt.Errorf("error while assigning roles to role %q: %s", externalId, err.Error())
 			}
@@ -782,7 +786,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 	}
 
 	if !ignoreWhat {
-		err := s.mergeGrants(repo, externalId, accessProvider.Type, foundGrants, expectedGrants, metaData)
+		err = s.mergeGrants(repo, externalId, accessProvider.Type, foundGrants, expectedGrants, metaData)
 		if err != nil {
 			return actualName, err
 		}
@@ -866,56 +870,56 @@ func (s *AccessSyncer) revokeRolesFromRole(ctx context.Context, repo dataAccessR
 	return repo.RevokeAccountRolesFromAccountRole(ctx, targetExternalId, toAddAccountRoles...)
 }
 
-func (s *AccessSyncer) createRole(externalId string, apType *string, repo dataAccessRepository) (string, error) {
+func (s *AccessSyncer) createRole(externalId string, apType *string, repo dataAccessRepository) error {
 	if isDatabaseRole(apType) {
 		database, cleanedRoleName, err := parseDatabaseRoleExternalId(externalId)
 		if err != nil {
-			return cleanedRoleName, err
+			return err
 		}
 
-		return cleanedRoleName, repo.CreateDatabaseRole(database, cleanedRoleName)
+		return repo.CreateDatabaseRole(database, cleanedRoleName)
 	}
 
-	return externalId, repo.CreateAccountRole(externalId)
+	return repo.CreateAccountRole(externalId)
 }
 
-func (s *AccessSyncer) dropRole(externalId string, databaseRole bool, repo dataAccessRepository) (string, error) {
+func (s *AccessSyncer) dropRole(externalId string, databaseRole bool, repo dataAccessRepository) error {
 	if databaseRole {
 		database, cleanedRoleName, err := parseDatabaseRoleExternalId(externalId)
 		if err != nil {
-			return cleanedRoleName, err
+			return err
 		}
 
-		return cleanedRoleName, repo.DropDatabaseRole(database, cleanedRoleName)
+		return repo.DropDatabaseRole(database, cleanedRoleName)
 	}
 
-	return externalId, repo.DropAccountRole(externalId)
+	return repo.DropAccountRole(externalId)
 }
 
-func (s *AccessSyncer) renameRole(oldName, newName string, apType *string, repo dataAccessRepository) (string, error) {
+func (s *AccessSyncer) renameRole(oldName, newName string, apType *string, repo dataAccessRepository) error {
 	if isDatabaseRole(apType) {
 		if !isDatabaseRoleByExternalId(newName) || !isDatabaseRoleByExternalId(oldName) {
-			return "", fmt.Errorf("both roles should be a database role newName:%q - oldName:%q", newName, oldName)
+			return fmt.Errorf("both roles should be a database role newName:%q - oldName:%q", newName, oldName)
 		}
 
 		oldDatabase, oldRoleName, err := parseDatabaseRoleExternalId(oldName)
 		if err != nil {
-			return "", err
+			return err
 		}
 
 		newDatabase, newRoleName, err := parseDatabaseRoleExternalId(newName)
 		if err != nil {
-			return newRoleName, err
+			return err
 		}
 
 		if oldDatabase != newDatabase {
-			return newRoleName, fmt.Errorf("expected new roleName %q pointing to the same database as old roleName %q", newName, oldName)
+			return fmt.Errorf("expected new roleName %q pointing to the same database as old roleName %q", newName, oldName)
 		}
 
-		return newRoleName, repo.RenameDatabaseRole(oldDatabase, oldRoleName, newRoleName)
+		return repo.RenameDatabaseRole(oldDatabase, oldRoleName, newRoleName)
 	}
 
-	return newName, repo.RenameAccountRole(oldName, newName)
+	return repo.RenameAccountRole(oldName, newName)
 }
 
 func (s *AccessSyncer) commentOnRoleIfExists(comment, roleName string, repo dataAccessRepository) error {
