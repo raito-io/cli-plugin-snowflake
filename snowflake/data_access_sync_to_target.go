@@ -196,11 +196,10 @@ func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, ap
 		}
 
 		for _, ap := range aps {
+			// Actually, actual name isn't even relevant for filters
 			var actualNameStr string
 			if actualName != nil {
 				actualNameStr = *actualName
-			} else if ap.ActualName != nil {
-				actualNameStr = *ap.ActualName
 			}
 
 			var apExternalId *string
@@ -277,7 +276,7 @@ func (s *AccessSyncer) removeRolesToRemove(toRemoveAps map[string]*importer.Acce
 			if ap == nil {
 				logger.Warn(fmt.Sprintf("no linked access provider found for %q, so just going to remove it from Snowflake", toRemoveExternalId))
 
-				err := s.dropRole(toRemoveExternalId, isDatabaseRoleByExternalId(toRemoveExternalId), repo)
+				_, err := s.dropRole(toRemoveExternalId, isDatabaseRoleByExternalId(toRemoveExternalId), repo)
 				if err != nil {
 					return err
 				}
@@ -290,11 +289,8 @@ func (s *AccessSyncer) removeRolesToRemove(toRemoveAps map[string]*importer.Acce
 				ExternalId:     ptr.String(toRemoveExternalId),
 			}
 
-			if ap.ActualName != nil {
-				fi.ActualName = *ap.ActualName
-			}
-
-			err := s.dropRole(toRemoveExternalId, isDatabaseRole(ap.Type), repo)
+			var err error
+			fi.ActualName, err = s.dropRole(toRemoveExternalId, isDatabaseRole(ap.Type), repo)
 			// If an error occurs (and not already deleted), we send an error back as feedback
 			if err != nil && !strings.Contains(err.Error(), "does not exist") {
 				logger.Error(fmt.Sprintf("unable to drop role %q: %s", toRemoveExternalId, err.Error()))
@@ -485,7 +481,7 @@ func (s *AccessSyncer) buildMetaDataMap(metaData *ds.MetaData) map[string]map[st
 }
 
 //nolint:gocyclo
-func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId string, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string, rolesCreated map[string]interface{}, repo dataAccessRepository, metaData map[string]map[string]struct{}) error {
+func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId string, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string, rolesCreated map[string]interface{}, repo dataAccessRepository, metaData map[string]map[string]struct{}) (string, error) {
 	accessProvider := toProcessAps[externalId]
 	logger.Debug(fmt.Sprintf("Handle access provider with key %q - %+v - %+v", externalId, accessProvider, toProcessAps))
 
@@ -497,6 +493,9 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 
 	// Extract RoleNames from Access Providers that are among the whoList of this one
 	inheritedRoles := make([]string, 0)
+
+	// We start of the actual name the same as the externalId.
+	actualName := externalId
 
 	if !ignoreInheritance {
 		for _, apWho := range accessProvider.Who.InheritFrom {
@@ -528,35 +527,35 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 			if isTableType(what.DataObject.Type) {
 				grants, err2 := s.createGrantsForTableOrView(what.DataObject.Type, permissions, what.DataObject.FullName, metaData)
 				if err2 != nil {
-					return err2
+					return actualName, err2
 				}
 
 				expectedGrants = append(expectedGrants, grants...)
 			} else if what.DataObject.Type == ds.Schema {
 				grants, err2 := s.createGrantsForSchema(repo, permissions, what.DataObject.FullName, metaData, false)
 				if err2 != nil {
-					return err2
+					return actualName, err2
 				}
 
 				expectedGrants = append(expectedGrants, grants...)
 			} else if what.DataObject.Type == "shared-schema" {
 				grants, err2 := s.createGrantsForSchema(repo, permissions, what.DataObject.FullName, metaData, true)
 				if err2 != nil {
-					return err2
+					return actualName, err2
 				}
 
 				expectedGrants = append(expectedGrants, grants...)
 			} else if what.DataObject.Type == "shared-database" {
 				grants, err2 := s.createGrantsForDatabase(repo, permissions, what.DataObject.FullName, metaData, true)
 				if err2 != nil {
-					return err2
+					return actualName, err2
 				}
 
 				expectedGrants = append(expectedGrants, grants...)
 			} else if what.DataObject.Type == ds.Database {
 				grants, err2 := s.createGrantsForDatabase(repo, permissions, what.DataObject.FullName, metaData, false)
 				if err2 != nil {
-					return err2
+					return actualName, err2
 				}
 
 				expectedGrants = append(expectedGrants, grants...)
@@ -565,13 +564,15 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 			} else if what.DataObject.Type == ds.Datasource {
 				grants, err2 := s.createGrantsForAccount(repo, permissions, metaData)
 				if err2 != nil {
-					return err2
+					return actualName, err2
 				}
 
 				expectedGrants = append(expectedGrants, grants...)
 			}
 		}
 	}
+
+	var err error
 
 	// If we find this role name in the rename map, this means we have to rename it.
 	if oldExternalId, f := toRenameAps[externalId]; f {
@@ -583,9 +584,9 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", externalId, oldExternalId))
 			} else {
 				// The old name exists and the new one doesn't exist yet, so we have to do the rename
-				err := s.renameRole(oldExternalId, externalId, accessProvider.Type, repo)
+				actualName, err = s.renameRole(oldExternalId, externalId, accessProvider.Type, repo)
 				if err != nil {
-					return fmt.Errorf("error while renaming role %q to %q: %s", oldExternalId, externalId, err.Error())
+					return actualName, fmt.Errorf("error while renaming role %q to %q: %s", oldExternalId, externalId, err.Error())
 				}
 
 				existingRoles.Add(externalId)
@@ -598,9 +599,9 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", externalId, oldExternalId))
 			} else {
 				// The old name exists but also the new one already exists. This is a weird case, but we'll delete the old one in this case and the new one will be updated in the next step of this method.
-				err := s.dropRole(oldExternalId, isDatabaseRoleByExternalId(oldExternalId), repo)
+				actualName, err = s.dropRole(oldExternalId, isDatabaseRoleByExternalId(oldExternalId), repo)
 				if err != nil {
-					return fmt.Errorf("error while dropping role (%s) which was the old name of access provider %q: %s", oldExternalId, accessProvider.Name, err.Error())
+					return actualName, fmt.Errorf("error while dropping role (%s) which was the old name of access provider %q: %s", oldExternalId, accessProvider.Name, err.Error())
 				}
 
 				existingRoles.Remove(oldExternalId)
@@ -618,14 +619,14 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 		if !ignoreWho && !ignoreWhat {
 			err2 := s.commentOnRoleIfExists(createComment(accessProvider, true), externalId, repo)
 			if err2 != nil {
-				return fmt.Errorf("error while updating comment on role %q: %s", externalId, err2.Error())
+				return actualName, fmt.Errorf("error while updating comment on role %q: %s", externalId, err2.Error())
 			}
 		}
 
 		if !ignoreWho || !ignoreInheritance {
 			grantsOfRole, err3 := s.retrieveGrantsOfRole(externalId, accessProvider.Type, repo)
 			if err3 != nil {
-				return err3
+				return actualName, err3
 			}
 
 			usersOfRole := make([]string, 0, len(grantsOfRole))
@@ -639,7 +640,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				} else if strings.EqualFold(gor.GrantedTo, "DATABASE_ROLE") {
 					database, parsedRoleName, err2 := parseDatabaseRoleRoleName(cleanDoubleQuotes(gor.GranteeName))
 					if err2 != nil {
-						return err2
+						return actualName, err2
 					}
 
 					rolesOfRole = append(rolesOfRole, databaseRoleExternalIdGenerator(database, parsedRoleName))
@@ -653,23 +654,23 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 
 				if len(toAdd) > 0 {
 					if isDatabaseRole(accessProvider.Type) {
-						return fmt.Errorf("error can not assign users from a database role %q", externalId)
+						return actualName, fmt.Errorf("error can not assign users from a database role %q", externalId)
 					}
 
 					e := repo.GrantUsersToAccountRole(ctx, externalId, toAdd...)
 					if e != nil {
-						return fmt.Errorf("error while assigning users to role %q: %s", externalId, e.Error())
+						return actualName, fmt.Errorf("error while assigning users to role %q: %s", externalId, e.Error())
 					}
 				}
 
 				if len(toRemove) > 0 {
 					if isDatabaseRole(accessProvider.Type) {
-						return fmt.Errorf("error can not unassign users from a database role %q", externalId)
+						return actualName, fmt.Errorf("error can not unassign users from a database role %q", externalId)
 					}
 
 					e := repo.RevokeUsersFromAccountRole(ctx, externalId, toRemove...)
 					if e != nil {
-						return fmt.Errorf("error while unassigning users from role %q: %s", externalId, e.Error())
+						return actualName, fmt.Errorf("error while unassigning users from role %q: %s", externalId, e.Error())
 					}
 				}
 			}
@@ -682,14 +683,14 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				if len(toAdd) > 0 {
 					e := s.grantRolesToRole(ctx, repo, externalId, accessProvider.Type, toAdd...)
 					if e != nil {
-						return fmt.Errorf("error while assigning role to role %q: %s", externalId, e.Error())
+						return actualName, fmt.Errorf("error while assigning role to role %q: %s", externalId, e.Error())
 					}
 				}
 
 				if len(toRemove) > 0 {
 					e := s.revokeRolesFromRole(ctx, repo, externalId, accessProvider.Type, toRemove...)
 					if e != nil {
-						return fmt.Errorf("error while unassigning role from role %q: %s", externalId, e.Error())
+						return actualName, fmt.Errorf("error while unassigning role from role %q: %s", externalId, e.Error())
 					}
 				}
 			}
@@ -703,24 +704,24 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				if what.DataObject.Type == "database" {
 					e := s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), externalId, accessProvider.Type, repo)
 					if e != nil {
-						return fmt.Errorf("error while assigning future schema grants in database %q to role %q: %s", what.DataObject.FullName, externalId, e.Error())
+						return actualName, fmt.Errorf("error while assigning future schema grants in database %q to role %q: %s", what.DataObject.FullName, externalId, e.Error())
 					}
 
 					e = s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), externalId, accessProvider.Type, repo)
 					if e != nil {
-						return fmt.Errorf("error while assigning future table grants in database %q to role %q: %s", what.DataObject.FullName, externalId, e.Error())
+						return actualName, fmt.Errorf("error while assigning future table grants in database %q to role %q: %s", what.DataObject.FullName, externalId, e.Error())
 					}
 				} else if what.DataObject.Type == "schema" {
 					e := s.executeRevokeOnRole("ALL", fmt.Sprintf("FUTURE TABLES IN SCHEMA %s", what.DataObject.FullName), externalId, accessProvider.Type, repo)
 					if e != nil {
-						return fmt.Errorf("error while assigning future table grants in schema %q to role %q: %s", what.DataObject.FullName, externalId, e.Error())
+						return actualName, fmt.Errorf("error while assigning future table grants in schema %q to role %q: %s", what.DataObject.FullName, externalId, e.Error())
 					}
 				}
 			}
 
 			grantsToRole, err3 := s.getGrantsToRole(externalId, accessProvider.Type, repo)
 			if err3 != nil {
-				return err3
+				return actualName, err3
 			}
 
 			logger.Debug(fmt.Sprintf("Found grants for role %q: %+v", externalId, grantsToRole))
@@ -748,34 +749,34 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 
 		if _, rf := rolesCreated[externalId]; !rf {
 			// Create the role if not exists
-			err := s.createRole(externalId, accessProvider.Type, repo)
+			actualName, err = s.createRole(externalId, accessProvider.Type, repo)
 			if err != nil {
-				return fmt.Errorf("error while creating role %q: %s", externalId, err.Error())
+				return actualName, fmt.Errorf("error while creating role %q: %s", externalId, err.Error())
 			}
 
 			// Updating the comment (independent of creation)
 			err = s.commentOnRoleIfExists(createComment(accessProvider, false), externalId, repo)
 			if err != nil {
-				return fmt.Errorf("error while updating comment on role %q: %s", externalId, err.Error())
+				return actualName, fmt.Errorf("error while updating comment on role %q: %s", externalId, err.Error())
 			}
 			rolesCreated[externalId] = struct{}{}
 		}
 
 		if !ignoreWho && len(accessProvider.Who.Users) > 0 {
 			if isDatabaseRole(accessProvider.Type) {
-				return fmt.Errorf("error can not assign users to a database role %q", externalId)
+				return actualName, fmt.Errorf("error can not assign users to a database role %q", externalId)
 			}
 
 			err := repo.GrantUsersToAccountRole(ctx, externalId, accessProvider.Who.Users...)
 			if err != nil {
-				return fmt.Errorf("error while assigning users to role %q: %s", externalId, err.Error())
+				return actualName, fmt.Errorf("error while assigning users to role %q: %s", externalId, err.Error())
 			}
 		}
 
 		if !ignoreInheritance {
 			err := s.grantRolesToRole(ctx, repo, externalId, accessProvider.Type, inheritedRoles...)
 			if err != nil {
-				return fmt.Errorf("error while assigning roles to role %q: %s", externalId, err.Error())
+				return actualName, fmt.Errorf("error while assigning roles to role %q: %s", externalId, err.Error())
 			}
 		}
 	}
@@ -783,11 +784,11 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 	if !ignoreWhat {
 		err := s.mergeGrants(repo, externalId, accessProvider.Type, foundGrants, expectedGrants, metaData)
 		if err != nil {
-			return err
+			return actualName, err
 		}
 	}
 
-	return nil
+	return actualName, nil
 }
 
 func (s *AccessSyncer) getGrantsToRole(externalId string, apType *string, repo dataAccessRepository) ([]GrantToRole, error) {
@@ -865,56 +866,56 @@ func (s *AccessSyncer) revokeRolesFromRole(ctx context.Context, repo dataAccessR
 	return repo.RevokeAccountRolesFromAccountRole(ctx, targetExternalId, toAddAccountRoles...)
 }
 
-func (s *AccessSyncer) createRole(externalId string, apType *string, repo dataAccessRepository) error {
+func (s *AccessSyncer) createRole(externalId string, apType *string, repo dataAccessRepository) (string, error) {
 	if isDatabaseRole(apType) {
 		database, cleanedRoleName, err := parseDatabaseRoleExternalId(externalId)
 		if err != nil {
-			return err
+			return cleanedRoleName, err
 		}
 
-		return repo.CreateDatabaseRole(database, cleanedRoleName)
+		return cleanedRoleName, repo.CreateDatabaseRole(database, cleanedRoleName)
 	}
 
-	return repo.CreateAccountRole(externalId)
+	return externalId, repo.CreateAccountRole(externalId)
 }
 
-func (s *AccessSyncer) dropRole(externalId string, databaseRole bool, repo dataAccessRepository) error {
+func (s *AccessSyncer) dropRole(externalId string, databaseRole bool, repo dataAccessRepository) (string, error) {
 	if databaseRole {
 		database, cleanedRoleName, err := parseDatabaseRoleExternalId(externalId)
 		if err != nil {
-			return err
+			return cleanedRoleName, err
 		}
 
-		return repo.DropDatabaseRole(database, cleanedRoleName)
+		return cleanedRoleName, repo.DropDatabaseRole(database, cleanedRoleName)
 	}
 
-	return repo.DropAccountRole(externalId)
+	return externalId, repo.DropAccountRole(externalId)
 }
 
-func (s *AccessSyncer) renameRole(oldName, newName string, apType *string, repo dataAccessRepository) error {
+func (s *AccessSyncer) renameRole(oldName, newName string, apType *string, repo dataAccessRepository) (string, error) {
 	if isDatabaseRole(apType) {
 		if !isDatabaseRoleByExternalId(newName) || !isDatabaseRoleByExternalId(oldName) {
-			return fmt.Errorf("both roles should be a database role newName:%q - oldName:%q", newName, oldName)
+			return "", fmt.Errorf("both roles should be a database role newName:%q - oldName:%q", newName, oldName)
 		}
 
 		oldDatabase, oldRoleName, err := parseDatabaseRoleExternalId(oldName)
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		newDatabase, newRoleName, err := parseDatabaseRoleExternalId(newName)
 		if err != nil {
-			return err
+			return newRoleName, err
 		}
 
 		if oldDatabase != newDatabase {
-			return fmt.Errorf("expected new roleName %q pointing to the same database as old roleName %q", newName, oldName)
+			return newRoleName, fmt.Errorf("expected new roleName %q pointing to the same database as old roleName %q", newName, oldName)
 		}
 
-		return repo.RenameDatabaseRole(oldDatabase, oldRoleName, newRoleName)
+		return newRoleName, repo.RenameDatabaseRole(oldDatabase, oldRoleName, newRoleName)
 	}
 
-	return repo.RenameAccountRole(oldName, newName)
+	return newName, repo.RenameAccountRole(oldName, newName)
 }
 
 func (s *AccessSyncer) commentOnRoleIfExists(comment, roleName string, repo dataAccessRepository) error {
@@ -949,11 +950,8 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, toProcessAps 
 			Type:           accessProvider.Type,
 		}
 
-		if accessProvider.ActualName != nil {
-			fi.ActualName = *accessProvider.ActualName
-		}
-
-		err2 := s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, repo, metaData)
+		actualName, err2 := s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, repo, metaData)
+		fi.ActualName = actualName
 
 		err3 := s.handleAccessProviderFeedback(feedbackHandler, &fi, err2)
 		if err3 != nil {
