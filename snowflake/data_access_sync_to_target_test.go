@@ -182,24 +182,28 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 		},
 		{
 			AccessProvider: "AccessProviderId2",
+			ActualName:     "ExistingRole1",
 			ExternalId:     ptr.String("ExistingRole1"),
 		},
 		{
 			AccessProvider: "AccessProviderId3",
+			ActualName:     "RoleName3",
 			ExternalId:     ptr.String("RoleName3"),
 		},
 		{
 			AccessProvider: "AccessProviderId1",
-			ActualName:     "AccessProvider1",
+			ActualName:     "RoleName1",
 			ExternalId:     ptr.String("RoleName1"),
 		},
 		{
 			AccessProvider: "AccessProviderId4",
+			ActualName:     "DatabaseRole1",
 			ExternalId:     ptr.String("DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1"),
 			Type:           ptr.String("databaseRole"),
 		},
 		{
 			AccessProvider: "AccessProviderId5",
+			ActualName:     "DatabaseRole2",
 			ExternalId:     ptr.String("DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2"),
 			Type:           ptr.String("databaseRole"),
 		},
@@ -1294,10 +1298,12 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 			Who: importer.WhoItem{
 				Users: []string{"User1"},
 			},
+			ExternalId: ptr.String("OldRoleName"),
 		},
 		"DATABASEROLE###DATABASE:TEST_DB###ROLE:newDBRole": {
 			Id:         "TEST_DB_DBRole",
 			ActualName: ptr.String("anActualName"),
+			ExternalId: ptr.String("DATABASEROLE###DATABASE:TEST_DB###ROLE:oldDBRole"),
 			Name:       "TEST_DB.DBRole",
 			Who: importer.WhoItem{
 				InheritFrom: []string{"DATABASEROLE###DATABASE:TEST_DB###ROLE:Role1", "DATABASEROLE###DATABASE:TEST_DB###ROLE:Role2"},
@@ -1316,10 +1322,11 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
 		{
 			AccessProvider: "AccessProviderId",
+			ActualName:     "NewRoleName",
 			ExternalId:     ptr.String("NewRoleName"),
 		}, {
 			AccessProvider: "TEST_DB_DBRole",
-			ActualName:     "anActualName",
+			ActualName:     "newDBRole",
 			ExternalId:     ptr.String("DATABASEROLE###DATABASE:TEST_DB###ROLE:newDBRole"),
 			Type:           ptr.String("databaseRole"),
 		},
@@ -1344,9 +1351,10 @@ func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
 
 	access := map[string]*importer.AccessProvider{
 		"NewRoleName": {
-			Id:   "AccessProviderId",
-			Name: "AccessProvider",
-			Type: ptr.String(access_provider.Role),
+			Id:         "AccessProviderId",
+			Name:       "AccessProvider",
+			ExternalId: ptr.String("NewRoleName"),
+			Type:       ptr.String(access_provider.Role),
 			Who: importer.WhoItem{
 				Users: []string{"User1"},
 			},
@@ -1362,6 +1370,7 @@ func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
 	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
 		{
 			AccessProvider: "AccessProviderId",
+			ActualName:     "NewRoleName",
 			ExternalId:     ptr.String("NewRoleName"),
 			Type:           ptr.String(access_provider.Role),
 		},
@@ -1389,13 +1398,16 @@ func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T)
 	})
 
 	access := map[string]*importer.AccessProvider{
+		// This AP gets renewed from OldRoleName to NewRoleName
 		"NewRoleName": {
-			Id:   "AccessProviderId",
-			Name: "AccessProvider",
+			Id:         "AccessProviderId",
+			ExternalId: ptr.String("OldRoleName"),
+			Name:       "AccessProvider",
 			Who: importer.WhoItem{
 				Users: []string{"User1"},
 			},
 		},
+		// In the meanwhile, there already is a new AP with the name OldRoleName
 		"OldRoleName": {
 			Id:   "AccessProviderId2",
 			Name: "AccessProvider2",
@@ -1411,10 +1423,12 @@ func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T)
 	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
 		{
 			AccessProvider: "AccessProviderId",
+			ActualName:     "NewRoleName",
 			ExternalId:     ptr.String("NewRoleName"),
 		},
 		{
 			AccessProvider: "AccessProviderId2",
+			ActualName:     "OldRoleName",
 			ExternalId:     ptr.String("OldRoleName"),
 		},
 	})
