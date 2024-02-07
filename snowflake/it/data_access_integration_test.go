@@ -153,6 +153,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
 		{
 			AccessProvider: accountRoleId,
+			ActualName:     actualRoleName,
 			ExternalId:     &actualRoleName,
 		},
 		{
@@ -255,6 +256,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
 		{
 			AccessProvider: accountRoleId,
+			ActualName:     actualRoleName,
 			ExternalId:     &actualRoleName,
 		},
 		{
@@ -328,6 +330,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	s.ElementsMatch(dataAccessFeedbackHandler.AccessProviderFeedback, []sync_to_target.AccessProviderSyncFeedback{
 		{
 			AccessProvider: id,
+			ActualName:     actualRoleName,
 			ExternalId:     &actualRoleName,
 		},
 	})
