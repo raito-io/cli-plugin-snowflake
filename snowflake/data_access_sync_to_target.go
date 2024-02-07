@@ -954,10 +954,9 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, toProcessAps 
 			Type:           accessProvider.Type,
 		}
 
-		actualName, err2 := s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, repo, metaData)
-		fi.ActualName = actualName
+		fi.ActualName, err = s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, repo, metaData)
 
-		err3 := s.handleAccessProviderFeedback(feedbackHandler, &fi, err2)
+		err3 := s.handleAccessProviderFeedback(feedbackHandler, &fi, err)
 		if err3 != nil {
 			return err3
 		}
