@@ -601,7 +601,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				CanBeCreated:                  true,
 				CanBeAssumed:                  true,
 				CanAssumeMultiple:             true,
-				AllowedWhoAccessProviderTypes: []string{access_provider.Role, apTypeDatabaseRole},
+				AllowedWhoAccessProviderTypes: []string{access_provider.Role},
 			},
 			{
 				Type:                          apTypeDatabaseRole,
@@ -610,7 +610,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				CanBeCreated:                  false,
 				CanBeAssumed:                  false,
 				CanAssumeMultiple:             false,
-				AllowedWhoAccessProviderTypes: []string{apTypeDatabaseRole},
+				AllowedWhoAccessProviderTypes: []string{access_provider.Role, apTypeDatabaseRole},
 			},
 		},
 		MaskingMetadata: &ds.MaskingMetadata{
