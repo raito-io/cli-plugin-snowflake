@@ -1038,7 +1038,7 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 							Id:         "AccessProviderId2",
 							Action:     importer.Grant,
 							Type:       ptr.String("databaseRole"),
-							NamingHint: "TEST_DB.DatabaseRole1",
+							NamingHint: "DatabaseRole1",
 							Who: importer.WhoItem{
 								InheritFrom: []string{"AccessProviderId1"},
 							},
@@ -1109,7 +1109,7 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 							Action:     importer.Grant,
 							ExternalId: ptr.String("DATABASEROLE###DATABASE:TEST_DB###ROLE:DATABASE_ROLE1_OLD"),
 							Type:       ptr.String("databaseRole"),
-							NamingHint: "TEST_DB.DatabaseRole1",
+							NamingHint: "DatabaseRole1",
 							Who: importer.WhoItem{
 								InheritFrom: []string{"AccessProviderId1"},
 							},
