@@ -28,6 +28,7 @@ type dataSourceRepository interface {
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTagsLinkedToDatabaseName(databaseName string) (map[string][]*tag.Tag, error)
+	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	ExecuteGrantOnAccountRole(perm, on, role string) error
 }
 
@@ -127,7 +128,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	schemaExcludes := parseCommaSeparatedList(excludedSchemaList)
 	shouldRetrieveTags := !standard && !skipTags
 
-	err = s.readWarehouses(repo, dataSourceHandler)
+	err = s.readWarehouses(repo, dataSourceHandler, shouldRetrieveTags)
 	if err != nil {
 		return err
 	}
@@ -354,7 +355,8 @@ func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludes set
 		return nil, err
 	}
 
-	enrichedDatabases, err := s.addDbEntitiesToImporter(repo, dataSourceHandler, databases, ds.Database, "", shouldRetrieveTags,
+	enrichedDatabases, err := s.addDbEntitiesToImporter(dataSourceHandler, databases, ds.Database, "", shouldRetrieveTags,
+		repo.GetTagsLinkedToDatabaseName,
 		func(name string) string { return name },
 		func(name, fullName string) bool {
 			_, shared := shares[fullName]
@@ -375,7 +377,8 @@ func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludes set.Se
 		return nil, nil, err
 	}
 
-	enrichedShares, err := s.addDbEntitiesToImporter(repo, dataSourceHandler, shares, "shared-database", "", shouldRetrieveTags,
+	enrichedShares, err := s.addDbEntitiesToImporter(dataSourceHandler, shares, "shared-database", "", shouldRetrieveTags,
+		repo.GetTagsLinkedToDatabaseName,
 		func(name string) string { return name },
 		func(name, fullName string) bool {
 			return !excludes.Contains(fullName) && s.shouldGoInto(fullName)
@@ -394,15 +397,26 @@ func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludes set.Se
 	return enrichedShares, sharesMap, nil
 }
 
-func (s *DataSourceSyncer) readWarehouses(repo dataSourceRepository, dataSourceHandler wrappers.DataSourceObjectHandler) error {
+func (s *DataSourceSyncer) readWarehouses(repo dataSourceRepository, dataSourceHandler wrappers.DataSourceObjectHandler, shouldRetrieveTags bool) error {
 	dbWarehouses, err := repo.GetWarehouses()
 	if err != nil {
 		return err
 	}
 
-	shouldRetrieveTags := false
+	allWarehouseTags := make(map[string][]*tag.Tag, 0)
 
-	_, err = s.addDbEntitiesToImporter(repo, dataSourceHandler, dbWarehouses, "warehouse", "", shouldRetrieveTags,
+	if shouldRetrieveTags {
+		allWarehouseTags, err = repo.GetTagsByDomain("WAREHOUSE")
+
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = s.addDbEntitiesToImporter(dataSourceHandler, dbWarehouses, "warehouse", "", shouldRetrieveTags,
+		func(name string) (map[string][]*tag.Tag, error) {
+			return allWarehouseTags, nil
+		},
 		func(name string) string { return name },
 		func(name, fullName string) bool { return s.shouldGoInto(fullName) })
 	if err != nil {
@@ -412,7 +426,7 @@ func (s *DataSourceSyncer) readWarehouses(repo dataSourceRepository, dataSourceH
 	return nil
 }
 
-func (s *DataSourceSyncer) addDbEntitiesToImporter(repo dataSourceRepository, dataObjectHandler wrappers.DataSourceObjectHandler, entities []DbEntity, doType string, parent string, shouldRetrieveTags bool, externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]ExtendedDbEntity, error) {
+func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.DataSourceObjectHandler, entities []DbEntity, doType string, parent string, shouldRetrieveTags bool, tagRetrieval func(name string) (map[string][]*tag.Tag, error), externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]ExtendedDbEntity, error) {
 	dbEntities := make([]ExtendedDbEntity, 0, 20)
 
 	for _, db := range entities {
@@ -429,7 +443,7 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(repo dataSourceRepository, da
 		fullName := externalIdGenerator(extendedEntity.Entity.Name)
 		if filter(extendedEntity.Entity.Name, fullName) {
 			if shouldRetrieveTags {
-				tagMap, err := repo.GetTagsLinkedToDatabaseName(extendedEntity.Entity.Name)
+				tagMap, err := tagRetrieval(extendedEntity.Entity.Name)
 
 				if err != nil {
 					return nil, err

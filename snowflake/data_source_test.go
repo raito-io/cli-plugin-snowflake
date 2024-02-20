@@ -53,7 +53,8 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 		{Name: "Database1"}, {Name: "Database2"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetTagsLinkedToDatabaseName(mock.Anything).Return(map[string][]*tag.Tag{}, nil)
+	repoMock.EXPECT().GetTagsByDomain("WAREHOUSE").Return(map[string][]*tag.Tag{}, nil).Once()
+	repoMock.EXPECT().GetTagsLinkedToDatabaseName(mock.Anything).Return(map[string][]*tag.Tag{}, nil).Times(3)
 
 	repoMock.EXPECT().GetSchemasInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&SchemaEntity{Database: s, Name: "schema1"})
@@ -170,7 +171,7 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter(t *testing.T) {
 	syncer := createSyncer(nil)
 
 	//When
-	returnedEntities, err := syncer.addDbEntitiesToImporter(repoMock, dataSourceObjectHandlerMock, entities, doType, parent, shouldRetrieveTags, externalIdGenerator, filter)
+	returnedEntities, err := syncer.addDbEntitiesToImporter(dataSourceObjectHandlerMock, entities, doType, parent, shouldRetrieveTags, repoMock.GetTagsLinkedToDatabaseName, externalIdGenerator, filter)
 
 	//Then
 	assert.NoError(t, err)
@@ -220,7 +221,7 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter_ErrorOnAddDataO
 	syncer := createSyncer(nil)
 
 	//When
-	returnedEntities, err := syncer.addDbEntitiesToImporter(repoMock, dataSourceObjectHandlerMock, entities, doType, parent, shouldRetrieveTags, externalIdGenerator, filter)
+	returnedEntities, err := syncer.addDbEntitiesToImporter(dataSourceObjectHandlerMock, entities, doType, parent, shouldRetrieveTags, repoMock.GetTagsLinkedToDatabaseName, externalIdGenerator, filter)
 
 	//Then
 	assert.Error(t, err)
@@ -237,10 +238,16 @@ func TestDataSourceSyncer_SyncDataSource_readWarehouses(t *testing.T) {
 		{Name: "Warehouse2"},
 	}, nil).Once()
 
+	repoMock.EXPECT().GetTagsByDomain("WAREHOUSE").Return(map[string][]*tag.Tag{
+		"Warehouse1": {
+			{Key: "tag1", Value: "value1"},
+		},
+	}, nil).Once()
+
 	syncer := createSyncer(nil)
 
 	//When
-	err := syncer.readWarehouses(repoMock, dataSourceObjectHandlerMock)
+	err := syncer.readWarehouses(repoMock, dataSourceObjectHandlerMock, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -250,6 +257,9 @@ func TestDataSourceSyncer_SyncDataSource_readWarehouses(t *testing.T) {
 		Type:       "warehouse",
 		FullName:   "Warehouse1",
 		ExternalId: "Warehouse1",
+		Tags: []*tag.Tag{
+			{Key: "tag1", Value: "value1"},
+		},
 	})
 	assert.Contains(t, dataSourceObjectHandlerMock.DataObjects, data_source.DataObject{
 		Name:       "Warehouse2",
@@ -425,7 +435,8 @@ func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
 		{Name: "Database1"}, {Name: "Database2"},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetTagsLinkedToDatabaseName(mock.Anything).Return(map[string][]*tag.Tag{}, nil)
+	repoMock.EXPECT().GetTagsByDomain("WAREHOUSE").Return(nil, nil).Once()
+	repoMock.EXPECT().GetTagsLinkedToDatabaseName(mock.Anything).Return(map[string][]*tag.Tag{}, nil).Once()
 
 	repoMock.EXPECT().GetSchemasInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&SchemaEntity{Database: s, Name: "schema1"})
