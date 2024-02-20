@@ -183,12 +183,15 @@ func splitFullName(fullName string, currentResults []string, err error) ([]strin
 			// This actually points to a malformed fullName (every beginning " should have a corresponding ending one)
 			return append(currentResults, fullName), fmt.Errorf("no corresponding ending \" found for %s", fullName)
 		}
+
 		i_quote++
 		subStr := fullName[i_quote:]
+
 		i_dot := strings.Index(subStr, `.`)
 		if i_dot > -1 {
 			i_dot += i_quote
 		}
+
 		if i_dot == -1 && i_quote == len(fullName)-1 {
 			// no dot found -> last entry in the list
 			currentResults = append(currentResults, fullName)
