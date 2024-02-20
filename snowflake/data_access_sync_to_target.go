@@ -1118,6 +1118,7 @@ func (s *AccessSyncer) getTablesForSchema(repo dataAccessRepository, database, s
 	err := repo.GetTablesInDatabase(database, schema, func(entity interface{}) error {
 		table := entity.(*TableEntity)
 		tables = append(tables, *table)
+
 		return nil
 	})
 
@@ -1140,6 +1141,7 @@ func (s *AccessSyncer) getSchemasForDatabase(repo dataAccessRepository, database
 	err := repo.GetSchemasInDatabase(database, func(entity interface{}) error {
 		schema := entity.(*SchemaEntity)
 		schemas = append(schemas, *schema)
+
 		return nil
 	})
 

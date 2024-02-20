@@ -383,6 +383,7 @@ func (s *AccessSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntity, externa
 				if err2 != nil {
 					return nil, nil, nil, err2
 				}
+
 				accessProviders = append(accessProviders, databaseRoleExternalIdGenerator(database, parsedRoleName))
 			}
 		}

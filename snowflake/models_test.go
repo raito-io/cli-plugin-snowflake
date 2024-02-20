@@ -21,9 +21,7 @@ func Test_TagEntity_GetFullName(t *testing.T) {
 			args: args{
 				tagEntity: TagEntity{
 					Domain:   "database",
-					Database: ptr.String("db1"),
-					Schema:   ptr.String("schema1"),
-					Name:     "resource1",
+					Name:     "db1",
 					Column:   ptr.String("column1"),
 					TagName:  "tag1",
 					TagValue: "value1",

@@ -170,6 +170,7 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 		}
 
 		logger.Info(fmt.Sprintf("Written %d statements to file for batch %d", len(executedStatements), currentBatch))
+
 		currentBatch++
 	}
 
