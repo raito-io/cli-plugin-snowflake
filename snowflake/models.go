@@ -18,6 +18,10 @@ type DbEntity struct {
 	Comment *string `db:"comment"`
 }
 
+type ExtendedDbEntity struct {
+	Entity     DbEntity
+	LinkedTags map[string][]*tag.Tag
+}
 type SchemaEntity struct {
 	Database string  `db:"CATALOG_NAME"`
 	Name     string  `db:"SCHEMA_NAME"`
@@ -45,7 +49,7 @@ func (t *TagEntity) CreateTag() *tag.Tag {
 func (t *TagEntity) GetFullName() string {
 	switch strings.ToUpper(t.Domain) {
 	case "DATABASE":
-		return *t.Database
+		return t.Name
 	case "SCHEMA":
 		return *t.Database + "." + t.Name
 	case "TABLE":

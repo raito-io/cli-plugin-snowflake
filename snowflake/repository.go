@@ -727,7 +727,7 @@ func (repo *SnowflakeRepository) getTags(domain *string, databaseName *string) (
 	}
 
 	if databaseName != nil {
-		query = append(query, common.FormatQuery("object_database = '%s'", *databaseName))
+		query = append(query, common.FormatQuery("(object_database = '%[1]s' OR (domain = 'DATABASE' AND object_name = '%[1]s'))", *databaseName))
 	}
 
 	if len(query) > 0 {
@@ -1170,6 +1170,7 @@ func (repo *SnowflakeRepository) execMultiStatements(ctx context.Context) (chan 
 					totalStatements += len(statements)
 				}
 				done <- statementError
+
 				break
 			}
 		}
