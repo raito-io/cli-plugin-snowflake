@@ -46,6 +46,7 @@ func main() {
 					{Name: snowflake.SfDataUsageWindow, Description: "The maximum number of days of usage data to retrieve. Default is 90. Maximum is 90 days. ", Mandatory: false},
 					{Name: snowflake.SfDatabaseRoles, Description: "If set, database-roles for all databases will be fetched. ", Mandatory: false},
 				},
+				TagSource: snowflake.TagSource,
 			},
 		})
 
