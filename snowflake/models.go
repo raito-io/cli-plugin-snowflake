@@ -60,6 +60,8 @@ func (t *TagEntity) GetFullName() string {
 		return t.Name
 	case "DATABASE ROLE":
 		return t.Name
+	case "WAREHOUSE":
+		return t.Name
 	}
 
 	return ""
