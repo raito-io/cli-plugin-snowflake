@@ -4,10 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/url"
 
 	e "github.com/raito-io/cli/base/util/error"
-	_ "github.com/snowflakedb/gosnowflake"
+	sf "github.com/snowflakedb/gosnowflake"
 )
 
 const SfLimit = 10000
@@ -38,13 +37,21 @@ func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string,
 	if role == "" {
 		role = "ACCOUNTADMIN"
 	}
+	dsn, err := sf.DSN(&sf.Config{
+		Account:     snowflakeAccount,
+		User:        snowflakeUser,
+		Password:    snowflakePassword,
+		Role:        role,
+		Application: ConnectionStringIdentifier,
+	})
 
-	urlUser := url.UserPassword(snowflakeUser, snowflakePassword)
+	if err != nil {
+		return nil, "", fmt.Errorf("snowflake DSN: %w", err)
+	}
 
-	connectionString := fmt.Sprintf("%s@%s?role=%s&application=%s", urlUser, snowflakeAccount, role, ConnectionStringIdentifier)
 	censoredConnectionString := fmt.Sprintf("%s:%s@%s?role=%s", snowflakeUser, "**censured**", snowflakeAccount, role)
 	logger.Debug(fmt.Sprintf("Using connection string: %s", censoredConnectionString))
-	conn, err := sql.Open("snowflake", connectionString)
+	conn, err := sql.Open("snowflake", dsn)
 
 	if err != nil {
 		return nil, "", e.CreateSourceConnectionError(censoredConnectionString, err.Error())
