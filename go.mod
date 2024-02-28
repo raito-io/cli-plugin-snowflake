@@ -5,16 +5,16 @@ go 1.22
 toolchain go1.22.0
 
 require (
-	github.com/aws/smithy-go v1.20.0
+	github.com/aws/smithy-go v1.20.1
 	github.com/blockloop/scan v1.3.0
 	github.com/hashicorp/go-hclog v1.6.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/matoous/go-nanoid/v2 v2.0.0
 	github.com/raito-io/bexpression v0.1.1
-	github.com/raito-io/cli v0.59.0
+	github.com/raito-io/cli v0.60.0
 	github.com/raito-io/golang-set v0.0.4
 	github.com/sirupsen/logrus v1.9.3
-	github.com/snowflakedb/gosnowflake v1.7.2
+	github.com/snowflakedb/gosnowflake v1.8.0
 	github.com/stretchr/testify v1.8.4
 	github.com/vektra/mockery/v2 v2.42.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
