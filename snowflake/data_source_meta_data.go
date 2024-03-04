@@ -596,7 +596,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 		AccessProviderTypes: []*ds.AccessProviderType{
 			{
 				Type:                          access_provider.Role,
-				Label:                         access_provider.Role,
+				Label:                         "Account Role",
 				IsNamedEntity:                 true,
 				CanBeCreated:                  true,
 				CanBeAssumed:                  true,
@@ -605,7 +605,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 			},
 			{
 				Type:                          apTypeDatabaseRole,
-				Label:                         apTypeDatabaseRole,
+				Label:                         "Database Role",
 				IsNamedEntity:                 true,
 				CanBeCreated:                  false,
 				CanBeAssumed:                  false,
