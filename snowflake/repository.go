@@ -809,39 +809,21 @@ func (repo *SnowflakeRepository) CommentAccountRoleIfExists(comment, objectName 
 	q := fmt.Sprintf(`COMMENT IF EXISTS ON ROLE %s IS '%s'`, common.FormatQuery("%s", objectName), strings.Replace(comment, "'", "", -1))
 	_, _, err := repo.query(q)
 
-	if err == nil {
-		return nil
-	}
-
-	ownershipQuery := common.FormatQuery(`GRANT OWNERSHIP ON ROLE %s TO ROLE %s REVOKE CURRENT GRANTS`, common.FormatQuery("%s", objectName), repo.role)
-	_, _, err = repo.query(ownershipQuery)
-
 	if err != nil {
-		logger.Warn(fmt.Sprintf("error while trying to change ownership for role '%s': %s ", objectName, err.Error()))
+		logger.Warn(fmt.Sprintf("unable to update comment on role %s, possibly because not owning it. Ignoring: %s ", objectName, err.Error()))
 	}
 
-	_, _, err = repo.query(q)
-
-	return err
+	return nil
 }
 func (repo *SnowflakeRepository) CommentDatabaseRoleIfExists(comment, database, roleName string) error {
 	q := fmt.Sprintf(`COMMENT IF EXISTS ON DATABASE ROLE %s.%s IS '%s'`, database, roleName, strings.Replace(comment, "'", "", -1))
 	_, _, err := repo.query(q)
 
-	if err == nil {
-		return nil
-	}
-
-	ownershipQuery := common.FormatQuery(`GRANT OWNERSHIP ON DATABASE ROLE %s.%s TO ROLE %s REVOKE CURRENT GRANTS`, database, roleName, repo.role)
-	_, _, err = repo.query(ownershipQuery)
-
 	if err != nil {
-		logger.Warn(fmt.Sprintf("error while trying to change ownership for role %s.%s: %s ", database, roleName, err.Error()))
+		logger.Warn(fmt.Sprintf("unable to update comment on database role %s.%s, possibly because not owning it. Ignoring: %s ", database, roleName, err.Error()))
 	}
 
-	_, _, err = repo.query(q)
-
-	return err
+	return nil
 }
 
 func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) (err error) {

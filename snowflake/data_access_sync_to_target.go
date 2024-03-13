@@ -633,8 +633,8 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 	if existingRoles.Contains(externalId) {
 		logger.Info(fmt.Sprintf("Merging role: %q", externalId))
 
-		// Only update the comment if we have full control over the role (who and what not ignored)
-		if !ignoreWho && !ignoreWhat {
+		// Only update the comment if we have full control over the role (who , inheritance and what not ignored)
+		if !ignoreWho && !ignoreWhat && !ignoreInheritance {
 			err2 := s.commentOnRoleIfExists(createComment(accessProvider, true), externalId, repo)
 			if err2 != nil {
 				return actualName, fmt.Errorf("error while updating comment on role %q: %s", externalId, err2.Error())
