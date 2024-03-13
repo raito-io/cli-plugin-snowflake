@@ -810,7 +810,7 @@ func (repo *SnowflakeRepository) CommentAccountRoleIfExists(comment, objectName 
 	_, _, err := repo.query(q)
 
 	if err != nil {
-		logger.Warn(fmt.Sprintf("unable to update comment on role %s, possibly because not owning it. Ignoring: %s ", objectName, err.Error())
+		logger.Warn(fmt.Sprintf("unable to update comment on role %s, possibly because not owning it. Ignoring: %s ", objectName, err.Error()))
 	}
 
 	return nil
@@ -820,7 +820,7 @@ func (repo *SnowflakeRepository) CommentDatabaseRoleIfExists(comment, database, 
 	_, _, err := repo.query(q)
 
 	if err != nil {
-		logger.Warn(fmt.Sprintf("unable to update comment on database role %s.%s, possibly because not owning it. Ignoring: %s ", database, roleName, err.Error())
+		logger.Warn(fmt.Sprintf("unable to update comment on database role %s.%s, possibly because not owning it. Ignoring: %s ", database, roleName, err.Error()))
 	}
 
 	return nil
