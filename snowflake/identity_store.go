@@ -7,6 +7,7 @@ import (
 	"time"
 
 	is "github.com/raito-io/cli/base/identity_store"
+	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
 	"github.com/raito-io/golang-set/set"
@@ -17,6 +18,7 @@ type identityStoreRepository interface {
 	Close() error
 	TotalQueryTime() time.Duration
 	GetUsers() ([]UserEntity, error)
+	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 }
 
 type IdentityStoreSyncer struct {
@@ -41,6 +43,23 @@ func (s *IdentityStoreSyncer) GetIdentityStoreMetaData(_ context.Context, _ *con
 	}, nil
 }
 
+func (s *IdentityStoreSyncer) retrieveAdditionalUserTags(repo identityStoreRepository, configMap *config.ConfigMap) (map[string][]*tag.Tag, error) {
+	standard := configMap.GetBoolWithDefault(SfStandardEdition, false)
+	skipTags := configMap.GetBoolWithDefault(SfSkipTags, false)
+
+	shouldRetrieveTags := !standard && !skipTags
+	if !shouldRetrieveTags {
+		return nil, nil
+	}
+
+	allUserTags, err := repo.GetTagsByDomain("USER")
+	if err != nil {
+		return nil, err
+	}
+
+	return allUserTags, nil
+}
+
 func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHandler wrappers.IdentityStoreIdentityHandler, configMap *config.ConfigMap) error {
 	repo, err := s.repoProvider(configMap.Parameters, "")
 	if err != nil {
@@ -59,6 +78,11 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 
 	visitedEmailSet := set.NewSet[string]()
 
+	allUserTags, err := s.retrieveAdditionalUserTags(repo, configMap)
+	if err != nil {
+		return err
+	}
+
 	for _, userRow := range userRows {
 		logger.Debug(fmt.Sprintf("Handling user %q", userRow.Name))
 
@@ -75,6 +99,11 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 			}
 		}
 
+		var tags []*tag.Tag
+		if len(allUserTags[userRow.Name]) > 0 {
+			tags = allUserTags[userRow.Name]
+		}
+
 		displayName := userRow.DisplayName
 		if displayName == "" {
 			displayName = userRow.Name
@@ -85,6 +114,7 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 			UserName:   cleanDoubleQuotes(userRow.Name),
 			Name:       cleanDoubleQuotes(displayName),
 			Email:      userRow.Email,
+			Tags:       tags,
 		}
 
 		err = identityHandler.AddUsers(&user)
