@@ -42,6 +42,8 @@ github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.3 h1:mDnFOE2sVkyphMWtTH+stv0eW3k0
 github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.3/go.mod h1:V8MuRVcCRt5h1S+Fwu8KbC7l/gBGo3yBAyUbJM2IJOk=
 github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.36.0 h1:Y/LhLofWpzHyhX4kJD09ki7QX9dYaF/kZRI4lV4pZ/I=
 github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.36.0/go.mod h1:jyiUkrm3YYzUOd+PCQi9q1RFgloXofDEYNDAEoaH9kc=
+github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.36.1 h1:6Lk8TH/hm99LL4aLbJ/edS3Ph93bb/kI+PrHFMESKCY=
+github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.36.1/go.mod h1:jyiUkrm3YYzUOd+PCQi9q1RFgloXofDEYNDAEoaH9kc=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.1 h1:EyBZibRTVAs6ECHZOw5/wlylS9OcTzwyjeQMudmREjE=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.1/go.mod h1:JKpmtYhhPs7D97NL/ltqz7yCkERFW5dOlHyVl66ZYF8=
 github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.3.5 h1:mbWNpfRUTT6bnacmvOTKXZjR/HycibdWzNpfbrbLDIs=
@@ -193,6 +195,8 @@ github.com/raito-io/bexpression v0.1.1 h1:MKm0hE34DNSR5OT5URicGuH05NS3HgIMO8f6i7
 github.com/raito-io/bexpression v0.1.1/go.mod h1:z0in8o1zo5cPNeCUa3Mh5ZP7h6v/LX0JH5/NbV3VtzI=
 github.com/raito-io/cli v0.61.2 h1:1YJKpNKIpGE6MbCa6NAQgFz7D0uWrLOBSUs9lBsLUWo=
 github.com/raito-io/cli v0.61.2/go.mod h1:6yYtSbvqmj0h4lJbGjXe+Eg1ckZULoKD+An0RVhkWz4=
+github.com/raito-io/cli v0.62.0 h1:gxIGdjySMo3MOd0xijqawM5nu/cZ+q+EyOz5JE148FU=
+github.com/raito-io/cli v0.62.0/go.mod h1:hZq+xDun4mlHf3c4owJFEBzCfDCKqbz+G/YLFvuyQho=
 github.com/raito-io/enumer v0.1.4 h1:r2QqGMjfKwn+yMHo4ybOAWvYON4pLBy+ucVP5niyHK4=
 github.com/raito-io/enumer v0.1.4/go.mod h1:+tSaVlYRuVnf2vA7ETf8t7/Mzq/sgvWT/dHeMVOjBu8=
 github.com/raito-io/golang-set v0.0.4 h1:7zk8r1TCE/F9JOOgseIXYx7oZJdC9/j5uivkCYjnCg0=
