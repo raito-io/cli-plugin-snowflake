@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
@@ -33,6 +34,12 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 			DisplayName: "user2",
 		},
 	}, nil)
+	repoMock.EXPECT().GetTagsByDomain("USER").Return(map[string][]*tag.Tag{
+		"UserName1": {
+			{Key: "a_key", Value: "override_name"},
+			{Key: "an_other_key", Value: "...."},
+		},
+	}, nil).Once()
 
 	syncer := IdentityStoreSyncer{
 		repoProvider: func(params map[string]string, role string) (identityStoreRepository, error) {
@@ -47,6 +54,11 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, identityHandlerMock.Users, 2)
 	assert.Len(t, identityHandlerMock.Groups, 0)
+
+	assert.Equal(t, "user1", identityHandlerMock.Users[0].Name)
+	assert.Equal(t, 2, len(identityHandlerMock.Users[0].Tags))
+	assert.Equal(t, "user2", identityHandlerMock.Users[1].Name)
+	assert.Equal(t, 0, len(identityHandlerMock.Users[1].Tags))
 
 	identityHandlerMock.AssertNumberOfCalls(t, "AddUsers", 2)
 	identityHandlerMock.AssertNotCalled(t, "AddGroups")
@@ -95,6 +107,7 @@ func TestNewIdentityStoreSyncer_AddUserError(t *testing.T) {
 
 	repoMock.EXPECT().Close().Return(nil)
 	repoMock.EXPECT().TotalQueryTime().Return(time.Second)
+	repoMock.EXPECT().GetTagsByDomain("USER").Return(nil, nil)
 	repoMock.EXPECT().GetUsers().Return([]UserEntity{
 		{
 			Name:        "UserName1",

@@ -44,19 +44,17 @@ func (s *IdentityStoreSyncer) GetIdentityStoreMetaData(_ context.Context, _ *con
 }
 
 func (s *IdentityStoreSyncer) retrieveAdditionalUserTags(repo identityStoreRepository, configMap *config.ConfigMap) (map[string][]*tag.Tag, error) {
-	var err error
-
 	standard := configMap.GetBoolWithDefault(SfStandardEdition, false)
 	skipTags := configMap.GetBoolWithDefault(SfSkipTags, false)
+
 	shouldRetrieveTags := !standard && !skipTags
+	if !shouldRetrieveTags {
+		return nil, nil
+	}
 
-	allUserTags := make(map[string][]*tag.Tag, 0)
-
-	if shouldRetrieveTags {
-		allUserTags, err = repo.GetTagsByDomain("USER")
-		if err != nil {
-			return nil, err
-		}
+	allUserTags, err := repo.GetTagsByDomain("USER")
+	if err != nil {
+		return nil, err
 	}
 
 	return allUserTags, nil
@@ -101,9 +99,9 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 			}
 		}
 
-		tags := make([]*tag.Tag, 0)
-		if allUserTags[userRow.Name] != nil {
-			tags = append(tags, allUserTags[userRow.Name]...)
+		var tags []*tag.Tag
+		if len(allUserTags[userRow.Name]) > 0 {
+			tags = allUserTags[userRow.Name]
 		}
 
 		displayName := userRow.DisplayName
