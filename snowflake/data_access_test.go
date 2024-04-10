@@ -122,21 +122,21 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "Share2.GranteeRole1Schema",
-								Type:     "",
+								Type:     data_source.Schema,
 							},
 							Permissions: []string{"READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "DB1.GranteeRole1Table",
-								Type:     "",
+								Type:     data_source.Table,
 							},
 							Permissions: []string{"SELECT"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "DB1.GranteeRole1MatView",
-								Type:     "",
+								Type:     MaterializedView,
 							},
 							Permissions: []string{"SELECT"},
 						},
@@ -314,21 +314,21 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "Share2.GranteeRole1Schema",
-								Type:     "",
+								Type:     data_source.Schema,
 							},
 							Permissions: []string{"READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "DB1.GranteeRole1Table",
-								Type:     "",
+								Type:     data_source.Table,
 							},
 							Permissions: []string{"SELECT"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "DB1.GranteeRole1MatView",
-								Type:     "",
+								Type:     MaterializedView,
 							},
 							Permissions: []string{"SELECT"},
 						},
@@ -381,14 +381,14 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "TEST_DB.GranteeRole1Table",
-								Type:     "",
+								Type:     data_source.Table,
 							},
 							Permissions: []string{"SELECT"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "TEST_DB.GranteeRole1MatView",
-								Type:     "",
+								Type:     MaterializedView,
 							},
 							Permissions: []string{"SELECT"},
 						},
@@ -435,7 +435,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "TEST_DB.GranteeRole3MatView",
-								Type:     "",
+								Type:     MaterializedView,
 							},
 							Permissions: []string{"SELECT"},
 						},
@@ -545,14 +545,14 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "Share2.GranteeRole1Schema",
-								Type:     "",
+								Type:     data_source.Schema,
 							},
 							Permissions: []string{"READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "DB1.GranteeRole1Table",
-								Type:     "",
+								Type:     data_source.Table,
 							},
 							Permissions: []string{"SELECT"},
 						},
@@ -681,14 +681,14 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "Share2.GranteeRole1Schema",
-								Type:     "",
+								Type:     data_source.Schema,
 							},
 							Permissions: []string{"READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
 								FullName: "DB1.GranteeRole1Table",
-								Type:     "",
+								Type:     data_source.Table,
 							},
 							Permissions: []string{"SELECT"},
 						},
