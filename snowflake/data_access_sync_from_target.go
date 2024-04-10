@@ -308,7 +308,7 @@ func (s *AccessSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole, 
 			sfObject := common.ParseFullName(grant.Name)
 			// We set type to empty string because that's not needed by the importer to match the data object
 			// + we cannot make the mapping to the correct Raito data object types here.
-			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: ""}
+			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: strings.ToLower(grant.GrantedOn)}
 		} else if do.FullName != grant.Name {
 			if len(permissions) > 0 {
 				whatItems = append(whatItems, exporter.WhatItem{
@@ -319,12 +319,14 @@ func (s *AccessSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole, 
 			sfObject := common.ParseFullName(grant.Name)
 			// We set type to empty string because that's not needed by the importer to match the data object
 			// + we cannot make the mapping to the correct Raito data object types here.
-			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: ""}
+			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: strings.ToLower(grant.GrantedOn)}
 			permissions = make([]string, 0)
 		}
 
-		if do.Type == "ACCOUNT" {
-			do.Type = "DATASOURCE"
+		do.Type = strings.ReplaceAll(do.Type, "_", "-")
+
+		if do.Type == "account" {
+			do.Type = "datasource"
 		}
 
 		// We do not import USAGE as this is handled separately in the data access export
