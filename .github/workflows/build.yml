@@ -60,6 +60,7 @@ jobs:
 
       - name: Terraform apply
         run: terraform apply -auto-approve
+        working-directory: .infra/infra
         env:
           TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           TF_VAR_snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
