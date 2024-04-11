@@ -41,7 +41,7 @@ jobs:
             backend "s3" {
               bucket = ${AWS_S3_TERRAFORM_BUCKET}
               key    = format("cli-snowflake-plugin/%s/terraform.tfstate", var.environment)
-              region = ${AWS.REGION}
+              region = ${AWS_REGION}
               
               access_key = ${AWS_ACCESS_KEY_ID} var.aws_access_key
               secret_key = ${AWS_SECRET_ACCESS_KEY}
@@ -49,8 +49,6 @@ jobs:
             }
           }
           EOF
-          
-          echo "cat .infra/infra/backend_override.tf "
 
         env:
           AWS_S3_TERRAFORM_BUCKET: ${{secrets.AWS_S3_TERRAFORM_BUCKET}}
