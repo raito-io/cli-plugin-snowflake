@@ -5,15 +5,8 @@ on:
       - "main"
   pull_request:
 permissions:
-  actions: write
-  checks: write
-  contents: write
-  deployments: write
-  discussions: write
   id-token: write
-  issues: write
-  pull-requests: write
-  statuses: write
+  contents: read
 jobs:
   build:
     environment: testing
@@ -43,52 +36,24 @@ jobs:
 
       - name: Terraform backed
         run: |
-          cat <<EOF > .infra/infra/backend_override.tf 
-          variable "s3_bucket_name" {
-            nullable  = false
-            sensitive = true
-            type      = string
-          }
-            
-            variable "s3_region" {
-            nullable  = false
-            sensitive = false
-            type      = string
-          }
-            
-            variable "aws_access_key" {
-            nullable  = false
-            sensitive = true
-            type      = string
-          }
-            
-            variable "aws_secret_key" {
-            nullable  = false
-            sensitive = true
-            type      = string
-          }
-            
-            variable "aws_session_token" {
-            nullable  = false
-            sensitive = true
-            type      = string
-          }
-            
+          cat <<EOF > .infra/infra/backend_override.tf             
           terraform {
             backend "s3" {
-              bucket = var.s3_bucket_name
+              bucket = ${AWS_S3_TERRAFORM_BUCKET}
               key    = format("cli-snowflake-plugin/%s/terraform.tfstate", var.environment)
-              region = var.s3_region
+              region = ${AWS.REGION}
               
-              access_key = var.aws_access_key
-              secret_key = var.aws_secret_key
-              token      = var.aws_session_token
+              access_key = ${AWS_ACCESS_KEY_ID} var.aws_access_key
+              secret_key = ${AWS_SECRET_ACCESS_KEY}
+              token      = ${AWS_SESSION_TOKEN}
             }
           }
           EOF
           
           echo "cat .infra/infra/backend_override.tf "
-          cat .infra/infra/backend_override.tf 
+
+        env:
+          AWS_S3_TERRAFORM_BUCKET: ${{secrets.AWS_S3_TERRAFORM_BUCKET}}
 
       - name: Terraform init
         run: terraform init
