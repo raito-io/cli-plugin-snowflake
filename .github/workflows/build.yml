@@ -47,7 +47,6 @@ jobs:
         env:
           AWS_S3_TERRAFORM_BUCKET: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
 
-
       - name: Mod Tidy
         run: go mod tidy
 
@@ -58,6 +57,13 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.56.1
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve
+        env:
+          TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          TF_VAR_snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
+          TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
 
       - name: Test
         run: make test

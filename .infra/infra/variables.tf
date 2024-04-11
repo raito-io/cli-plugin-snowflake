@@ -19,11 +19,3 @@ variable "snowflake_password" {
   description = "Snowflake password"
   nullable    = false
 }
-
-variable "environment" {
-  type        = string
-  sensitive   = false
-  description = "environment name"
-  nullable    = false
-  default     = "testing"
-}
