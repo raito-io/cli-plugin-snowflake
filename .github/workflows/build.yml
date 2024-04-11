@@ -17,6 +17,59 @@ jobs:
           go-version: "1.22"
           cache: true
 
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform backed
+        run: |
+          cat <<EOF > .infra/infra/backend_override.tf
+          variable "s3_bucket_name" {
+            nullable  = false
+            sensitive = true
+            type      = string
+          }
+            
+            variable "s3_region" {
+            nullable  = false
+            sensitive = false
+            type      = string
+          }
+            
+            variable "aws_access_key" {
+            nullable  = false
+            sensitive = true
+            type      = string
+          }
+            
+            variable "aws_secret_key" {
+            nullable  = false
+            sensitive = true
+            type      = string
+          }
+            
+            variable "aws_session_token" {
+            nullable  = false
+            sensitive = true
+            type      = string
+          }
+            
+          terraform {
+            backend "s3" {
+              bucket = var.s3_bucket_name
+              key    = format("cli-snowflake-plugin/%s/terraform.tfstate", var.environment)
+              region = var.s3_region
+              
+              access_key = var.aws_access_key
+              secret_key = var.aws_secret_key
+              token      = var.aws_session_token
+            }
+          }
+          EOF
+
+      - name: Format terraform
+        run: terraform fmt -check
+        working-directory: .infra/infra
+
       - name: Mod Tidy
         run: go mod tidy
 
