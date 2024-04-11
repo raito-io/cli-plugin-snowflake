@@ -11,6 +11,12 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v3
 
+      - name: Assume role using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
       - name: Install Go
         uses: actions/setup-go@v3
         with:
@@ -26,7 +32,7 @@ jobs:
 
       - name: Terraform backed
         run: |
-          cat <<EOF > .infra/infra/backend_override.tf
+          cat <<EOF > .infra/infra/backend_override.tf 
           variable "s3_bucket_name" {
             nullable  = false
             sensitive = true
@@ -69,6 +75,13 @@ jobs:
             }
           }
           EOF
+          
+          echo "cat .infra/infra/backend_override.tf "
+          cat .infra/infra/backend_override.tf 
+
+      - name: Terraform init
+        run: terraform init
+        working-directory: .infra/infra
 
       - name: Mod Tidy
         run: go mod tidy
