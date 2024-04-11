@@ -6,6 +6,7 @@ on:
   pull_request:
 jobs:
   build:
+    environment: testing
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
