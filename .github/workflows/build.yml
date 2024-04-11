@@ -43,7 +43,7 @@ jobs:
               key    = format("cli-snowflake-plugin/%s/terraform.tfstate", var.environment)
               region = ${AWS_REGION}
               
-              access_key = ${AWS_ACCESS_KEY_ID} var.aws_access_key
+              access_key = ${AWS_ACCESS_KEY_ID}
               secret_key = ${AWS_SECRET_ACCESS_KEY}
               token      = ${AWS_SESSION_TOKEN}
             }
@@ -51,7 +51,8 @@ jobs:
           EOF
 
         env:
-          AWS_S3_TERRAFORM_BUCKET: ${{secrets.AWS_S3_TERRAFORM_BUCKET}}
+          AWS_S3_TERRAFORM_BUCKET: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
+          TF_VAR_environment: testing
 
       - name: Terraform init
         run: terraform init
