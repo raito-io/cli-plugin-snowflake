@@ -20,6 +20,10 @@ jobs:
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Format terraform
+        run: terraform fmt -check
+        working-directory: .infra/infra
+
       - name: Terraform backed
         run: |
           cat <<EOF > .infra/infra/backend_override.tf
@@ -65,10 +69,6 @@ jobs:
             }
           }
           EOF
-
-      - name: Format terraform
-        run: terraform fmt -check
-        working-directory: .infra/infra
 
       - name: Mod Tidy
         run: go mod tidy
