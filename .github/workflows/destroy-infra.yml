@@ -53,3 +53,10 @@ jobs:
 
       - name: Generate usage
         run: make destroy-test-infra
+        env:
+          TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          TF_VAR_snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
+          TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
