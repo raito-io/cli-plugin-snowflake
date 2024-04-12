@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   build:
-    environment: integration-testing
+    environment: integration_testing
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
