@@ -238,7 +238,7 @@ resource "snowflake_tag_association" "supplier_pii" {
 }
 
 // ORDERS VIEW
-resource "snowflake_materialized_view" "orders_limited" {
+resource "snowflake_view" "orders_limited" {
   database  = snowflake_database.db.name
   schema    = snowflake_schema.ordering.name
   name      = "ORDERS_LIMITED"

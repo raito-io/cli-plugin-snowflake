@@ -108,7 +108,7 @@ resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_o
   all_privileges    = true
   account_role_name = snowflake_role.data_analyst.name
   on_schema_object {
-    object_name = "\"${snowflake_materialized_view.orders_limited.database}\".\"${snowflake_materialized_view.orders_limited.schema}\".\"${snowflake_materialized_view.orders_limited.name}\""
+    object_name = "\"${snowflake_view.orders_limited.database}\".\"${snowflake_view.orders_limited.schema}\".\"${snowflake_view.orders_limited.name}\""
     object_type = "VIEW"
   }
 }
