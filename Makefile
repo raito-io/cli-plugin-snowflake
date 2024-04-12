@@ -24,8 +24,7 @@ gen-test-infra:
 	cd .infra/infra; terraform apply -auto-approve
 
 destroy-test-infra:
-	cd .infra/infra; terraform apply -destroy -auto-approve
-	cd .infra/infra; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfUser ${SF_USER} --sfPassword ${SF_PASSWORD}
+	cd .infra/infra; terraform apply -destroy -auto-approve; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfUser ${SF_USER} --sfPassword ${SF_PASSWORD}
 
 gen-test-usage:
 	cd .infra/infra; terraform output -json | go run ../usage/usage.go
