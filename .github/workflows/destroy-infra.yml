@@ -1,5 +1,23 @@
 name: Manual - Destroy infra
 on:
+  workflow_call:
+    inputs:
+      targetEnvironment:
+        required: true
+        type: string
+    secrets:
+      AWS_OIDC_DEPLOY_ROLE:
+        required: true
+      AWS_REGION:
+        required: true
+      AWS_S3_TERRAFORM_BUCKET:
+        required: true
+      SNOWFLAKE_ACCOUNT:
+        required: true
+      SNOWFLAKE_USER:
+        required: true
+      SNOWFLAKE_PASSWORD:
+        required: true
   workflow_dispatch:
     inputs:
       targetEnvironment:
