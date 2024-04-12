@@ -29,7 +29,7 @@ permissions:
   contents: read
 jobs:
   generate-usage:
-    environment: ${{ input.targetEnvironment }}
+    environment: ${{ inputs.targetEnvironment }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
