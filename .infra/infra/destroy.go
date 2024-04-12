@@ -44,7 +44,7 @@ func dropAllRoles() error {
 	}
 
 	for i, existingRole := range existingRoles {
-		if existingRole.Owner != "" || systemRoles.Contains(existingRole.Name) {
+		if existingRole.Owner == "" || systemRoles.Contains(existingRole.Name) {
 			fmt.Printf("ignore role %q %d/%d\n", existingRole.Name, i+1, len(existingRoles))
 			continue
 		}
