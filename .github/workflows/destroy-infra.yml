@@ -33,7 +33,7 @@ permissions:
   contents: read
 jobs:
   destroy-infra:
-    environment: ${{ input.targetEnvironment }}
+    environment: ${{ inputs.targetEnvironment }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
