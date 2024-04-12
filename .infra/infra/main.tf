@@ -11,6 +11,8 @@ resource "snowflake_schema" "ordering" {
 }
 
 resource "snowflake_tag" "sensitivity" {
+  count = var.snowflake_standard_edition ? 0 : 1
+
   database       = snowflake_database.db.name
   schema         = snowflake_schema.ordering.name
   name           = "SENSITIVITY"
@@ -65,6 +67,8 @@ resource "snowflake_table" "ordering_customer" {
 }
 
 resource "snowflake_tag_association" "customer_pii" {
+  count = var.snowflake_standard_edition ? 0 : 1
+
   object_identifier {
     name     = "${snowflake_table.ordering_customer.name}.ADDRESS"
     database = snowflake_database.db.name
@@ -84,7 +88,7 @@ resource "snowflake_tag_association" "customer_pii" {
   }
 
   object_type = "COLUMN"
-  tag_id      = snowflake_tag.sensitivity.id
+  tag_id      = snowflake_tag.sensitivity[0].id
   tag_value   = "PII"
 }
 
@@ -208,6 +212,8 @@ resource "snowflake_masking_policy" "masking_policy" {
 }
 
 resource "snowflake_tag_association" "supplier_pii" {
+  count = var.snowflake_standard_edition ? 0 : 1
+
   object_identifier {
     name     = "${snowflake_table.ordering_supplier.name}.ADDRESS"
     database = snowflake_database.db.name
@@ -227,7 +233,7 @@ resource "snowflake_tag_association" "supplier_pii" {
   }
 
   object_type = "COLUMN"
-  tag_id      = snowflake_tag.sensitivity.id
+  tag_id      = snowflake_tag.sensitivity[0].id
   tag_value   = "PII"
 }
 
