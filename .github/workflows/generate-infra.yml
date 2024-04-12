@@ -83,3 +83,4 @@ jobs:
           TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           TF_VAR_snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
           TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          TF_VAR_snowflake_standard_edition: ${{ env.SNOWFLAKE_STANDARD_EDITION }}
