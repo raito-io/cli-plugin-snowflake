@@ -12,7 +12,7 @@ output "snowflake_account" {
 }
 
 output "snowflake_tables" {
-  value = [snowflake_table.ordering_supplier.qualified_name, snowflake_table.ordering_orders.qualified_name, snowflake_table.ordering_customer.qualified_name, "\"${snowflake_materialized_view.orders_limited.database}\".\"${snowflake_materialized_view.orders_limited.schema}\".\"${snowflake_materialized_view.orders_limited.name}\""]
+  value = [snowflake_table.ordering_supplier.qualified_name, snowflake_table.ordering_orders.qualified_name, snowflake_table.ordering_customer.qualified_name, "\"${snowflake_view.orders_limited.database}\".\"${snowflake_view.orders_limited.schema}\".\"${snowflake_view.orders_limited.name}\""]
 }
 
 output "persona_password" {

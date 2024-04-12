@@ -242,7 +242,6 @@ resource "snowflake_view" "orders_limited" {
   database  = snowflake_database.db.name
   schema    = snowflake_schema.ordering.name
   name      = "ORDERS_LIMITED"
-  warehouse = snowflake_warehouse.warehouse.name
   comment   = "Materialized view with limited data"
 
   statement  = <<-SQL
