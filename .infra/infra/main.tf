@@ -264,7 +264,7 @@ resource "snowflake_database" "shared_db" {
   name = "SNOWFLAKE_SAMPLE_DATA"
   from_share = {
     provider = "SFC_SAMPLES"
-    share = "SAMPLE_DATA"
+    share    = "SAMPLE_DATA"
   }
   data_retention_time_in_days = 0
 }

@@ -189,18 +189,18 @@ resource "snowflake_grant_privileges_to_account_role" "warehouse_grant" {
 // Database ROLES
 resource "snowflake_database_role" "database_role" {
   database = snowflake_database.db.name
-  name = "RAITO_DB_ROLE_1"
-  comment = "Database role for RAITO testing and demo"
+  name     = "RAITO_DB_ROLE_1"
+  comment  = "Database role for RAITO testing and demo"
 }
 
 resource "snowflake_grant_privileges_to_database_role" "database_role_privileges_database" {
-  all_privileges = true
+  all_privileges     = true
   database_role_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_database_role.database_role.name}\""
-  on_database = snowflake_database_role.database_role.database
+  on_database        = snowflake_database_role.database_role.database
 }
 
 resource "snowflake_grant_privileges_to_database_role" "database_role_privileges_schema" {
-  all_privileges = true
+  all_privileges     = true
   database_role_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_database_role.database_role.name}\""
   on_schema {
     schema_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_schema.ordering.name}\""
@@ -208,7 +208,7 @@ resource "snowflake_grant_privileges_to_database_role" "database_role_privileges
 }
 
 resource "snowflake_grant_privileges_to_database_role" "database_role_privileges_table" {
-  privileges = ["SELECT"]
+  privileges         = ["SELECT"]
   database_role_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_database_role.database_role.name}\""
   on_schema_object {
     object_name = snowflake_table.ordering_orders.qualified_name
@@ -218,7 +218,7 @@ resource "snowflake_grant_privileges_to_database_role" "database_role_privileges
 
 resource "snowflake_grant_database_role" "database_role_grant" {
   database_role_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_database_role.database_role.name}\""
-  parent_role_name = snowflake_role.human_resources.name
+  parent_role_name   = snowflake_role.human_resources.name
 
 }
 
