@@ -28,4 +28,4 @@ destroy-test-infra:
 	cd .infra/infra; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfUser ${SF_USER} --sfPassword ${SF_PASSWORD}
 
 gen-test-usage:
-	cd .infra/infra; terraform output | go run ../usage/usage.go
+	cd .infra/infra; terraform output -json | go run ../usage/usage.go
