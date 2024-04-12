@@ -96,7 +96,11 @@ jobs:
           files: ./coverage.txt
 
   cleanup:
-    uses: raito-io/cli-plugin-snowflake/.github/workflows/destroy-infra.yml
+    needs:
+      - build
+    if: always()
+
+    uses: ./.github/workflows/destroy-infra.yml
     with:
       targetEnvironment: integration_testing
     secrets: inherit
