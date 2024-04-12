@@ -21,8 +21,8 @@ variable "snowflake_password" {
 }
 
 variable "snowflake_standard_edition" {
-  type = bool
-  sensitive = false
+  type        = bool
+  sensitive   = false
   description = "Snowflake standard edition"
-  default = true
+  default     = true
 }

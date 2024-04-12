@@ -6,8 +6,9 @@ on:
         type: choice
         description: Please select a target environment
         required: true
-        default: 'testing'
+        default: 'integration_testing'
         options:
+          - integration_testing
           - testing
 permissions:
   id-token: write
