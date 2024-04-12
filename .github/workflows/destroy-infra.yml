@@ -1,0 +1,55 @@
+name: Manual - Destroy infra
+on:
+  workflow_dispatch:
+    inputs:
+      targetEnvironment:
+        type: choice
+        description: Please select a target environment
+        required: true
+        default: 'testing'
+        options:
+          - testing
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  generate-usage:
+    environment: ${{ input.targetEnvironment }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Assume role using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform backend
+        run: |
+          cat <<EOF > .infra/infra/backend_override.tf
+          terraform {
+            backend "s3" {
+            }
+          }
+          EOF
+
+      - name: Terraform init
+        run: |
+          terraform init \
+            -backend-config=bucket=${AWS_S3_TERRAFORM_BUCKET} \
+            -backend-config=key=cli-snowflake-plugin/testing/terraform.tfstate \
+            -backend-config=region=${AWS_REGION} \
+            -backend-config=access_key=${AWS_ACCESS_KEY_ID} \
+            -backend-config=secret_key=${AWS_SECRET_ACCESS_KEY} \
+            -backend-config=token=${AWS_SESSION_TOKEN} \
+        working-directory: .infra/infra
+        env:
+          AWS_S3_TERRAFORM_BUCKET: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
+
+      - name: Generate usage
+        run: make destroy-test-infra

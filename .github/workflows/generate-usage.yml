@@ -1,15 +1,20 @@
-name: Raito CLI - Snowflake Plugin - Build
+name: Manual - Generate usage
 on:
-  push:
-    branches:
-      - "main"
-  pull_request:
+  workflow_dispatch:
+    inputs:
+      targetEnvironment:
+        type: choice
+        description: Please select a target environment
+        required: true
+        default: 'testing'
+        options:
+          - testing
 permissions:
   id-token: write
   contents: read
 jobs:
-  build:
-    environment: testing
+  generate-usage:
+    environment: ${{ input.targetEnvironment }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
@@ -31,10 +36,6 @@ jobs:
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Format terraform
-        run: terraform fmt -check
-        working-directory: .infra/infra
-
       - name: Terraform backend
         run: |
           cat <<EOF > .infra/infra/backend_override.tf
@@ -45,7 +46,7 @@ jobs:
           EOF
 
       - name: Terraform init
-        run: | 
+        run: |
           terraform init \
             -backend-config=bucket=${AWS_S3_TERRAFORM_BUCKET} \
             -backend-config=key=cli-snowflake-plugin/testing/terraform.tfstate \
@@ -57,37 +58,5 @@ jobs:
         env:
           AWS_S3_TERRAFORM_BUCKET: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
 
-      - name: Mod Tidy
-        run: go mod tidy
-
-      - name: Build
-        run: make build
-
-      - name: Lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: v1.56.1
-
-      - name: Terraform apply
-        run: make gen-test-infra
-        env:
-          TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          TF_VAR_snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
-          TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
-
       - name: Generate usage
         run: make gen-test-usage
-
-      - name: Test
-        run: make test
-        env:
-          SF_ACCOUNT: ${{ secrets.sf_account }}
-          SF_USER: ${{ secrets.sf_user }}
-          SF_PASSWORD: ${{ secrets.sf_password }}
-          SF_ROLE: ${{ secrets.sf_role }}
-          SF_STANDARD_EDITION: true
-
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.txt
