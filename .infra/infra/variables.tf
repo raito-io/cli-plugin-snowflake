@@ -19,3 +19,10 @@ variable "snowflake_password" {
   description = "Snowflake password"
   nullable    = false
 }
+
+variable "snowflake_standard_edition" {
+  type = bool
+  sensitive = false
+  description = "Snowflake standard edition"
+  default = true
+}

@@ -154,7 +154,7 @@ resource "snowflake_table" "ordering_supplier" {
   column {
     name           = "NAME"
     type           = "VARCHAR"
-    masking_policy = snowflake_masking_policy.masking_policy.qualified_name
+    masking_policy = var.snowflake_standard_edition ? null : snowflake_masking_policy.masking_policy.qualified_name
   }
 
   column {
@@ -184,6 +184,8 @@ resource "snowflake_table" "ordering_supplier" {
 }
 
 resource "snowflake_masking_policy" "masking_policy" {
+  count = var.snowflake_standard_edition ? 0 : 1
+
   name     = "ORDERING_MASKING_POLICY"
   database = snowflake_database.db.name
   schema   = snowflake_schema.ordering.name

@@ -51,7 +51,7 @@ jobs:
         env:
           AWS_S3_TERRAFORM_BUCKET: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
 
-      - name: Generate usage
+      - name: Destroy infrastructure
         run: make destroy-test-infra
         env:
           TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
