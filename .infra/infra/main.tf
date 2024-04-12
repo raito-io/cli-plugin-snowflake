@@ -239,10 +239,10 @@ resource "snowflake_tag_association" "supplier_pii" {
 
 // ORDERS VIEW
 resource "snowflake_view" "orders_limited" {
-  database  = snowflake_database.db.name
-  schema    = snowflake_schema.ordering.name
-  name      = "ORDERS_LIMITED"
-  comment   = "Materialized view with limited data"
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "ORDERS_LIMITED"
+  comment  = "Materialized view with limited data"
 
   statement  = <<-SQL
     SELECT ORDERKEY, ORDERSTATUS, CUSTKEY FROM ORDERS;
