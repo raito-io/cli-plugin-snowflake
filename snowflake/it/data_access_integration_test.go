@@ -39,7 +39,7 @@ func TestDataAccessTestSuite(t *testing.T) {
 
 func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	//Given
-	dataAccessProviderHandler := mocks.NewSimpleAccessProviderHandler(s.T(), 8)
+	dataAccessProviderHandler := mocks.NewSimpleAccessProviderHandler(s.T(), 13)
 	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
 
 	config := s.getConfig()
@@ -64,8 +64,12 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	s.Contains(externalIds, "SECURITYADMIN")
 	s.Contains(externalIds, "USERADMIN")
 	s.Contains(externalIds, "PUBLIC")
-	s.Contains(externalIds, "DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:IT_TEST_ROLE1")
-	s.Contains(externalIds, "DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:IT_TEST_ROLE2")
+	s.Contains(externalIds, "RAITO_DATA_ANALYST")
+	s.Contains(externalIds, "RAITO_FINANCE")
+	s.Contains(externalIds, "RAITO_HUMAN_RESOURCES")
+	s.Contains(externalIds, "RAITO_MARKETING")
+	s.Contains(externalIds, "RAITO_SALES")
+	s.Contains(externalIds, "DATABASEROLE###DATABASE:RAITO_DATABASE###ROLE:RAITO_DB_ROLE_1")
 }
 
 func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
@@ -78,8 +82,8 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 	databaseRoleName1 := generateRole("TESTDATABASEROLE1", testId)
 	databaseRoleName2 := generateRole("TESTDATABASEROLE2", testId)
 
-	databaseRoleExternalId1 := fmt.Sprintf("DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:%s", databaseRoleName1)
-	databaseRoleExternalId2 := fmt.Sprintf("DATABASEROLE###DATABASE:SNOWFLAKE_INTEGRATION_TEST###ROLE:%s", databaseRoleName2)
+	databaseRoleExternalId1 := fmt.Sprintf("DATABASEROLE###DATABASE:RAITO_DATABASE###ROLE:%s", databaseRoleName1)
+	databaseRoleExternalId2 := fmt.Sprintf("DATABASEROLE###DATABASE:RAITO_DATABASE###ROLE:%s", databaseRoleName2)
 
 	accessProviderImport := &sync_to_target.AccessProviderImport{
 		AccessProviders: []*sync_to_target.AccessProvider{
@@ -96,7 +100,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 				What: []sync_to_target.WhatItem{
 					{
 						DataObject: &data_source.DataObjectReference{
-							FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+							FullName: "RAITO_DATABASE.ORDERING.ORDERS",
 							Type:     "table",
 						},
 						Permissions: []string{"SELECT"},
@@ -116,7 +120,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 				What: []sync_to_target.WhatItem{
 					{
 						DataObject: &data_source.DataObjectReference{
-							FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+							FullName: "RAITO_DATABASE.ORDERING.ORDERS",
 							Type:     "table",
 						},
 						Permissions: []string{"SELECT"},
@@ -141,7 +145,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 				What: []sync_to_target.WhatItem{
 					{
 						DataObject: &data_source.DataObjectReference{
-							FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+							FullName: "RAITO_DATABASE.ORDERING.ORDERS",
 							Type:     "table",
 						},
 						Permissions: []string{"SELECT"},
@@ -196,7 +200,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		Owner:           "ACCOUNTADMIN",
 	})
 
-	databaseRoles, err := s.sfRepo.GetDatabaseRoles("SNOWFLAKE_INTEGRATION_TEST")
+	databaseRoles, err := s.sfRepo.GetDatabaseRoles("RAITO_DATABASE")
 	s.NoError(err)
 	s.Contains(databaseRoles, snowflake.RoleEntity{
 		Name:            databaseRoleName1,
@@ -231,7 +235,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			What: []sync_to_target.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
-						FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+						FullName: "RAITO_DATABASE.ORDERING.ORDERS",
 						Type:     "table",
 					},
 					Permissions: []string{"SELECT"},
@@ -293,7 +297,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		Owner:           "ACCOUNTADMIN",
 	})
 
-	databaseRoles, err = s.sfRepo.GetDatabaseRoles("SNOWFLAKE_INTEGRATION_TEST")
+	databaseRoles, err = s.sfRepo.GetDatabaseRoles("RAITO_DATABASE")
 	s.NoError(err)
 	s.Contains(databaseRoles, snowflake.RoleEntity{
 		Name:            databaseRoleName1,
@@ -328,7 +332,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			What: []sync_to_target.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
-						FullName: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+						FullName: "RAITO_DATABASE.ORDERING.ORDERS",
 						Type:     "table",
 					},
 					Permissions: []string{"SELECT"},

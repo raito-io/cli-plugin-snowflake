@@ -2,6 +2,10 @@ output "snowflake_database_name" {
   value = snowflake_database.db.name
 }
 
+output "snowflake_share_database_name" {
+  value = snowflake_database.shared_db.name
+}
+
 output "snowflake_warehouse_name" {
   value = snowflake_warehouse.warehouse.name
 }

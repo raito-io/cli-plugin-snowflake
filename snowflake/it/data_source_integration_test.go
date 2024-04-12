@@ -40,7 +40,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	sourceName := strings.ToUpper(strings.Split(sfAccount, ".")[0])
 
 	s.NoError(err)
-	s.Len(dataSourceObjectHandler.DataObjects, 16)
+	s.Len(dataSourceObjectHandler.DataObjects, 35)
 
 	warehouses := getByType(dataSourceObjectHandler.DataObjects, "warehouse")
 	s.Len(warehouses, 1)
@@ -60,11 +60,11 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	databases := getByType(dataSourceObjectHandler.DataObjects, "database")
 	s.Len(databases, 1)
 	s.Contains(databases, data_source.DataObject{
-		ExternalId:       "SNOWFLAKE_INTEGRATION_TEST",
-		Name:             "SNOWFLAKE_INTEGRATION_TEST",
-		FullName:         "SNOWFLAKE_INTEGRATION_TEST",
+		ExternalId:       "RAITO_DATABASE",
+		Name:             "RAITO_DATABASE",
+		FullName:         "RAITO_DATABASE",
 		Type:             "database",
-		Description:      "Database created for integration testing",
+		Description:      "Database for RAITO testing and demo",
 		ParentExternalId: "",
 		Tags:             nil,
 	})
@@ -72,47 +72,47 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	schemas := getByType(dataSourceObjectHandler.DataObjects, "schema")
 	s.Len(schemas, 2)
 	s.Contains(schemas, data_source.DataObject{
-		ExternalId:       "SNOWFLAKE_INTEGRATION_TEST.ORDERING",
+		ExternalId:       "RAITO_DATABASE.ORDERING",
 		Name:             "ORDERING",
-		FullName:         "SNOWFLAKE_INTEGRATION_TEST.ORDERING",
+		FullName:         "RAITO_DATABASE.ORDERING",
 		Type:             "schema",
-		Description:      "",
-		ParentExternalId: "SNOWFLAKE_INTEGRATION_TEST",
+		Description:      "Schema for RAITO testing and demo",
+		ParentExternalId: "RAITO_DATABASE",
 		Tags:             nil,
 	})
 
 	Views := getByType(dataSourceObjectHandler.DataObjects, "view")
 	s.Len(Views, 1)
 	s.Contains(Views, data_source.DataObject{
-		ExternalId:       "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDER_VIEW",
-		Name:             "ORDER_VIEW",
-		FullName:         "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDER_VIEW",
+		ExternalId:       "RAITO_DATABASE.ORDERING.ORDERS_LIMITED",
+		Name:             "ORDERS_LIMITED",
+		FullName:         "RAITO_DATABASE.ORDERING.ORDERS_LIMITED",
 		Type:             "view",
-		Description:      "",
-		ParentExternalId: "SNOWFLAKE_INTEGRATION_TEST.ORDERING",
+		Description:      "Materialized view with limited data",
+		ParentExternalId: "RAITO_DATABASE.ORDERING",
 	})
 
 	tables := getByType(dataSourceObjectHandler.DataObjects, "table")
-	s.Len(tables, 1)
+	s.Len(tables, 3)
 	s.Contains(tables, data_source.DataObject{
-		ExternalId:       "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+		ExternalId:       "RAITO_DATABASE.ORDERING.ORDERS",
 		Name:             "ORDERS",
-		FullName:         "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+		FullName:         "RAITO_DATABASE.ORDERING.ORDERS",
 		Type:             "table",
 		Description:      "",
-		ParentExternalId: "SNOWFLAKE_INTEGRATION_TEST.ORDERING",
+		ParentExternalId: "RAITO_DATABASE.ORDERING",
 		Tags:             nil,
 	})
 
 	column := getByType(dataSourceObjectHandler.DataObjects, "column")
-	s.Len(column, 10)
+	s.Len(column, 27)
 	s.Contains(column, data_source.DataObject{
-		ExternalId:       "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS.ORDERKEY",
+		ExternalId:       "RAITO_DATABASE.ORDERING.ORDERS.ORDERKEY",
 		Name:             "ORDERKEY",
-		FullName:         "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS.ORDERKEY",
+		FullName:         "RAITO_DATABASE.ORDERING.ORDERS.ORDERKEY",
 		Type:             "column",
 		Description:      "",
-		ParentExternalId: "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+		ParentExternalId: "RAITO_DATABASE.ORDERING.ORDERS",
 		Tags:             nil,
 		DataType:         ptr.String("NUMBER"),
 	})

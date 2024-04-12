@@ -23,7 +23,7 @@ var (
 )
 
 const (
-	snowflakeWarehouse string = "TESTING_WAREHOUSE"
+	snowflakeWarehouse string = "RAITO_WAREHOUSE"
 )
 
 func setup() error {
@@ -79,7 +79,7 @@ func teardown() error {
 		}
 	}
 
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 	databaseRoles, err := connectAndQuery(config.Parameters, "", fmt.Sprintf("SHOW DATABASE ROLES IN DATABASE %s", database))
 	if err != nil {
 		return err

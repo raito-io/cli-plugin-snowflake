@@ -5,7 +5,6 @@ package it
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -222,26 +221,26 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RenameAccountRole() {
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToAccountRole() {
 	//When
-	grantsToRole, err := s.repo.GetGrantsToAccountRole("PUBLIC")
+	grantsToRole, err := s.repo.GetGrantsToAccountRole("RAITO_DATA_ANALYST")
 
 	//Then
 	s.NoError(err)
-	s.True(len(grantsToRole) >= 87, "grantsToRole only has %d grants: %+v", len(grantsToRole), grantsToRole)
+	s.Len(grantsToRole, 16)
 
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "USAGE",
 		GrantedOn: "DATABASE",
-		Name:      "SNOWFLAKE_SAMPLE_DATA",
+		Name:      "RAITO_DATABASE",
 	})
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "USAGE",
 		GrantedOn: "SCHEMA",
-		Name:      "SNOWFLAKE_SAMPLE_DATA.TPCDS_SF100TCL",
+		Name:      "RAITO_DATABASE.PUBLIC",
 	})
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "SELECT",
 		GrantedOn: "TABLE",
-		Name:      "SNOWFLAKE_SAMPLE_DATA.TPCDS_SF100TCL.CALL_CENTER",
+		Name:      "RAITO_DATABASE.ORDERING.SUPPLIER",
 	})
 }
 
@@ -368,7 +367,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnAccountRole(
 	s.NoError(err)
 
 	//When
-	err = s.repo.ExecuteGrantOnAccountRole("SELECT", "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS", roleName)
+	err = s.repo.ExecuteGrantOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName)
 
 	//Then
 	s.NoError(err)
@@ -378,7 +377,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnAccountRole(
 
 	s.Equal(grantsTo, []snowflake.GrantToRole{
 		{
-			Name:      "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+			Name:      "RAITO_DATABASE.ORDERING.ORDERS",
 			GrantedOn: "TABLE",
 			Privilege: "SELECT",
 		},
@@ -390,11 +389,11 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevokeOnAccountRole
 	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_REVOKE_TEST", testId)
 	err := s.repo.CreateAccountRole(roleName)
 	s.NoError(err)
-	err = s.repo.ExecuteGrantOnAccountRole("SELECT", "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS", roleName)
+	err = s.repo.ExecuteGrantOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName)
 	s.NoError(err)
 
 	//When
-	err = s.repo.ExecuteRevokeOnAccountRole("SELECT", "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS", roleName)
+	err = s.repo.ExecuteRevokeOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName)
 
 	//Then
 	s.NoError(err)
@@ -406,7 +405,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevokeOnAccountRole
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabaseRolesWithPrefix() {
 	//When
-	roles, err := s.repo.GetDatabaseRolesWithPrefix("SNOWFLAKE_INTEGRATION_TEST", "IT_TEST_")
+	roles, err := s.repo.GetDatabaseRolesWithPrefix("RAITO_DATABASE", "RAITO_DB_ROLE_")
 
 	//Then
 	s.NoError(err)
@@ -416,18 +415,18 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabaseRolesWithPrefix
 	for _, role := range roles {
 		roleNames = append(roleNames, role.Name)
 
-		if !strings.HasPrefix(role.Name, "IT_TEST_") {
-			s.Failf("Role %s should have prefix 'IT_TEST_'", role.Name)
+		if !strings.HasPrefix(role.Name, "RAITO_DB_ROLE_") {
+			s.Failf("Role %s should have prefix 'RAITO_DB_ROLE_'", role.Name)
 		}
 	}
 
-	s.Contains(roleNames, "IT_TEST_ROLE1")
+	s.Contains(roleNames, "RAITO_DB_ROLE_1")
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateDatabaseRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_CREATE_DATABASE_ROLE_TEST", testId)
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 
 	//When
 	err := s.repo.CreateDatabaseRole(database, roleName)
@@ -449,7 +448,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateDatabaseRole() {
 func (s *RepositoryTestSuite) TestSnowflakeRepository_DropDatabaseRole() {
 	//Given
 	roleName := fmt.Sprintf("%s_REPO_TEST_DROP_DATABASE_ROLE_TEST", testId)
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 
 	//When
 	err := s.repo.CreateDatabaseRole(database, roleName)
@@ -486,7 +485,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RenameDatabaseRole() {
 	//Given
 	originalRoleName := fmt.Sprintf("%s_REPO_TEST_RENAME_DATABASE_ROLE_TEST", testId)
 	newExpectedRoleName := fmt.Sprintf("%s_REPO_TEST_RENAME_ROLE_DATABASE_TEST_NEW", testId)
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 	err := s.repo.CreateDatabaseRole(database, originalRoleName)
 	s.NoError(err)
 
@@ -534,8 +533,8 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToDatabaseRole() {
 	//Given
-	roleName := "IT_TEST_ROLE1"
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	roleName := "RAITO_DB_ROLE_1"
+	database := "RAITO_DATABASE"
 
 	//When
 	grantsToRole, err := s.repo.GetGrantsToDatabaseRole(database, roleName)
@@ -547,19 +546,19 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToDatabaseRole() 
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "USAGE",
 		GrantedOn: "DATABASE",
-		Name:      "SNOWFLAKE_INTEGRATION_TEST",
+		Name:      "RAITO_DATABASE",
 	})
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "SELECT",
 		GrantedOn: "TABLE",
-		Name:      "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+		Name:      "RAITO_DATABASE.ORDERING.ORDERS",
 	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsOfDatabaseRole() {
 	//Given
-	roleName := "IT_TEST_ROLE1"
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	roleName := "RAITO_DB_ROLE_1"
+	database := "RAITO_DATABASE"
 
 	//When
 	grantsOfRole, err := s.repo.GetGrantsOfDatabaseRole(database, roleName)
@@ -568,14 +567,14 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsOfDatabaseRole() 
 	s.NoError(err)
 	s.True(len(grantsOfRole) >= 1)
 	s.Contains(grantsOfRole, snowflake.GrantOfRole{
-		GrantedTo:   "DATABASE_ROLE",
-		GranteeName: "SNOWFLAKE_INTEGRATION_TEST.IT_TEST_ROLE2",
+		GrantedTo:   "ROLE",
+		GranteeName: "RAITO_HUMAN_RESOURCES",
 	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantAccountRolesToDatabaseRole() {
 	//Given
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 	originalRoleName := fmt.Sprintf("%s_REPO_TEST_GRANT_R2DBR", testId)
 	accountRolesToGrant := make([]string, 0, 5)
 
@@ -611,7 +610,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantAccountRolesToDatabas
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantDatabaseRolesToDatabaseRole() {
 	//Given
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 	originalRoleName := fmt.Sprintf("%s_REPO_TEST_GRANT_DBR2DBR", testId)
 	databaseRolesToGrant := make([]string, 0, 5)
 
@@ -647,7 +646,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantDatabaseRolesToDataba
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeAccountRolesFromDatabaseRole() {
 	//When
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 	originalRoleName := fmt.Sprintf("%s_REPO_TEST_REVOKE_R2DBR", testId)
 	accountRolesToGrants := make([]string, 0, 5)
 
@@ -674,7 +673,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeAccountRolesFromData
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeDatabaseRolesFromDatabaseRole() {
 	//When
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 	originalRoleName := fmt.Sprintf("%s_REPO_TEST_REVOKE_DBR2DBR", testId)
 	databaseRolesToGrants := make([]string, 0, 5)
 
@@ -701,13 +700,13 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeDatabaseRolesFromDat
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnDatabaseRole() {
 	//Given
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_GRANT_DATABASEROLE_TEST", testId)
 	err := s.repo.CreateDatabaseRole(database, roleName)
 	s.NoError(err)
 
 	//When
-	err = s.repo.ExecuteGrantOnDatabaseRole("SELECT", "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS", database, roleName)
+	err = s.repo.ExecuteGrantOnDatabaseRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", database, roleName)
 
 	//Then
 	s.NoError(err)
@@ -717,12 +716,12 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnDatabaseRole
 
 	s.Equal(grantsTo, []snowflake.GrantToRole{
 		{
-			Name:      "SNOWFLAKE_INTEGRATION_TEST",
+			Name:      "RAITO_DATABASE",
 			GrantedOn: "DATABASE",
 			Privilege: "USAGE",
 		},
 		{
-			Name:      "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS",
+			Name:      "RAITO_DATABASE.ORDERING.ORDERS",
 			GrantedOn: "TABLE",
 			Privilege: "SELECT",
 		},
@@ -731,15 +730,15 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnDatabaseRole
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevokeOnDatabaseRole() {
 	//Given
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_REVOKE_DATABASEROLE_TEST", testId)
 	err := s.repo.CreateDatabaseRole(database, roleName)
 	s.NoError(err)
-	err = s.repo.ExecuteGrantOnDatabaseRole("SELECT", "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS", database, roleName)
+	err = s.repo.ExecuteGrantOnDatabaseRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", database, roleName)
 	s.NoError(err)
 
 	//When
-	err = s.repo.ExecuteRevokeOnDatabaseRole("SELECT", "SNOWFLAKE_INTEGRATION_TEST.ORDERING.ORDERS", database, roleName)
+	err = s.repo.ExecuteRevokeOnDatabaseRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", database, roleName)
 
 	//Then
 	s.NoError(err)
@@ -748,7 +747,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevokeOnDatabaseRol
 	s.NoError(err)
 	s.Equal(grantsTo, []snowflake.GrantToRole{
 		{
-			Name:      "SNOWFLAKE_INTEGRATION_TEST",
+			Name:      "RAITO_DATABASE",
 			GrantedOn: "DATABASE",
 			Privilege: "USAGE",
 		},
@@ -827,7 +826,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetWarehouses() {
 	comment := ""
 
 	s.Contains(warehouses, snowflake.DbEntity{
-		Name:    "TESTING_WAREHOUSE",
+		Name:    "RAITO_WAREHOUSE",
 		Comment: &comment,
 	})
 }
@@ -855,7 +854,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabases() {
 
 	//Then
 	s.NoError(err)
-	s.True(len(databases) >= 3)
+	s.Len(databases, 3)
 
 	comment := ""
 
@@ -864,24 +863,22 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabases() {
 		Comment: &comment,
 	})
 
-	comment = "Provided by Snowflake during account provisioning"
-
 	s.Contains(databases, snowflake.DbEntity{
 		Name:    "SNOWFLAKE_SAMPLE_DATA",
 		Comment: &comment,
 	})
 
-	comment = "Database created for integration testing"
+	comment = "Database for RAITO testing and demo"
 
 	s.Contains(databases, snowflake.DbEntity{
-		Name:    "SNOWFLAKE_INTEGRATION_TEST",
+		Name:    "RAITO_DATABASE",
 		Comment: &comment,
 	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemasInDatabase() {
 	//Given
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 
 	//When
 	schemas := make([]snowflake.SchemaEntity, 0)
@@ -894,16 +891,16 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemasInDatabase() {
 	s.NoError(err)
 	s.Len(schemas, 3)
 
-	comment := ""
+	comment := "Schema for RAITO testing and demo"
 
 	s.Contains(schemas, snowflake.SchemaEntity{
-		Database: "SNOWFLAKE_INTEGRATION_TEST",
+		Database: "RAITO_DATABASE",
 		Name:     "PUBLIC",
 		Comment:  nil,
 	})
 
 	s.Contains(schemas, snowflake.SchemaEntity{
-		Database: "SNOWFLAKE_INTEGRATION_TEST",
+		Database: "RAITO_DATABASE",
 		Name:     "ORDERING",
 		Comment:  &comment,
 	})
@@ -911,7 +908,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemasInDatabase() {
 	comment = "Views describing the contents of schemas in this database"
 
 	s.Contains(schemas, snowflake.SchemaEntity{
-		Database: "SNOWFLAKE_INTEGRATION_TEST",
+		Database: "RAITO_DATABASE",
 		Name:     "INFORMATION_SCHEMA",
 		Comment:  &comment,
 	})
@@ -919,7 +916,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSchemasInDatabase() {
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 	//Given
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 	schema := "ORDERING"
 
 	//When
@@ -931,37 +928,42 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 
 	//Then
 	s.NoError(err)
-	s.Len(tables, 2)
-
-	sort.Slice(tables, func(i, j int) bool {
-		return tables[i].Name < tables[j].Name
-	})
+	s.Len(tables, 4)
 
 	expected := []snowflake.TableEntity{
 		{
-			Database:  "SNOWFLAKE_INTEGRATION_TEST",
+			Database:  "RAITO_DATABASE",
 			Schema:    "ORDERING",
-			Name:      "ORDER_VIEW",
+			Name:      "ORDERS_LIMITED",
 			TableType: "VIEW",
+			Comment:   ptr.String("Materialized view with limited data"),
 		},
 		{
-			Database:  "SNOWFLAKE_INTEGRATION_TEST",
+			Database:  "RAITO_DATABASE",
 			Schema:    "ORDERING",
 			Name:      "ORDERS",
 			TableType: "BASE TABLE",
 		},
+		{
+			Database:  "RAITO_DATABASE",
+			Schema:    "ORDERING",
+			Name:      "CUSTOMER",
+			TableType: "BASE TABLE",
+		},
+		{
+			Database:  "RAITO_DATABASE",
+			Schema:    "ORDERING",
+			Name:      "SUPPLIER",
+			TableType: "BASE TABLE",
+		},
 	}
 
-	sort.Slice(expected, func(i, j int) bool {
-		return expected[i].Name < expected[j].Name
-	})
-
-	s.Equal(expected, tables)
+	s.ElementsMatch(expected, tables)
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 	//Given
-	database := "SNOWFLAKE_INTEGRATION_TEST"
+	database := "RAITO_DATABASE"
 	schema := "ORDERING"
 	table := "ORDERS"
 
@@ -985,6 +987,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 			Schema:   schema,
 			Table:    table,
 			Name:     "CLERK",
+			Comment:  ptr.String(""),
 			DataType: "TEXT",
 		},
 		{
@@ -992,6 +995,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 			Schema:   schema,
 			Table:    table,
 			Name:     "COMMENT",
+			Comment:  ptr.String(""),
 			DataType: "TEXT",
 		},
 		{
@@ -999,6 +1003,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 			Schema:   schema,
 			Table:    table,
 			Name:     "CUSTKEY",
+			Comment:  ptr.String(""),
 			DataType: "NUMBER",
 		},
 		{
@@ -1006,6 +1011,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 			Schema:   schema,
 			Table:    table,
 			Name:     "ORDERDATE",
+			Comment:  ptr.String(""),
 			DataType: "DATE",
 		},
 		{
@@ -1013,6 +1019,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 			Schema:   schema,
 			Table:    table,
 			Name:     "ORDERKEY",
+			Comment:  ptr.String(""),
 			DataType: "NUMBER",
 		},
 		{
@@ -1020,6 +1027,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 			Schema:   schema,
 			Table:    table,
 			Name:     "ORDERPRIORITY",
+			Comment:  ptr.String(""),
 			DataType: "TEXT",
 		},
 		{
@@ -1027,6 +1035,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 			Schema:   schema,
 			Table:    table,
 			Name:     "ORDERSTATUS",
+			Comment:  ptr.String(""),
 			DataType: "TEXT",
 		},
 		{
@@ -1034,6 +1043,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 			Schema:   schema,
 			Table:    table,
 			Name:     "SHIPPRIORITY",
+			Comment:  ptr.String(""),
 			DataType: "NUMBER",
 		},
 		{
@@ -1041,6 +1051,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetColumnsInTable() {
 			Schema:   schema,
 			Table:    table,
 			Name:     "TOTALPRICE",
+			Comment:  ptr.String(""),
 			DataType: "NUMBER",
 		},
 	})
