@@ -77,7 +77,7 @@ jobs:
     needs:
       - setup-infra
       - build
-    if: steps.setup-infra.outcome == 'success'
+    if: always() && needs.setup-infra.outcome == 'success'
 
     uses: ./.github/workflows/destroy-infra.yml
     with:
