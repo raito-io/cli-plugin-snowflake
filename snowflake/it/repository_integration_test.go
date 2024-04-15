@@ -936,7 +936,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 			Schema:    "ORDERING",
 			Name:      "ORDERS_LIMITED",
 			TableType: "VIEW",
-			Comment:   ptr.String("Materialized view with limited data"),
+			Comment:   ptr.String("Non-materialized view with limited data"),
 		},
 		{
 			Database:  "RAITO_DATABASE",

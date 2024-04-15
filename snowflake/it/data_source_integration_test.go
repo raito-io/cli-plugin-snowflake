@@ -88,7 +88,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 		Name:             "ORDERS_LIMITED",
 		FullName:         "RAITO_DATABASE.ORDERING.ORDERS_LIMITED",
 		Type:             "view",
-		Description:      "Materialized view with limited data",
+		Description:      "Non-materialized view with limited data",
 		ParentExternalId: "RAITO_DATABASE.ORDERING",
 	})
 

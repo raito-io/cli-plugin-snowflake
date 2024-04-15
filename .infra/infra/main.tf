@@ -242,15 +242,34 @@ resource "snowflake_view" "orders_limited" {
   database = snowflake_database.db.name
   schema   = snowflake_schema.ordering.name
   name     = "ORDERS_LIMITED"
-  comment  = "Materialized view with limited data"
+  comment  = "Non-materialized view with limited data"
 
   statement  = <<-SQL
-    SELECT ORDERKEY, ORDERSTATUS, CUSTKEY FROM ORDERS;
+    SELECT ORDERKEY, ORDERSTATUS, CUSTKEY FROM ${snowflake_table.ordering_orders.name};
   SQL
   or_replace = true
 
   depends_on = [snowflake_table.ordering_orders]
 }
+
+resource "snowflake_materialized_view" "customers_limited" {
+  count = var.snowflake_standard_edition ? 0 : 1
+
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "CUSTOMERS_LIMITED"
+  comment  = "Materialized view with limited data"
+
+  statement  = <<-SQL
+    SELECT CUSTKEY, ACCTBAL, MKTSEGMENT FROM ${snowflake_table.ordering_customer.name};
+  SQL
+  or_replace = true
+
+  depends_on = [snowflake_table.ordering_orders]
+  warehouse  = snowflake_warehouse.warehouse.id
+}
+
+// TODO external table
 
 // SNOWFLAKE WAREHOUSE
 resource "snowflake_warehouse" "warehouse" {
