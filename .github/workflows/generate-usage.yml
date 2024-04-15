@@ -1,0 +1,87 @@
+name: Manual - Generate usage
+on:
+  workflow_call:
+    inputs:
+      targetEnvironment:
+        required: true
+        type: string
+    secrets:
+      AWS_OIDC_DEPLOY_ROLE:
+        required: true
+      AWS_REGION:
+        required: true
+      AWS_S3_TERRAFORM_BUCKET:
+        required: true
+      AWS_S3_TERRAFORM_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      targetEnvironment:
+        type: choice
+        description: Please select a target environment
+        required: true
+        default: 'integration_testing'
+        options:
+          - integration_testing
+          - testing
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  generate-usage:
+    environment: ${{ inputs.targetEnvironment }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Assume role using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform backend
+        run: |
+          cat <<EOF > .infra/infra/backend_override.tf
+          terraform {
+            backend "s3" {
+            }
+          }
+          EOF
+
+      - name: Terraform backend
+        run: |
+          cat <<EOF > .infra/infra/backend_override.tf
+          terraform {
+            backend "s3" {
+            }
+          }
+          EOF
+
+      - name: Terraform init
+        run: |
+          terraform init \
+            -backend-config=bucket=${AWS_S3_TERRAFORM_BUCKET} \
+            -backend-config=key=${AWS_S3_TERRAFORM_KEY} \
+            -backend-config=region=${AWS_REGION} \
+            -backend-config=access_key=${AWS_ACCESS_KEY_ID} \
+            -backend-config=secret_key=${AWS_SECRET_ACCESS_KEY} \
+            -backend-config=token=${AWS_SESSION_TOKEN} \
+        working-directory: .infra/infra
+        env:
+          AWS_S3_TERRAFORM_BUCKET: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
+          AWS_S3_TERRAFORM_KEY: ${{ secrets.AWS_S3_TERRAFORM_KEY }}
+
+      - name: Generate usage
+        run: make gen-test-usage

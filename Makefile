@@ -19,3 +19,12 @@ test:
 	$(gotestsum) --debug --format testname -- -mod=readonly -tags=integration -race -coverpkg=./... -covermode=atomic -coverprofile=coverage.out.tmp ./...
 	cat coverage.out.tmp | grep -v "/mock_" > coverage.txt #IGNORE MOCKS
 	go tool cover -html=coverage.txt -o coverage.html
+
+gen-test-infra:
+	cd .infra/infra; terraform apply -auto-approve
+
+destroy-test-infra:
+	cd .infra/infra; terraform apply -destroy -auto-approve; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfUser ${SF_USER} --sfPassword ${SF_PASSWORD} --drop=true
+
+gen-test-usage:
+	cd .infra/infra; terraform output -json | go run ../usage/usage.go

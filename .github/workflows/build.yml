@@ -4,17 +4,48 @@ on:
     branches:
       - "main"
   pull_request:
+permissions:
+  id-token: write
+  contents: read
 jobs:
+  setup-infra:
+    uses: ./.github/workflows/generate-infra.yml
+    with:
+      targetEnvironment: integration_testing
+    secrets: inherit
+
+  generate-usage:
+    uses: ./.github/workflows/generate-usage.yml
+    with:
+      targetEnvironment: integration_testing
+    secrets: inherit
+
+    needs:
+      - setup-infra
+
   build:
+    environment: integration_testing
     runs-on: ubuntu-latest
+
+    needs:
+      - setup-infra
+      - generate-usage
+
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
 
-      - name: Install Go
-        uses: actions/setup-go@v3
+      - name: Assume role using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          go-version: "1.22"
+          role-to-assume: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
           cache: true
 
       - name: Mod Tidy
@@ -31,9 +62,9 @@ jobs:
       - name: Test
         run: make test
         env:
-          SF_ACCOUNT: ${{ secrets.sf_account }}
-          SF_USER: ${{ secrets.sf_user }}
-          SF_PASSWORD: ${{ secrets.sf_password }}
+          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SF_ROLE: ${{ secrets.sf_role }}
           SF_STANDARD_EDITION: true
 
@@ -41,3 +72,15 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.txt
+
+  cleanup:
+    needs:
+      - setup-infra
+      - build
+    if: always() && needs.setup-infra.result == 'success'
+
+    uses: ./.github/workflows/destroy-infra.yml
+    with:
+      targetEnvironment: integration_testing
+    secrets: inherit
+
