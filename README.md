@@ -23,7 +23,6 @@ This Raito CLI plugin implements the integration with Snowflake. It can
  - Synchronize the users in Snowflake to an identity store in Raito Cloud.
  - Synchronize the Snowflake meta data (data structure, known permissions, ...) to a data source in Raito Cloud.
  - Synchronize the Snowflake role, masking rules and row-level security rules with access providers in Raito Cloud.
- - Synchronize the access providers from Raito Cloud (or from a file in case of the [access-as-code flow](http://docs.raito.io/docs/guide/access)) into Snowflake roles.
  - Synchronize the data usage information to Raito Cloud.
 
 
@@ -34,14 +33,12 @@ To use this plugin, you will need
 2. A Raito Cloud account to synchronize your Snowflake account with. If you don't have this yet, visit our webpage at (https://raito.io) and request a trial account.
 3. At least one Snowflake account.
 
-Note: if you are only using the [access-as-code flow](http://docs.raito.io/docs/guide/access), no Raito Cloud account is required.
-
 A full example on how to start using Raito Cloud with Snowflake can be found as a [guide in our documentation](http://docs.raito.io/docs/guide/cloud).
 
 ## Usage
 To use the plugin, add the following snippet to your Raito CLI configuration file (`raito.yml`, by default) under the `targets` section:
 
-```json
+```yaml
   - name: snowflake1
     connector-name: raito-io/cli-plugin-snowflake
     data-source-id: <<Snowflake DataSource ID>>
@@ -65,7 +62,7 @@ Make sure you have a system variable called `RAITO_SNOWFLAKE_PASSWORD` with the 
 You will also need to configure the Raito CLI further to connect to your Raito Cloud account, if that's not set up yet.
 A full guide on how to configure the Raito CLI can be found on (http://docs.raito.io/docs/cli/configuration).
 
-## Trying it out
+### Trying it out
 
 As a first step, you can check if the CLI finds this plugin correctly. In a command-line terminal, execute the following command:
 ```bash
@@ -81,3 +78,89 @@ $> raito run
 This will take the configuration from the `raito.yml` file (in the current working directory) and start a single synchronization.
 
 Note: if you have multiple targets configured in your configuration file, you can run only this target by adding `--only-targets snowflake1` at the end of the command.
+
+## Configuration
+The following configuration parameters are available
+
+| Configuration name                          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                     | Mandatory | Default value        |
+|---------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|----------------------|
+| `sf-account`                                | The account name of the Snowflake account to connect to. For example, xy123456.eu-central-1                                                                                                                                                                                                                                                                                                                                                     | True      |                      |
+| `sf-user`                                   | The username to authenticate against the Snowflake account.                                                                                                                                                                                                                                                                                                                                                                                     | True      |                      |
+| `sf-password`                               | The password to authenticate against the Snowflake account.                                                                                                                                                                                                                                                                                                                                                                                     | True      |                      |
+| `sf-role`                                   | The name of the role to use for executing the necessary queries.                                                                                                                                                                                                                                                                                                                                                                                | False     | `ACCOUNTADMIN`       |
+| `sf-excluded-databases`                     | A comma-separated list of databases that should be skipped.                                                                                                                                                                                                                                                                                                                                                                                     | False     |                      |
+| `sf-excluded-schemas`                       | A comma-separated list of schemas that should be skipped. This can either be in a specific database (as <database>.<schema>) or a just a schema name that should be skipped in all databases.                                                                                                                                                                                                                                                   | False     | `INFORMATION_SCHEMA` |
+| `sf-excluded-roles`                         | A comma-separated list of roles that should be skipped. You should not exclude roles which others (not-excluded) roles depend on as that would break the hierarchy.                                                                                                                                                                                                                                                                             | False     |                      |
+| `sf-external-identity-store-owners`         | A comma-separated list of owners of SCIM integrations with external identity stores (e.g. Okta or Active Directory). Roles which are imported from groups from these identity stores will be partially or fully locked in Raito to avoid a conflict with the SCIM integration.                                                                                                                                                                  | False     |                      |
+| `sf-link-to-external-identity-store-groups` | A boolean parameter can be set when the 'sf-external-identity-store-owners' parameter is set. When `true`, the 'who' of roles coming from the external access provider will refer to the group of the external access provider and the 'what' of the access provider will still be editable in Raito Cloud. When `false` the 'who' will contain the unpacked users of the group and the access provider in Raito Cloud will be locked entirely. | False     | `false`              |
+| `sf-standard-edition`                       | If set, enterprise features will be disabled                                                                                                                                                                                                                                                                                                                                                                                                    | False     | `false`              |
+| `sf-skip-tags`                              | If set, tags will not be fetched                                                                                                                                                                                                                                                                                                                                                                                                                | False     | `false`              |
+| `sf-skip-columns`                           | If set, columns and column masking policies will not be imported.                                                                                                                                                                                                                                                                                                                                                                               | False     | `false`              |
+| `sf-data-usage-window`                      | The maximum number of days of usage data to retrieve. Maximum is 90 days.                                                                                                                                                                                                                                                                                                                                                                       | False     | `90`                 |
+| `sf-database-roles`                         | If set, database-roles for all databases will be fetched.                                                                                                                                                                                                                                                                                                                                                                                       | False     | `false`              |
+
+## Supported features
+
+| Feature             | Supported | Remarks                                |
+|---------------------|-----------|----------------------------------------|
+| Row level filtering | ✅         | Only supported for enterprise editions |
+| Column masking      | ✅         | Only supported for enterprise editions |
+| Locking             | ✅         | Support for both who and what lock     |
+| Replay              | ✅         | Explicit deletes cannot be replayed    |
+| Usage               | ✅         |                                        |
+
+## Supported dataobjects
+- Account (is represented as Raito DataSource)
+- Warehouse
+- Database
+- Shared Database
+- Schema
+- Shared Schema
+- Table
+- External Table
+- Shared Table
+- View
+- Materialized View
+- Shared View
+- Column
+- Shared Column
+
+
+## Access controls
+### From Target
+#### Account Roles
+Account roles are imported as `grant` with type `Role`.
+All grants to users and other roles associated with the role are added as who-items to the grant that will be imported in Raito.
+All grants to privileges on data objects associated the role are added as what-items to the grant that will be imported in Raito.
+All system roles (`ORGADMIN`, `ACCOUNTADMIN`, `SECURITYADMIN`, `USERADMIN`, `SYSADMIN`, `PUBLIC`) will be annotated as non-internalizable.
+If roles are managed by external identity stores in Snowflake, the following locks will be set: `name-lock`, `delete-lock`, `who-lock`, `inheritance-lock`.
+
+#### Database Roles
+Database roles are imported as `grant` with type `databaseRole`.
+All grants to users and other roles associated with the role are added as who-items to the grant that will be imported in Raito.
+All grants to privileges on data objects associated the role are added as what-items to the grant that will be imported in Raito.
+The who and what of the grants created by database roles will be locked and those grants.
+
+#### Masking Policies
+Masking policies are imported as `mask`.
+Those are non-internalizable as we are not able to indicate the `who` of all masking policies in all cases.
+
+#### Row Access Policies
+Row access policies are imported as `filters`.
+The same mechanism is used as for masking policies. Therefor, row access policies are non-internalizable as the `who`-items can not be identified.
+
+## To Target
+#### Grants
+Grants will be implemented as `Account role` (type `Role`) or `Database role` (type `databaseRole`).
+All associated who items will be granted access to the role.
+All what items will be granted permission for the specific role.
+
+#### Purposes
+Purposes will be implemented exactly the same as grants.
+
+#### Masks
+Each mask will be exported as masking policy to all schemas associated with the what-items of the mask.
+Within each schema a masking policy function is created for each required data type.
+
+#### Filters
+Each filter will be exported as row access policy to exactly one table.
