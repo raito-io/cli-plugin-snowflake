@@ -33,7 +33,7 @@ func main() {
 				Parameters: []*plugin.ParameterInfo{
 					{Name: snowflake.SfAccount, Description: "The account name of the Snowflake account to connect to. For example, xy123456.eu-central-1", Mandatory: true},
 					{Name: snowflake.SfUser, Description: "The username to authenticate against the Snowflake account.", Mandatory: true},
-					{Name: snowflake.SfPassword, Description: "The username to authenticate against the Snowflake account.", Mandatory: true},
+					{Name: snowflake.SfPassword, Description: "The password to authenticate against the Snowflake account.", Mandatory: true},
 					{Name: snowflake.SfRole, Description: "The name of the role to use for executing the necessary queries. If not specified 'ACCOUNTADMIN' is used.", Mandatory: false},
 					{Name: snowflake.SfExcludedDatabases, Description: "The optional comma-separated list of databases that should be skipped.", Mandatory: false},
 					{Name: snowflake.SfExcludedSchemas, Description: "The optional comma-separated list of schemas that should be skipped. This can either be in a specific database (as <database>.<schema>) or a just a schema name that should be skipped in all databases. By default INFORMATION_SCHEMA is skipped since there are no access controls to manage", Mandatory: false},
@@ -43,7 +43,7 @@ func main() {
 					{Name: snowflake.SfStandardEdition, Description: "If set enterprise features will be disabled", Mandatory: false},
 					{Name: snowflake.SfSkipTags, Description: "If set, tags will not be fetched", Mandatory: false},
 					{Name: snowflake.SfSkipColumns, Description: "If set, columns and column masking policies will not be imported.", Mandatory: false},
-					{Name: snowflake.SfDataUsageWindow, Description: "The maximum number of days of usage data to retrieve. Default is 90. Maximum is 90 days. ", Mandatory: false},
+					{Name: snowflake.SfDataUsageWindow, Description: "The maximum number of days of usage data to retrieve. Default is 90. Maximum is 90 days.", Mandatory: false},
 					{Name: snowflake.SfDatabaseRoles, Description: "If set, database-roles for all databases will be fetched. ", Mandatory: false},
 				},
 				TagSource: snowflake.TagSource,
