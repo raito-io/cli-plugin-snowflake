@@ -101,15 +101,15 @@ The following configuration parameters are available
 
 ## Supported features
 
-| Feature             | Supported | Remarks                                |
-|---------------------|-----------|----------------------------------------|
-| Row level filtering | ✅         | Only supported for enterprise editions |
-| Column masking      | ✅         | Only supported for enterprise editions |
-| Locking             | ✅         | Support for both who and what lock     |
-| Replay              | ✅         | Explicit deletes cannot be replayed    |
-| Usage               | ✅         |                                        |
+| Feature             | Supported | Remarks                                                                                                 |
+|---------------------|-----------|---------------------------------------------------------------------------------------------------------|
+| Row level filtering | ✅         | Only supported for enterprise editions                                                                  |
+| Column masking      | ✅         | Only supported for enterprise editions                                                                  |
+| Locking             | ✅         | Support for both who and what lock                                                                      |
+| Replay              | ✅         | Explicit deletes cannot be replayed                                                                     |
+| Usage               | ✅         | Usage permissions will be associated in best effort. Mistakes with permissions in subqueries can occur. |
 
-## Supported dataobjects
+## Supported data objects
 - Account (is represented as Raito DataSource)
 - Warehouse
 - Database
@@ -133,7 +133,7 @@ Account roles are imported as `grant` with type `Role`.
 All grants to users and other roles associated with the role are added as who-items to the grant that will be imported in Raito.
 All grants to privileges on data objects associated the role are added as what-items to the grant that will be imported in Raito.
 All system roles (`ORGADMIN`, `ACCOUNTADMIN`, `SECURITYADMIN`, `USERADMIN`, `SYSADMIN`, `PUBLIC`) will be annotated as non-internalizable.
-If roles are managed by external identity stores in Snowflake, the following locks will be set: `name-lock`, `delete-lock`, `who-lock`, `inheritance-lock`.
+If roles are managed by external identity stores in Snowflake, the following locks will be set: `name-lock`, `delete-lock`, `who-lock`, `inheritance-lock`. The parameters `sf-external-identity-store-owners` and `sf-link-to-external-identity-store-groups` will be used to indicate if roles are managed by external identities.
 
 #### Database Roles
 Database roles are imported as `grant` with type `databaseRole`.
@@ -143,7 +143,7 @@ The who and what of the grants created by database roles will be locked and thos
 
 #### Masking Policies
 Masking policies are imported as `mask`.
-Those are non-internalizable as we are not able to indicate the `who` of all masking policies in all cases.
+Masking policies are imported as non-internalizable because most existing masking policies cannot be correctly interpreted Raito.
 
 #### Row Access Policies
 Row access policies are imported as `filters`.
