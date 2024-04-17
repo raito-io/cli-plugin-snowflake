@@ -637,7 +637,7 @@ func (repo *SnowflakeRepository) GetPolicies(policy string) ([]PolicyEntity, err
 	return policyEntities, nil
 }
 
-func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, policyName string) ([]describePolicyEntity, error) {
+func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, policyName string) ([]DescribePolicyEntity, error) {
 	q := common.FormatQuery("DESCRIBE "+policyType+" POLICY %s.%s.%s", dbName, schema, policyName)
 
 	rows, _, err := repo.query(q)
@@ -645,7 +645,7 @@ func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, poli
 		return nil, err
 	}
 
-	var desribeMaskingPolicyEntities []describePolicyEntity
+	var desribeMaskingPolicyEntities []DescribePolicyEntity
 
 	err = scan.Rows(&desribeMaskingPolicyEntities, rows)
 	if err != nil {
@@ -655,7 +655,7 @@ func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, poli
 	return desribeMaskingPolicyEntities, nil
 }
 
-func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error) {
+func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName string) ([]PolicyReferenceEntity, error) {
 	// to fetch policy references we need to have USAGE on dbName and schema
 	if !strings.EqualFold(repo.role, "ACCOUNTADMIN") && repo.role != "" {
 		err := repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("DATABASE %s", dbName), repo.role)
@@ -678,7 +678,7 @@ func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName 
 		return nil, err
 	}
 
-	var policyReferenceEntities []policyReferenceEntity
+	var policyReferenceEntities []PolicyReferenceEntity
 
 	err = scan.Rows(&policyReferenceEntities, rows)
 	if err != nil {
@@ -923,7 +923,7 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 		return err
 	}
 
-	var policyEntries []policyReferenceEntity
+	var policyEntries []PolicyReferenceEntity
 
 	for _, policy := range policies {
 		entities, err2 := repo.GetPolicyReferences(databaseName, schema, policy.Name)

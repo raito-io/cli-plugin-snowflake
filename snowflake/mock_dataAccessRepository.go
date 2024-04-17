@@ -309,23 +309,23 @@ func (_c *mockDataAccessRepository_CreateMaskPolicy_Call) RunAndReturn(run func(
 }
 
 // DescribePolicy provides a mock function with given fields: policyType, dbName, schema, policyName
-func (_m *mockDataAccessRepository) DescribePolicy(policyType string, dbName string, schema string, policyName string) ([]describePolicyEntity, error) {
+func (_m *mockDataAccessRepository) DescribePolicy(policyType string, dbName string, schema string, policyName string) ([]DescribePolicyEntity, error) {
 	ret := _m.Called(policyType, dbName, schema, policyName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DescribePolicy")
 	}
 
-	var r0 []describePolicyEntity
+	var r0 []DescribePolicyEntity
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string) ([]describePolicyEntity, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, string, string, string) ([]DescribePolicyEntity, error)); ok {
 		return rf(policyType, dbName, schema, policyName)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, string, string) []describePolicyEntity); ok {
+	if rf, ok := ret.Get(0).(func(string, string, string, string) []DescribePolicyEntity); ok {
 		r0 = rf(policyType, dbName, schema, policyName)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]describePolicyEntity)
+			r0 = ret.Get(0).([]DescribePolicyEntity)
 		}
 	}
 
@@ -359,12 +359,12 @@ func (_c *mockDataAccessRepository_DescribePolicy_Call) Run(run func(policyType 
 	return _c
 }
 
-func (_c *mockDataAccessRepository_DescribePolicy_Call) Return(_a0 []describePolicyEntity, _a1 error) *mockDataAccessRepository_DescribePolicy_Call {
+func (_c *mockDataAccessRepository_DescribePolicy_Call) Return(_a0 []DescribePolicyEntity, _a1 error) *mockDataAccessRepository_DescribePolicy_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_DescribePolicy_Call) RunAndReturn(run func(string, string, string, string) ([]describePolicyEntity, error)) *mockDataAccessRepository_DescribePolicy_Call {
+func (_c *mockDataAccessRepository_DescribePolicy_Call) RunAndReturn(run func(string, string, string, string) ([]DescribePolicyEntity, error)) *mockDataAccessRepository_DescribePolicy_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1394,23 +1394,23 @@ func (_c *mockDataAccessRepository_GetPoliciesLike_Call) RunAndReturn(run func(s
 }
 
 // GetPolicyReferences provides a mock function with given fields: dbName, schema, policyName
-func (_m *mockDataAccessRepository) GetPolicyReferences(dbName string, schema string, policyName string) ([]policyReferenceEntity, error) {
+func (_m *mockDataAccessRepository) GetPolicyReferences(dbName string, schema string, policyName string) ([]PolicyReferenceEntity, error) {
 	ret := _m.Called(dbName, schema, policyName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPolicyReferences")
 	}
 
-	var r0 []policyReferenceEntity
+	var r0 []PolicyReferenceEntity
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string) ([]policyReferenceEntity, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, string, string) ([]PolicyReferenceEntity, error)); ok {
 		return rf(dbName, schema, policyName)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, string) []policyReferenceEntity); ok {
+	if rf, ok := ret.Get(0).(func(string, string, string) []PolicyReferenceEntity); ok {
 		r0 = rf(dbName, schema, policyName)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]policyReferenceEntity)
+			r0 = ret.Get(0).([]PolicyReferenceEntity)
 		}
 	}
 
@@ -1443,12 +1443,12 @@ func (_c *mockDataAccessRepository_GetPolicyReferences_Call) Run(run func(dbName
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetPolicyReferences_Call) Return(_a0 []policyReferenceEntity, _a1 error) *mockDataAccessRepository_GetPolicyReferences_Call {
+func (_c *mockDataAccessRepository_GetPolicyReferences_Call) Return(_a0 []PolicyReferenceEntity, _a1 error) *mockDataAccessRepository_GetPolicyReferences_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockDataAccessRepository_GetPolicyReferences_Call) RunAndReturn(run func(string, string, string) ([]policyReferenceEntity, error)) *mockDataAccessRepository_GetPolicyReferences_Call {
+func (_c *mockDataAccessRepository_GetPolicyReferences_Call) RunAndReturn(run func(string, string, string) ([]PolicyReferenceEntity, error)) *mockDataAccessRepository_GetPolicyReferences_Call {
 	_c.Call.Return(run)
 	return _c
 }

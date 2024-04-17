@@ -1,0 +1,356 @@
+// SNOWFLAKE DATABASE
+resource "snowflake_database" "db" {
+  name    = "RAITO_DATABASE"
+  comment = "Database for RAITO testing and demo"
+}
+
+resource "snowflake_schema" "ordering" {
+  database = snowflake_database.db.name
+  name     = "ORDERING"
+  comment  = "Schema for RAITO testing and demo"
+}
+
+resource "snowflake_tag" "sensitivity" {
+  database       = snowflake_database.db.name
+  schema         = snowflake_schema.ordering.name
+  name           = "SENSITIVITY"
+  allowed_values = ["PHI", "PII"]
+}
+
+// CUSTOMERS TABLE
+resource "snowflake_table" "ordering_customer" {
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "CUSTOMER"
+
+  column {
+    name = "CUSTKEY"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "NAME"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "ADDRESS"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "NATIONKEY"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "PHONE"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "ACCTBAL"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "MKTSEGMENT"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "COMMENT"
+    type = "VARCHAR"
+  }
+}
+
+resource "snowflake_tag_association" "customer_pii" {
+  object_identifier {
+    name     = "${snowflake_table.ordering_customer.name}.ADDRESS"
+    database = snowflake_database.db.name
+    schema   = snowflake_schema.ordering.name
+  }
+
+  object_identifier {
+    name     = "${snowflake_table.ordering_customer.name}.NAME"
+    database = snowflake_database.db.name
+    schema   = snowflake_schema.ordering.name
+  }
+
+  object_identifier {
+    name     = "${snowflake_table.ordering_customer.name}.PHONE"
+    database = snowflake_database.db.name
+    schema   = snowflake_schema.ordering.name
+  }
+
+  object_type = "COLUMN"
+  tag_id      = snowflake_tag.sensitivity.id
+  tag_value   = "PII"
+}
+
+// ORDERS TABLE
+resource "snowflake_table" "ordering_orders" {
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "ORDERS"
+
+  column {
+    name = "ORDERKEY"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "CUSTKEY"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "ORDERSTATUS"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "TOTALPRICE"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "ORDERDATE"
+    type = "DATE"
+  }
+
+  column {
+    name = "ORDERPRIORITY"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "CLERK"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "SHIPPRIORITY"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "COMMENT"
+    type = "VARCHAR"
+  }
+}
+
+// SUPPLIER
+resource "snowflake_table" "ordering_supplier" {
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "SUPPLIER"
+
+  column {
+    name = "SUPPKEY"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name           = "NAME"
+    type           = "VARCHAR"
+    masking_policy = snowflake_masking_policy.masking_policy.qualified_name
+  }
+
+  column {
+    name = "ADDRESS"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "NATIONKEY"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "PHONE"
+    type = "DATE"
+  }
+
+  column {
+    name = "ACCTBAL"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "COMMENT"
+    type = "VARCHAR"
+  }
+}
+
+resource "snowflake_masking_policy" "masking_policy" {
+  name     = "ORDERING_MASKING_POLICY"
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  signature {
+    column {
+      name = "val"
+      type = "VARCHAR"
+    }
+  }
+  masking_expression = <<-EOF
+    case
+      when current_role() in ('ACCOUNTADMIN', 'SYSADMIN') then
+        val
+      else
+        '******'
+    end
+  EOF
+
+  return_data_type = "VARCHAR"
+}
+
+resource "snowflake_tag_association" "supplier_pii" {
+  object_identifier {
+    name     = "${snowflake_table.ordering_supplier.name}.ADDRESS"
+    database = snowflake_database.db.name
+    schema   = snowflake_schema.ordering.name
+  }
+
+  object_identifier {
+    name     = "${snowflake_table.ordering_supplier.name}.NAME"
+    database = snowflake_database.db.name
+    schema   = snowflake_schema.ordering.name
+  }
+
+  object_identifier {
+    name     = "${snowflake_table.ordering_supplier.name}.PHONE"
+    database = snowflake_database.db.name
+    schema   = snowflake_schema.ordering.name
+  }
+
+  object_type = "COLUMN"
+  tag_id      = snowflake_tag.sensitivity.id
+  tag_value   = "PII"
+}
+
+// ORDERS VIEW
+resource "snowflake_view" "orders_limited" {
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "ORDERS_LIMITED"
+  comment  = "Non-materialized view with limited data"
+
+  statement  = <<-SQL
+    SELECT ORDERKEY, ORDERSTATUS, CUSTKEY FROM ${snowflake_table.ordering_orders.name};
+  SQL
+  or_replace = true
+}
+
+resource "snowflake_materialized_view" "customers_limited" {
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "CUSTOMERS_LIMITED"
+  comment  = "Materialized view with limited data"
+
+  statement  = <<-SQL
+    SELECT CUSTKEY, ACCTBAL, MKTSEGMENT FROM ${snowflake_table.ordering_customer.name};
+  SQL
+  or_replace = true
+
+  warehouse  = var.snowflake_warehouse
+}
+
+// TODO external table
+
+// SHARE
+resource "snowflake_database" "shared_db" {
+  name = "SNOWFLAKE_SAMPLE_DATA"
+  from_share = {
+    provider = "SFC_SAMPLES"
+    share    = "SAMPLE_DATA"
+  }
+  data_retention_time_in_days = 0
+}
+
+// Role what
+resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_orders" {
+  all_privileges    = true
+  account_role_name = "DATA_ANALYST"
+  on_schema_object {
+    object_name = "\"${snowflake_view.orders_limited.database}\".\"${snowflake_view.orders_limited.schema}\".\"${snowflake_view.orders_limited.name}\""
+    object_type = "VIEW"
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_supplier" {
+  privileges        = ["SELECT", "REFERENCES"]
+  account_role_name = "DATA_ANALYST"
+  on_schema_object {
+    object_name = snowflake_table.ordering_supplier.qualified_name
+    object_type = "TABLE"
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "sales_privileges_orders" {
+  privileges        = ["SELECT", "INSERT"]
+  account_role_name = "SALES"
+  on_schema_object {
+    object_name = snowflake_table.ordering_orders.qualified_name
+    object_type = "TABLE"
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "usage_on_database" {
+  privileges = ["USAGE"]
+
+  for_each = var.existing_snowflake_roles
+
+  account_role_name = each.value
+  on_account_object {
+    object_name = snowflake_database.db.name
+    object_type = "DATABASE"
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "usage_on_schema" {
+  privileges = ["USAGE"]
+
+  for_each = var.existing_snowflake_roles
+
+  account_role_name = each.value
+  on_schema {
+    schema_name = "${snowflake_schema.ordering.database}.${snowflake_schema.ordering.name}"
+  }
+}
+
+// Database ROLES
+resource "snowflake_database_role" "database_role" {
+  database = snowflake_database.db.name
+  name     = "RAITO_DB_ROLE_1"
+  comment  = "Database role for RAITO testing and demo"
+}
+
+resource "snowflake_grant_privileges_to_database_role" "database_role_privileges_database" {
+  all_privileges     = true
+  database_role_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_database_role.database_role.name}\""
+  on_database        = snowflake_database_role.database_role.database
+}
+
+resource "snowflake_grant_privileges_to_database_role" "database_role_privileges_schema" {
+  all_privileges     = true
+  database_role_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_database_role.database_role.name}\""
+  on_schema {
+    schema_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_schema.ordering.name}\""
+  }
+}
+
+resource "snowflake_grant_privileges_to_database_role" "database_role_privileges_table" {
+  privileges         = ["SELECT"]
+  database_role_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_database_role.database_role.name}\""
+  on_schema_object {
+    object_name = snowflake_table.ordering_orders.qualified_name
+    object_type = "TABLE"
+  }
+}
+
+resource "snowflake_grant_database_role" "database_role_grant" {
+  database_role_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_database_role.database_role.name}\""
+  parent_role_name   = "HUMAN_RESOURCES"
+
+}

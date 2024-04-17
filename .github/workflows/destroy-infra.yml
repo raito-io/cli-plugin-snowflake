@@ -92,3 +92,5 @@ jobs:
           SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SF_USER: ${{ secrets.SNOWFLAKE_USER }}
           SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          TF_VAR_testing_dataset: true
+          TF_VAR_demo_dataset: true

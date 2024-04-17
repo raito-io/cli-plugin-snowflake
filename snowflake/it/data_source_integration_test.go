@@ -40,7 +40,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	sourceName := strings.ToUpper(strings.Split(sfAccount, ".")[0])
 
 	s.NoError(err)
-	s.Len(dataSourceObjectHandler.DataObjects, 35)
+	s.Len(dataSourceObjectHandler.DataObjects, 39)
 
 	warehouses := getByType(dataSourceObjectHandler.DataObjects, "warehouse")
 	s.Len(warehouses, 1)
@@ -105,7 +105,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	})
 
 	column := getByType(dataSourceObjectHandler.DataObjects, "column")
-	s.Len(column, 27)
+	s.Len(column, 30)
 	s.Contains(column, data_source.DataObject{
 		ExternalId:       "RAITO_DATABASE.ORDERING.ORDERS.ORDERKEY",
 		Name:             "ORDERKEY",
