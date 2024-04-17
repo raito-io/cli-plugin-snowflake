@@ -55,95 +55,95 @@ resource "snowflake_user" "mary" {
 }
 
 resource "snowflake_user" "luis_garcia_stork" {
-  name = "stork_m"
-  email = "lg.stork@raito.io"
-  display_name = "Luis Garcia Stork"
-  first_name = "Luis"
-  last_name = "Garcia Stork"
-  password = random_password.persona_password.result
+  name              = "stork_m"
+  email             = "lg.stork@raito.io"
+  display_name      = "Luis Garcia Stork"
+  first_name        = "Luis"
+  last_name         = "Garcia Stork"
+  password          = random_password.persona_password.result
   default_warehouse = snowflake_warehouse.warehouse.id
 }
 
 resource "snowflake_user" "jobs_de" {
-  name = "jobs_de"
-  email = "jobs_de@raito.io"
-  display_name = "Intern Data Engineer"
-  password = random_password.persona_password.result
+  name              = "jobs_de"
+  email             = "jobs_de@raito.io"
+  display_name      = "Intern Data Engineer"
+  password          = random_password.persona_password.result
   default_warehouse = snowflake_warehouse.warehouse.id
 }
 
 resource "snowflake_user" "data_engineering" {
-  name = "data_engineering"
-  email = "data_engineer@raito.io"
-  display_name = "Data Engineer service account"
-  password = random_password.persona_password.result
+  name              = "data_engineering"
+  email             = "data_engineer@raito.io"
+  display_name      = "Data Engineer service account"
+  password          = random_password.persona_password.result
   default_warehouse = snowflake_warehouse.warehouse.id
 }
 
 resource "snowflake_user" "scranton_j" {
-  name = "scranton_j"
-  email = "jscranton123@raito.io"
+  name         = "scranton_j"
+  email        = "jscranton123@raito.io"
   display_name = "James Robert Scranton"
-  first_name = "James"
-  last_name = "Robert Scranton"
-  password = random_password.persona_password.result
+  first_name   = "James"
+  last_name    = "Robert Scranton"
+  password     = random_password.persona_password.result
 }
 
 resource "snowflake_user" "atkison_a" {
-  name = "atkison_a"
-  email = "a_abbotatkinson7576@raito.io"
+  name         = "atkison_a"
+  email        = "a_abbotatkinson7576@raito.io"
   display_name = "Angelica Abbot Atkinson"
-  first_name = "Angelica"
-  last_name = "Abbot Atkinson"
-  password = random_password.persona_password.result
+  first_name   = "Angelica"
+  last_name    = "Abbot Atkinson"
+  password     = random_password.persona_password.result
 }
 
 resource "snowflake_user" "macwilliam_j" {
-  name = "macwilliam_j"
-  email = "jb_macwilliam@raito.io"
+  name         = "macwilliam_j"
+  email        = "jb_macwilliam@raito.io"
   display_name = "Juliette Berkant MacWilliam"
-  first_name = "Juliette"
-  last_name = "Berkant MacWilliam"
-  password = random_password.persona_password.result
+  first_name   = "Juliette"
+  last_name    = "Berkant MacWilliam"
+  password     = random_password.persona_password.result
 }
 
 resource "snowflake_user" "keith_c" {
-  name = "keith_c"
-  email = "c_keith@raito.io"
+  name         = "keith_c"
+  email        = "c_keith@raito.io"
   display_name = "Claudia Seyyed Keith"
-  first_name = "Claudia"
-  last_name = "Seyyed Keith"
-  password = random_password.persona_password.result
+  first_name   = "Claudia"
+  last_name    = "Seyyed Keith"
+  password     = random_password.persona_password.result
 }
 
 resource "snowflake_user" "sakamoto_w" {
-  name = "sakamoto_w"
-  email = "w-sakamoto515@raito.io"
+  name         = "sakamoto_w"
+  email        = "w-sakamoto515@raito.io"
   display_name = "Wil Arya Sakamoto"
-  first_name = "Wil"
-  last_name = "Arya Sakamoto"
-  password = random_password.persona_password.result
+  first_name   = "Wil"
+  last_name    = "Arya Sakamoto"
+  password     = random_password.persona_password.result
 }
 
 resource "snowflake_user" "stein_v" {
-  name = "stein_v"
-  email = "v.scarletstein8246@raito.us"
+  name         = "stein_v"
+  email        = "v.scarletstein8246@raito.us"
   display_name = "Vladimir Scarlet Stein (US Sales)"
-  password = random_password.persona_password.result
+  password     = random_password.persona_password.result
 }
 
 resource "snowflake_user" "kiss_k" {
-  name = "kiss_k"
-  email = "k.a.kiss54856@raito.io"
+  name         = "kiss_k"
+  email        = "k.a.kiss54856@raito.io"
   display_name = "Katsuo América Kiss"
-  password = random_password.persona_password.result
+  password     = random_password.persona_password.result
 }
 
 resource "snowflake_user" "henriksson_v" {
-  name = "henriksson_v"
-  email = "vk-henriksson@raito.io"
+  name         = "henriksson_v"
+  email        = "vk-henriksson@raito.io"
   display_name = "Valentin Kasey Henriksson"
-  password = random_password.persona_password.result
+  password     = random_password.persona_password.result
 
 }
 
@@ -180,54 +180,54 @@ locals {
       roles : []
     },
     {
-      user: nonsensitive(snowflake_user.jobs_de.name)
-      email: snowflake_user.jobs_de.email
-      roles: []
+      user : nonsensitive(snowflake_user.jobs_de.name)
+      email : snowflake_user.jobs_de.email
+      roles : []
     },
     {
-      user: nonsensitive(snowflake_user.data_engineering.name)
-      email: snowflake_user.data_engineering.email
-      roles: []
+      user : nonsensitive(snowflake_user.data_engineering.name)
+      email : snowflake_user.data_engineering.email
+      roles : []
     },
     {
-      user: nonsensitive(snowflake_user.scranton_j.name)
-      email: snowflake_user.scranton_j.email
-      roles: [snowflake_role.human_resources.name]
+      user : nonsensitive(snowflake_user.scranton_j.name)
+      email : snowflake_user.scranton_j.email
+      roles : [snowflake_role.human_resources.name]
     },
     {
-      user: nonsensitive(snowflake_user.atkison_a.name)
-      email: snowflake_user.atkison_a.email
-      roles: []
+      user : nonsensitive(snowflake_user.atkison_a.name)
+      email : snowflake_user.atkison_a.email
+      roles : []
     },
     {
-      user: nonsensitive(snowflake_user.macwilliam_j.name)
-      email: snowflake_user.macwilliam_j.email
-      roles: [snowflake_role.human_resources.name]
+      user : nonsensitive(snowflake_user.macwilliam_j.name)
+      email : snowflake_user.macwilliam_j.email
+      roles : [snowflake_role.human_resources.name]
     },
     {
-      user: nonsensitive(snowflake_user.keith_c.name)
-      email: snowflake_user.keith_c.email
-      roles: [snowflake_role.human_resources.name]
+      user : nonsensitive(snowflake_user.keith_c.name)
+      email : snowflake_user.keith_c.email
+      roles : [snowflake_role.human_resources.name]
     },
     {
-      user: nonsensitive(snowflake_user.sakamoto_w.name)
-      email: snowflake_user.sakamoto_w.email
-      roles: [snowflake_role.finance.name, snowflake_role.marketing.name]
+      user : nonsensitive(snowflake_user.sakamoto_w.name)
+      email : snowflake_user.sakamoto_w.email
+      roles : [snowflake_role.finance.name, snowflake_role.marketing.name]
     },
     {
-      user: nonsensitive(snowflake_user.stein_v.name)
-      email: snowflake_user.stein_v.email
-      roles: []
+      user : nonsensitive(snowflake_user.stein_v.name)
+      email : snowflake_user.stein_v.email
+      roles : []
     },
     {
-      user: nonsensitive(snowflake_user.kiss_k.name)
-      email: snowflake_user.kiss_k.email
-      roles: []
+      user : nonsensitive(snowflake_user.kiss_k.name)
+      email : snowflake_user.kiss_k.email
+      roles : []
     },
     {
-      user: nonsensitive(snowflake_user.henriksson_v.name)
-      email: snowflake_user.henriksson_v.email
-      roles: []
+      user : nonsensitive(snowflake_user.henriksson_v.name)
+      email : snowflake_user.henriksson_v.email
+      roles : []
     }
   ]
 
@@ -268,12 +268,12 @@ resource "snowflake_role" "sales" {
 }
 
 resource "snowflake_role" "sales_analysis" {
-  name = "SALES_ANALYSIS"
+  name    = "SALES_ANALYSIS"
   comment = "Raito - Sales Analysis"
 }
 
 resource "snowflake_role" "sales_ext" {
-  name = "SALES_EXT"
+  name    = "SALES_EXT"
   comment = "Raito - Sales Extension"
 }
 

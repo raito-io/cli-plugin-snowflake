@@ -1,7 +1,7 @@
 resource "snowflake_row_access_policy" "rls_sales_data" {
-  name = "RLS_SALES_DATA"
+  name     = "RLS_SALES_DATA"
   database = snowflake_schema.sales.database
-  schema = snowflake_schema.sales.name
+  schema   = snowflake_schema.sales.name
 
   signature = {
     TerritoryID = "NUMBER(38,0)"

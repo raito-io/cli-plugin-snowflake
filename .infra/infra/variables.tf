@@ -21,15 +21,15 @@ variable "snowflake_password" {
 }
 
 variable "testing_dataset" {
-  type = bool
-  sensitive = false
+  type        = bool
+  sensitive   = false
   description = "Infrastructure for testing purposes"
-  default = true
+  default     = true
 }
 
 variable "demo_dataset" {
-  type = bool
-  sensitive = false
+  type        = bool
+  sensitive   = false
   description = "Infrastructure for testing purposes"
-  default = true
+  default     = true
 }

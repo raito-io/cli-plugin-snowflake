@@ -253,7 +253,7 @@ resource "snowflake_materialized_view" "customers_limited" {
   SQL
   or_replace = true
 
-  warehouse  = var.snowflake_warehouse
+  warehouse = var.snowflake_warehouse
 }
 
 // TODO external table

@@ -67,7 +67,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Format terraform
-        run: terraform fmt -check
+        run: terraform fmt -check -recursive
         working-directory: .infra/infra
 
       - name: Terraform backend

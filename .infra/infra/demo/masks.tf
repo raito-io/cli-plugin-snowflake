@@ -1,7 +1,7 @@
 resource "snowflake_masking_policy" "pserson_pii" {
-  database = snowflake_schema.person.database
-  schema   = snowflake_schema.person.name
-  name = "PERSON-PII_MASK"
+  database           = snowflake_schema.person.database
+  schema             = snowflake_schema.person.name
+  name               = "PERSON-PII_MASK"
   masking_expression = <<-EOF
     case
       when is_role_in_session('SALES') then val
@@ -9,7 +9,7 @@ resource "snowflake_masking_policy" "pserson_pii" {
       else '********'
     end
   EOF
-  return_data_type = "VARCHAR"
+  return_data_type   = "VARCHAR"
   signature {
     column {
       name = "val"

@@ -326,20 +326,20 @@ resource "snowflake_table" "address" {
   }
 
   column {
-    name = "AddressLine1"
-    type = "VARCHAR"
+    name           = "AddressLine1"
+    type           = "VARCHAR"
     masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
   }
 
   column {
-    name = "AddressLine2"
-    type = "VARCHAR"
+    name           = "AddressLine2"
+    type           = "VARCHAR"
     masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
   }
 
   column {
-    name = "City"
-    type = "VARCHAR"
+    name           = "City"
+    type           = "VARCHAR"
     masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
   }
 
@@ -349,8 +349,8 @@ resource "snowflake_table" "address" {
   }
 
   column {
-    name = "PostalCode"
-    type = "VARCHAR"
+    name           = "PostalCode"
+    type           = "VARCHAR"
     masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
   }
 
@@ -373,8 +373,8 @@ resource "snowflake_table" "address" {
 // -- -- Table ADDRESSTYPE
 resource "snowflake_table" "address_type" {
   database = snowflake_schema.person.database
-  schema     = snowflake_schema.person.name
-  name   = "ADDRESSTYPE"
+  schema   = snowflake_schema.person.name
+  name     = "ADDRESSTYPE"
   comment  = "Types of addresses stored in the Address table."
 
   column {
@@ -459,7 +459,7 @@ resource "snowflake_table" "business_entity_contact" {
   database = snowflake_schema.person.database
   schema   = snowflake_schema.person.name
   name     = "BUSINESSENTITYCONTACT"
-  comment = "Cross-reference table mapping stores, vendors, and employees to people"
+  comment  = "Cross-reference table mapping stores, vendors, and employees to people"
 
   column {
     name = "BusinessEntityID"
@@ -490,8 +490,8 @@ resource "snowflake_table" "business_entity_contact" {
 // -- -- Table CONTACTTYPE
 resource "snowflake_table" "contact_type" {
   database = snowflake_schema.person.database
-  schema     = snowflake_schema.person.name
-  name   = "CONTACTTYPE"
+  schema   = snowflake_schema.person.name
+  name     = "CONTACTTYPE"
   comment  = "Lookup table containing the types of business entity contacts."
 
   column {
@@ -538,7 +538,7 @@ resource "snowflake_table" "email_address" {
   database = snowflake_schema.person.database
   schema   = snowflake_schema.person.name
   name     = "EMAILADDRESS"
-  comment = "Where to send a person email."
+  comment  = "Where to send a person email."
 
   column {
     name = "BusinessEntityID"
@@ -546,8 +546,8 @@ resource "snowflake_table" "email_address" {
   }
 
   column {
-    name = "EmailAddress"
-    type = "VARCHAR"
+    name           = "EmailAddress"
+    type           = "VARCHAR"
     masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
   }
 
@@ -585,8 +585,8 @@ resource "snowflake_table" "person_phone" {
   }
 
   column {
-    name = "PhoneNumber"
-    type = "VARCHAR"
+    name           = "PhoneNumber"
+    type           = "VARCHAR"
     masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
   }
 
@@ -1015,8 +1015,8 @@ resource "snowflake_table" "product" {
 resource "snowflake_table" "product_category" {
   database = snowflake_schema.production.database
   schema   = snowflake_schema.production.name
-  name = "PRODUCTCATEGORY"
-  comment = "High-level product categorization."
+  name     = "PRODUCTCATEGORY"
+  comment  = "High-level product categorization."
 
   column {
     name = "ModifiedDate"
@@ -1043,7 +1043,7 @@ resource "snowflake_table" "product_category" {
 resource "snowflake_table" "product_cost_history" {
   database = snowflake_schema.production.database
   schema   = snowflake_schema.production.name
-  name   = "PRODUCTCOSTHISTORY"
+  name     = "PRODUCTCOSTHISTORY"
 
   column {
     name = "EndDate"
@@ -1264,7 +1264,7 @@ resource "snowflake_table" "product_model_prod" {
   database = snowflake_schema.production.database
   schema   = snowflake_schema.production.name
   name     = "PRODUCTMODELPROD"
-  comment = "Cross-reference table mapping product descriptions and the language the description is written in."
+  comment  = "Cross-reference table mapping product descriptions and the language the description is written in."
 
   column {
     name = "CultureID"
@@ -2011,21 +2011,21 @@ resource "snowflake_schema" "sales" {
 }
 
 resource "snowflake_tag" "sales_sensitivity" {
-  database = snowflake_schema.sales.database
-  schema = snowflake_schema.sales.name
-  name = "SENSITIVITY"
+  database       = snowflake_schema.sales.database
+  schema         = snowflake_schema.sales.name
+  name           = "SENSITIVITY"
   allowed_values = ["PCI", "PII"]
 }
 
 resource "snowflake_tag_association" "sales_sensitivity" {
   object_identifier {
-    name = snowflake_schema.sales.name
+    name     = snowflake_schema.sales.name
     database = snowflake_schema.sales.database
   }
 
   object_type = "SCHEMA"
-  tag_id = "${snowflake_tag.sales_sensitivity.database}.${snowflake_tag.sales_sensitivity.schema}.${snowflake_tag.sales_sensitivity.name}"
-  tag_value = "PII"
+  tag_id      = "${snowflake_tag.sales_sensitivity.database}.${snowflake_tag.sales_sensitivity.schema}.${snowflake_tag.sales_sensitivity.name}"
+  tag_value   = "PII"
 }
 
 // -- -- Table COUNTRYREGIONCURRENCY
@@ -2033,7 +2033,7 @@ resource "snowflake_table" "country_region_currency" {
   database = snowflake_schema.sales.database
   schema   = snowflake_schema.sales.name
   name     = "COUNTRYREGIONCURRENCY"
-  comment = "Cross-reference table mapping ISO currency codes to a country or region."
+  comment  = "Cross-reference table mapping ISO currency codes to a country or region."
 
   column {
     name = "CountryRegionCode"
@@ -2211,8 +2211,8 @@ resource "snowflake_materialized_view" "customer_eu" {
 resource "snowflake_table" "person_creditcard" {
   database = snowflake_schema.sales.database
   schema   = snowflake_schema.sales.name
-  name = "PERSONCREDITCARD"
-  comment = "Cross-reference table mapping people to their credit card information in the CreditCard table."
+  name     = "PERSONCREDITCARD"
+  comment  = "Cross-reference table mapping people to their credit card information in the CreditCard table."
 
   column {
     name = "BusinessEntityID"
@@ -2232,13 +2232,13 @@ resource "snowflake_table" "person_creditcard" {
 
 resource "snowflake_tag_association" "preson_creditcard_sensitivity" {
   object_identifier {
-    name = "${snowflake_table.person_creditcard.name}.CreditCardID"
+    name     = "${snowflake_table.person_creditcard.name}.CreditCardID"
     database = snowflake_table.person_creditcard.database
-    schema = snowflake_table.person_creditcard.schema
+    schema   = snowflake_table.person_creditcard.schema
   }
   object_type = "COLUMN"
-  tag_id = snowflake_tag.sales_sensitivity.id
-  tag_value = "PCI"
+  tag_id      = snowflake_tag.sales_sensitivity.id
+  tag_value   = "PCI"
 }
 
 // -- -- Table SALESORDERDETAIL
