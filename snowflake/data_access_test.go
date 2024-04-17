@@ -84,16 +84,16 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
 						{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
 					}, nil).Once()
-					repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
+					repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]DescribePolicyEntity{
 						{Name: "DescribePolicy1", Body: "PolicyBody 1"},
 					}, nil).Once()
-					repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
+					repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]DescribePolicyEntity{
 						{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
 					}, nil).Once()
-					repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]PolicyReferenceEntity{
 						{POLICY_DB: "PolicyDB"},
 					}, nil).Once()
-					repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]PolicyReferenceEntity{
 						{POLICY_DB: "PolicyDB"},
 					}, nil).Once()
 
@@ -276,16 +276,16 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
 						{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
 					}, nil).Once()
-					repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
+					repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]DescribePolicyEntity{
 						{Name: "DescribePolicy1", Body: "PolicyBody 1"},
 					}, nil).Once()
-					repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
+					repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]DescribePolicyEntity{
 						{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
 					}, nil).Once()
-					repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]PolicyReferenceEntity{
 						{POLICY_DB: "PolicyDB"},
 					}, nil).Once()
-					repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]PolicyReferenceEntity{
 						{POLICY_DB: "PolicyDB"},
 					}, nil).Once()
 
@@ -507,16 +507,16 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{
 						{Name: "RowAccess1", SchemaName: "schema2", DatabaseName: "DB", Owner: "RowAccessOwner", Kind: "ROW_ACCESS_POLICY"},
 					}, nil).Once()
-					repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]describePolicyEntity{
+					repoMock.EXPECT().DescribePolicy("MASKING", "DB", "schema1", "MaskingPolicy1").Return([]DescribePolicyEntity{
 						{Name: "DescribePolicy1", Body: "PolicyBody 1"},
 					}, nil).Once()
-					repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]describePolicyEntity{
+					repoMock.EXPECT().DescribePolicy("ROW ACCESS", "DB", "schema2", "RowAccess1").Return([]DescribePolicyEntity{
 						{Name: "DescribePolicy2", Body: "Row Access Policy Body"},
 					}, nil).Once()
-					repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]policyReferenceEntity{
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema1", "MaskingPolicy1").Return([]PolicyReferenceEntity{
 						{POLICY_DB: "PolicyDB"},
 					}, nil).Once()
-					repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]policyReferenceEntity{
+					repoMock.EXPECT().GetPolicyReferences("DB", "schema2", "RowAccess1").Return([]PolicyReferenceEntity{
 						{POLICY_DB: "PolicyDB"},
 					}, nil).Once()
 

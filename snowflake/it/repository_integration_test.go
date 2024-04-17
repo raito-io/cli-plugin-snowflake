@@ -108,7 +108,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CheckAccessHistoryAvailabi
 
 	//Then
 	s.NoError(err)
-	s.False(result)
+	s.True(result)
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetAccountRoles() {
@@ -221,11 +221,10 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RenameAccountRole() {
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToAccountRole() {
 	//When
-	grantsToRole, err := s.repo.GetGrantsToAccountRole("RAITO_DATA_ANALYST")
+	grantsToRole, err := s.repo.GetGrantsToAccountRole("DATA_ANALYST")
 
 	//Then
 	s.NoError(err)
-	s.Len(grantsToRole, 16)
 
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "USAGE",
@@ -235,7 +234,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToAccountRole() {
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "USAGE",
 		GrantedOn: "SCHEMA",
-		Name:      "RAITO_DATABASE.PUBLIC",
+		Name:      "RAITO_DATABASE.ORDERING",
 	})
 	s.Contains(grantsToRole, snowflake.GrantToRole{
 		Privilege: "SELECT",
@@ -568,7 +567,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsOfDatabaseRole() 
 	s.True(len(grantsOfRole) >= 1)
 	s.Contains(grantsOfRole, snowflake.GrantOfRole{
 		GrantedTo:   "ROLE",
-		GranteeName: "RAITO_HUMAN_RESOURCES",
+		GranteeName: "HUMAN_RESOURCES",
 	})
 }
 
@@ -754,48 +753,36 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevokeOnDatabaseRol
 	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GetPolicies_Masking() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_GetPolicies() {
 	if sfStandardEdition {
 		s.T().Skip("Standard edition do not support masking policies")
 	}
 
 	//When
-	_, err := s.repo.GetPolicies("MASKING")
+	policies, err := s.repo.GetPolicies("MASKING")
 
 	//Then
-	s.NoError(err)
+	require.NoError(s.T(), err)
 
-	//TODO
+	s.Contains(policies, snowflake.PolicyEntity{
+		Name:         "ORDERING_MASKING_POLICY",
+		DatabaseName: "RAITO_DATABASE",
+		SchemaName:   "ORDERING",
+		Kind:         "MASKING_POLICY",
+		Owner:        "ACCOUNTADMIN",
+	})
 }
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_GetPolicies_RowAccess() {
-	if sfStandardEdition {
-		s.T().Skip("Standard edition do not support row access policies")
-	}
-
-	//When
-	_, err := s.repo.GetPolicies("ROW ACCESS")
-
-	//Then
-	s.NoError(err)
-
-	//TODO
-}
-
-func (s *RepositoryTestSuite) TestSnowflakeRepository_DescribePolicy_Masking() {
+func (s *RepositoryTestSuite) TestSnowflakeRepository_DescribePolicy() {
 	if sfStandardEdition {
 		s.T().Skip("Standard edition do not support masking policies")
 	}
 
-	//TODO
-}
+	entries, err := s.repo.DescribePolicy("MASKING", "RAITO_DATABASE", "ORDERING", "ORDERING_MASKING_POLICY")
+	assert.NoError(s.T(), err)
 
-func (s *RepositoryTestSuite) TestSnowflakeRepository_DescribePolicy_RowAccess() {
-	if sfStandardEdition {
-		s.T().Skip("Standard edition do not support row access policies")
-	}
-
-	//TODO
+	assert.Len(s.T(), entries, 1)
+	s.Equal(snowflake.DescribePolicyEntity{Name: "ORDERING_MASKING_POLICY", Body: "case\n  when current_role() in ('ACCOUNTADMIN', 'SYSADMIN') then\n    val\n  else\n    '******'\nend"}, entries[0])
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetPolicyReferences() {
@@ -803,7 +790,27 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetPolicyReferences() {
 		s.T().Skip("Standard edition do not support policy references")
 	}
 
-	//TODO
+	entries, err := s.repo.GetPolicyReferences("RAITO_DATABASE", "ORDERING", "ORDERING_MASKING_POLICY")
+	assert.NoError(s.T(), err)
+
+	assert.Len(s.T(), entries, 1)
+
+	s.Equal(snowflake.PolicyReferenceEntity{
+		POLICY_DB:            "RAITO_DATABASE",
+		POLICY_SCHEMA:        "ORDERING",
+		POLICY_NAME:          "ORDERING_MASKING_POLICY",
+		POLICY_KIND:          "MASKING_POLICY",
+		REF_DATABASE_NAME:    "RAITO_DATABASE",
+		REF_SCHEMA_NAME:      "ORDERING",
+		REF_ENTITY_NAME:      "SUPPLIER",
+		REF_ENTITY_DOMAIN:    "TABLE",
+		REF_COLUMN_NAME:      snowflake.NullString{String: "NAME", Valid: true},
+		REF_ARG_COLUMN_NAMES: snowflake.NullString{String: "", Valid: false},
+		TAG_DATABASE:         snowflake.NullString{String: "", Valid: false},
+		TAG_SCHEMA:           snowflake.NullString{String: "", Valid: false},
+		TAG_NAME:             snowflake.NullString{String: "", Valid: false},
+		POLICY_STATUS:        "ACTIVE",
+	}, entries[0])
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSnowFlakeAccountName() {
@@ -928,7 +935,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 
 	//Then
 	s.NoError(err)
-	s.Len(tables, 4)
+	s.Len(tables, 5)
 
 	expected := []snowflake.TableEntity{
 		{
@@ -955,6 +962,13 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetTablesInSchema() {
 			Schema:    "ORDERING",
 			Name:      "SUPPLIER",
 			TableType: "BASE TABLE",
+		},
+		{
+			Database:  "RAITO_DATABASE",
+			Schema:    "ORDERING",
+			Name:      "CUSTOMERS_LIMITED",
+			TableType: "MATERIALIZED VIEW",
+			Comment:   ptr.String("Materialized view with limited data"),
 		},
 	}
 
@@ -1110,16 +1124,18 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CommentDatabaseRoleIfExist
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateMaskPolicy() {
-	s.T().Skip("Skip test as Masking is a non standard edition feature")
+	if sfStandardEdition {
+		s.T().Skip("Skip test as Masking is a non standard edition feature")
+	}
 
 	// Given
-	database := "RUBEN_TEST"
-	schema := "TESTING"
-	table := "CITIES"
-	column := "CITY"
+	database := "RAITO_DATABASE"
+	schema := "ORDERING"
+	table := "SUPPLIER"
+	column := "ADDRESS"
 
 	beneficiary := snowflake.MaskingBeneficiaries{
-		Roles: []string{"RUBEN_AP"},
+		Roles: []string{"HUMAN_RESOURCES"},
 	}
 
 	maskName := strings.Join([]string{"MaskingTest", gonanoid.MustGenerate("0123456789ABCDEF", 8)}, "_")

@@ -39,7 +39,7 @@ type dataAccessRepository interface {
 	CreateAccountRole(roleName string) error
 	CreateDatabaseRole(database, roleName string) error
 	CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) error
-	DescribePolicy(policyType, dbName, schema, policyName string) ([]describePolicyEntity, error)
+	DescribePolicy(policyType, dbName, schema, policyName string) ([]DescribePolicyEntity, error)
 	DropAccountRole(roleName string) error
 	DropDatabaseRole(database string, roleName string) error
 	DropFilter(databaseName string, schema string, tableName string, filterName string) error
@@ -59,7 +59,7 @@ type dataAccessRepository interface {
 	GetGrantsToDatabaseRole(database, roleName string) ([]GrantToRole, error)
 	GetPolicies(policy string) ([]PolicyEntity, error)
 	GetPoliciesLike(policy string, like string) ([]PolicyEntity, error)
-	GetPolicyReferences(dbName, schema, policyName string) ([]policyReferenceEntity, error)
+	GetPolicyReferences(dbName, schema, policyName string) ([]PolicyReferenceEntity, error)
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetShares() ([]DbEntity, error)
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error

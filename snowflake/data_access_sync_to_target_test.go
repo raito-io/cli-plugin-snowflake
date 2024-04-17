@@ -533,21 +533,21 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 		},
 	}, nil).Once()
 
-	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema1", "Policy1").Return([]describePolicyEntity{
+	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema1", "Policy1").Return([]DescribePolicyEntity{
 		{
 			Name: "Policy1",
 			Body: "PolicyBody1",
 		},
 	}, nil).Once()
 
-	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema2", "Policy2").Return([]describePolicyEntity{
+	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema2", "Policy2").Return([]DescribePolicyEntity{
 		{
 			Name: "Policy2",
 			Body: "PolicyBody2",
 		},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetPolicyReferences("DB1", "Schema1", "Policy1").Return([]policyReferenceEntity{
+	repoMock.EXPECT().GetPolicyReferences("DB1", "Schema1", "Policy1").Return([]PolicyReferenceEntity{
 		{
 			POLICY_STATUS:     "Active",
 			REF_COLUMN_NAME:   NullString{String: "ColumnName1", Valid: true},
@@ -557,7 +557,7 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 		},
 	}, nil).Once()
 
-	repoMock.EXPECT().GetPolicyReferences("DB1", "Schema2", "Policy2").Return([]policyReferenceEntity{
+	repoMock.EXPECT().GetPolicyReferences("DB1", "Schema2", "Policy2").Return([]PolicyReferenceEntity{
 		{
 			POLICY_STATUS:     "Active",
 			REF_COLUMN_NAME:   NullString{Valid: false},
@@ -636,7 +636,7 @@ func TestAccessSyncer_importPoliciesOfType_ErrorOnDescribePolicy(t *testing.T) {
 		},
 	}, nil).Once()
 
-	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema1", "Policy1").Return([]describePolicyEntity{
+	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema1", "Policy1").Return([]DescribePolicyEntity{
 		{
 			Name: "Policy1",
 			Body: "PolicyBody1",

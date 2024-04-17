@@ -5,6 +5,12 @@ on:
       targetEnvironment:
         required: true
         type: string
+      demo-infra:
+        required: true
+        type: boolean
+      testing-infra:
+        required: true
+        type: boolean
     secrets:
       AWS_OIDC_DEPLOY_ROLE:
         required: true
@@ -20,8 +26,6 @@ on:
         required: true
       SNOWFLAKE_PASSWORD:
         required: true
-      SNOWFLAKE_STANDARD_EDITION:
-        required: true
   workflow_dispatch:
     inputs:
       targetEnvironment:
@@ -32,6 +36,16 @@ on:
         options:
           - integration_testing
           - testing
+      demo-infra:
+        type: boolean
+        description: Indicate if demo infrastructure should be generated
+        required: false
+        default: true
+      testing-infra:
+        type: boolean
+        description: Indicate if testing infrastructure should be generated
+        required: false
+        default: false
 permissions:
   id-token: write
   contents: read
@@ -53,7 +67,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Format terraform
-        run: terraform fmt -check
+        run: terraform fmt -check -recursive
         working-directory: .infra/infra
 
       - name: Terraform backend
@@ -85,4 +99,5 @@ jobs:
           TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           TF_VAR_snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
           TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          TF_VAR_snowflake_standard_edition: ${{ secrets.SNOWFLAKE_STANDARD_EDITION }}
+          TF_VAR_testing_dataset: ${{ inputs.testing-infra }}
+          TF_VAR_demo_dataset: ${{ inputs.demo-infra }}

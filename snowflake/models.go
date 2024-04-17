@@ -167,12 +167,12 @@ type PolicyEntity struct {
 	Owner        string `db:"owner"`
 }
 
-type describePolicyEntity struct {
+type DescribePolicyEntity struct {
 	Name string `db:"name"`
 	Body string `db:"body"`
 }
 
-type policyReferenceEntity struct {
+type PolicyReferenceEntity struct {
 	POLICY_DB            string     `db:"POLICY_DB"`
 	POLICY_SCHEMA        string     `db:"POLICY_SCHEMA"`
 	POLICY_NAME          string     `db:"POLICY_NAME"`

@@ -64,11 +64,11 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	s.Contains(externalIds, "SECURITYADMIN")
 	s.Contains(externalIds, "USERADMIN")
 	s.Contains(externalIds, "PUBLIC")
-	s.Contains(externalIds, "RAITO_DATA_ANALYST")
-	s.Contains(externalIds, "RAITO_FINANCE")
-	s.Contains(externalIds, "RAITO_HUMAN_RESOURCES")
-	s.Contains(externalIds, "RAITO_MARKETING")
-	s.Contains(externalIds, "RAITO_SALES")
+	s.Contains(externalIds, "DATA_ANALYST")
+	s.Contains(externalIds, "FINANCE")
+	s.Contains(externalIds, "HUMAN_RESOURCES")
+	s.Contains(externalIds, "MARKETING")
+	s.Contains(externalIds, "SALES")
 	s.Contains(externalIds, "DATABASEROLE###DATABASE:RAITO_DATABASE###ROLE:RAITO_DB_ROLE_1")
 }
 
@@ -366,15 +366,17 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 }
 
 func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget() {
-	s.T().Skip("Skip test as Masking is a non standard edition feature")
+	if sfStandardEdition {
+		s.T().Skip("Skip test as Masking is a non standard edition feature")
+	}
 
 	//Given
 	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
-	database := "RUBEN_TEST"
-	schema := "TESTING"
-	table := "CITIES"
-	column := "CITY"
+	database := "RAITO_DATABASE"
+	schema := "ORDERING"
+	table := "SUPPLIER"
+	column := "ADDRESS"
 
 	doFullname := fmt.Sprintf("%s.%s.%s.%s", database, schema, table, column)
 

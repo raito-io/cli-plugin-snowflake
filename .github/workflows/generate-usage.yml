@@ -60,15 +60,6 @@ jobs:
           }
           EOF
 
-      - name: Terraform backend
-        run: |
-          cat <<EOF > .infra/infra/backend_override.tf
-          terraform {
-            backend "s3" {
-            }
-          }
-          EOF
-
       - name: Terraform init
         run: |
           terraform init \

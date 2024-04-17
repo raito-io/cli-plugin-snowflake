@@ -20,9 +20,16 @@ variable "snowflake_password" {
   nullable    = false
 }
 
-variable "snowflake_standard_edition" {
+variable "testing_dataset" {
   type        = bool
   sensitive   = false
-  description = "Snowflake standard edition"
+  description = "Infrastructure for testing purposes"
+  default     = true
+}
+
+variable "demo_dataset" {
+  type        = bool
+  sensitive   = false
+  description = "Infrastructure for testing purposes"
   default     = true
 }

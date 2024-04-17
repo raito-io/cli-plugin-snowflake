@@ -1,9 +1,9 @@
-output "snowflake_database_name" {
-  value = snowflake_database.db.name
+output "testing_snowflake_database_name" {
+  value = var.testing_dataset ? module.testing[0].snowflake_database_name : null
 }
 
-output "snowflake_share_database_name" {
-  value = snowflake_database.shared_db.name
+output "testing_snowflake_share_database_name" {
+  value = var.testing_dataset ? module.testing[0].snowflake_database_name : null
 }
 
 output "snowflake_warehouse_name" {
@@ -16,8 +16,9 @@ output "snowflake_account" {
 }
 
 output "snowflake_tables" {
-  value = [snowflake_table.ordering_supplier.qualified_name, snowflake_table.ordering_orders.qualified_name, snowflake_table.ordering_customer.qualified_name, "\"${snowflake_view.orders_limited.database}\".\"${snowflake_view.orders_limited.schema}\".\"${snowflake_view.orders_limited.name}\""]
+  value = concat(var.testing_dataset ? module.testing[0].snowflake_tables : [], var.demo_dataset ? module.demo[0].tables : [])
 }
+
 
 output "persona_password" {
   value     = random_password.persona_password.result
