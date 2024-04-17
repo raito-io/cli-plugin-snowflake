@@ -68,7 +68,7 @@ jobs:
           SF_USER: ${{ secrets.SNOWFLAKE_USER }}
           SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SF_ROLE: ${{ secrets.sf_role }}
-          SF_STANDARD_EDITION: true
+          SF_STANDARD_EDITION: false
 
       - uses: codecov/codecov-action@v3
         with:
