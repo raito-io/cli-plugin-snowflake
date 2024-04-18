@@ -26,5 +26,8 @@ gen-test-infra:
 destroy-test-infra:
 	cd .infra/infra; terraform apply -destroy -auto-approve; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfUser ${SF_USER} --sfPassword ${SF_PASSWORD} --drop=true
 
+destroy-roles:
+	cd .infra/infra; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfUser ${SF_USER} --sfPassword ${SF_PASSWORD} --drop=true
+
 gen-test-usage:
 	cd .infra/infra; terraform output -json | go run ../usage/usage.go
