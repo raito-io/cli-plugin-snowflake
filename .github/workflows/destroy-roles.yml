@@ -1,0 +1,51 @@
+name: Manual - Destroy roles
+on:
+  workflow_call:
+    inputs:
+      targetEnvironment:
+        required: true
+        type: string
+    secrets:
+      SNOWFLAKE_ACCOUNT:
+        required: true
+      SNOWFLAKE_USER:
+        required: true
+      SNOWFLAKE_PASSWORD:
+        required: true
+  workflow_dispatch:
+    inputs:
+      targetEnvironment:
+        type: choice
+        description: Please select a target environment
+        required: true
+        default: 'integration_testing'
+        options:
+          - integration_testing
+          - testing
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  destroy-infra:
+    environment: ${{ inputs.targetEnvironment }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - name: Mod Tidy
+        run: go mod tidy
+
+      - name: Destroy infrastructure
+        run: make destroy-roles
+        env:
+          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}

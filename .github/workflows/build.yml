@@ -8,6 +8,12 @@ permissions:
   id-token: write
   contents: read
 jobs:
+  remove-old-infra:
+    uses: ./.github/workflows/destroy-roles.yml
+    with:
+      targetEnvironment: integration_testing
+    secrets: inherit
+
   setup-infra:
     uses: ./.github/workflows/generate-infra.yml
     with:
@@ -15,6 +21,10 @@ jobs:
       demo-infra: false
       testing-infra: true
     secrets: inherit
+
+    needs:
+      - remove-old-infra
+    if: always()
 
   generate-usage:
     uses: ./.github/workflows/generate-usage.yml
@@ -75,14 +85,14 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.txt
 
-  cleanup:
-    needs:
-      - setup-infra
-      - build
-    if: always() && needs.setup-infra.result == 'success'
-
-    uses: ./.github/workflows/destroy-infra.yml
-    with:
-      targetEnvironment: integration_testing
-    secrets: inherit
+#  cleanup:
+#    needs:
+#      - setup-infra
+#      - build
+#    if: always() && needs.setup-infra.result == 'success'
+#
+#    uses: ./.github/workflows/destroy-infra.yml
+#    with:
+#      targetEnvironment: integration_testing
+#    secrets: inherit
 
