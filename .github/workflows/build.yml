@@ -45,7 +45,7 @@ jobs:
 
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Assume role using OIDC
         uses: aws-actions/configure-aws-credentials@v4
@@ -67,7 +67,7 @@ jobs:
         run: make build
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v4
         with:
           version: v1.56.1
 
@@ -80,7 +80,7 @@ jobs:
           SF_ROLE: ${{ secrets.sf_role }}
           SF_STANDARD_EDITION: false
 
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.txt
