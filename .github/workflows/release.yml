@@ -16,7 +16,7 @@ jobs:
         run: git config --global url."https://${{ secrets.CI_SECRETS_TOKEN }}:x-oauth-basic@github.com/raito-io".insteadOf "https://github.com/raito-io"
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -28,7 +28,7 @@ jobs:
           cache: true
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
           version: latest
