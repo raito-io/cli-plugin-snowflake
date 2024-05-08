@@ -16,7 +16,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/snowflakedb/gosnowflake v1.9.0
 	github.com/stretchr/testify v1.9.0
-	github.com/vektra/mockery/v2 v2.42.3
+	github.com/vektra/mockery/v2 v2.43.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 )
 
