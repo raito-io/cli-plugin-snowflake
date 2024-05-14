@@ -38,7 +38,7 @@ func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string,
 	if role == "" {
 		role = "ACCOUNTADMIN"
 	}
-	
+
 	insecure := false
 	if v, ok := params[SfDriverInsecureMode]; ok && strings.EqualFold(v, "true") {
 		insecure = true
