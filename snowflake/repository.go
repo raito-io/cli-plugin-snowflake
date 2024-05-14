@@ -47,6 +47,14 @@ type SnowflakeRepository struct {
 }
 
 func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRepository, error) {
+	if v, f := params[SfDriverDebug]; f && strings.EqualFold(v, "true") {
+		err := sf.GetLogger().SetLogLevel("debug")
+
+		if err != nil {
+			logger.Error("Error while setting snowflake sdk to debug level: %s", err.Error())
+		}
+	}
+
 	conn, role, err := ConnectToSnowflake(params, role)
 	if err != nil {
 		return nil, err

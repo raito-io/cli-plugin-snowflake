@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	e "github.com/raito-io/cli/base/util/error"
 	sf "github.com/snowflakedb/gosnowflake"
@@ -11,10 +12,6 @@ import (
 
 const SfLimit = 10000
 const ConnectionStringIdentifier = "Raito_CLI"
-
-func init() {
-	sf.GetLogger().SetLogLevel("debug")
-}
 
 func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string, error) {
 	snowflakeUser, found := params[SfUser]
@@ -41,12 +38,19 @@ func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string,
 	if role == "" {
 		role = "ACCOUNTADMIN"
 	}
+	
+	insecure := false
+	if v, ok := params[SfDriverInsecureMode]; ok && strings.EqualFold(v, "true") {
+		insecure = true
+	}
+
 	dsn, err := sf.DSN(&sf.Config{
-		Account:     snowflakeAccount,
-		User:        snowflakeUser,
-		Password:    snowflakePassword,
-		Role:        role,
-		Application: ConnectionStringIdentifier,
+		Account:      snowflakeAccount,
+		User:         snowflakeUser,
+		Password:     snowflakePassword,
+		Role:         role,
+		Application:  ConnectionStringIdentifier,
+		InsecureMode: insecure,
 	})
 
 	if err != nil {

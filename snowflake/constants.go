@@ -15,6 +15,8 @@ const (
 	SfSkipColumns                       = "sf-skip-columns"
 	SfDataUsageWindow                   = "sf-data-usage-window"
 	SfDatabaseRoles                     = "sf-database-roles"
+	SfDriverDebug                       = "sf-driver-debug"
+	SfDriverInsecureMode                = "sf-driver-insecure-mode"
 
 	TagSource = "Snowflake"
 
