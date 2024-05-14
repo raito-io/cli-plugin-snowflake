@@ -12,6 +12,10 @@ import (
 const SfLimit = 10000
 const ConnectionStringIdentifier = "Raito_CLI"
 
+func init() {
+	sf.GetLogger().SetLogLevel("debug")
+}
+
 func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string, error) {
 	snowflakeUser, found := params[SfUser]
 	if !found {

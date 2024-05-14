@@ -1088,6 +1088,8 @@ func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, 
 	sec := time.Since(startQuery).Round(time.Millisecond)
 	repo.queryTime += sec
 
+	logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
+
 	return result, sec, err
 }
 
