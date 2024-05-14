@@ -47,6 +47,14 @@ type SnowflakeRepository struct {
 }
 
 func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRepository, error) {
+	if v, f := params[SfDriverDebug]; f && strings.EqualFold(v, "true") {
+		err := sf.GetLogger().SetLogLevel("debug")
+
+		if err != nil {
+			logger.Error("Error while setting snowflake sdk to debug level: %s", err.Error())
+		}
+	}
+
 	conn, role, err := ConnectToSnowflake(params, role)
 	if err != nil {
 		return nil, err
@@ -1087,6 +1095,8 @@ func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, 
 	result, err := QuerySnowflake(repo.conn, query)
 	sec := time.Since(startQuery).Round(time.Millisecond)
 	repo.queryTime += sec
+
+	logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
 
 	return result, sec, err
 }
