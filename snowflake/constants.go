@@ -17,6 +17,7 @@ const (
 	SfDatabaseRoles                     = "sf-database-roles"
 	SfDriverDebug                       = "sf-driver-debug"
 	SfDriverInsecureMode                = "sf-driver-insecure-mode"
+	SfIgnoreLinksToRoles                = "sf-ignore-links-to-roles"
 
 	TagSource = "Snowflake"
 

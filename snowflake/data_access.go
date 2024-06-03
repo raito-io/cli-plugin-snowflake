@@ -89,6 +89,7 @@ type AccessSyncer struct {
 	warehousesCache               []DbEntity
 	namingConstraints             naming_hint.NamingConstraints
 	uniqueRoleNameGeneratorsCache map[*string]naming_hint.UniqueGenerator
+	ignoreLinksToRole             []string
 }
 
 func NewDataAccessSyncer(namingConstraints naming_hint.NamingConstraints) *AccessSyncer {

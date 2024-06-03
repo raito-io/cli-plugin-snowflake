@@ -16,6 +16,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
+	"github.com/raito-io/cli/base/util/match"
 	"github.com/raito-io/cli/base/util/slice"
 	"github.com/raito-io/cli/base/wrappers"
 	"github.com/raito-io/golang-set/set"
@@ -104,6 +105,13 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRe
 	logger.Info("Configuring access providers as roles in Snowflake")
 
 	databaseRoleSupportEnabled := configMap.GetBoolWithDefault(SfDatabaseRoles, false)
+
+	ignoreLinksToRoles := configMap.GetString(SfIgnoreLinksToRoles)
+	if ignoreLinksToRoles != "" {
+		s.ignoreLinksToRole = slice.ParseCommaSeparatedList(ignoreLinksToRoles)
+	} else {
+		s.ignoreLinksToRole = nil
+	}
 
 	err := s.removeRolesToRemove(toRemoveAps, repo, feedbackHandler)
 	if err != nil {
@@ -763,6 +771,10 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 
 		logger.Info(fmt.Sprintf("Done updating users granted to role %q", externalId))
 	} else {
+		if ignoreInheritance || ignoreWho || ignoreWhat {
+			return actualName, fmt.Errorf("role %q does not exist but contains locks. Not creating the role as it is probably removed externally. Simply remove it from Raito as well", externalId)
+		}
+
 		logger.Info(fmt.Sprintf("Creating role %q", externalId))
 
 		if _, rf := rolesCreated[externalId]; !rf {
@@ -780,7 +792,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 			rolesCreated[externalId] = struct{}{}
 		}
 
-		if !ignoreWho && len(accessProvider.Who.Users) > 0 {
+		if len(accessProvider.Who.Users) > 0 {
 			if isDatabaseRole(accessProvider.Type) {
 				return actualName, fmt.Errorf("error can not assign users to a database role %q", externalId)
 			}
@@ -791,11 +803,9 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 			}
 		}
 
-		if !ignoreInheritance {
-			err = s.grantRolesToRole(ctx, repo, externalId, accessProvider.Type, inheritedRoles...)
-			if err != nil {
-				return actualName, fmt.Errorf("error while assigning roles to role %q: %s", externalId, err.Error())
-			}
+		err = s.grantRolesToRole(ctx, repo, externalId, accessProvider.Type, inheritedRoles...)
+		if err != nil {
+			return actualName, fmt.Errorf("error while assigning roles to role %q: %s", externalId, err.Error())
 		}
 	}
 
@@ -839,49 +849,124 @@ func (s *AccessSyncer) splitRoles(inheritedRoles []string) ([]string, []string) 
 func (s *AccessSyncer) grantRolesToRole(ctx context.Context, repo dataAccessRepository, targetExternalId string, targetApType *string, roles ...string) error {
 	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
 
+	var filteredAccountRoles []string
+
+	for _, accountRole := range toAddAccountRoles {
+		shouldIgnore, err2 := s.shouldIgnoreLinkedRole(accountRole)
+		if err2 != nil {
+			return err2
+		}
+
+		if !shouldIgnore {
+			filteredAccountRoles = append(filteredAccountRoles, accountRole)
+		}
+	}
+
 	if isDatabaseRole(targetApType) {
 		database, parsedRoleName, err := parseDatabaseRoleExternalId(targetExternalId)
 		if err != nil {
 			return err
 		}
 
-		err = repo.GrantDatabaseRolesToDatabaseRole(ctx, database, parsedRoleName, toAddDatabaseRoles...)
+		var filteredDatabaseRoles []string
+
+		for _, dbRole := range toAddDatabaseRoles {
+			toDatabase, toParsedRoleName, err2 := parseDatabaseRoleExternalId(dbRole)
+			if err2 != nil {
+				return err2
+			}
+
+			if database != toDatabase {
+				return fmt.Errorf("database role %q is from a different database than %q", parsedRoleName, toParsedRoleName)
+			}
+
+			shouldIgnore, err2 := s.shouldIgnoreLinkedRole(toParsedRoleName)
+			if err2 != nil {
+				return err2
+			}
+
+			if !shouldIgnore {
+				filteredDatabaseRoles = append(filteredDatabaseRoles, toParsedRoleName)
+			}
+		}
+
+		err = repo.GrantDatabaseRolesToDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
 		if err != nil {
 			return err
 		}
 
-		return repo.GrantAccountRolesToDatabaseRole(ctx, database, parsedRoleName, toAddAccountRoles...)
+		return repo.GrantAccountRolesToDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
 	}
 
 	if len(toAddDatabaseRoles) > 0 {
-		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddAccountRoles)
+		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddDatabaseRoles)
 	}
 
-	return repo.GrantAccountRolesToAccountRole(ctx, targetExternalId, toAddAccountRoles...)
+	return repo.GrantAccountRolesToAccountRole(ctx, targetExternalId, filteredAccountRoles...)
+}
+
+func (s *AccessSyncer) shouldIgnoreLinkedRole(roleName string) (bool, error) {
+	matched, err := match.MatchesAny(roleName, s.ignoreLinksToRole)
+	if err != nil {
+		return false, fmt.Errorf("parsing regular expressions in parameter %q: %s", SfIgnoreLinksToRoles, err.Error())
+	}
+
+	return matched, nil
 }
 
 func (s *AccessSyncer) revokeRolesFromRole(ctx context.Context, repo dataAccessRepository, targetExternalId string, targetApType *string, roles ...string) error {
 	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
 
+	var filteredAccountRoles []string
+
+	for _, accountRole := range toAddAccountRoles {
+		shouldIgnore, err2 := s.shouldIgnoreLinkedRole(accountRole)
+		if err2 != nil {
+			return err2
+		}
+
+		if !shouldIgnore {
+			filteredAccountRoles = append(filteredAccountRoles, accountRole)
+		}
+	}
+
 	if isDatabaseRole(targetApType) {
 		database, parsedRoleName, err := parseDatabaseRoleExternalId(targetExternalId)
 		if err != nil {
 			return err
 		}
 
-		err = repo.RevokeDatabaseRolesFromDatabaseRole(ctx, database, parsedRoleName, toAddDatabaseRoles...)
+		var filteredDatabaseRoles []string
+
+		for _, dbRole := range toAddDatabaseRoles {
+			_, toParsedRoleName, err2 := parseDatabaseRoleExternalId(dbRole)
+			if err2 != nil {
+				return err2
+			}
+
+			shouldIgnore, err2 := s.shouldIgnoreLinkedRole(toParsedRoleName)
+			if err2 != nil {
+				return err2
+			}
+
+			if !shouldIgnore {
+				filteredDatabaseRoles = append(filteredDatabaseRoles, toParsedRoleName)
+			}
+		}
+
+		err = repo.RevokeDatabaseRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
 		if err != nil {
 			return err
 		}
 
-		return repo.RevokeAccountRolesFromDatabaseRole(ctx, database, parsedRoleName, toAddAccountRoles...)
+		return repo.RevokeAccountRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
 	}
 
 	if len(toAddDatabaseRoles) > 0 {
-		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddAccountRoles)
+		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddDatabaseRoles)
 	}
 
-	return repo.RevokeAccountRolesFromAccountRole(ctx, targetExternalId, toAddAccountRoles...)
+	return repo.RevokeAccountRolesFromAccountRole(ctx, targetExternalId, filteredAccountRoles...)
 }
 
 func (s *AccessSyncer) createRole(externalId string, apType *string, repo dataAccessRepository) error {
