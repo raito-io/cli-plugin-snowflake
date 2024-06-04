@@ -126,7 +126,6 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 						Permissions: []string{"SELECT"},
 					},
 				},
-				WhoLocked: ptr.Bool(true),
 			},
 			{
 				Id:          databaseRoleName2,
@@ -151,7 +150,6 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 						Permissions: []string{"SELECT"},
 					},
 				},
-				WhoLocked: ptr.Bool(true),
 			},
 		},
 	}

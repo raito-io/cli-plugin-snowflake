@@ -146,13 +146,11 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 	}
 
 	apDatabaseRole2 := &importer.AccessProvider{
-		Id:         "AccessProviderId5",
-		Name:       "TEST_DB.DatabaseRole2",
-		Type:       ptr.String("databaseRole"),
-		Who:        importer.WhoItem{},
-		What:       []importer.WhatItem{},
-		WhoLocked:  ptr.Bool(true),
-		WhatLocked: ptr.Bool(true),
+		Id:   "AccessProviderId5",
+		Name: "TEST_DB.DatabaseRole2",
+		Type: ptr.String("databaseRole"),
+		Who:  importer.WhoItem{},
+		What: []importer.WhatItem{},
 	}
 
 	access := map[string]*importer.AccessProvider{
@@ -1158,7 +1156,7 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, true, "TEST_DB", "existingDBRole1", "DATABASEROLE###DATABASE:TEST_DB###ROLE:Role1")
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, false, "TEST_DB", "existingDBRole1")
-	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1", "DATABASEROLE###DATABASE:TEST_DB###ROLE:Role3").Return(nil).Once()
+	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1", "Role3").Return(nil).Once()
 	repoMock.EXPECT().RevokeAccountRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1").Return(nil).Once()
 
 	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
@@ -1616,6 +1614,62 @@ func Test_RenameRole(t *testing.T) {
 	}
 }
 
+func TestGrantRolesToRole_DatabaseFiltering(t *testing.T) {
+	repoMock := newMockDataAccessRepository(t)
+	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
+		return repoMock, nil
+	})
+	syncer.ignoreLinksToRole = []string{"My.+"}
+
+	repoMock.EXPECT().GrantDatabaseRolesToDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherDBRole").Return(nil).Once()
+	repoMock.EXPECT().GrantAccountRolesToDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherRole").Return(nil).Once()
+
+	dbRoleType := apTypeDatabaseRole
+	err := syncer.grantRolesToRole(context.Background(), repoMock, databaseRoleExternalIdGenerator("DB1", "TargetRole"), &dbRoleType, "MyRole1", "AnotherRole", databaseRoleExternalIdGenerator("DB1", "MyDBRole"), databaseRoleExternalIdGenerator("DB1", "AnotherDBRole"))
+	assert.NoError(t, err)
+}
+
+func TestGrantRolesToRole_AccountFiltering(t *testing.T) {
+	repoMock := newMockDataAccessRepository(t)
+	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
+		return repoMock, nil
+	})
+	syncer.ignoreLinksToRole = []string{"My.+"}
+
+	repoMock.EXPECT().GrantAccountRolesToAccountRole(mock.Anything, "TargetRole", "AnotherRole").Return(nil).Once()
+
+	err := syncer.grantRolesToRole(context.Background(), repoMock, "TargetRole", nil, "MyRole1", "AnotherRole")
+	assert.NoError(t, err)
+}
+
+func TestRevokeRolesFromRole_DatabaseFiltering(t *testing.T) {
+	repoMock := newMockDataAccessRepository(t)
+	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
+		return repoMock, nil
+	})
+	syncer.ignoreLinksToRole = []string{"My.+"}
+
+	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherDBRole").Return(nil).Once()
+	repoMock.EXPECT().RevokeAccountRolesFromDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherRole").Return(nil).Once()
+
+	dbRoleType := apTypeDatabaseRole
+	err := syncer.revokeRolesFromRole(context.Background(), repoMock, databaseRoleExternalIdGenerator("DB1", "TargetRole"), &dbRoleType, "MyRole1", "AnotherRole", databaseRoleExternalIdGenerator("DB1", "MyDBRole"), databaseRoleExternalIdGenerator("DB1", "AnotherDBRole"))
+	assert.NoError(t, err)
+}
+
+func TestRevokeRolesFromRole_AccountFiltering(t *testing.T) {
+	repoMock := newMockDataAccessRepository(t)
+	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
+		return repoMock, nil
+	})
+	syncer.ignoreLinksToRole = []string{"My.+"}
+
+	repoMock.EXPECT().RevokeAccountRolesFromAccountRole(mock.Anything, "TargetRole", "AnotherRole").Return(nil).Once()
+
+	err := syncer.revokeRolesFromRole(context.Background(), repoMock, "TargetRole", nil, "MyRole1", "AnotherRole")
+	assert.NoError(t, err)
+}
+
 func expectGrantUsersToRole(repoMock *mockDataAccessRepository, roleName string, users ...string) {
 	expectedUsersList := make([]string, 0, len(users))
 	expectedUsersList = append(expectedUsersList, users...)
@@ -1646,11 +1700,18 @@ func expectGrantUsersToRole(repoMock *mockDataAccessRepository, roleName string,
 
 func expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock *mockDataAccessRepository, expectDatabaseRoles bool, database string, roleName string, roles ...string) {
 	expectedRolesList := make([]string, 0, len(roles))
-	expectedRolesList = append(expectedRolesList, roles...)
+
+	for _, expectedRole := range roles {
+		if isDatabaseRoleByExternalId(expectedRole) {
+			_, expectedRole, _ = parseDatabaseRoleExternalId(expectedRole)
+		}
+
+		expectedRolesList = append(expectedRolesList, expectedRole)
+	}
+
 	grantedInheritFromList := make(map[string]struct{})
 
 	expectedAccountRoles := func(accountRole string) bool {
-
 		if _, f := grantedInheritFromList[accountRole]; f {
 			return false
 		}
