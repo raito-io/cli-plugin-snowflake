@@ -509,6 +509,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 	ignoreWho := accessProvider.WhoLocked != nil && *accessProvider.WhoLocked
 	ignoreInheritance := accessProvider.InheritanceLocked != nil && *accessProvider.InheritanceLocked
 	ignoreWhat := accessProvider.WhatLocked != nil && *accessProvider.WhatLocked
+	deleteLocked := accessProvider.DeleteLocked != nil && *accessProvider.DeleteLocked
 
 	logger.Info(fmt.Sprintf("Generating access controls for access provider %q (Ignore who: %t; Ignore inheritance: %t; Ignore what: %t)", accessProvider.Name, ignoreWho, ignoreInheritance, ignoreWhat))
 
@@ -771,8 +772,10 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 
 		logger.Info(fmt.Sprintf("Done updating users granted to role %q", externalId))
 	} else {
-		if ignoreInheritance || ignoreWho || ignoreWhat {
-			return actualName, fmt.Errorf("role %q does not exist but contains locks. Not creating the role as it is probably removed externally. Simply remove it from Raito as well", externalId)
+		// When delete is locked (so this was originally created/managed in the data source), we don't recreate it again if it is deleted on the data source in the meanwhile.
+		if deleteLocked {
+			logger.Warn(fmt.Sprintf("Role %q does not exist but is marked as delete locked. Not creating the role as it is probably removed externally.", externalId))
+			return actualName, nil
 		}
 
 		logger.Info(fmt.Sprintf("Creating role %q", externalId))
