@@ -382,28 +382,27 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 		}
 
 		// get policy definition
-		desribeMaskingPolicyEntities, err := repo.DescribePolicy(policyType, policy.DatabaseName, policy.SchemaName, policy.Name)
-		if err != nil {
-			logger.Error(err.Error())
+		describeMaskingPolicyEntities, err2 := repo.DescribePolicy(policyType, policy.DatabaseName, policy.SchemaName, policy.Name)
+		if err2 != nil {
+			logger.Warn(fmt.Sprintf("Error fetching description for policy %s.%s.%s: %s", policy.DatabaseName, policy.SchemaName, policy.Name, err2.Error()))
 
-			return err
+			continue
 		}
 
-		if len(desribeMaskingPolicyEntities) != 1 {
-			err = fmt.Errorf("found %d definitions for %s policy %s.%s.%s, only expecting one", len(desribeMaskingPolicyEntities), policyType, policy.DatabaseName, policy.SchemaName, policy.Name)
-			logger.Error(err.Error())
+		if len(describeMaskingPolicyEntities) != 1 {
+			logger.Warn(fmt.Sprintf("Found %d definitions for %s policy %s.%s.%s, only expecting one", len(describeMaskingPolicyEntities), policyType, policy.DatabaseName, policy.SchemaName, policy.Name))
 
-			return err
+			continue
 		}
 
-		ap.Policy = desribeMaskingPolicyEntities[0].Body
+		ap.Policy = describeMaskingPolicyEntities[0].Body
 
 		// get policy references
-		policyReferenceEntities, err := repo.GetPolicyReferences(policy.DatabaseName, policy.SchemaName, policy.Name)
-		if err != nil {
-			logger.Error(err.Error())
+		policyReferenceEntities, err2 := repo.GetPolicyReferences(policy.DatabaseName, policy.SchemaName, policy.Name)
+		if err2 != nil {
+			logger.Warn(fmt.Sprintf("Error fetching policy references for %s.%s.%s: %s", policy.DatabaseName, policy.SchemaName, policy.Name, err2.Error()))
 
-			return fmt.Errorf("error fetching %s policy references: %s", policyType, err.Error())
+			continue
 		}
 
 		for ind := range policyReferenceEntities {
@@ -431,9 +430,9 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 			})
 		}
 
-		err = accessProviderHandler.AddAccessProviders(&ap)
-		if err != nil {
-			return fmt.Errorf("error adding access provider to import file: %s", err.Error())
+		err2 = accessProviderHandler.AddAccessProviders(&ap)
+		if err2 != nil {
+			return fmt.Errorf("error adding access provider to import file: %s", err2.Error())
 		}
 	}
 

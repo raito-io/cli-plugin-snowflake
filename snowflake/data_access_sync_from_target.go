@@ -48,7 +48,7 @@ func (s *AccessSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappe
 
 		err = s.transformAccountRoleToAccessProvider(roleEntity, processedAps, linkToExternalIdentityStoreGroups, *tagRetrieval, externalGroupOwners, shares, repo)
 		if err != nil {
-			return err
+			logger.Warn(fmt.Sprintf("Error importing SnowFlake role %q: %s"+roleEntity.Name, err.Error()))
 		}
 	}
 
@@ -202,9 +202,9 @@ func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrapp
 				continue
 			}
 
-			err = s.importAccessForDatabaseRole(database.Name, roleEntity, externalGroupOwners, linkToExternalIdentityStoreGroups, *tagRetrieval, repo, processedAps, shares)
-			if err != nil {
-				return err
+			err2 := s.importAccessForDatabaseRole(database.Name, roleEntity, externalGroupOwners, linkToExternalIdentityStoreGroups, *tagRetrieval, repo, processedAps, shares)
+			if err2 != nil {
+				logger.Warn(fmt.Sprintf("Error importing SnowFlake Database role %q: %s", fullRoleName, err2.Error()))
 			}
 		}
 
