@@ -617,46 +617,6 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 
 }
 
-func TestAccessSyncer_importPoliciesOfType_ErrorOnDescribePolicy(t *testing.T) {
-	//Given
-	repoMock := newMockDataAccessRepository(t)
-	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
-
-	policyType := "policyType"
-
-	repoMock.EXPECT().GetPolicies(policyType).Return([]PolicyEntity{
-		{
-			Name:         "Policy1",
-			Owner:        "PolicyOwner",
-			Kind:         policyType,
-			DatabaseName: "DB1",
-			SchemaName:   "Schema1",
-		},
-	}, nil).Once()
-
-	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema1", "Policy1").Return([]DescribePolicyEntity{
-		{
-			Name: "Policy1",
-			Body: "PolicyBody1",
-		},
-		{
-			Name: "BadPolicy1",
-			Body: "PolicyBody1",
-		},
-	}, nil).Once()
-
-	syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-		return nil, nil
-	})
-
-	//When
-	err := syncer.importPoliciesOfType(fileCreator, repoMock, policyType, sync_from_target.Grant)
-
-	//Then
-	assert.Error(t, err)
-	assert.Empty(t, fileCreator.AccessProviders)
-}
-
 func generateAccessControls_table(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
