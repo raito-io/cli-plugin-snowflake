@@ -746,7 +746,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						},
 					}, nil).Once()
 
-					repoMock.EXPECT().GetTagsByDomain("DATABASE ROLE").Return(map[string][]*tag.Tag{
+					repoMock.EXPECT().GetDatabaseRoleTags("TEST_DB", "DatabaseRole1").Return(map[string][]*tag.Tag{
 						"TEST_DB.DatabaseRole1": {
 							{Key: "a_key", Value: "override_name_2"},
 							{Key: "an_other_key", Value: "...."},
