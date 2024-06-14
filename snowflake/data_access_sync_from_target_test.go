@@ -5,10 +5,8 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/cli/base/access_provider"
-	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_IsNotInternalizableRole(t *testing.T) {
@@ -66,32 +64,17 @@ func Test_IsNotInternalizableRole(t *testing.T) {
 }
 
 func Test_ShouldRetrieveTags(t *testing.T) {
-	type fields struct {
-		setup func(repoMock *mockDataAccessRepository)
-	}
 	type args struct {
 		configMap config.ConfigMap
-		tagDomain string
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    *tagApRetrievalConfig
-		wantErr require.ErrorAssertionFunc
+		name string
+		args args
+		want bool
 	}{
 		{
 			name: "basic",
-			fields: fields{
-				setup: func(repoMock *mockDataAccessRepository) {
-					repoMock.EXPECT().GetTagsByDomain("ROLE").Return(map[string][]*tag.Tag{
-						"Role1": {
-							{Key: "a_key", Value: "override_name"},
-							{Key: "an_other_key", Value: "...."},
-						},
-					}, nil).Once()
-				},
-			},
+
 			args: args{
 				configMap: config.ConfigMap{
 					Parameters: map[string]string{
@@ -99,24 +82,12 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 						SfSkipTags:        "false",
 					},
 				},
-				tagDomain: "ROLE",
 			},
-			want: &tagApRetrievalConfig{
-				enabled: true,
-				availableTags: map[string][]*tag.Tag{
-					"Role1": {
-						{Key: "a_key", Value: "override_name"},
-						{Key: "an_other_key", Value: "...."},
-					},
-				},
-			},
-			wantErr: require.NoError,
+			want: true,
 		},
 		{
 			name: "on SF standard edition",
-			fields: fields{
-				setup: func(repoMock *mockDataAccessRepository) {},
-			},
+
 			args: args{
 				configMap: config.ConfigMap{
 					Parameters: map[string]string{
@@ -124,19 +95,12 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 						SfSkipTags:        "false",
 					},
 				},
-				tagDomain: "ROLE",
 			},
-			want: &tagApRetrievalConfig{
-				enabled:       false,
-				availableTags: map[string][]*tag.Tag{},
-			},
-			wantErr: require.NoError,
+			want: false,
 		},
 		{
 			name: "skip tags enabled",
-			fields: fields{
-				setup: func(repoMock *mockDataAccessRepository) {},
-			},
+
 			args: args{
 				configMap: config.ConfigMap{
 					Parameters: map[string]string{
@@ -144,13 +108,8 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 						SfSkipTags:        "true",
 					},
 				},
-				tagDomain: "ROLE",
 			},
-			want: &tagApRetrievalConfig{
-				enabled:       false,
-				availableTags: map[string][]*tag.Tag{},
-			},
-			wantErr: require.NoError,
+			want: false,
 		},
 	}
 	for _, tt := range tests {
@@ -158,18 +117,15 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 			// Given
 			repoMock := newMockDataAccessRepository(t)
 
-			tt.fields.setup(repoMock)
-
 			syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
 				return repoMock, nil
 			})
 
 			//When
-			retrieveConfig, err := syncer.shouldRetrieveTags(&tt.args.configMap, repoMock, tt.args.tagDomain)
+			shouldRetrieveTags := syncer.shouldRetrieveTags(&tt.args.configMap)
 
 			// Then
-			tt.wantErr(t, err)
-			assert.Equal(t, tt.want, retrieveConfig)
+			assert.Equal(t, tt.want, shouldRetrieveTags)
 		})
 	}
 }

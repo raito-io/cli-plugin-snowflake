@@ -766,6 +766,35 @@ func (repo *SnowflakeRepository) getTags(domain *string, databaseName *string) (
 	return tagMap, nil
 }
 
+func (repo *SnowflakeRepository) GetDatabaseRoleTags(databaseName string, roleName string) (map[string][]*tag.Tag, error) {
+	tagMap := make(map[string][]*tag.Tag)
+
+	rows, _, err := repo.query(fmt.Sprintf(`
+		select column_name, object_database, object_schema, object_name, domain, tag_name, tag_value
+		FROM TABLE(%[1]s.INFORMATION_SCHEMA.TAG_REFERENCES('%[1]s.%[2]s','DATABASE ROLE'));`, databaseName, roleName))
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		tagEntity := TagEntity{}
+
+		err = scanRow(rows, &tagEntity)
+		if err != nil {
+			return nil, err
+		}
+
+		fullName := tagEntity.GetFullName()
+		if fullName != "" {
+			tagMap[fullName] = append(tagMap[fullName], tagEntity.CreateTag())
+		} else {
+			logger.Warn(fmt.Sprintf("skipping tag (%+v) because cannot construct full name", tagEntity))
+		}
+	}
+
+	return tagMap, nil
+}
+
 func (repo *SnowflakeRepository) GetWarehouses() ([]DbEntity, error) {
 	q := "SHOW WAREHOUSES"
 	return repo.getDbEntities(q)
@@ -1008,7 +1037,7 @@ func (repo *SnowflakeRepository) UpdateFilter(databaseName string, schema string
 	}
 
 	q := make([]string, 0, 3)
-	q = append(q, fmt.Sprintf(`CREATE ROW ACCESS POLICY %s.%s.%s AS (%s) returns boolean -> 
+	q = append(q, fmt.Sprintf(`CREATE ROW ACCESS POLICY %s.%s.%s AS (%s) returns boolean ->
 			%s;`, databaseName, schema, filterName, strings.Join(functionArguments, ", "), expression),
 		fmt.Sprintf("ALTER TABLE %[1]s.%[2]s.%[3]s %[4]s ADD ROW ACCESS POLICY %[1]s.%[2]s.%[5]s on (%[6]s);", databaseName, schema, tableName, dropOldPolicy, filterName, strings.Join(argumentNames, ", ")))
 

@@ -108,7 +108,7 @@ func Test_TagEntity_GetFullName(t *testing.T) {
 			name: "domain DATABASE ROLE",
 			args: args{
 				tagEntity: TagEntity{
-					Domain:   "database role",
+					Domain:   "database_role",
 					Database: ptr.String("db1"),
 					Schema:   ptr.String("schema1"),
 					Name:     "resource1",
@@ -117,7 +117,7 @@ func Test_TagEntity_GetFullName(t *testing.T) {
 					TagValue: "value1",
 				},
 			},
-			want: "resource1",
+			want: "db1.resource1",
 		},
 	}
 	for _, tt := range tests {
