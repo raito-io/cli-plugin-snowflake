@@ -1,1 +1,0 @@
-{"query":"update sessions set start_date = '2020-04-20 10:12:15.653', end_date = '2020-04-22 15:40:30.123' where id = 1;","databaseName":"","schemaName":"","expectedOutput":[{"dataObject":{"fullName":"..SESSIONS","type":"table"},"permissions":["UPDATE"]}]}

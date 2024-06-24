@@ -122,6 +122,36 @@ func (entity QueryDbEntities) String() string {
 		entity.ExternalId, entity.Status, entity.Query, entity.DatabaseName.String, entity.SchemaName.String, entity.User, entity.Role, entity.StartTime, entity.EndTime, entity.DirectObjectsAccessed, entity.BaseObjectsAccessed)
 }
 
+type UsageQueryResult struct {
+	ExternalId            string        `db:"QUERY_ID" useColumnName:"true"`
+	Query                 string        `db:"QUERY_TEXT" useColumnName:"true"`
+	DatabaseName          NullString    `db:"DATABASE_NAME" useColumnName:"true"`
+	SchemaName            NullString    `db:"SCHEMA_NAME" useColumnName:"true"`
+	QueryType             string        `db:"QUERY_TYPE" useColumnName:"true"`
+	SessionID             NullString    `db:"SESSION_ID" useColumnName:"true"`
+	User                  string        `db:"USER_NAME" useColumnName:"true"`
+	Role                  NullString    `db:"ROLE_NAME" useColumnName:"true"`
+	Status                string        `db:"EXECUTION_STATUS" useColumnName:"true"`
+	StartTime             string        `db:"START_TIME" useColumnName:"true"`
+	EndTime               string        `db:"END_TIME" useColumnName:"true"`
+	TotalElapsedTime      int64         `db:"TOTAL_ELAPSED_TIME" useColumnName:"true"`
+	BytesScanned          int64         `db:"BYTES_SCANNED" useColumnName:"true"`
+	BytesWritten          int64         `db:"BYTES_WRITTEN" useColumnName:"true"`
+	BytesWrittenToResult  int64         `db:"BYTES_WRITTEN_TO_RESULT" useColumnName:"true"`
+	RowsProduced          sql.NullInt64 `db:"ROWS_PRODUCED" useColumnName:"true"`
+	RowsInserted          int64         `db:"ROWS_INSERTED" useColumnName:"true"`
+	RowsUpdated           int64         `db:"ROWS_UPDATED" useColumnName:"true"`
+	RowsDeleted           int64         `db:"ROWS_DELETED" useColumnName:"true"`
+	RowsUnloaded          int64         `db:"ROWS_UNLOADED" useColumnName:"true"`
+	CloudCreditsUsed      float64       `db:"CREDITS_USED_CLOUD_SERVICES" useColumnName:"true"`
+	DirectObjectsAccessed NullString    `db:"DIRECT_OBJECTS_ACCESSED" useColumnName:"true"`
+	BaseObjectsAccessed   NullString    `db:"BASE_OBJECTS_ACCESSED" useColumnName:"true"`
+	ObjectsModified       NullString    `db:"OBJECTS_MODIFIED" useColumnName:"true"`
+	ObjectsModifiedByDdl  NullString    `db:"OBJECTS_MODIFIED_BY_DDL" useColumnName:"true"`
+	ParentQueryID         NullString    `db:"PARENT_QUERY_ID" useColumnName:"true"`
+	RootQueryID           NullString    `db:"ROOT_QUERY_ID" useColumnName:"true"`
+}
+
 // Data Access
 type RoleEntity struct {
 	Name            string `db:"name"`
