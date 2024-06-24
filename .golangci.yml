@@ -24,7 +24,8 @@ linters-settings:
       - paramTypeCombine
 
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
 
   revive:
     rules:
@@ -43,7 +44,6 @@ linters-settings:
   gosec:
     excludes:
       - G404 # To be checked: Insecure random number source (rand)
-      - G602
 
   stylecheck:
     checks: [ "all", "-ST1003"] # ST1003: No underscores in package names should be fixed and removed?
@@ -60,6 +60,27 @@ linters-settings:
     skip-tests: true
     package-average: 0.0
 
+  errorlint:
+    errorf: true
+    errorf-multi: true
+    asserts: true
+    comparison: true
+
+  exhaustive:
+    default-signifies-exhaustive: true
+
+  wrapcheck:
+    ignoreSigs:
+      - .Errorf(
+      - errors.New(
+      - errors.Unwrap(
+      - .Wrap(
+      - .Wrapf(
+      - .WithMessage(
+      - .WithMessagef(
+      - .WithStack(
+      - go-multierror.Append(
+
 linters:
   disable-all: true
   enable:
@@ -72,6 +93,7 @@ linters:
     - dupword
     - durationcheck
     - errcheck
+    - errorlint
     - exportloopref
     - exhaustive
     - forbidigo
@@ -86,6 +108,7 @@ linters:
     - govet
     - ineffassign
     - misspell
+    - nilerr
     - nolintlint
     - nakedret
     - prealloc
@@ -100,7 +123,6 @@ linters:
     - unparam
     - unused
     - whitespace
-    # - wrapcheck # 3th party errors should be wrapped to not lose context
     - wsl
 
 run:
@@ -110,7 +132,6 @@ run:
 output:
   path-prefix: ""
   sort-results: true
-  format: tab
   print-issued-lines: false
   print-linter-name: true
   uniq-by-line: false
