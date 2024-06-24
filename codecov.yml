@@ -1,0 +1,4 @@
+ignore:
+  - "**/*_enumer.go"
+  - "**/mock_*.go"
+  - ".infra/**"
