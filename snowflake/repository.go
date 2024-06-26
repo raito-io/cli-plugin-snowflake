@@ -16,6 +16,7 @@ import (
 	sf "github.com/snowflakedb/gosnowflake"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
+	"github.com/raito-io/cli-plugin-snowflake/common/stream"
 )
 
 var IgnoreDatabaseRolesForDatabases = []string{"SNOWFLAKE"}
@@ -81,33 +82,73 @@ func (repo *SnowflakeRepository) isProtectedRoleName(rn string) bool {
 	return !strings.EqualFold(repo.role, "ACCOUNTADMIN") && strings.EqualFold(repo.role, rn)
 }
 
-func (repo *SnowflakeRepository) BatchingInformation(startDate *time.Time, historyTable string) (*string, *string, int, error) {
-	filterClause := fmt.Sprintf("WHERE start_time > '%s'", startDate.Format(time.RFC3339))
-	fetchBatchingInfoQuery := fmt.Sprintf("SELECT min(START_TIME) as minTime, max(START_TIME) as maxTime, COUNT(START_TIME) as numRows FROM %s %s", historyTable, filterClause)
+func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time) <-chan stream.MaybeError[UsageQueryResult] {
+	outputChannel := make(chan stream.MaybeError[UsageQueryResult])
 
-	batchingInfoResult, _, err := repo.query(fetchBatchingInfoQuery)
-	if err != nil {
-		return nil, nil, 0, err
-	}
+	go func() {
+		defer close(outputChannel)
 
-	var minTime *string
-	var maxTime *string
-	numRows := 0
+		sendError := func(err error) {
+			select {
+			case <-ctx.Done():
+				return
+			case outputChannel <- stream.NewMaybeErrorError[UsageQueryResult](err):
+				return
+			}
+		}
 
-	for batchingInfoResult.Next() {
-		err := batchingInfoResult.Scan(&minTime, &maxTime, &numRows)
+		sendObject := func(obj UsageQueryResult) {
+			select {
+			case <-ctx.Done():
+				return
+			case outputChannel <- stream.NewMaybeErrorValue[UsageQueryResult](obj):
+				return
+			}
+		}
+
+		arguments := make([]any, 0, 2)
+		arguments = append(arguments, minTime)
+
+		endTime := ""
+
+		if maxTime != nil {
+			endTime = "AND START_TIME <= ?"
+
+			arguments = append(arguments, *maxTime)
+		}
+
+		query := fmt.Sprintf(`SELECT QUERY_HISTORY.QUERY_ID as QUERY_ID, QUERY_HISTORY.QUERY_TEXT as QUERY_TEXT, DATABASE_NAME, SCHEMA_NAME, QUERY_TYPE, SESSION_ID, QUERY_HISTORY.USER_NAME as USER_NAME, ROLE_NAME, EXECUTION_STATUS, START_TIME, END_TIME, TOTAL_ELAPSED_TIME, BYTES_SCANNED, BYTES_WRITTEN, BYTES_WRITTEN_TO_RESULT, ROWS_PRODUCED, ROWS_INSERTED, ROWS_UPDATED, ROWS_DELETED, ROWS_UNLOADED, CREDITS_USED_CLOUD_SERVICES, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED, OBJECT_MODIFIED_BY_DDL, PARENT_QUERY_ID, ROOT_QUERY_ID
+FROM "SNOWFLAKE"."ACCOUNT_USAGE"."QUERY_HISTORY" INNER JOIN "SNOWFLAKE"."ACCOUNT_USAGE"."ACCESS_HISTORY" ON QUERY_HISTORY.QUERY_ID = ACCESS_HISTORY.QUERY_ID
+WHERE START_TIME >= ? %s
+ORDER BY QUERY_HISTORY.START_TIME DESC`, endTime)
+
+		rows, sec, err := repo.queryContext(ctx, query, arguments...)
 		if err != nil {
-			return nil, nil, 0, err
+			sendError(err)
+			return
 		}
 
-		if numRows == 0 || minTime == nil || maxTime == nil {
-			errorMessage := fmt.Sprintf("no usage information available with query: %s => result: numRows: %d, minTime: %v, maxtime: %v",
-				fetchBatchingInfoQuery, numRows, minTime, maxTime)
-			return nil, nil, 0, fmt.Errorf("%s", errorMessage)
-		}
-	}
+		defer rows.Close()
 
-	return minTime, maxTime, numRows, nil
+		i := 0
+
+		for rows.Next() {
+			var result UsageQueryResult
+
+			err = rows.Scan(&result.ExternalId, &result.Query, &result.DatabaseName, &result.SchemaName, &result.QueryType, &result.SessionID, &result.User, &result.Role, &result.Status, &result.StartTime, &result.EndTime, &result.TotalElapsedTime, &result.BytesScanned, &result.BytesWritten, &result.BytesWrittenToResult, &result.RowsProduced, &result.RowsInserted, &result.RowsUpdated, &result.RowsDeleted, &result.RowsUnloaded, &result.CloudCreditsUsed, &result.DirectObjectsAccessed, &result.BaseObjectsAccessed, &result.ObjectsModified, &result.ObjectsModifiedByDdl, &result.ParentQueryID, &result.RootQueryID)
+			if err != nil {
+				sendError(fmt.Errorf("error while scanning row: %w", err))
+			}
+
+			sendObject(result)
+
+			i += 1
+		}
+
+		logger.Info(fmt.Sprintf("Fetched %d rows from Snowflake in %s", i, sec))
+	}()
+
+	return outputChannel
 }
 
 func (repo *SnowflakeRepository) DataUsage(columns []string, limit int, offset int, historyTable string, minTime, maxTime *string, accessHistoryAvailable bool) ([]QueryDbEntities, error) {
@@ -141,27 +182,6 @@ func (repo *SnowflakeRepository) DataUsage(columns []string, limit int, offset i
 	logger.Info(fmt.Sprintf("Fetched %d rows from Snowflake in %s", len(returnedRows), sec))
 
 	return returnedRows, nil
-}
-
-func (repo *SnowflakeRepository) CheckAccessHistoryAvailability(historyTable string) (bool, error) {
-	checkAccessHistoryAvailabilityQuery := fmt.Sprintf("SELECT QUERY_ID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM %s LIMIT 10", historyTable)
-
-	result, _, err := repo.query(checkAccessHistoryAvailabilityQuery)
-	if err != nil {
-		return false, err
-	}
-
-	numRows := 0
-	for result.Next() {
-		numRows++
-	}
-
-	if numRows > 0 {
-		logger.Debug(fmt.Sprintf("Access history query returned %d rows", numRows))
-		return true, nil
-	}
-
-	return false, nil
 }
 
 func (repo *SnowflakeRepository) GetAccountRoles() ([]RoleEntity, error) {
@@ -1116,6 +1136,18 @@ func (repo *SnowflakeRepository) getDbEntities(query string) ([]DbEntity, error)
 	}
 
 	return dbs, nil
+}
+
+func (repo *SnowflakeRepository) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, time.Duration, error) {
+	logger.Debug(fmt.Sprintf("Sending query: %s", query))
+	startQuery := time.Now()
+	result, err := repo.conn.QueryContext(ctx, query, args...)
+	sec := time.Since(startQuery).Round(time.Millisecond)
+	repo.queryTime += sec
+
+	logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
+
+	return result, sec, err
 }
 
 func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, error) {

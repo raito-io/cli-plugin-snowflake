@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	gonanoid "github.com/matoous/go-nanoid/v2"
@@ -35,80 +34,6 @@ func TestRepositoryTestSuite(t *testing.T) {
 
 	ts.repo = repo
 	suite.Run(t, &ts)
-}
-
-func (s *RepositoryTestSuite) TestSnowflakeRepository_BatchingInformation() {
-	//given
-	queryHistoryTable := "SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY"
-	startDate := time.Now().Truncate(24*time.Hour).AddDate(0, 0, -14)
-
-	//When
-	minTimeStr, maxTimeStr, numRows, err := s.repo.BatchingInformation(&startDate, queryHistoryTable)
-
-	//Then
-	s.NoError(err)
-	s.True(numRows > 0)
-	s.NotNil(minTimeStr)
-	s.NotNil(maxTimeStr)
-
-	minTime, err := time.Parse(time.RFC3339, *minTimeStr)
-	s.NoError(err)
-	s.True(startDate.Before(minTime))
-	s.True(minTime.Before(time.Now()))
-
-	maxTime, err := time.Parse(time.RFC3339, *maxTimeStr)
-	s.NoError(err)
-	s.True(startDate.Before(minTime))
-	s.True(minTime.Before(maxTime))
-	s.True(maxTime.Before(time.Now()))
-}
-
-func (s *RepositoryTestSuite) TestSnowflakeRepository_DataUsage() {
-	//given
-	queryHistoryTable := "SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY"
-	startDate := time.Now().Truncate(24*time.Hour).AddDate(0, 0, -14)
-	minTimeStr, maxTimeStr, _, err := s.repo.BatchingInformation(&startDate, queryHistoryTable)
-
-	columns := []string{"QUERY_ID", "EXECUTION_STATUS", "QUERY_TEXT", "START_TIME"}
-	limit := 10
-	offset := 5
-
-	//When
-	entities, err := s.repo.DataUsage(columns, limit, offset, queryHistoryTable, minTimeStr, maxTimeStr, true)
-
-	//Then
-	s.NoError(err)
-	s.Len(entities, 10)
-}
-
-func (s *RepositoryTestSuite) TestSnowflakeRepository_DataUsage_NoHistoryTable() {
-	//given
-	queryHistoryTable := "SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY"
-	startDate := time.Now().Truncate(24*time.Hour).AddDate(0, 0, -14)
-	minTimeStr, maxTimeStr, _, err := s.repo.BatchingInformation(&startDate, queryHistoryTable)
-
-	columns := snowflake.GetQueryDbEntitiesColumnNames("db", "useColumnName")
-	limit := 10
-	offset := 5
-
-	//When
-	entities, err := s.repo.DataUsage(columns, limit, offset, queryHistoryTable, minTimeStr, maxTimeStr, false)
-
-	//Then
-	s.NoError(err)
-	s.Len(entities, 10)
-}
-
-func (s *RepositoryTestSuite) TestSnowflakeRepository_CheckAccessHistoryAvailability() {
-	//given
-	queryHistoryTable := "SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY"
-
-	//When
-	result, err := s.repo.CheckAccessHistoryAvailability(queryHistoryTable)
-
-	//Then
-	s.NoError(err)
-	s.True(result)
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetAccountRoles() {

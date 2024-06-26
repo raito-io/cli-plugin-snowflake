@@ -2,8 +2,11 @@ package snowflake
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,15 +15,16 @@ import (
 	"github.com/raito-io/cli/base/wrappers"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
+	"github.com/raito-io/cli-plugin-snowflake/common/stream"
 )
+
+const snowflakeTimeFormat = "2006-01-02T15:04:05.999999-07:00"
 
 //go:generate go run github.com/vektra/mockery/v2 --name=dataUsageRepository --with-expecter --inpackage
 type dataUsageRepository interface {
 	Close() error
 	TotalQueryTime() time.Duration
-	BatchingInformation(startDate *time.Time, historyTable string) (*string, *string, int, error)
-	DataUsage(columns []string, limit int, offset int, historyTable string, minTime, maxTime *string, accessHistoryAvailable bool) ([]QueryDbEntities, error)
-	CheckAccessHistoryAvailability(historyTable string) (bool, error)
+	GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time) <-chan stream.MaybeError[UsageQueryResult]
 }
 
 type DataUsageSyncer struct {
@@ -36,6 +40,10 @@ func newDataUsageSnowflakeRepo(params map[string]string, role string) (dataUsage
 }
 
 func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrappers.DataUsageStatementHandler, configParams *config.ConfigMap) error {
+	if configParams.GetBoolWithDefault(SfStandardEdition, false) {
+		return errors.New("data usage is not supported in standard edition. Please upgrade to enterprise edition or skip usage sync")
+	}
+
 	repo, err := s.repoProvider(configParams.Parameters, "")
 	if err != nil {
 		return err
@@ -45,9 +53,6 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
 		repo.Close()
 	}()
-
-	const numRowsPerBatch = 10000
-	queryHistoryTable := "SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY"
 
 	numberOfDays := configParams.GetIntWithDefault(SfDataUsageWindow, 90)
 	if numberOfDays > 90 {
@@ -77,104 +82,173 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 
 	logger.Info(fmt.Sprintf("using start date %s", startDate.Format(time.RFC3339)))
 
-	minTime, maxTime, numRows, err := repo.BatchingInformation(&startDate, queryHistoryTable)
-	if err != nil {
-		return err
-	}
+	queryCtx, cancelCtx := context.WithCancel(ctx)
+	defer cancelCtx()
 
-	logger.Info(fmt.Sprintf("Batch information result; min time: %s, max time: %s, num rows: %d", *minTime, *maxTime, numRows))
+	usageStatementSqlRows := repo.GetDataUsage(queryCtx, startDate, nil)
 
-	columns := GetQueryDbEntitiesColumnNames("db", "useColumnName")
+	for usageStatement := range usageStatementSqlRows {
+		if usageStatement.HasError() {
+			return fmt.Errorf("get usage information: %w", usageStatement.Error())
+		}
 
-	currentBatch := 0
+		statement := usageQueryResultToStatement(usageStatement.ValueIfNoError())
 
-	accessHistoryAvailable, err := repo.CheckAccessHistoryAvailability("SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY")
-	if err != nil {
-		logger.Warn(fmt.Sprintf("Error accessing access history table: %s", err.Error()))
-	}
-
-	for currentBatch*numRowsPerBatch < numRows {
-		returnedRows, err := repo.DataUsage(columns, numRowsPerBatch, currentBatch*numRowsPerBatch, queryHistoryTable, minTime, maxTime, accessHistoryAvailable)
+		err = fileCreator.AddStatements([]du.Statement{statement})
 		if err != nil {
-			return err
+			return fmt.Errorf("add statement to file: %w", err)
 		}
-
-		timeFormat := "2006-01-02T15:04:05.999999-07:00"
-		executedStatements := make([]du.Statement, 0, 20)
-
-		unparsableQueries := map[string]interface{}{}
-
-		for ind := range returnedRows {
-			returnedRow := returnedRows[ind]
-			startTime, e := time.Parse(timeFormat, returnedRow.StartTime)
-
-			if e != nil {
-				logger.Warn(fmt.Sprintf("Error parsing start time of '%s', expected format is: '%s'", returnedRow.StartTime, timeFormat))
-			}
-			endTime, e := time.Parse(timeFormat, returnedRow.EndTime)
-
-			if e != nil {
-				logger.Warn(fmt.Sprintf("Error parsing end time of '%s', expected format is: '%s'", returnedRow.StartTime, timeFormat))
-			}
-
-			databaseName := ""
-			if returnedRow.DatabaseName.Valid {
-				databaseName = returnedRow.DatabaseName.String
-			}
-			schemaName := ""
-
-			if returnedRow.SchemaName.Valid {
-				schemaName = returnedRow.SchemaName.String
-			}
-
-			accessedDataObjects, localErr := common.ParseSnowflakeInformation(returnedRow.Query, databaseName, schemaName,
-				returnedRow.BaseObjectsAccessed, returnedRow.DirectObjectsAccessed, returnedRow.ObjectsModified)
-
-			emptyDu := du.Statement{
-				StartTime: 0,
-				Query:     returnedRow.Query,
-			}
-			if localErr != nil || len(accessedDataObjects) == 0 || accessedDataObjects[0].DataObject == nil {
-				if _, found := unparsableQueries[emptyDu.Query]; !found {
-					executedStatements = append(executedStatements, emptyDu)
-					unparsableQueries[emptyDu.Query] = true
-				}
-			} else {
-				roleName := ""
-				if returnedRow.Role.Valid {
-					roleName = returnedRow.Role.String
-				}
-				du := du.Statement{
-					ExternalId:          returnedRow.ExternalId,
-					AccessedDataObjects: accessedDataObjects,
-					Success:             returnedRow.Status == "SUCCESS",
-					Status:              returnedRow.Status,
-					User:                returnedRow.User,
-					Role:                roleName,
-					StartTime:           startTime.Unix(),
-					EndTime:             endTime.Unix(),
-					Bytes:               returnedRow.BytesTranferred,
-					Rows:                returnedRow.RowsReturned,
-					Credits:             returnedRow.CloudCreditsUsed,
-				}
-				executedStatements = append(executedStatements, du)
-			}
-		}
-
-		logger.Debug(fmt.Sprintf("Writing data usage export log to file for batch %d", currentBatch))
-
-		err = fileCreator.AddStatements(executedStatements)
-
-		if err != nil {
-			return err
-		}
-
-		logger.Info(fmt.Sprintf("Written %d statements to file for batch %d", len(executedStatements), currentBatch))
-
-		currentBatch++
 	}
 
 	return nil
+}
+
+func stringWithDefault(value NullString) string {
+	if value.Valid {
+		return value.String
+	}
+
+	return ""
+}
+
+func usageQueryResultToStatement(input *UsageQueryResult) (statement du.Statement) {
+	var objects []du.UsageDataObjectItem
+
+	statement.ExternalId = input.ExternalId
+	statement.User = input.User
+	statement.Role = stringWithDefault(input.Role)
+	statement.Success = input.Status == "SUCCESS"
+	statement.Status = input.Status
+	statement.Query = input.Query
+	statement.Bytes = int(input.BytesWrittenToResult)
+	statement.Credits = float32(input.CloudCreditsUsed)
+
+	if input.RowsProduced.Valid {
+		statement.Rows = int(input.RowsProduced.Int64)
+	}
+
+	startTime, e := time.Parse(snowflakeTimeFormat, input.StartTime)
+
+	if e != nil {
+		logger.Warn(fmt.Sprintf("Error parsing start time of '%s', expected format is: '%s'", input.StartTime, snowflakeTimeFormat))
+	}
+	endTime, e := time.Parse(snowflakeTimeFormat, input.EndTime)
+
+	if e != nil {
+		logger.Warn(fmt.Sprintf("Error parsing end time of '%s', expected format is: '%s'", input.EndTime, snowflakeTimeFormat))
+	}
+
+	statement.StartTime = startTime.Unix()
+	statement.EndTime = endTime.Unix()
+
+	objects, err := parseAccessedObjects(&input.DirectObjectsAccessed, objects, du.Read)
+	if err != nil {
+		statement.Error = fmt.Sprintf("parse direct objects accessed: %s", err.Error())
+
+		return statement
+	}
+
+	// We maybe should handle this differently in a later stage
+	objects, err = parseAccessedObjects(&input.BaseObjectsAccessed, objects, du.Read)
+	if err != nil {
+		statement.Error = fmt.Sprintf("parse base objects accessed: %s", err.Error())
+
+		return statement
+	}
+
+	objects, err = parseAccessedObjects(&input.ObjectsModified, objects, du.Write)
+	if err != nil {
+		statement.Error = fmt.Sprintf("parse objects modified: %s", err.Error())
+
+		return statement
+	}
+
+	objects, err = parseDdlModifiedObject(&input.ObjectsModifiedByDdl, objects)
+	if err != nil {
+		statement.Error = fmt.Sprintf("parse ddl modified object: %s", err.Error())
+
+		return statement
+	}
+
+	statement.AccessedDataObjects = objects
+
+	return statement
+}
+
+var typeParentMap = map[string]string{
+	"table":    "schema",
+	"schema":   "database",
+	"database": "account",
+	"view":     "schema",
+}
+
+func parseDdlModifiedObject(objectString *NullString, objects []du.UsageDataObjectItem) ([]du.UsageDataObjectItem, error) {
+	if !objectString.Valid {
+		return objects, nil
+	}
+
+	var modifiedObject common.SnowflakeModifiedObjectsByDdl
+
+	err := json.Unmarshal([]byte(objectString.String), &modifiedObject)
+	if err != nil {
+		return objects, fmt.Errorf("unmarshal: %w", err)
+	}
+
+	fullName := modifiedObject.ObjectName
+	objectType := strings.ToLower(modifiedObject.ObjectDomain)
+
+	if modifiedObject.OperationType == common.ModifiedObjectByDdlOperationTypeCreate || modifiedObject.OperationType == common.ModifiedObjectByDdlOperationTypeDrop {
+		newObjectType, found := typeParentMap[objectType]
+		if !found {
+			logger.Warn(fmt.Sprintf("Unknown object type '%s' for object '%s'", objectType, fullName))
+		} else {
+			objectType = newObjectType
+
+			nameParts := strings.Split(fullName, ".")
+			fullName = strings.Join(nameParts[:len(nameParts)-1], ".")
+		}
+	}
+
+	objects = append(objects, du.UsageDataObjectItem{
+		DataObject: du.UsageDataObjectReference{
+			FullName: fullName,
+			Type:     objectType,
+		},
+		GlobalPermission: du.Admin,
+	})
+
+	return objects, nil
+}
+
+var versionPostFix = regexp.MustCompile(`\$V\d+$`) // Fullname version postfix (e.g. SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY$V1)
+
+func parseAccessedObjects(objectString *NullString, objects []du.UsageDataObjectItem, permission du.ActionType) ([]du.UsageDataObjectItem, error) {
+	if !objectString.Valid {
+		return objects, nil
+	}
+
+	var snowflakeObjects []common.SnowflakeAccessedObjects
+
+	err := json.Unmarshal([]byte(objectString.String), &snowflakeObjects)
+	if err != nil {
+		return objects, err
+	}
+
+	for _, object := range snowflakeObjects {
+		fullName := object.Name
+
+		fullName = versionPostFix.ReplaceAllString(fullName, "")
+
+		objects = append(objects, du.UsageDataObjectItem{
+			DataObject: du.UsageDataObjectReference{
+				FullName: fullName,
+				Type:     strings.ToLower(object.Domain),
+			},
+			GlobalPermission: permission,
+		})
+	}
+
+	return objects, nil
 }
 
 func GetQueryDbEntitiesColumnNames(tag string, includeTag string) []string {

@@ -16,8 +16,7 @@ lint:
 	go fmt ./...
 
 test:
-	$(gotestsum) --debug --format testname -- -mod=readonly -tags=integration -race -coverpkg=./... -covermode=atomic -coverprofile=coverage.out.tmp ./...
-	cat coverage.out.tmp | grep -v "/mock_" > coverage.txt #IGNORE MOCKS
+	$(gotestsum) --debug --format testname -- -mod=readonly -tags=integration -race -coverpkg=./... -covermode=atomic -coverprofile=coverage.txt ./...
 	go tool cover -html=coverage.txt -o coverage.html
 
 gen-test-infra:

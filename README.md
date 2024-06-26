@@ -101,13 +101,13 @@ The following configuration parameters are available
 
 ## Supported features
 
-| Feature             | Supported | Remarks                                                                                                 |
-|---------------------|-----------|---------------------------------------------------------------------------------------------------------|
-| Row level filtering | ✅         | Only supported for enterprise editions                                                                  |
-| Column masking      | ✅         | Only supported for enterprise editions                                                                  |
-| Locking             | ✅         | Support for both who and what lock                                                                      |
-| Replay              | ✅         | Explicit deletes cannot be replayed                                                                     |
-| Usage               | ✅         | Usage permissions will be associated in best effort. Mistakes with permissions in subqueries can occur. |
+| Feature             | Supported | Remarks                                                                                                                                                                                                                                                                |
+|---------------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Row level filtering | ✅         | Only supported for enterprise editions                                                                                                                                                                                                                                 |
+| Column masking      | ✅         | Only supported for enterprise editions                                                                                                                                                                                                                                 |
+| Locking             | ✅         | Support for both who and what lock                                                                                                                                                                                                                                     |
+| Replay              | ✅         | Explicit deletes cannot be replayed                                                                                                                                                                                                                                    |
+| Usage               | ✅         | Only supported for enterprise editions. Usage will be processed based on [QUERY_HISTORY](https://docs.snowflake.com/en/sql-reference/account-usage/query_history) and [ACCESS_HISTORY](https://docs.snowflake.com/en/sql-reference/account-usage/access_history) view. |
 
 ## Supported data objects
 - Account (is represented as Raito DataSource)
@@ -164,3 +164,16 @@ Within each schema a masking policy function is created for each required data t
 
 #### Filters
 Each filter will be exported as row access policy to exactly one table.
+
+## Usage
+The Raito Snowflake plugin retrieves usage data from the Snowflake system views:
+- `QUERY_HISTORY`: This view contains historical data on queries executed within the Snowflake account.
+- `ACCESS_HISTORY`: This view contains historical data on Snowflake object access events.
+
+The plugin extracts relevant usage information from these views based on specific columns:
+- `direct_objects_accessed`: This column identifies objects directly accessed through queries (read usage).
+- `base_objects_accessed`: This column identifies objects used in queries (read usage).
+- `objects_modified`: This column identifies objects modified through DML statements (write usage).
+- `object_modified_by_ddl`: This column identifies objects modified through DDL statements (admin usage).
+
+Note: The maximum timeframe for retrieved usage data is configurable through the `sf-data-usage-window` parameter in the configuration file. The default value is 90 days.
