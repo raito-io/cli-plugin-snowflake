@@ -61,7 +61,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
 						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
 						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
-						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
 						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
 						{GrantedOn: "MATERIALIZED_VIEW", Name: "DB1.GranteeRole1MatView", Privilege: "SELECT"},
 					}, nil).Once()
@@ -124,7 +123,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 								FullName: "Share2.GranteeRole1Schema",
 								Type:     "",
 							},
-							Permissions: []string{"READ"},
+							Permissions: []string{"USAGE", "READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
@@ -233,7 +232,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
 						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
 						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
-						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
 						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
 						{GrantedOn: "MATERIALIZED_VIEW", Name: "DB1.GranteeRole1MatView", Privilege: "SELECT"},
 					}, nil).Once()
@@ -255,7 +253,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.DatabaseRole2"},
 					}, nil).Once()
 					repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantToRole{
-						{GrantedOn: "TABLE", Name: "TEST_DB.GranteeRole1Table", Privilege: "USAGE"},
 						{GrantedOn: "TABLE", Name: "TEST_DB.GranteeRole1Table", Privilege: "SELECT"},
 						{GrantedOn: "MATERIALIZED_VIEW", Name: "TEST_DB.GranteeRole1MatView", Privilege: "SELECT"},
 					}, nil).Once()
@@ -316,7 +313,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 								FullName: "Share2.GranteeRole1Schema",
 								Type:     "",
 							},
-							Permissions: []string{"READ"},
+							Permissions: []string{"USAGE", "READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
@@ -495,7 +492,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
 						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
 						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
-						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
 						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
 					}, nil).Once()
 					repoMock.EXPECT().GetGrantsToAccountRole("Role3").Return([]GrantToRole{
@@ -547,7 +543,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 								FullName: "Share2.GranteeRole1Schema",
 								Type:     "",
 							},
-							Permissions: []string{"READ"},
+							Permissions: []string{"USAGE", "READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
@@ -632,7 +628,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					repoMock.EXPECT().GetGrantsToAccountRole("Role1").Return([]GrantToRole{
 						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "USAGE"},
 						{GrantedOn: "SCHEMA", Name: "Share2.GranteeRole1Schema", Privilege: "READ"},
-						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "USAGE"},
 						{GrantedOn: "TABLE", Name: "DB1.GranteeRole1Table", Privilege: "SELECT"},
 					}, nil).Once()
 					repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{
@@ -683,7 +678,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 								FullName: "Share2.GranteeRole1Schema",
 								Type:     "",
 							},
-							Permissions: []string{"READ"},
+							Permissions: []string{"USAGE", "READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
