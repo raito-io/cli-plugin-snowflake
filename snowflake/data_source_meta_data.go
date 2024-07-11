@@ -241,8 +241,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 					{
 						Permission:        "USAGE",
 						Description:       "Enables using a schema, including returning the schema details in the SHOW SCHEMAS command output. To execute SHOW <objects> commands for objects (tables, views, stages, file formats, sequences, pipes, or functions) in the schema, a role must have at least one privilege granted on the object.",
-						GlobalPermissions: []string{ds.Admin},
-						CannotBeGranted:   true,
+						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
 					{
 						Permission:             "CREATE TABLE",

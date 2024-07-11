@@ -322,23 +322,20 @@ func (s *AccessSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole, 
 			do.Type = "datasource"
 		}
 
-		// We do not import USAGE as this is handled separately in the data access export
-		if !strings.EqualFold("USAGE", grant.Privilege) {
-			if _, f := AcceptedTypes[strings.ToUpper(grant.GrantedOn)]; f {
-				permissions = append(permissions, grant.Privilege)
-			}
+		if _, f := AcceptedTypes[strings.ToUpper(grant.GrantedOn)]; f {
+			permissions = append(permissions, grant.Privilege)
+		}
 
-			databaseName := strings.Split(grant.Name, ".")[0]
-			if slices.Contains(shares, databaseName) {
-				// TODO do we need to do this for all tabular types?
-				if strings.EqualFold(grant.GrantedOn, "TABLE") && !slices.Contains(sharesApplied, databaseName) {
-					whatItems = append(whatItems, exporter.WhatItem{
-						DataObject:  &ds.DataObjectReference{FullName: databaseName, Type: SharedPrefix + ds.Database},
-						Permissions: []string{"IMPORTED PRIVILEGES"},
-					})
+		databaseName := strings.Split(grant.Name, ".")[0]
+		if slices.Contains(shares, databaseName) {
+			// TODO do we need to do this for all tabular types?
+			if strings.EqualFold(grant.GrantedOn, "TABLE") && !slices.Contains(sharesApplied, databaseName) {
+				whatItems = append(whatItems, exporter.WhatItem{
+					DataObject:  &ds.DataObjectReference{FullName: databaseName, Type: SharedPrefix + ds.Database},
+					Permissions: []string{"IMPORTED PRIVILEGES"},
+				})
 
-					sharesApplied = append(sharesApplied, databaseName)
-				}
+				sharesApplied = append(sharesApplied, databaseName)
 			}
 		}
 
