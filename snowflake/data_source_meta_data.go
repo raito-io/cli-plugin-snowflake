@@ -199,7 +199,6 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						Permission:        "USAGE",
 						Description:       "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
 						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
-						CannotBeGranted:   true,
 					},
 					{
 						Permission:             "MODIFY",
