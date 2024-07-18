@@ -648,7 +648,7 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 			continue
 		}
 
-		rows, _, err = repo.query(fmt.Sprintf(`DESCRIBE USER "%s"`, userRow.Name))
+		rows, _, err = repo.query(fmt.Sprintf(`DESCRIBE USER "%s"`, userRow.Name)) //nolint:gocritic
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Unable to fetch user details for %q: %s", userRow.Name, err.Error()))
 			continue
@@ -656,6 +656,7 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 
 		var userDetails []UserDetails
 		err = scan.Rows(&userDetails, rows)
+
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Unable to parse user details for %q: %s", userRow.Name, err.Error()))
 			continue
