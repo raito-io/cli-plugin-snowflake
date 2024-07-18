@@ -9,6 +9,10 @@ import (
 	"github.com/raito-io/cli/base/util/config"
 )
 
+const USAGE = "USAGE"
+const USAGE_ON_DATABASE = "USAGE on DATABASE"
+const USAGE_ON_SCHEMA = "USAGE on SCHEMA"
+
 const apTypeDatabaseRole = "databaseRole"
 const ExternalTable = "external-" + ds.Table
 const MaterializedView = "materialized-" + ds.View
@@ -178,7 +182,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						UsageGlobalPermissions: []string{ds.Admin},
 					},
 					{
-						Permission:        "USAGE",
+						Permission:        USAGE,
 						Description:       "Enables using a virtual warehouse and, as a result, executing queries on the warehouse. If the warehouse is configured to auto-resume when a SQL statement (e.g. query) is submitted to it, the warehouse resumes automatically and executes the statement.",
 						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
@@ -197,7 +201,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 					},
 					{
 						// Defining a USAGE permission specifically for database level as it should not be inherited by the schema level.
-						Permission:        "USAGE on DATABASE",
+						Permission:        USAGE_ON_DATABASE,
 						Description:       "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
 						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
@@ -240,7 +244,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 					},
 					{
 						// Defining a USAGE permission specifically for schema level as we should not inherit it from the database level.
-						Permission:        "USAGE on SCHEMA",
+						Permission:        USAGE_ON_SCHEMA,
 						Description:       "Enables using a schema, including returning the schema details in the SHOW SCHEMAS command output. To execute SHOW <objects> commands for objects (tables, views, stages, file formats, sequences, pipes, or functions) in the schema, a role must have at least one privilege granted on the object.",
 						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
