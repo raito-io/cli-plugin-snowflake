@@ -1284,6 +1284,10 @@ func (s *AccessSyncer) createPermissionGrantsForSchema(repo dataAccessRepository
 
 	// Check if the permission is applicable on the schema itself
 	if _, f := metaData[schemaType][strings.ToUpper(p)]; f {
+		if strings.EqualFold(p, USAGE_ON_SCHEMA) {
+			p = USAGE
+		}
+
 		grants.Add(Grant{p, schemaType, common.FormatQuery(`%s.%s`, database, schema)})
 		matchFound = true
 	} else {
@@ -1314,6 +1318,10 @@ func (s *AccessSyncer) createPermissionGrantsForDatabase(repo dataAccessReposito
 	if _, f := metaData[dbType][strings.ToUpper(p)]; f {
 		matchFound = true
 
+		if strings.EqualFold(p, USAGE_ON_DATABASE) {
+			p = USAGE
+		}
+
 		grants.Add(Grant{p, dbType, database})
 	} else {
 		schemas, err := s.getSchemasForDatabase(repo, database)
@@ -1337,7 +1345,7 @@ func (s *AccessSyncer) createPermissionGrantsForDatabase(repo dataAccessReposito
 			if schemaMatchFound && !isShared {
 				schemaName := schema.Name
 				sfSchemaObject := common.SnowflakeObject{Database: &database, Schema: &schemaName, Table: nil, Column: nil}
-				grants.Add(Grant{"USAGE", ds.Schema, sfSchemaObject.GetFullName(true)})
+				grants.Add(Grant{USAGE, ds.Schema, sfSchemaObject.GetFullName(true)})
 			}
 
 			matchFound = matchFound || schemaMatchFound
@@ -1382,14 +1390,14 @@ func (s *AccessSyncer) createGrantsForDatabase(repo dataAccessRepository, permis
 	// Only generate the USAGE grant if any applicable permissions were applied or any item below
 	if len(grants) > 0 && !isShared {
 		sfDBObject := common.SnowflakeObject{Database: &database, Schema: nil, Table: nil, Column: nil}
-		grants.Add(Grant{"USAGE", ds.Database, sfDBObject.GetFullName(true)})
+		grants.Add(Grant{USAGE, ds.Database, sfDBObject.GetFullName(true)})
 	}
 
 	return nil
 }
 
 func (s *AccessSyncer) createGrantsForWarehouse(permissions []string, warehouse string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) {
-	grants.Add(Grant{"USAGE", "warehouse", common.FormatQuery(`%s`, warehouse)})
+	grants.Add(Grant{USAGE, "warehouse", common.FormatQuery(`%s`, warehouse)})
 
 	for _, p := range permissions {
 		if _, f := metaData["warehouse"][strings.ToUpper(p)]; !f {
@@ -1448,7 +1456,7 @@ func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permiss
 				if databaseMatchFound && !isShare {
 					dsName := database.Name
 					sfDBObject := common.SnowflakeObject{Database: &dsName, Schema: nil, Table: nil, Column: nil}
-					grants.Add(Grant{"USAGE", ds.Database, sfDBObject.GetFullName(true)})
+					grants.Add(Grant{USAGE, ds.Database, sfDBObject.GetFullName(true)})
 				}
 			}
 		}
@@ -1692,6 +1700,10 @@ func groupFiltersByTable(aps map[string]*importer.AccessProvider, feedbackHandle
 }
 
 func verifyGrant(grant Grant, metaData map[string]map[string]struct{}) bool {
+	if grant.Permissions == USAGE && (grant.OnType == ds.Database || grant.OnType == ds.Schema) {
+		return true
+	}
+
 	if tmd, f := metaData[grant.OnType]; f {
 		if _, f2 := tmd[grant.Permissions]; f2 {
 			return true

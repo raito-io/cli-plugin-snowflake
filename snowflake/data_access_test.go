@@ -123,7 +123,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 								FullName: "Share2.GranteeRole1Schema",
 								Type:     "",
 							},
-							Permissions: []string{"USAGE", "READ"},
+							Permissions: []string{"USAGE on SCHEMA", "READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
@@ -313,7 +313,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 								FullName: "Share2.GranteeRole1Schema",
 								Type:     "",
 							},
-							Permissions: []string{"USAGE", "READ"},
+							Permissions: []string{"USAGE on SCHEMA", "READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
@@ -543,7 +543,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 								FullName: "Share2.GranteeRole1Schema",
 								Type:     "",
 							},
-							Permissions: []string{"USAGE", "READ"},
+							Permissions: []string{"USAGE on SCHEMA", "READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
@@ -678,7 +678,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 								FullName: "Share2.GranteeRole1Schema",
 								Type:     "",
 							},
-							Permissions: []string{"USAGE", "READ"},
+							Permissions: []string{"USAGE on SCHEMA", "READ"},
 						},
 						{
 							DataObject: &data_source.DataObjectReference{
