@@ -78,7 +78,7 @@ resource "snowflake_user" "data_engineering" {
   display_name      = "Data Engineer service account"
   password          = random_password.persona_password.result
   default_warehouse = snowflake_warehouse.warehouse.id
-  type = "SERVICE"
+  type              = "SERVICE"
 }
 
 resource "snowflake_user" "scranton_j" {
