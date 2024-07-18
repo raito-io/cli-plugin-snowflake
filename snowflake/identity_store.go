@@ -109,12 +109,18 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 			displayName = userRow.Name
 		}
 
+		isMachine := false
+		if strings.EqualFold(userRow.Type, "SERVICE") || strings.EqualFold(userRow.Type, "LEGACY_SERVICE") {
+			isMachine = true
+		}
+
 		user := is.User{
 			ExternalId: cleanDoubleQuotes(userRow.LoginName),
 			UserName:   cleanDoubleQuotes(userRow.Name),
 			Name:       cleanDoubleQuotes(displayName),
 			Email:      userRow.Email,
 			Tags:       tags,
+			IsMachine:  &isMachine,
 		}
 
 		err = identityHandler.AddUsers(&user)

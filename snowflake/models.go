@@ -94,6 +94,7 @@ type UserEntity struct {
 	DisplayName string `db:"display_name"`
 	Email       string `db:"email"`
 	Owner       string `db:"owner"`
+	Type        string `db:"type"`
 }
 
 // Data Usage

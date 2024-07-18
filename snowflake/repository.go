@@ -642,7 +642,39 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 		return nil, fmt.Errorf("error while fetching users: %s", err.Error())
 	}
 
+	for i := range userRows {
+		userRow := userRows[i]
+		if userRow.Type != "" {
+			continue
+		}
+
+		rows, _, err = repo.query(fmt.Sprintf(`DESCRIBE USER "%s"`, userRow.Name))
+		if err != nil {
+			logger.Warn(fmt.Sprintf("Unable to fetch user details for %q: %s", userRow.Name, err.Error()))
+			continue
+		}
+
+		var userDetails []UserDetails
+		err = scan.Rows(&userDetails, rows)
+		if err != nil {
+			logger.Warn(fmt.Sprintf("Unable to parse user details for %q: %s", userRow.Name, err.Error()))
+			continue
+		}
+
+		for _, detail := range userDetails {
+			if strings.EqualFold(detail.Property, "TYPE") {
+				userRow.Type = detail.Value
+				userRows[i] = userRow
+			}
+		}
+	}
+
 	return userRows, nil
+}
+
+type UserDetails struct {
+	Property string `db:"property"`
+	Value    string `db:"value"`
 }
 
 func (repo *SnowflakeRepository) GetPolicies(policy string) ([]PolicyEntity, error) {
