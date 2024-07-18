@@ -457,11 +457,11 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 	})
 
 	s.Contains(users, snowflake.UserEntity{
-		Name:        "atkison_a",
-		Email:       "a_abbotatkinson7576@raito.io",
+		Name:        "data_engineering",
+		Email:       "data_engineer@raito.io",
 		Owner:       "ACCOUNTADMIN",
-		DisplayName: "Angelica Abbot Atkinson",
-		LoginName:   "ATKISON_A",
+		DisplayName: "Data Engineer service account",
+		LoginName:   "DATA_ENGINEERING",
 		Type:        "SERVICE",
 	})
 }

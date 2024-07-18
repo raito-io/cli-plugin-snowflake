@@ -59,11 +59,12 @@ func (s *IdentityStoreTestSuite) TestIdentityStoreSync() {
 		Tags:             nil,
 		IsMachine:        ptr.Bool(false),
 	})
+
 	s.Contains(identityHandler.Users, identity_store.User{
-		ExternalId:       "ATKISON_A",
-		Name:             "Angelica Abbot Atkinson",
-		UserName:         "atkison_a",
-		Email:            "a_abbotatkinson7576@raito.io",
+		ExternalId:       "DATA_ENGINEERING",
+		Name:             "Data Engineer service account",
+		UserName:         "data_engineering",
+		Email:            "data_engineer@raito.io",
 		GroupExternalIds: nil,
 		Tags:             nil,
 		IsMachine:        ptr.Bool(true),
