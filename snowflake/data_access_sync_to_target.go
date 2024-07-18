@@ -1284,6 +1284,10 @@ func (s *AccessSyncer) createPermissionGrantsForSchema(repo dataAccessRepository
 
 	// Check if the permission is applicable on the schema itself
 	if _, f := metaData[schemaType][strings.ToUpper(p)]; f {
+		if strings.EqualFold(p, "USAGE on SCHEMA") {
+			p = "USAGE"
+		}
+
 		grants.Add(Grant{p, schemaType, common.FormatQuery(`%s.%s`, database, schema)})
 		matchFound = true
 	} else {
@@ -1313,6 +1317,10 @@ func (s *AccessSyncer) createPermissionGrantsForDatabase(repo dataAccessReposito
 
 	if _, f := metaData[dbType][strings.ToUpper(p)]; f {
 		matchFound = true
+
+		if strings.EqualFold(p, "USAGE on DATABASE") {
+			p = "USAGE"
+		}
 
 		grants.Add(Grant{p, dbType, database})
 	} else {
@@ -1692,6 +1700,10 @@ func groupFiltersByTable(aps map[string]*importer.AccessProvider, feedbackHandle
 }
 
 func verifyGrant(grant Grant, metaData map[string]map[string]struct{}) bool {
+	if grant.Permissions == "USAGE" && (grant.OnType == ds.Database || grant.OnType == ds.Schema) {
+		return true
+	}
+
 	if tmd, f := metaData[grant.OnType]; f {
 		if _, f2 := tmd[grant.Permissions]; f2 {
 			return true

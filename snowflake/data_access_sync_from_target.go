@@ -323,7 +323,7 @@ func (s *AccessSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole, 
 		}
 
 		if _, f := AcceptedTypes[strings.ToUpper(grant.GrantedOn)]; f {
-			permissions = append(permissions, grant.Privilege)
+			permissions = append(permissions, mapPrivilege(grant.Privilege, grant.GrantedOn))
 		}
 
 		databaseName := strings.Split(grant.Name, ".")[0]
@@ -348,6 +348,21 @@ func (s *AccessSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole, 
 	}
 
 	return whatItems
+}
+
+// mapPrivilege maps the USAGE privilege to the corresponding one on database or schema.
+// We do this to separate USAGE between database and schema because this is a special case that does not inherit from database to schema.
+func mapPrivilege(privilege string, grantedOn string) string {
+	if strings.EqualFold(privilege, "USAGE") {
+		doType := strings.ToUpper(grantedOn)
+		if strings.Contains(doType, "DATABASE") {
+			return "USAGE on DATABASE"
+		} else if strings.Contains(doType, "SCHEMA") {
+			return "USAGE on SCHEMA"
+		}
+	}
+
+	return privilege
 }
 
 func (s *AccessSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntity, externalId string, apType *string, fromExternalIS bool, linkToExternalIdentityStoreGroups bool, repo dataAccessRepository) (users []string, groups []string, accessProviders []string, err error) {

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/wrappers/mocks"
@@ -39,7 +40,7 @@ func TestDataAccessTestSuite(t *testing.T) {
 
 func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	//Given
-	dataAccessProviderHandler := mocks.NewSimpleAccessProviderHandler(s.T(), 13)
+	dataAccessProviderHandler := mocks.NewSimpleAccessProviderHandler(s.T(), 15)
 	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
 
 	config := s.getConfig()
@@ -70,6 +71,31 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	s.Contains(externalIds, "MARKETING")
 	s.Contains(externalIds, "SALES")
 	s.Contains(externalIds, "DATABASEROLE###DATABASE:RAITO_DATABASE###ROLE:RAITO_DB_ROLE_1")
+
+	for _, ap := range dataAccessProviderHandler.AccessProviders {
+		// Specifically verifying the SALES roles
+		if ap.Name == "SALES" {
+			s.Len(ap.What, 4)
+			s.ElementsMatch(ap.What, []sync_from_target.WhatItem{
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE", Type: ""},
+					Permissions: []string{"USAGE on DATABASE"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE.ORDERING", Type: ""},
+					Permissions: []string{"USAGE on SCHEMA"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE.ORDERING.ORDERS", Type: ""},
+					Permissions: []string{"INSERT", "SELECT"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_WAREHOUSE", Type: ""},
+					Permissions: []string{"OPERATE", "USAGE"},
+				},
+			})
+		}
+	}
 }
 
 func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
@@ -104,6 +130,20 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 							Type:     "table",
 						},
 						Permissions: []string{"SELECT"},
+					},
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: "RAITO_DATABASE",
+							Type:     "database",
+						},
+						Permissions: []string{"USAGE on DATABASE"},
+					},
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: "RAITO_DATABASE.ORDERING",
+							Type:     "schema",
+						},
+						Permissions: []string{"USAGE on SCHEMA"},
 					},
 				},
 			},
@@ -197,6 +237,23 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		GrantedRoles:    0,
 		Owner:           "ACCOUNTADMIN",
 	})
+
+	grants, err := s.sfRepo.GetGrantsToAccountRole(actualRoleName)
+	s.NoError(err)
+	s.Len(grants, 4)
+	dbUsageFound := false
+	schemaUsageFound := false
+
+	for _, grant := range grants {
+		if strings.EqualFold(grant.GrantedOn, "DATABASE") && grant.Name == "RAITO_DATABASE" && grant.Privilege == "USAGE" {
+			dbUsageFound = true
+		} else if strings.EqualFold(grant.GrantedOn, "SCHEMA") && grant.Name == "RAITO_DATABASE.ORDERING" && grant.Privilege == "USAGE" {
+			schemaUsageFound = true
+		}
+	}
+
+	s.True(dbUsageFound)
+	s.True(schemaUsageFound)
 
 	databaseRoles, err := s.sfRepo.GetDatabaseRoles("RAITO_DATABASE")
 	s.NoError(err)

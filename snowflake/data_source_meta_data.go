@@ -196,7 +196,8 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						UsageGlobalPermissions: []string{ds.Admin},
 					},
 					{
-						Permission:        "USAGE",
+						// Defining a USAGE permission specifically for database level as it should not be inherited by the schema level.
+						Permission:        "USAGE on DATABASE",
 						Description:       "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
 						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
@@ -238,7 +239,8 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						UsageGlobalPermissions: []string{ds.Admin},
 					},
 					{
-						Permission:        "USAGE",
+						// Defining a USAGE permission specifically for schema level as we should not inherit it from the database level.
+						Permission:        "USAGE on SCHEMA",
 						Description:       "Enables using a schema, including returning the schema details in the SHOW SCHEMAS command output. To execute SHOW <objects> commands for objects (tables, views, stages, file formats, sequences, pipes, or functions) in the schema, a role must have at least one privilege granted on the object.",
 						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
