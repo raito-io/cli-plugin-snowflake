@@ -109,10 +109,7 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 			displayName = userRow.Name
 		}
 
-		isMachine := false
-		if strings.EqualFold(userRow.Type, "SERVICE") || strings.EqualFold(userRow.Type, "LEGACY_SERVICE") {
-			isMachine = true
-		}
+		isMachine := strings.EqualFold(userRow.Type, "SERVICE") || strings.EqualFold(userRow.Type, "LEGACY_SERVICE")
 
 		user := is.User{
 			ExternalId: cleanDoubleQuotes(userRow.LoginName),
