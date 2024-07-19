@@ -170,7 +170,29 @@ func usageQueryResultToStatement(input *UsageQueryResult) (statement du.Statemen
 		return statement
 	}
 
-	statement.AccessedDataObjects = objects
+	if len(objects) > 0 {
+		statement.AccessedDataObjects = objects
+	} else {
+		// Didn't find any object from ACCESS_HISTORY table, will try to parse query
+		databaseName := ""
+		if input.DatabaseName.Valid {
+			databaseName = input.DatabaseName.String
+		}
+		schemaName := ""
+
+		if input.SchemaName.Valid {
+			schemaName = input.SchemaName.String
+		}
+
+		whatObjects, err2 := common.ExtractInfoFromQuery(input.Query, databaseName, schemaName)
+		if err2 != nil {
+			statement.Error = fmt.Sprintf("parse snowflake query: %s", err2.Error())
+
+			return statement
+		}
+
+		statement.AccessedDataObjects = whatObjects
+	}
 
 	return statement
 }

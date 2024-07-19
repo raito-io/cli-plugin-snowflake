@@ -85,6 +85,12 @@ func (repo *SnowflakeRepository) isProtectedRoleName(rn string) bool {
 func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time) <-chan stream.MaybeError[UsageQueryResult] {
 	outputChannel := make(chan stream.MaybeError[UsageQueryResult])
 
+	notAfter := time.Now().Add(-3 * time.Hour) // 3 hours ago to ensure ACCESS HISTORY table is up to date
+
+	if maxTime == nil || maxTime.After(notAfter) {
+		maxTime = &notAfter
+	}
+
 	go func() {
 		defer close(outputChannel)
 
@@ -118,7 +124,7 @@ func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.
 		}
 
 		query := fmt.Sprintf(`SELECT QUERY_HISTORY.QUERY_ID as QUERY_ID, QUERY_HISTORY.QUERY_TEXT as QUERY_TEXT, DATABASE_NAME, SCHEMA_NAME, QUERY_TYPE, SESSION_ID, QUERY_HISTORY.USER_NAME as USER_NAME, ROLE_NAME, EXECUTION_STATUS, START_TIME, END_TIME, TOTAL_ELAPSED_TIME, BYTES_SCANNED, BYTES_WRITTEN, BYTES_WRITTEN_TO_RESULT, ROWS_PRODUCED, ROWS_INSERTED, ROWS_UPDATED, ROWS_DELETED, ROWS_UNLOADED, CREDITS_USED_CLOUD_SERVICES, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED, OBJECT_MODIFIED_BY_DDL, PARENT_QUERY_ID, ROOT_QUERY_ID
-FROM "SNOWFLAKE"."ACCOUNT_USAGE"."QUERY_HISTORY" INNER JOIN "SNOWFLAKE"."ACCOUNT_USAGE"."ACCESS_HISTORY" ON QUERY_HISTORY.QUERY_ID = ACCESS_HISTORY.QUERY_ID
+FROM "SNOWFLAKE"."ACCOUNT_USAGE"."QUERY_HISTORY" LEFT OUTER JOIN "SNOWFLAKE"."ACCOUNT_USAGE"."ACCESS_HISTORY" ON QUERY_HISTORY.QUERY_ID = ACCESS_HISTORY.QUERY_ID
 WHERE START_TIME >= ? %s
 ORDER BY QUERY_HISTORY.START_TIME DESC`, endTime)
 
