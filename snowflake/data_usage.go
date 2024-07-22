@@ -87,6 +87,12 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 
 	usageStatementSqlRows := repo.GetDataUsage(queryCtx, startDate, nil)
 
+	i := 0
+
+	defer func() {
+		logger.Info(fmt.Sprintf("Processed %d statements", i))
+	}()
+
 	for usageStatement := range usageStatementSqlRows {
 		if usageStatement.HasError() {
 			return fmt.Errorf("get usage information: %w", usageStatement.Error())
@@ -97,6 +103,12 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 		err = fileCreator.AddStatements([]du.Statement{statement})
 		if err != nil {
 			return fmt.Errorf("add statement to file: %w", err)
+		}
+
+		i += 1
+
+		if i%1000 == 0 {
+			logger.Debug(fmt.Sprintf("Processed %d statements", i))
 		}
 	}
 

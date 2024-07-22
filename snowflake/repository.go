@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -106,6 +107,14 @@ func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.
 			}
 		}
 
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error(fmt.Sprintf("Panic data usage processing: %v\n\n%s", r, string(debug.Stack())))
+
+				sendError(fmt.Errorf("panic during data usage processing: %v", r))
+			}
+		}()
+
 		arguments := make([]any, 0, 2)
 		arguments = append(arguments, minTime)
 
@@ -132,6 +141,10 @@ ORDER BY QUERY_HISTORY.START_TIME DESC`, endTime)
 
 		i := 0
 
+		defer func() {
+			logger.Info(fmt.Sprintf("Fetched %d rows from Snowflake in %s", i, sec))
+		}()
+
 		for rows.Next() {
 			var result UsageQueryResult
 
@@ -143,9 +156,11 @@ ORDER BY QUERY_HISTORY.START_TIME DESC`, endTime)
 			sendObject(result)
 
 			i += 1
-		}
 
-		logger.Info(fmt.Sprintf("Fetched %d rows from Snowflake in %s", i, sec))
+			if i%1000 == 0 {
+				logger.Debug(fmt.Sprintf("Fetched %d usage query statements", i))
+			}
+		}
 	}()
 
 	return outputChannel
