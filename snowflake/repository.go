@@ -20,8 +20,6 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/common/stream"
 )
 
-var IgnoreDatabaseRolesForDatabases = []string{"SNOWFLAKE"}
-
 type EntityHandler func(entity interface{}) error
 type EntityCreator func() interface{}
 
@@ -403,10 +401,6 @@ func (repo *SnowflakeRepository) GetDatabaseRoles(database string) ([]RoleEntity
 
 func (repo *SnowflakeRepository) GetDatabaseRolesWithPrefix(database string, prefix string) ([]RoleEntity, error) {
 	var roleEntities []RoleEntity
-
-	if isIgnoredForDatabaseRoles(database) {
-		return roleEntities, nil
-	}
 
 	q := common.FormatQuery(`SHOW DATABASE ROLES IN DATABASE %s`, database)
 
@@ -1388,14 +1382,4 @@ func scanRow(rows *sql.Rows, dest interface{}) error {
 	}
 
 	return rows.Scan(fieldPtrs...)
-}
-
-func isIgnoredForDatabaseRoles(database string) bool {
-	for _, r := range IgnoreDatabaseRolesForDatabases {
-		if strings.EqualFold(r, database) {
-			return true
-		}
-	}
-
-	return false
 }
