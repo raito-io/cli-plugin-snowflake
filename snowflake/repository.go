@@ -82,34 +82,23 @@ func (repo *SnowflakeRepository) isProtectedRoleName(rn string) bool {
 }
 
 func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time) <-chan stream.MaybeError[UsageQueryResult] {
-	outputChannel := make(chan stream.MaybeError[UsageQueryResult])
+	batchSize := 1000
+
+	outputChannel := make(chan stream.MaybeError[UsageQueryResult], batchSize)
 
 	go func() {
 		defer close(outputChannel)
-
-		sendError := func(err error) {
-			select {
-			case <-ctx.Done():
-				return
-			case outputChannel <- stream.NewMaybeErrorError[UsageQueryResult](err):
-				return
-			}
-		}
-
-		sendObject := func(obj UsageQueryResult) {
-			select {
-			case <-ctx.Done():
-				return
-			case outputChannel <- stream.NewMaybeErrorValue[UsageQueryResult](obj):
-				return
-			}
-		}
 
 		defer func() {
 			if r := recover(); r != nil {
 				logger.Error(fmt.Sprintf("Panic data usage processing: %v\n\n%s", r, string(debug.Stack())))
 
-				sendError(fmt.Errorf("panic during data usage processing: %v", r))
+				select {
+				case <-ctx.Done():
+					return
+				case outputChannel <- stream.NewMaybeErrorError[UsageQueryResult](fmt.Errorf("panic during data usage processing: %v", r)):
+					return
+				}
 			}
 		}()
 
@@ -129,34 +118,24 @@ FROM "SNOWFLAKE"."ACCOUNT_USAGE"."QUERY_HISTORY" INNER JOIN "SNOWFLAKE"."ACCOUNT
 WHERE START_TIME >= ? %s
 ORDER BY QUERY_HISTORY.START_TIME DESC`, endTime)
 
-		rows, sec, err := repo.queryContext(ctx, query, arguments...)
-		if err != nil {
-			sendError(err)
-			return
-		}
-
-		defer rows.Close()
-
 		i := 0
 
+		totalDuration := time.Duration(0)
+
 		defer func() {
-			logger.Info(fmt.Sprintf("Fetched %d rows from Snowflake in %s", i, sec))
+			logger.Info(fmt.Sprintf("Fetched %d rows from Snowflake in %s", i, totalDuration))
 		}()
 
-		for rows.Next() {
-			var result UsageQueryResult
+		for {
+			numberOfStatements, duration, nextPage := repo.dataUsageBatch(ctx, outputChannel, batchSize, i, query, arguments...)
 
-			err = rows.Scan(&result.ExternalId, &result.Query, &result.DatabaseName, &result.SchemaName, &result.QueryType, &result.SessionID, &result.User, &result.Role, &result.Status, &result.StartTime, &result.EndTime, &result.TotalElapsedTime, &result.BytesScanned, &result.BytesWritten, &result.BytesWrittenToResult, &result.RowsProduced, &result.RowsInserted, &result.RowsUpdated, &result.RowsDeleted, &result.RowsUnloaded, &result.CloudCreditsUsed, &result.DirectObjectsAccessed, &result.BaseObjectsAccessed, &result.ObjectsModified, &result.ObjectsModifiedByDdl, &result.ParentQueryID, &result.RootQueryID)
-			if err != nil {
-				sendError(fmt.Errorf("error while scanning row: %w", err))
-			}
+			logger.Debug(fmt.Sprintf("Fetched batch of %d rows from Snowflake in %s", numberOfStatements, duration))
 
-			sendObject(result)
+			i += numberOfStatements
+			totalDuration += duration
 
-			i += 1
-
-			if i%1000 == 0 {
-				logger.Debug(fmt.Sprintf("Fetched %d usage query statements", i))
+			if !nextPage {
+				break
 			}
 		}
 	}()
@@ -164,37 +143,58 @@ ORDER BY QUERY_HISTORY.START_TIME DESC`, endTime)
 	return outputChannel
 }
 
-func (repo *SnowflakeRepository) DataUsage(columns []string, limit int, offset int, historyTable string, minTime, maxTime *string, accessHistoryAvailable bool) ([]QueryDbEntities, error) {
-	filterClause := fmt.Sprintf("WHERE START_TIME >= '%s' and START_TIME <= '%s'", *minTime, *maxTime)
-	paginationClause := fmt.Sprintf("LIMIT %d OFFSET %d", limit, offset)
-
-	var query string
-
-	if accessHistoryAvailable {
-		logger.Info("Using access history table in combination with history table")
-		query = fmt.Sprintf(`SELECT %s, QID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM (SELECT %s FROM %s %s) as QUERIES LEFT JOIN (SELECT QUERY_ID as QID, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED FROM SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY) as ACCESS on QUERIES.QUERY_ID = ACCESS.QID ORDER BY START_TIME, QUERIES.QUERY_ID DESC %s`,
-			strings.Join(columns, ", "), strings.Join(columns, ", "), historyTable, filterClause, paginationClause)
-	} else {
-		query = fmt.Sprintf("SELECT %s FROM %s %s ORDER BY START_TIME, QUERY_ID DESC %s", strings.Join(columns, ", "), historyTable, filterClause, paginationClause)
+func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChannel chan<- stream.MaybeError[UsageQueryResult], batchSize int, skip int, query string, args ...interface{}) (int, time.Duration, bool) {
+	sendError := func(err error) {
+		select {
+		case <-ctx.Done():
+			return
+		case outputChannel <- stream.NewMaybeErrorError[UsageQueryResult](err):
+			return
+		}
 	}
 
-	logger.Debug(fmt.Sprintf("Retrieving paginated query log from Snowflake with query: %s", query))
-	rows, sec, err := repo.query(query)
+	sendObject := func(obj UsageQueryResult) bool {
+		select {
+		case <-ctx.Done():
+			return false
+		case outputChannel <- stream.NewMaybeErrorValue[UsageQueryResult](obj):
+			return true
+		}
+	}
 
+	batchQuery := query + " LIMIT ? OFFSET ?"
+	allArgs := args
+	allArgs = append(allArgs, batchSize, skip)
+
+	rows, sec, err := repo.queryContext(ctx, batchQuery, allArgs...)
 	if err != nil {
-		return nil, err
+		sendError(err)
+		return 0, 0, false
 	}
 
-	var returnedRows []QueryDbEntities
-	err = scan.Rows(&returnedRows, rows)
+	defer rows.Close()
 
-	if err != nil {
-		return nil, err
+	i := 0
+
+	for rows.Next() {
+		var result UsageQueryResult
+
+		err = rows.Scan(&result.ExternalId, &result.Query, &result.DatabaseName, &result.SchemaName, &result.QueryType, &result.SessionID, &result.User, &result.Role, &result.Status, &result.StartTime, &result.EndTime, &result.TotalElapsedTime, &result.BytesScanned, &result.BytesWritten, &result.BytesWrittenToResult, &result.RowsProduced, &result.RowsInserted, &result.RowsUpdated, &result.RowsDeleted, &result.RowsUnloaded, &result.CloudCreditsUsed, &result.DirectObjectsAccessed, &result.BaseObjectsAccessed, &result.ObjectsModified, &result.ObjectsModifiedByDdl, &result.ParentQueryID, &result.RootQueryID)
+		if err != nil {
+			sendError(fmt.Errorf("error while scanning row: %w", err))
+
+			return i, sec, false
+		}
+
+		ok := sendObject(result)
+		if !ok {
+			return i, sec, false
+		}
+
+		i += 1
 	}
 
-	logger.Info(fmt.Sprintf("Fetched %d rows from Snowflake in %s", len(returnedRows), sec))
-
-	return returnedRows, nil
+	return i, sec, i == batchSize
 }
 
 func (repo *SnowflakeRepository) GetAccountRoles() ([]RoleEntity, error) {
@@ -1192,7 +1192,7 @@ func (repo *SnowflakeRepository) queryContext(ctx context.Context, query string,
 	return result, sec, err
 }
 
-func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, error) {
+func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, error) { //nolint:unparam
 	logger.Debug(fmt.Sprintf("Sending query: %s", query))
 	startQuery := time.Now()
 	result, err := QuerySnowflake(repo.conn, query)
