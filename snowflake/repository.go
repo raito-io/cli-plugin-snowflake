@@ -165,12 +165,15 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 
 	batchQuery := query
 	allArgs := args
+
 	if mostRecentQueryId != "" {
-		batchQuery = batchQuery + " AND QUERY_HISTORY.QUERY_ID < ?"
+		batchQuery += " AND QUERY_HISTORY.QUERY_ID < ?"
+
 		allArgs = append(allArgs, mostRecentQueryId)
 	}
 
-	batchQuery = batchQuery + " ORDER BY QUERY_HISTORY.QUERY_ID DESC LIMIT ?"
+	batchQuery += " ORDER BY QUERY_HISTORY.QUERY_ID DESC LIMIT ?"
+
 	allArgs = append(allArgs, batchSize)
 
 	rows, sec, err := repo.queryContext(ctx, batchQuery, allArgs...)
