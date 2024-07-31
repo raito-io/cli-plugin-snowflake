@@ -30,7 +30,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	dataSourceSyncer := snowflake.NewDataSourceSyncer()
 
 	config := s.getConfig()
-	config.Parameters[snowflake.SfExcludedDatabases] = "SNOWFLAKE,SNOWFLAKE_SAMPLE_DATA"
+	config.Parameters[snowflake.SfExcludedDatabases] = "SYSTEM,SNOWFLAKE,SNOWFLAKE_SAMPLE_DATA"
 	config.Parameters[snowflake.SfRole] = "ACCOUNTADMIN"
 
 	//When
