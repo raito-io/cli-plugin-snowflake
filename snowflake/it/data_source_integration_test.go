@@ -40,10 +40,10 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	sourceName := strings.ToUpper(strings.Split(sfAccount, ".")[0])
 
 	s.NoError(err)
-	s.Len(dataSourceObjectHandler.DataObjects, 39)
+	s.Len(dataSourceObjectHandler.DataObjects, 40)
 
 	warehouses := getByType(dataSourceObjectHandler.DataObjects, "warehouse")
-	s.Len(warehouses, 1)
+	s.Len(warehouses, 2)
 	s.Contains(warehouses, data_source.DataObject{
 		ExternalId:       snowflakeWarehouse,
 		Name:             snowflakeWarehouse,
