@@ -188,10 +188,12 @@ func usageQueryResultToStatement(input *UsageQueryResult) (statement du.Statemen
 }
 
 var typeParentMap = map[string]string{
-	"table":    "schema",
-	"schema":   "database",
-	"database": "account",
-	"view":     "schema",
+	"table":             "schema",
+	"external table":    "schema",
+	"schema":            "database",
+	"database":          "account",
+	"view":              "schema",
+	"materialized view": "schema",
 }
 
 func parseDdlModifiedObject(objectString *NullString, objects []du.UsageDataObjectItem) ([]du.UsageDataObjectItem, error) {
