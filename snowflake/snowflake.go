@@ -21,6 +21,7 @@ func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string,
 
 	sfPassword, foundPassword := params[SfPassword]
 	sfPrivateKey, foundPrivateKey := params[SfPrivateKey]
+
 	if !foundPassword && !foundPrivateKey {
 		return nil, "", fmt.Errorf("either parameter %q or %q need to be specified", SfPassword, SfPrivateKey)
 	}
