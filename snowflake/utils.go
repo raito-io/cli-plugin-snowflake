@@ -1,7 +1,11 @@
 package snowflake
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
@@ -93,4 +97,27 @@ func parseCommaSeparatedList(list string) set.Set[string] {
 	}
 
 	return ret
+}
+
+func loadPrivateKey(file string) (*rsa.PrivateKey, error) {
+	pemData, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("opening file %q: %w", file, err)
+	}
+
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM block containing the private key; block is nil")
+	}
+
+	if block.Type != "PRIVATE KEY" {
+		return nil, fmt.Errorf("failed to decode PEM block containing the private key; wrong block type %q", block.Type)
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parsing private key: %w", err)
+	}
+
+	return key.(*rsa.PrivateKey), nil
 }

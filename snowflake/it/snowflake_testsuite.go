@@ -17,6 +17,7 @@ var (
 	sfAccount         string
 	sfUser            string
 	sfPassword        string
+	sfPrivateKey      string
 	sfRole            string
 	sfStandardEdition bool
 	lock              = &sync.Mutex{}
@@ -31,6 +32,7 @@ func readDatabaseConfig() *config.ConfigMap {
 		sfUser = os.Getenv("SF_USER")
 		sfPassword = os.Getenv("SF_PASSWORD")
 		sfRole = os.Getenv("SF_ROLE")
+		sfPrivateKey = os.Getenv("SF_PRIVATE_KEY")
 
 		if sfStandardStr, sfStandardSet := os.LookupEnv("SF_STANDARD_EDITION"); sfStandardSet {
 			var err error
@@ -47,6 +49,7 @@ func readDatabaseConfig() *config.ConfigMap {
 			snowflake.SfAccount:         sfAccount,
 			snowflake.SfUser:            sfUser,
 			snowflake.SfPassword:        sfPassword,
+			snowflake.SfPrivateKey:      sfPrivateKey,
 			snowflake.SfRole:            sfRole,
 			snowflake.SfStandardEdition: strconv.FormatBool(sfStandardEdition),
 			snowflake.SfDatabaseRoles:   "true",
