@@ -14,14 +14,16 @@ const SfLimit = 10000
 const ConnectionStringIdentifier = "Raito_CLI"
 
 func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string, error) {
-	snowflakeUser, found := params[SfUser]
+	sfUser, found := params[SfUser]
 	if !found {
 		return nil, "", e.CreateMissingInputParameterError(SfUser)
 	}
 
-	snowflakePassword, found := params[SfPassword]
-	if !found {
-		return nil, "", e.CreateMissingInputParameterError(SfPassword)
+	sfPassword, foundPassword := params[SfPassword]
+	sfPrivateKey, foundPrivateKey := params[SfPrivateKey]
+
+	if (!foundPassword || sfPassword == "") && (!foundPrivateKey || sfPrivateKey == "") {
+		return nil, "", fmt.Errorf("either parameter %q or %q need to be specified", SfPassword, SfPrivateKey)
 	}
 
 	snowflakeAccount, found := params[SfAccount]
@@ -44,20 +46,32 @@ func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string,
 		insecure = true
 	}
 
-	dsn, err := sf.DSN(&sf.Config{
+	dsnConfig := sf.Config{
 		Account:      snowflakeAccount,
-		User:         snowflakeUser,
-		Password:     snowflakePassword,
+		User:         sfUser,
 		Role:         role,
 		Application:  ConnectionStringIdentifier,
 		InsecureMode: insecure,
-	})
+	}
 
+	if foundPrivateKey && sfPrivateKey != "" {
+		privateKey, err := loadPrivateKey(sfPrivateKey)
+		if err != nil {
+			return nil, "", e.CreateBadInputParameterError(SfPrivateKey, sfPrivateKey, fmt.Sprintf("Failed to parse private key: %s", err.Error()))
+		}
+
+		dsnConfig.PrivateKey = privateKey
+		dsnConfig.Authenticator = sf.AuthTypeJwt
+	} else {
+		dsnConfig.Password = sfPassword
+	}
+
+	dsn, err := sf.DSN(&dsnConfig)
 	if err != nil {
 		return nil, "", fmt.Errorf("snowflake DSN: %w", err)
 	}
 
-	censoredConnectionString := fmt.Sprintf("%s:%s@%s?role=%s", snowflakeUser, "**censured**", snowflakeAccount, role)
+	censoredConnectionString := fmt.Sprintf("%s:%s@%s?role=%s", sfUser, "**censured**", snowflakeAccount, role)
 	logger.Debug(fmt.Sprintf("Using connection string: %s", censoredConnectionString))
 	conn, err := sql.Open("snowflake", dsn)
 

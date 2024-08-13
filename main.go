@@ -33,7 +33,8 @@ func main() {
 				Parameters: []*plugin.ParameterInfo{
 					{Name: snowflake.SfAccount, Description: "The account name of the Snowflake account to connect to. For example, xy123456.eu-central-1", Mandatory: true},
 					{Name: snowflake.SfUser, Description: "The username to authenticate against the Snowflake account.", Mandatory: true},
-					{Name: snowflake.SfPassword, Description: "The password to authenticate against the Snowflake account.", Mandatory: true},
+					{Name: snowflake.SfPassword, Description: fmt.Sprintf("The password to authenticate against the Snowflake account. Either this or %s must be specified", snowflake.SfPrivateKey), Mandatory: false},
+					{Name: snowflake.SfPrivateKey, Description: fmt.Sprintf("The path of the file containing the private key to authenticate against the Snowflake account. Either this or %s must be specified.", snowflake.SfPassword), Mandatory: false},
 					{Name: snowflake.SfRole, Description: "The name of the role to use for executing the necessary queries. If not specified 'ACCOUNTADMIN' is used.", Mandatory: false},
 					{Name: snowflake.SfExcludedDatabases, Description: "The optional comma-separated list of databases that should be skipped.", Mandatory: false},
 					{Name: snowflake.SfExcludedSchemas, Description: "The optional comma-separated list of schemas that should be skipped. This can either be in a specific database (as <database>.<schema>) or a just a schema name that should be skipped in all databases. By default INFORMATION_SCHEMA is skipped since there are no access controls to manage", Mandatory: false},
