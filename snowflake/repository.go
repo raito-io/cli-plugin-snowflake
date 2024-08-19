@@ -82,7 +82,7 @@ func (repo *SnowflakeRepository) isProtectedRoleName(rn string) bool {
 }
 
 func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time) <-chan stream.MaybeError[UsageQueryResult] {
-	batchSize := 1000
+	batchSize := 20000
 
 	outputChannel := make(chan stream.MaybeError[UsageQueryResult], batchSize)
 
