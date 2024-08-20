@@ -122,11 +122,6 @@ func logUsageBatch(count int) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	// The following outputs are in bytes
-	fmt.Printf("\tHeap = %v MiB", bToMb(m.Alloc))
-	fmt.Printf("\tMem from system = %v MiB", bToMb(m.Sys))
-	fmt.Printf("\tNumGC = %v\n", m.NumGC)
-
 	logger.Debug(fmt.Sprintf("Processed %d statements (Heap: %v MiB; System memory: %v MiB)", count, bToMb(m.Alloc), bToMb(m.Sys)))
 }
 
