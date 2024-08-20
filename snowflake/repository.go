@@ -70,7 +70,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 		}
 
 		if usageBatchSize != 0 && (usageBatchSize < 10000 || usageBatchSize > 1000000) {
-			return nil, fmt.Errorf("invalid value %d for %q parameter (If set, it must not be smaller than 10.000 and not larger than 1.000.000)", usageBatchSize, SfUsageBatchSize)
+			return nil, fmt.Errorf("invalid value %d for %q parameter (If set, it must be between 10.000 and 1.000.000)", usageBatchSize, SfUsageBatchSize)
 		}
 	}
 
