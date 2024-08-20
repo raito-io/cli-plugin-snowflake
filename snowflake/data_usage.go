@@ -122,7 +122,7 @@ func logUsageBatch(count int) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	logger.Debug(fmt.Sprintf("Processed %d statements (Heap: %v MiB; System memory: %v MiB)", count, bToMb(m.Alloc), bToMb(m.Sys)))
+	logger.Info(fmt.Sprintf("Processed %d statements (Heap: %v MiB; System memory: %v MiB)", count, bToMb(m.Alloc), bToMb(m.Sys)))
 }
 
 func bToMb(b uint64) uint64 {
