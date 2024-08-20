@@ -19,6 +19,7 @@ const (
 	SfDriverDebug                       = "sf-driver-debug"
 	SfDriverInsecureMode                = "sf-driver-insecure-mode"
 	SfIgnoreLinksToRoles                = "sf-ignore-links-to-roles"
+	SfUsageBatchSize                    = "sf-usage-batch-size"
 
 	TagSource = "Snowflake"
 
