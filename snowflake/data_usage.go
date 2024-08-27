@@ -153,19 +153,8 @@ func usageQueryResultToStatement(input *UsageQueryResult) (statement du.Statemen
 		statement.Rows = int(input.RowsProduced.Int64)
 	}
 
-	startTime, e := time.Parse(snowflakeTimeFormat, input.StartTime)
-
-	if e != nil {
-		logger.Warn(fmt.Sprintf("Error parsing start time of '%s', expected format is: '%s'", input.StartTime, snowflakeTimeFormat))
-	}
-	endTime, e := time.Parse(snowflakeTimeFormat, input.EndTime)
-
-	if e != nil {
-		logger.Warn(fmt.Sprintf("Error parsing end time of '%s', expected format is: '%s'", input.EndTime, snowflakeTimeFormat))
-	}
-
-	statement.StartTime = startTime.Unix()
-	statement.EndTime = endTime.Unix()
+	statement.StartTime = input.StartTime.Time.Unix()
+	statement.EndTime = input.EndTime.Time.Unix()
 
 	objects, err := parseAccessedObjects(&input.DirectObjectsAccessed, objects, du.Read)
 	if err != nil {

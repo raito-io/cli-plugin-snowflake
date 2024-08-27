@@ -133,8 +133,8 @@ type UsageQueryResult struct {
 	User                  string        `db:"USER_NAME" useColumnName:"true"`
 	Role                  NullString    `db:"ROLE_NAME" useColumnName:"true"`
 	Status                string        `db:"EXECUTION_STATUS" useColumnName:"true"`
-	StartTime             string        `db:"START_TIME" useColumnName:"true"`
-	EndTime               string        `db:"END_TIME" useColumnName:"true"`
+	StartTime             sql.NullTime  `db:"START_TIME" useColumnName:"true"`
+	EndTime               sql.NullTime  `db:"END_TIME" useColumnName:"true"`
 	TotalElapsedTime      int64         `db:"TOTAL_ELAPSED_TIME" useColumnName:"true"`
 	BytesScanned          int64         `db:"BYTES_SCANNED" useColumnName:"true"`
 	BytesWritten          int64         `db:"BYTES_WRITTEN" useColumnName:"true"`

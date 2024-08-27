@@ -131,7 +131,7 @@ FROM "SNOWFLAKE"."ACCOUNT_USAGE"."QUERY_HISTORY" INNER JOIN "SNOWFLAKE"."ACCOUNT
 WHERE START_TIME >= ? %s`, endTime)
 
 		i := 0
-		mostRecentQueryStartTime := ""
+		var mostRecentQueryStartTime sql.NullTime
 
 		totalDuration := time.Duration(0)
 
@@ -165,7 +165,7 @@ WHERE START_TIME >= ? %s`, endTime)
 	return outputChannel
 }
 
-func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChannel chan<- stream.MaybeError[UsageQueryResult], mostRecentQueryStartTime string, query string, args ...interface{}) (string, int, time.Duration, bool) {
+func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChannel chan<- stream.MaybeError[UsageQueryResult], mostRecentQueryStartTime sql.NullTime, query string, args ...interface{}) (sql.NullTime, int, time.Duration, bool) {
 	sendError := func(err error) {
 		select {
 		case <-ctx.Done():
@@ -188,7 +188,7 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 	allArgs := args
 
 	if repo.usageBatchSize > 0 {
-		if mostRecentQueryStartTime != "" {
+		if mostRecentQueryStartTime.Valid {
 			batchQuery += " AND QUERY_HISTORY.START_TIME < ?"
 
 			allArgs = append(allArgs, mostRecentQueryStartTime)
@@ -202,13 +202,13 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 	rows, sec, err := repo.queryContext(ctx, batchQuery, allArgs...)
 	if err != nil {
 		sendError(err)
-		return "", 0, 0, false
+		return sql.NullTime{}, 0, 0, false
 	}
 
 	defer rows.Close()
 
 	i := 0
-	newMostRecentQueryStartTime := ""
+	var newMostRecentQueryStartTime sql.NullTime
 
 	for rows.Next() {
 		var result UsageQueryResult
