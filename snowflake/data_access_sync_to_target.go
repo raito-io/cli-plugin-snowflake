@@ -746,7 +746,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				if strings.EqualFold(grant.GrantedOn, "ACCOUNT") {
 					foundGrants = append(foundGrants, Grant{grant.Privilege, "account", ""})
 				} else if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
-					logger.Warn(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, externalId))
+					logger.Info(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, externalId))
 				} else if strings.EqualFold(grant.Privilege, "USAGE") && (strings.EqualFold(grant.GrantedOn, "ROLE") || strings.EqualFold(grant.GrantedOn, "DATABASE_ROLE")) {
 					logger.Debug(fmt.Sprintf("Ignoring USAGE permission on %s %q", grant.GrantedOn, grant.Name))
 				} else {
@@ -1260,7 +1260,7 @@ func (s *AccessSyncer) createGrantsForSchema(repo dataAccessRepository, permissi
 		}
 
 		if !permissionMatchFound {
-			logger.Warn(fmt.Sprintf("Permission %q does not apply to type SCHEMA or any of its descendants. Skipping", p))
+			logger.Info(fmt.Sprintf("Permission %q does not apply to type SCHEMA or any of its descendants. Skipping", p))
 		}
 	}
 
@@ -1383,7 +1383,7 @@ func (s *AccessSyncer) createGrantsForDatabase(repo dataAccessRepository, permis
 		}
 
 		if !databaseMatchFound {
-			logger.Warn(fmt.Sprintf("Permission %q does not apply to type DATABASE or any of its descendants. Skipping", p))
+			logger.Info(fmt.Sprintf("Permission %q does not apply to type DATABASE or any of its descendants. Skipping", p))
 		}
 	}
 
@@ -1462,7 +1462,7 @@ func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permiss
 		}
 
 		if !matchFound {
-			logger.Warn(fmt.Sprintf("Permission %q does not apply to type ACCOUNT (datasource) or any of its descendants. Skipping", p))
+			logger.Info(fmt.Sprintf("Permission %q does not apply to type ACCOUNT (datasource) or any of its descendants. Skipping", p))
 			continue
 		}
 	}
