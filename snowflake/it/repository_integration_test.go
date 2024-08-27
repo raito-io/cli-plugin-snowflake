@@ -444,7 +444,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 		Owner:       "",
 		DisplayName: "SNOWFLAKE",
 		LoginName:   "SNOWFLAKE",
-		Type:        "",
+		Type:        nil,
 	})
 
 	s.Contains(users, snowflake.UserEntity{
@@ -453,7 +453,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 		Owner:       "ACCOUNTADMIN",
 		DisplayName: snowflakeUserName,
 		LoginName:   snowflakeUserName,
-		Type:        "null",
+		Type:        ptr.String("null"),
 	})
 
 	s.Contains(users, snowflake.UserEntity{
@@ -462,7 +462,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 		Owner:       "ACCOUNTADMIN",
 		DisplayName: "Data Engineer service account",
 		LoginName:   "DATA_ENGINEERING",
-		Type:        "SERVICE",
+		Type:        ptr.String("SERVICE"),
 	})
 }
 

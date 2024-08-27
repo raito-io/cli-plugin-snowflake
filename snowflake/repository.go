@@ -688,7 +688,7 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 
 	for i := range userRows {
 		userRow := userRows[i]
-		if userRow.Type != "" {
+		if userRow.Type != nil && *userRow.Type != "" {
 			continue
 		}
 
@@ -708,7 +708,8 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 
 		for _, detail := range userDetails {
 			if strings.EqualFold(detail.Property, "TYPE") {
-				userRow.Type = detail.Value
+				val := detail.Value
+				userRow.Type = &val
 				userRows[i] = userRow
 			}
 		}

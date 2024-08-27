@@ -90,12 +90,12 @@ type ColumnEntity struct {
 // Identity Store
 
 type UserEntity struct {
-	Name        string `db:"name"`
-	LoginName   string `db:"login_name"`
-	DisplayName string `db:"display_name"`
-	Email       string `db:"email"`
-	Owner       string `db:"owner"`
-	Type        string `db:"type"`
+	Name        string  `db:"name"`
+	LoginName   string  `db:"login_name"`
+	DisplayName string  `db:"display_name"`
+	Email       string  `db:"email"`
+	Owner       string  `db:"owner"`
+	Type        *string `db:"type"`
 }
 
 // Data Usage
