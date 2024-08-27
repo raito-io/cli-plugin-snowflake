@@ -19,8 +19,6 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/common/stream"
 )
 
-const snowflakeTimeFormat = "2006-01-02T15:04:05.999999-07:00"
-
 //go:generate go run github.com/vektra/mockery/v2 --name=dataUsageRepository --with-expecter --inpackage
 type dataUsageRepository interface {
 	Close() error
