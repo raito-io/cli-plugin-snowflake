@@ -16,6 +16,7 @@ type NullString sql.NullString
 type DbEntity struct {
 	Name    string  `db:"name"`
 	Comment *string `db:"comment"`
+	Kind    *string `db:"kind"`
 }
 
 type ExtendedDbEntity struct {

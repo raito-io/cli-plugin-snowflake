@@ -912,7 +912,21 @@ func (repo *SnowflakeRepository) GetShares() ([]DbEntity, error) {
 
 func (repo *SnowflakeRepository) GetDatabases() ([]DbEntity, error) {
 	q := "SHOW DATABASES IN ACCOUNT"
-	return repo.getDbEntities(q)
+
+	dbs, err := repo.getDbEntities(q)
+	if err != nil {
+		return nil, fmt.Errorf("fetching databases: %w", err)
+	}
+
+	ret := make([]DbEntity, 0, len(dbs))
+
+	for _, db := range dbs {
+		if db.Kind != nil && strings.EqualFold(*db.Kind, "STANDARD") {
+			ret = append(ret, db)
+		}
+	}
+
+	return ret, nil
 }
 
 func (repo *SnowflakeRepository) GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error {
