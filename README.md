@@ -115,7 +115,7 @@ The following configuration parameters are available
 ## Supported data objects
 - Account (is represented as Raito DataSource)
 - Warehouse
-- Database
+- Database (only STANDARD databases)
 - Shared Database
 - Schema
 - Shared Schema

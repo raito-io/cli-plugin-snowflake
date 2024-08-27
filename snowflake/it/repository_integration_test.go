@@ -797,25 +797,12 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabases() {
 
 	//Then
 	s.NoError(err)
-	s.Len(databases, 3)
-
-	comment := ""
-
-	s.Contains(databases, snowflake.DbEntity{
-		Name:    "SNOWFLAKE",
-		Comment: &comment,
-	})
-
-	s.Contains(databases, snowflake.DbEntity{
-		Name:    "SNOWFLAKE_SAMPLE_DATA",
-		Comment: &comment,
-	})
-
-	comment = "Database for RAITO testing and demo"
+	s.Len(databases, 1)
 
 	s.Contains(databases, snowflake.DbEntity{
 		Name:    "RAITO_DATABASE",
-		Comment: &comment,
+		Comment: ptr.String("Database for RAITO testing and demo"),
+		Kind:    ptr.String("STANDARD"),
 	})
 }
 
