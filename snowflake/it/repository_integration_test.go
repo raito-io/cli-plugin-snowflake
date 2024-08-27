@@ -799,11 +799,10 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabases() {
 	s.NoError(err)
 	s.Len(databases, 1)
 
-	comment := "Database for RAITO testing and demo"
-
 	s.Contains(databases, snowflake.DbEntity{
 		Name:    "RAITO_DATABASE",
-		Comment: &comment,
+		Comment: ptr.String("Database for RAITO testing and demo"),
+		Kind:    ptr.String("STANDARD"),
 	})
 }
 
