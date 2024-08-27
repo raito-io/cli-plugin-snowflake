@@ -19,8 +19,6 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/common/stream"
 )
 
-const snowflakeTimeFormat = "2006-01-02T15:04:05.999999-07:00"
-
 //go:generate go run github.com/vektra/mockery/v2 --name=dataUsageRepository --with-expecter --inpackage
 type dataUsageRepository interface {
 	Close() error
@@ -153,19 +151,8 @@ func usageQueryResultToStatement(input *UsageQueryResult) (statement du.Statemen
 		statement.Rows = int(input.RowsProduced.Int64)
 	}
 
-	startTime, e := time.Parse(snowflakeTimeFormat, input.StartTime)
-
-	if e != nil {
-		logger.Warn(fmt.Sprintf("Error parsing start time of '%s', expected format is: '%s'", input.StartTime, snowflakeTimeFormat))
-	}
-	endTime, e := time.Parse(snowflakeTimeFormat, input.EndTime)
-
-	if e != nil {
-		logger.Warn(fmt.Sprintf("Error parsing end time of '%s', expected format is: '%s'", input.EndTime, snowflakeTimeFormat))
-	}
-
-	statement.StartTime = startTime.Unix()
-	statement.EndTime = endTime.Unix()
+	statement.StartTime = input.StartTime.Time.Unix()
+	statement.EndTime = input.EndTime.Time.Unix()
 
 	objects, err := parseAccessedObjects(&input.DirectObjectsAccessed, objects, du.Read)
 	if err != nil {
