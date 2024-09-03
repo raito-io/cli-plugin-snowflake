@@ -709,14 +709,14 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 		}
 
 		wp.Submit(func() {
-			rows, _, err = repo.query(fmt.Sprintf(`DESCRIBE USER "%s"`, userRow.Name)) //nolint:gocritic
+			describeRows, _, err := repo.query(fmt.Sprintf(`DESCRIBE USER "%s"`, userRow.Name)) //nolint:gocritic
 			if err != nil {
 				logger.Warn(fmt.Sprintf("Unable to fetch user details for %q: %s", userRow.Name, err.Error()))
 				return
 			}
 
 			var userDetails []UserDetails
-			err = scan.Rows(&userDetails, rows)
+			err = scan.Rows(&userDetails, describeRows)
 
 			if err != nil {
 				logger.Warn(fmt.Sprintf("Unable to parse user details for %q: %s", userRow.Name, err.Error()))
