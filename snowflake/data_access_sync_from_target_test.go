@@ -120,9 +120,11 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 			syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
 				return repoMock, nil
 			})
+			syncer.repo = repoMock
+			syncer.configMap = &tt.args.configMap
 
 			//When
-			shouldRetrieveTags := syncer.shouldRetrieveTags(&tt.args.configMap)
+			shouldRetrieveTags := syncer.shouldRetrieveTags()
 
 			// Then
 			assert.Equal(t, tt.want, shouldRetrieveTags)
