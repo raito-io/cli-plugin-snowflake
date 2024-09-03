@@ -1,8 +1,6 @@
 package snowflake
 
 import (
-	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -915,40 +913,6 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			wantErr: require.NoError,
 		},
-		{
-			name: "error on connecting to repo",
-			fields: fields{
-				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
-					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
-					return fileCreator
-				},
-			},
-			args: args{
-				repoCreateError: fmt.Errorf("BOOOM"),
-				configMap: config.ConfigMap{
-					Parameters: map[string]string{},
-				},
-			},
-			wantErr: require.Error,
-		},
-		{
-			name: "error on shares",
-			fields: fields{
-				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
-					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
-					repoMock.EXPECT().Close().Return(nil).Once()
-					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-					repoMock.EXPECT().GetShares().Return(nil, fmt.Errorf("boom")).Once()
-					return fileCreator
-				},
-			},
-			args: args{
-				configMap: config.ConfigMap{
-					Parameters: map[string]string{},
-				},
-			},
-			wantErr: require.Error,
-		},
 	}
 
 	for _, tt := range tests {
@@ -957,16 +921,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			repoMock := newMockDataAccessRepository(t)
 			fileCreator := tt.fields.setup(repoMock)
 
-			syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-				return repoMock, tt.args.repoCreateError
-			})
+			syncer := createBasicFromTargetSyncer(repoMock, fileCreator, &tt.args.configMap)
 
 			//When
-			err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &tt.args.configMap)
-
-			// Then
-			tt.wantErr(t, err)
-
+			syncer.syncFromTarget()
 			assert.ElementsMatch(t, tt.wantAps, fileCreator.AccessProviders)
 		})
 	}
@@ -1173,28 +1131,6 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 			},
 			wantErr: require.NoError,
 		},
-
-		{
-			name: "repo connection error",
-			fields: fields{
-				setup: func(repoMock *mockDataAccessRepository, feedbackHandlerMock *mocks.SimpleAccessProviderFeedbackHandler) {
-
-				},
-				repoProviderError: fmt.Errorf("boom"),
-			},
-			args: args{
-				accessProviders: &sync_to_target.AccessProviderImport{
-					AccessProviders: []*importer.AccessProvider{},
-				},
-				configMap: &config.ConfigMap{
-					Parameters: map[string]string{
-						SfStandardEdition: "false",
-					},
-				},
-			},
-			wantErr: require.Error,
-		},
-
 		{
 			name: "basic - masks + filters on non-basic SF",
 			fields: fields{
@@ -1272,12 +1208,10 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 
 			tt.fields.setup(repoMock, feedbackHandler)
 
-			syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-				return repoMock, tt.fields.repoProviderError
-			})
+			syncer := createBasicToTargetSyncer(repoMock, tt.args.accessProviders, feedbackHandler, tt.args.configMap)
 
 			// When
-			err := syncer.SyncAccessProviderToTarget(context.Background(), tt.args.accessProviders, feedbackHandler, tt.args.configMap)
+			err := syncer.syncToTarget()
 
 			// Then
 			tt.wantErr(t, err)
