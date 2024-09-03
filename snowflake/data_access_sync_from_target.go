@@ -188,9 +188,9 @@ func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrapp
 		logger.Info(fmt.Sprintf("Reading roles from Snowflake inside database %s", database.Name))
 
 		// Get all database roles for database
-		roleEntities, err := s.repo.GetDatabaseRoles(database.Name)
-		if err != nil {
-			return err
+		roleEntities, err2 := s.repo.GetDatabaseRoles(database.Name)
+		if err2 != nil {
+			return err2
 		}
 
 		for _, roleEntity := range roleEntities {

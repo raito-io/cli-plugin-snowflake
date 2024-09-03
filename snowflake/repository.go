@@ -60,6 +60,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 	}
 
 	workerPoolSize := 10
+
 	if v, f := params[SfWorkerPoolSize]; f {
 		poolSize, err := strconv.Atoi(v)
 		if err != nil {
