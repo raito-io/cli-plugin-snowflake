@@ -15,7 +15,6 @@ import (
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	ds "github.com/raito-io/cli/base/data_source"
-	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/util/match"
 	"github.com/raito-io/cli/base/util/slice"
 	"github.com/raito-io/cli/base/wrappers"
@@ -101,19 +100,19 @@ func (s *AccessSyncer) getUniqueRoleNameGenerator(prefix string, database *strin
 	return s.uniqueRoleNameGeneratorsCache[database], nil
 }
 
-func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRemoveAps map[string]*importer.AccessProvider, toProcessAps map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
+func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRemoveAps map[string]*importer.AccessProvider, toProcessAps map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
 	logger.Info("Configuring access providers as roles in Snowflake")
 
-	databaseRoleSupportEnabled := configMap.GetBoolWithDefault(SfDatabaseRoles, false)
+	databaseRoleSupportEnabled := s.configMap.GetBoolWithDefault(SfDatabaseRoles, false)
 
-	ignoreLinksToRoles := configMap.GetString(SfIgnoreLinksToRoles)
+	ignoreLinksToRoles := s.configMap.GetString(SfIgnoreLinksToRoles)
 	if ignoreLinksToRoles != "" {
 		s.ignoreLinksToRole = slice.ParseCommaSeparatedList(ignoreLinksToRoles)
 	} else {
 		s.ignoreLinksToRole = nil
 	}
 
-	err := s.removeRolesToRemove(toRemoveAps, repo, feedbackHandler)
+	err := s.removeRolesToRemove(toRemoveAps, feedbackHandler)
 	if err != nil {
 		return err
 	}
@@ -126,12 +125,12 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRe
 		}
 	}
 
-	existingRoles, err := s.findRoles("", databaseRoleSupportEnabled, repo)
+	existingRoles, err := s.findRoles("", databaseRoleSupportEnabled)
 	if err != nil {
 		return err
 	}
 
-	err = s.generateAccessControls(ctx, toProcessAps, existingRoles, toRenameAps, repo, configMap, feedbackHandler)
+	err = s.generateAccessControls(ctx, toProcessAps, existingRoles, toRenameAps, feedbackHandler)
 	if err != nil {
 		return err
 	}
@@ -139,10 +138,10 @@ func (s *AccessSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRe
 	return nil
 }
 
-func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
+func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
 	var err error
 
-	if configMap.GetBoolWithDefault(SfStandardEdition, false) {
+	if s.configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		if len(apToRemoveMap) > 0 || len(apMap) > 0 {
 			logger.Error("Skipping masking policies due to Snowflake Standard Edition.")
 		}
@@ -154,7 +153,7 @@ func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apTo
 
 	// Step 1: Update masks and create new masks
 	for _, mask := range apMap {
-		maskName, err2 := s.updateMask(ctx, mask, roleNameMap, repo)
+		maskName, err2 := s.updateMask(ctx, mask, roleNameMap)
 		fi := importer.AccessProviderSyncFeedback{AccessProvider: mask.Id, ActualName: maskName, ExternalId: &maskName}
 
 		if err2 != nil {
@@ -172,7 +171,7 @@ func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apTo
 		externalId := maskToRemove
 		fi := importer.AccessProviderSyncFeedback{AccessProvider: maskAp.Id, ActualName: maskToRemove, ExternalId: &externalId}
 
-		err = s.removeMask(ctx, maskToRemove, repo)
+		err = s.removeMask(ctx, maskToRemove)
 		if err != nil {
 			fi.Errors = append(fi.Errors, err.Error())
 		}
@@ -186,8 +185,8 @@ func (s *AccessSyncer) SyncAccessProviderMasksToTarget(ctx context.Context, apTo
 	return nil
 }
 
-func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap, repo dataAccessRepository) error {
-	if configMap.GetBoolWithDefault(SfStandardEdition, false) {
+func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
+	if s.configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		if len(apToRemoveMap) > 0 || len(apMap) > 0 {
 			logger.Error("Skipping filter policies due to Snowflake Standard Edition.")
 		}
@@ -249,7 +248,7 @@ func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, ap
 	updatedTables := set.NewSet[string]()
 
 	for table, filters := range updateGroupedFilters {
-		filterName, externalId, createErr := s.updateOrCreateFilter(ctx, repo, table, filters, roleNameMap)
+		filterName, externalId, createErr := s.updateOrCreateFilter(ctx, table, filters, roleNameMap)
 
 		ferr := feedbackFn(filters, &filterName, externalId, createErr)
 		if ferr != nil {
@@ -265,7 +264,7 @@ func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, ap
 	for table, filters := range removeGroupedFilters {
 		if _, found := updateGroupedFilters[table]; found {
 			if updatedTables.Contains(table) {
-				deleteErr := s.deleteFilter(repo, table, filters)
+				deleteErr := s.deleteFilter(table, filters)
 
 				ferr := feedbackFn(filters, nil, nil, deleteErr)
 				if ferr != nil {
@@ -278,7 +277,7 @@ func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, ap
 				}
 			}
 		} else {
-			deleteErr := s.deleteFilter(repo, table, filters)
+			deleteErr := s.deleteFilter(table, filters)
 
 			ferr := feedbackFn(filters, nil, nil, deleteErr)
 			if ferr != nil {
@@ -290,7 +289,7 @@ func (s *AccessSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, ap
 	return nil
 }
 
-func (s *AccessSyncer) removeRolesToRemove(toRemoveAps map[string]*importer.AccessProvider, repo dataAccessRepository, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
+func (s *AccessSyncer) removeRolesToRemove(toRemoveAps map[string]*importer.AccessProvider, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
 	if len(toRemoveAps) > 0 {
 		logger.Info(fmt.Sprintf("Removing %d old Raito roles in Snowflake", len(toRemoveAps)))
 
@@ -298,7 +297,7 @@ func (s *AccessSyncer) removeRolesToRemove(toRemoveAps map[string]*importer.Acce
 			if ap == nil {
 				logger.Warn(fmt.Sprintf("no linked access provider found for %q, so just going to remove it from Snowflake", toRemoveExternalId))
 
-				err := s.dropRole(toRemoveExternalId, isDatabaseRoleByExternalId(toRemoveExternalId), repo)
+				err := s.dropRole(toRemoveExternalId, isDatabaseRoleByExternalId(toRemoveExternalId))
 				if err != nil {
 					return err
 				}
@@ -311,7 +310,7 @@ func (s *AccessSyncer) removeRolesToRemove(toRemoveAps map[string]*importer.Acce
 				ExternalId:     ptr.String(toRemoveExternalId),
 			}
 
-			err := s.dropRole(toRemoveExternalId, isDatabaseRole(ap.Type), repo)
+			err := s.dropRole(toRemoveExternalId, isDatabaseRole(ap.Type))
 			// If an error occurs (and not already deleted), we send an error back as feedback
 			if err != nil && !strings.Contains(err.Error(), "does not exist") {
 				logger.Error(fmt.Sprintf("unable to drop role %q: %s", toRemoveExternalId, err.Error()))
@@ -331,8 +330,8 @@ func (s *AccessSyncer) removeRolesToRemove(toRemoveAps map[string]*importer.Acce
 	return nil
 }
 
-func (s *AccessSyncer) getShareNames(repo dataAccessRepository) ([]string, error) {
-	dbShares, err := repo.GetShares()
+func (s *AccessSyncer) getShareNames() ([]string, error) {
+	dbShares, err := s.repo.GetShares()
 	if err != nil {
 		return nil, err
 	}
@@ -345,8 +344,8 @@ func (s *AccessSyncer) getShareNames(repo dataAccessRepository) ([]string, error
 	return shareNames, nil
 }
 
-func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, policyType string, action exporter.Action) error {
-	policyEntities, err := repo.GetPolicies(policyType)
+func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.AccessProviderHandler, policyType string, action exporter.Action) error {
+	policyEntities, err := s.repo.GetPolicies(policyType)
 	if err != nil {
 		// For Standard edition, row access policies are not supported. Failsafe in case `sf-standard-edition` is overlooked.
 		// You can see the Snowflake edition in the UI, or through the 'show organization accounts;' query (ORGADMIN role needed).
@@ -382,7 +381,7 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 		}
 
 		// get policy definition
-		describeMaskingPolicyEntities, err2 := repo.DescribePolicy(policyType, policy.DatabaseName, policy.SchemaName, policy.Name)
+		describeMaskingPolicyEntities, err2 := s.repo.DescribePolicy(policyType, policy.DatabaseName, policy.SchemaName, policy.Name)
 		if err2 != nil {
 			logger.Warn(fmt.Sprintf("Error fetching description for policy %s.%s.%s: %s", policy.DatabaseName, policy.SchemaName, policy.Name, err2.Error()))
 
@@ -398,7 +397,7 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 		ap.Policy = describeMaskingPolicyEntities[0].Body
 
 		// get policy references
-		policyReferenceEntities, err2 := repo.GetPolicyReferences(policy.DatabaseName, policy.SchemaName, policy.Name)
+		policyReferenceEntities, err2 := s.repo.GetPolicyReferences(policy.DatabaseName, policy.SchemaName, policy.Name)
 		if err2 != nil {
 			logger.Warn(fmt.Sprintf("Error fetching policy references for %s.%s.%s: %s", policy.DatabaseName, policy.SchemaName, policy.Name, err2.Error()))
 
@@ -439,19 +438,19 @@ func (s *AccessSyncer) importPoliciesOfType(accessProviderHandler wrappers.Acces
 	return nil
 }
 
-func (s *AccessSyncer) importMaskingPolicies(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository) error {
-	return s.importPoliciesOfType(accessProviderHandler, repo, "MASKING", exporter.Mask)
+func (s *AccessSyncer) importMaskingPolicies(accessProviderHandler wrappers.AccessProviderHandler) error {
+	return s.importPoliciesOfType(accessProviderHandler, "MASKING", exporter.Mask)
 }
 
-func (s *AccessSyncer) importRowAccessPolicies(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository) error {
-	return s.importPoliciesOfType(accessProviderHandler, repo, "ROW ACCESS", exporter.Filtered)
+func (s *AccessSyncer) importRowAccessPolicies(accessProviderHandler wrappers.AccessProviderHandler) error {
+	return s.importPoliciesOfType(accessProviderHandler, "ROW ACCESS", exporter.Filtered)
 }
 
 // findRoles returns the set of existing roles with the given prefix
-func (s *AccessSyncer) findRoles(prefix string, databaseRoleSupportEnabled bool, repo dataAccessRepository) (set.Set[string], error) {
+func (s *AccessSyncer) findRoles(prefix string, databaseRoleSupportEnabled bool) (set.Set[string], error) {
 	existingRoles := set.NewSet[string]()
 
-	roleEntities, err := repo.GetAccountRolesWithPrefix(prefix)
+	roleEntities, err := s.repo.GetAccountRolesWithPrefix(prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -465,14 +464,14 @@ func (s *AccessSyncer) findRoles(prefix string, databaseRoleSupportEnabled bool,
 	}
 
 	//Get all database roles for each database and add database roles to existing roles
-	databases, err := s.getAllAvailableDatabases(repo)
+	databases, err := s.getAllAvailableDatabases()
 	if err != nil {
 		return nil, err
 	}
 
 	for _, database := range databases {
 		// Get all database roles for database
-		roleEntities, err := repo.GetDatabaseRolesWithPrefix(database.Name, prefix)
+		roleEntities, err := s.repo.GetDatabaseRolesWithPrefix(database.Name, prefix)
 		if err != nil {
 			return nil, err
 		}
@@ -501,7 +500,7 @@ func (s *AccessSyncer) buildMetaDataMap(metaData *ds.MetaData) map[string]map[st
 }
 
 //nolint:gocyclo
-func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId string, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string, rolesCreated map[string]interface{}, repo dataAccessRepository, metaData map[string]map[string]struct{}) (string, error) {
+func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId string, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string, rolesCreated map[string]interface{}, metaData map[string]map[string]struct{}) (string, error) {
 	accessProvider := toProcessAps[externalId]
 	logger.Debug(fmt.Sprintf("Handle access provider with key %q - %+v - %+v", externalId, accessProvider, toProcessAps))
 
@@ -558,29 +557,29 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 					return actualName, err2
 				}
 			} else if what.DataObject.Type == ds.Schema {
-				err2 := s.createGrantsForSchema(repo, permissions, what.DataObject.FullName, metaData, false, expectedGrants)
+				err2 := s.createGrantsForSchema(permissions, what.DataObject.FullName, metaData, false, expectedGrants)
 				if err2 != nil {
 					return actualName, err2
 				}
 			} else if what.DataObject.Type == "shared-schema" {
-				err2 := s.createGrantsForSchema(repo, permissions, what.DataObject.FullName, metaData, true, expectedGrants)
+				err2 := s.createGrantsForSchema(permissions, what.DataObject.FullName, metaData, true, expectedGrants)
 				if err2 != nil {
 					return actualName, err2
 				}
 			} else if what.DataObject.Type == "shared-database" {
-				err2 := s.createGrantsForDatabase(repo, permissions, what.DataObject.FullName, metaData, true, expectedGrants)
+				err2 := s.createGrantsForDatabase(permissions, what.DataObject.FullName, metaData, true, expectedGrants)
 				if err2 != nil {
 					return actualName, err2
 				}
 			} else if what.DataObject.Type == ds.Database {
-				err2 := s.createGrantsForDatabase(repo, permissions, what.DataObject.FullName, metaData, false, expectedGrants)
+				err2 := s.createGrantsForDatabase(permissions, what.DataObject.FullName, metaData, false, expectedGrants)
 				if err2 != nil {
 					return actualName, err2
 				}
 			} else if what.DataObject.Type == "warehouse" {
 				s.createGrantsForWarehouse(permissions, what.DataObject.FullName, metaData, expectedGrants)
 			} else if what.DataObject.Type == ds.Datasource {
-				err2 := s.createGrantsForAccount(repo, permissions, metaData, expectedGrants)
+				err2 := s.createGrantsForAccount(permissions, metaData, expectedGrants)
 				if err2 != nil {
 					return actualName, err2
 				}
@@ -598,7 +597,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", externalId, oldExternalId))
 			} else {
 				// The old name exists and the new one doesn't exist yet, so we have to do the rename
-				err = s.renameRole(oldExternalId, externalId, accessProvider.Type, repo)
+				err = s.renameRole(oldExternalId, externalId, accessProvider.Type)
 				if err != nil {
 					return actualName, fmt.Errorf("error while renaming role %q to %q: %s", oldExternalId, externalId, err.Error())
 				}
@@ -613,7 +612,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", externalId, oldExternalId))
 			} else {
 				// The old name exists but also the new one already exists. This is a weird case, but we'll delete the old one in this case and the new one will be updated in the next step of this method.
-				err = s.dropRole(oldExternalId, isDatabaseRoleByExternalId(oldExternalId), repo)
+				err = s.dropRole(oldExternalId, isDatabaseRoleByExternalId(oldExternalId))
 				if err != nil {
 					return actualName, fmt.Errorf("error while dropping role (%s) which was the old name of access provider %q: %s", oldExternalId, accessProvider.Name, err.Error())
 				}
@@ -631,14 +630,14 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 
 		// Only update the comment if we have full control over the role (who , inheritance and what not ignored)
 		if !ignoreWho && !ignoreWhat && !ignoreInheritance {
-			err2 := s.commentOnRoleIfExists(createComment(accessProvider, true), externalId, repo)
+			err2 := s.commentOnRoleIfExists(createComment(accessProvider, true), externalId)
 			if err2 != nil {
 				return actualName, fmt.Errorf("error while updating comment on role %q: %s", externalId, err2.Error())
 			}
 		}
 
 		if !ignoreWho || !ignoreInheritance {
-			grantsOfRole, err3 := s.retrieveGrantsOfRole(externalId, accessProvider.Type, repo)
+			grantsOfRole, err3 := s.retrieveGrantsOfRole(externalId, accessProvider.Type)
 			if err3 != nil {
 				return actualName, err3
 			}
@@ -671,7 +670,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 						return actualName, fmt.Errorf("error can not assign users from a database role %q", externalId)
 					}
 
-					e := repo.GrantUsersToAccountRole(ctx, externalId, toAdd...)
+					e := s.repo.GrantUsersToAccountRole(ctx, externalId, toAdd...)
 					if e != nil {
 						return actualName, fmt.Errorf("error while assigning users to role %q: %s", externalId, e.Error())
 					}
@@ -682,7 +681,7 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 						return actualName, fmt.Errorf("error can not unassign users from a database role %q", externalId)
 					}
 
-					e := repo.RevokeUsersFromAccountRole(ctx, externalId, toRemove...)
+					e := s.repo.RevokeUsersFromAccountRole(ctx, externalId, toRemove...)
 					if e != nil {
 						return actualName, fmt.Errorf("error while unassigning users from role %q: %s", externalId, e.Error())
 					}
@@ -695,14 +694,14 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				logger.Info(fmt.Sprintf("Identified %d roles to add and %d roles to remove from role %q", len(toAdd), len(toRemove), externalId))
 
 				if len(toAdd) > 0 {
-					e := s.grantRolesToRole(ctx, repo, externalId, accessProvider.Type, toAdd...)
+					e := s.grantRolesToRole(ctx, externalId, accessProvider.Type, toAdd...)
 					if e != nil {
 						return actualName, fmt.Errorf("error while assigning role to role %q: %s", externalId, e.Error())
 					}
 				}
 
 				if len(toRemove) > 0 {
-					e := s.revokeRolesFromRole(ctx, repo, externalId, accessProvider.Type, toRemove...)
+					e := s.revokeRolesFromRole(ctx, externalId, accessProvider.Type, toRemove...)
 					if e != nil {
 						return actualName, fmt.Errorf("error while unassigning role from role %q: %s", externalId, e.Error())
 					}
@@ -716,24 +715,24 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 			// We assume nobody manually added others to this role manually.
 			for _, what := range accessProvider.What {
 				if what.DataObject.Type == "database" {
-					e := s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), externalId, accessProvider.Type, repo)
+					e := s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), externalId, accessProvider.Type)
 					if e != nil {
 						return actualName, fmt.Errorf("error while assigning future schema grants in database %q to role %q: %s", what.DataObject.FullName, externalId, e.Error())
 					}
 
-					e = s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), externalId, accessProvider.Type, repo)
+					e = s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), externalId, accessProvider.Type)
 					if e != nil {
 						return actualName, fmt.Errorf("error while assigning future table grants in database %q to role %q: %s", what.DataObject.FullName, externalId, e.Error())
 					}
 				} else if what.DataObject.Type == "schema" {
-					e := s.executeRevokeOnRole("ALL", fmt.Sprintf("FUTURE TABLES IN SCHEMA %s", what.DataObject.FullName), externalId, accessProvider.Type, repo)
+					e := s.executeRevokeOnRole("ALL", fmt.Sprintf("FUTURE TABLES IN SCHEMA %s", what.DataObject.FullName), externalId, accessProvider.Type)
 					if e != nil {
 						return actualName, fmt.Errorf("error while assigning future table grants in schema %q to role %q: %s", what.DataObject.FullName, externalId, e.Error())
 					}
 				}
 			}
 
-			grantsToRole, err3 := s.getGrantsToRole(externalId, accessProvider.Type, repo)
+			grantsToRole, err3 := s.getGrantsToRole(externalId, accessProvider.Type)
 			if err3 != nil {
 				return actualName, err3
 			}
@@ -769,13 +768,13 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 
 		if _, rf := rolesCreated[externalId]; !rf {
 			// Create the role if not exists
-			err = s.createRole(externalId, accessProvider.Type, repo)
+			err = s.createRole(externalId, accessProvider.Type)
 			if err != nil {
 				return actualName, fmt.Errorf("error while creating role %q: %s", externalId, err.Error())
 			}
 
 			// Updating the comment (independent of creation)
-			err = s.commentOnRoleIfExists(createComment(accessProvider, false), externalId, repo)
+			err = s.commentOnRoleIfExists(createComment(accessProvider, false), externalId)
 			if err != nil {
 				return actualName, fmt.Errorf("error while updating comment on role %q: %s", externalId, err.Error())
 			}
@@ -787,20 +786,20 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 				return actualName, fmt.Errorf("error can not assign users to a database role %q", externalId)
 			}
 
-			err = repo.GrantUsersToAccountRole(ctx, externalId, accessProvider.Who.Users...)
+			err = s.repo.GrantUsersToAccountRole(ctx, externalId, accessProvider.Who.Users...)
 			if err != nil {
 				return actualName, fmt.Errorf("error while assigning users to role %q: %s", externalId, err.Error())
 			}
 		}
 
-		err = s.grantRolesToRole(ctx, repo, externalId, accessProvider.Type, inheritedRoles...)
+		err = s.grantRolesToRole(ctx, externalId, accessProvider.Type, inheritedRoles...)
 		if err != nil {
 			return actualName, fmt.Errorf("error while assigning roles to role %q: %s", externalId, err.Error())
 		}
 	}
 
 	if !ignoreWhat {
-		err = s.mergeGrants(repo, externalId, accessProvider.Type, foundGrants, expectedGrants.Slice(), metaData)
+		err = s.mergeGrants(externalId, accessProvider.Type, foundGrants, expectedGrants.Slice(), metaData)
 		if err != nil {
 			return actualName, err
 		}
@@ -809,17 +808,17 @@ func (s *AccessSyncer) handleAccessProvider(ctx context.Context, externalId stri
 	return actualName, nil
 }
 
-func (s *AccessSyncer) getGrantsToRole(externalId string, apType *string, repo dataAccessRepository) ([]GrantToRole, error) {
+func (s *AccessSyncer) getGrantsToRole(externalId string, apType *string) ([]GrantToRole, error) {
 	if isDatabaseRole(apType) {
 		database, parsedRoleName, err := parseDatabaseRoleExternalId(externalId)
 		if err != nil {
 			return nil, err
 		}
 
-		return repo.GetGrantsToDatabaseRole(database, parsedRoleName)
+		return s.repo.GetGrantsToDatabaseRole(database, parsedRoleName)
 	}
 
-	return repo.GetGrantsToAccountRole(externalId)
+	return s.repo.GetGrantsToAccountRole(externalId)
 }
 
 func (s *AccessSyncer) splitRoles(inheritedRoles []string) ([]string, []string) {
@@ -836,7 +835,7 @@ func (s *AccessSyncer) splitRoles(inheritedRoles []string) ([]string, []string) 
 	return toAddDatabaseRoles, toAddAccountRoles
 }
 
-func (s *AccessSyncer) grantRolesToRole(ctx context.Context, repo dataAccessRepository, targetExternalId string, targetApType *string, roles ...string) error {
+func (s *AccessSyncer) grantRolesToRole(ctx context.Context, targetExternalId string, targetApType *string, roles ...string) error {
 	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
 
 	var filteredAccountRoles []string
@@ -880,19 +879,19 @@ func (s *AccessSyncer) grantRolesToRole(ctx context.Context, repo dataAccessRepo
 			}
 		}
 
-		err = repo.GrantDatabaseRolesToDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
+		err = s.repo.GrantDatabaseRolesToDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
 		if err != nil {
 			return err
 		}
 
-		return repo.GrantAccountRolesToDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
+		return s.repo.GrantAccountRolesToDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
 	}
 
 	if len(toAddDatabaseRoles) > 0 {
 		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddDatabaseRoles)
 	}
 
-	return repo.GrantAccountRolesToAccountRole(ctx, targetExternalId, filteredAccountRoles...)
+	return s.repo.GrantAccountRolesToAccountRole(ctx, targetExternalId, filteredAccountRoles...)
 }
 
 func (s *AccessSyncer) shouldIgnoreLinkedRole(roleName string) (bool, error) {
@@ -904,7 +903,7 @@ func (s *AccessSyncer) shouldIgnoreLinkedRole(roleName string) (bool, error) {
 	return matched, nil
 }
 
-func (s *AccessSyncer) revokeRolesFromRole(ctx context.Context, repo dataAccessRepository, targetExternalId string, targetApType *string, roles ...string) error {
+func (s *AccessSyncer) revokeRolesFromRole(ctx context.Context, targetExternalId string, targetApType *string, roles ...string) error {
 	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
 
 	var filteredAccountRoles []string
@@ -944,48 +943,48 @@ func (s *AccessSyncer) revokeRolesFromRole(ctx context.Context, repo dataAccessR
 			}
 		}
 
-		err = repo.RevokeDatabaseRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
+		err = s.repo.RevokeDatabaseRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
 		if err != nil {
 			return err
 		}
 
-		return repo.RevokeAccountRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
+		return s.repo.RevokeAccountRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
 	}
 
 	if len(toAddDatabaseRoles) > 0 {
 		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddDatabaseRoles)
 	}
 
-	return repo.RevokeAccountRolesFromAccountRole(ctx, targetExternalId, filteredAccountRoles...)
+	return s.repo.RevokeAccountRolesFromAccountRole(ctx, targetExternalId, filteredAccountRoles...)
 }
 
-func (s *AccessSyncer) createRole(externalId string, apType *string, repo dataAccessRepository) error {
+func (s *AccessSyncer) createRole(externalId string, apType *string) error {
 	if isDatabaseRole(apType) {
 		database, cleanedRoleName, err := parseDatabaseRoleExternalId(externalId)
 		if err != nil {
 			return err
 		}
 
-		return repo.CreateDatabaseRole(database, cleanedRoleName)
+		return s.repo.CreateDatabaseRole(database, cleanedRoleName)
 	}
 
-	return repo.CreateAccountRole(externalId)
+	return s.repo.CreateAccountRole(externalId)
 }
 
-func (s *AccessSyncer) dropRole(externalId string, databaseRole bool, repo dataAccessRepository) error {
+func (s *AccessSyncer) dropRole(externalId string, databaseRole bool) error {
 	if databaseRole {
 		database, cleanedRoleName, err := parseDatabaseRoleExternalId(externalId)
 		if err != nil {
 			return err
 		}
 
-		return repo.DropDatabaseRole(database, cleanedRoleName)
+		return s.repo.DropDatabaseRole(database, cleanedRoleName)
 	}
 
-	return repo.DropAccountRole(externalId)
+	return s.repo.DropAccountRole(externalId)
 }
 
-func (s *AccessSyncer) renameRole(oldName, newName string, apType *string, repo dataAccessRepository) error {
+func (s *AccessSyncer) renameRole(oldName, newName string, apType *string) error {
 	if isDatabaseRole(apType) {
 		if !isDatabaseRoleByExternalId(newName) || !isDatabaseRoleByExternalId(oldName) {
 			return fmt.Errorf("both roles should be a database role newName:%q - oldName:%q", newName, oldName)
@@ -1005,31 +1004,31 @@ func (s *AccessSyncer) renameRole(oldName, newName string, apType *string, repo 
 			return fmt.Errorf("expected new roleName %q pointing to the same database as old roleName %q", newName, oldName)
 		}
 
-		return repo.RenameDatabaseRole(oldDatabase, oldRoleName, newRoleName)
+		return s.repo.RenameDatabaseRole(oldDatabase, oldRoleName, newRoleName)
 	}
 
-	return repo.RenameAccountRole(oldName, newName)
+	return s.repo.RenameAccountRole(oldName, newName)
 }
 
-func (s *AccessSyncer) commentOnRoleIfExists(comment, roleName string, repo dataAccessRepository) error {
+func (s *AccessSyncer) commentOnRoleIfExists(comment, roleName string) error {
 	if isDatabaseRoleByExternalId(roleName) {
 		database, cleanedRoleName, err := parseDatabaseRoleExternalId(roleName)
 		if err != nil {
 			return err
 		}
 
-		return repo.CommentDatabaseRoleIfExists(comment, database, cleanedRoleName)
+		return s.repo.CommentDatabaseRoleIfExists(comment, database, cleanedRoleName)
 	}
 
-	return repo.CommentAccountRoleIfExists(comment, roleName)
+	return s.repo.CommentAccountRoleIfExists(comment, roleName)
 }
 
-func (s *AccessSyncer) generateAccessControls(ctx context.Context, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string, repo dataAccessRepository, configMap *config.ConfigMap, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
+func (s *AccessSyncer) generateAccessControls(ctx context.Context, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string, feedbackHandler wrappers.AccessProviderFeedbackHandler) error {
 	// We always need the meta data
 	rolesCreated := make(map[string]interface{})
 	dsSyncer := DataSourceSyncer{}
 
-	md, err := dsSyncer.GetDataSourceMetaData(ctx, configMap)
+	md, err := dsSyncer.GetDataSourceMetaData(ctx, s.configMap)
 	if err != nil {
 		return err
 	}
@@ -1043,7 +1042,7 @@ func (s *AccessSyncer) generateAccessControls(ctx context.Context, toProcessAps 
 			Type:           accessProvider.Type,
 		}
 
-		fi.ActualName, err = s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, repo, metaData)
+		fi.ActualName, err = s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, metaData)
 
 		err3 := s.handleAccessProviderFeedback(feedbackHandler, &fi, err)
 		if err3 != nil {
@@ -1063,7 +1062,7 @@ func (s *AccessSyncer) handleAccessProviderFeedback(feedbackHandler wrappers.Acc
 	return feedbackHandler.AddAccessProviderFeedback(*fi)
 }
 
-func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvider, roleNameMap map[string]string, repo dataAccessRepository) (string, error) {
+func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvider, roleNameMap map[string]string) (string, error) {
 	logger.Info(fmt.Sprintf("Updating mask %q", mask.Name))
 
 	globalMaskName := raitoMaskName(mask.Name)
@@ -1104,7 +1103,7 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 	}
 
 	// Step 1: Get existing masking policies with same prefix
-	existingPolicies, err := repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", globalMaskName, "%"))
+	existingPolicies, err := s.repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", globalMaskName, "%"))
 	if err != nil {
 		return uniqueMaskName, err
 	}
@@ -1117,7 +1116,7 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 		database := namesplit[0]
 		schemaName := namesplit[1]
 
-		err = repo.CreateMaskPolicy(database, schemaName, uniqueMaskName, dos, mask.Type, &beneficiaries)
+		err = s.repo.CreateMaskPolicy(database, schemaName, uniqueMaskName, dos, mask.Type, &beneficiaries)
 		if err != nil {
 			return uniqueMaskName, err
 		}
@@ -1128,7 +1127,7 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 		existingUniqueMaskNameSpit := strings.Split(policy.Name, "_")
 		existingUniqueMaskName := strings.Join(existingUniqueMaskNameSpit[:len(existingUniqueMaskNameSpit)-1], "_")
 
-		err = repo.DropMaskingPolicy(policy.DatabaseName, policy.SchemaName, existingUniqueMaskName)
+		err = s.repo.DropMaskingPolicy(policy.DatabaseName, policy.SchemaName, existingUniqueMaskName)
 		if err != nil {
 			return uniqueMaskName, err
 		}
@@ -1137,16 +1136,16 @@ func (s *AccessSyncer) updateMask(_ context.Context, mask *importer.AccessProvid
 	return uniqueMaskName, nil
 }
 
-func (s *AccessSyncer) removeMask(_ context.Context, maskName string, repo dataAccessRepository) error {
+func (s *AccessSyncer) removeMask(_ context.Context, maskName string) error {
 	logger.Info(fmt.Sprintf("Remove mask %q", maskName))
 
-	existingPolicies, err := repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", maskName, "%"))
+	existingPolicies, err := s.repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", maskName, "%"))
 	if err != nil {
 		return err
 	}
 
 	for _, policy := range existingPolicies {
-		err = repo.DropMaskingPolicy(policy.DatabaseName, policy.SchemaName, maskName)
+		err = s.repo.DropMaskingPolicy(policy.DatabaseName, policy.SchemaName, maskName)
 		if err != nil {
 			return err
 		}
@@ -1178,7 +1177,7 @@ func (s *AccessSyncer) createGrantsForTableOrView(doType string, permissions []s
 	return nil
 }
 
-func (s *AccessSyncer) getTablesForSchema(repo dataAccessRepository, database, schema string) ([]TableEntity, error) {
+func (s *AccessSyncer) getTablesForSchema(database, schema string) ([]TableEntity, error) {
 	cacheKey := database + "." + schema
 
 	if tables, f := s.tablesPerSchemaCache[cacheKey]; f {
@@ -1187,7 +1186,7 @@ func (s *AccessSyncer) getTablesForSchema(repo dataAccessRepository, database, s
 
 	tables := make([]TableEntity, 10)
 
-	err := repo.GetTablesInDatabase(database, schema, func(entity interface{}) error {
+	err := s.repo.GetTablesInDatabase(database, schema, func(entity interface{}) error {
 		table := entity.(*TableEntity)
 		tables = append(tables, *table)
 
@@ -1203,14 +1202,14 @@ func (s *AccessSyncer) getTablesForSchema(repo dataAccessRepository, database, s
 	return tables, nil
 }
 
-func (s *AccessSyncer) getSchemasForDatabase(repo dataAccessRepository, database string) ([]SchemaEntity, error) {
+func (s *AccessSyncer) getSchemasForDatabase(database string) ([]SchemaEntity, error) {
 	if schemas, f := s.schemasPerDataBaseCache[database]; f {
 		return schemas, nil
 	}
 
 	schemas := make([]SchemaEntity, 10)
 
-	err := repo.GetSchemasInDatabase(database, func(entity interface{}) error {
+	err := s.repo.GetSchemasInDatabase(database, func(entity interface{}) error {
 		schema := entity.(*SchemaEntity)
 		schemas = append(schemas, *schema)
 
@@ -1226,13 +1225,13 @@ func (s *AccessSyncer) getSchemasForDatabase(repo dataAccessRepository, database
 	return schemas, nil
 }
 
-func (s *AccessSyncer) getWarehouses(repo dataAccessRepository) ([]DbEntity, error) {
+func (s *AccessSyncer) getWarehouses() ([]DbEntity, error) {
 	if s.warehousesCache != nil {
 		return s.warehousesCache, nil
 	}
 
 	var err error
-	s.warehousesCache, err = repo.GetWarehouses()
+	s.warehousesCache, err = s.repo.GetWarehouses()
 
 	if err != nil {
 		s.warehousesCache = nil
@@ -1242,7 +1241,7 @@ func (s *AccessSyncer) getWarehouses(repo dataAccessRepository) ([]DbEntity, err
 	return s.warehousesCache, nil
 }
 
-func (s *AccessSyncer) createGrantsForSchema(repo dataAccessRepository, permissions []string, fullName string, metaData map[string]map[string]struct{}, isShared bool, grants set.Set[Grant]) error {
+func (s *AccessSyncer) createGrantsForSchema(permissions []string, fullName string, metaData map[string]map[string]struct{}, isShared bool, grants set.Set[Grant]) error {
 	// TODO: this does not work for Raito full names
 	sfObject := common.ParseFullName(fullName)
 	if sfObject.Database == nil || sfObject.Schema == nil || sfObject.Table != nil || sfObject.Column != nil {
@@ -1254,7 +1253,7 @@ func (s *AccessSyncer) createGrantsForSchema(repo dataAccessRepository, permissi
 	for _, p := range permissions {
 		permissionMatchFound := false
 
-		permissionMatchFound, err = s.createPermissionGrantsForSchema(repo, *sfObject.Database, *sfObject.Schema, p, metaData, isShared, grants)
+		permissionMatchFound, err = s.createPermissionGrantsForSchema(*sfObject.Database, *sfObject.Schema, p, metaData, isShared, grants)
 		if err != nil {
 			return err
 		}
@@ -1274,7 +1273,7 @@ func (s *AccessSyncer) createGrantsForSchema(repo dataAccessRepository, permissi
 	return nil
 }
 
-func (s *AccessSyncer) createPermissionGrantsForSchema(repo dataAccessRepository, database, schema, p string, metaData map[string]map[string]struct{}, isShared bool, grants set.Set[Grant]) (bool, error) {
+func (s *AccessSyncer) createPermissionGrantsForSchema(database, schema, p string, metaData map[string]map[string]struct{}, isShared bool, grants set.Set[Grant]) (bool, error) {
 	matchFound := false
 
 	schemaType := ds.Schema
@@ -1291,7 +1290,7 @@ func (s *AccessSyncer) createPermissionGrantsForSchema(repo dataAccessRepository
 		grants.Add(Grant{p, schemaType, common.FormatQuery(`%s.%s`, database, schema)})
 		matchFound = true
 	} else {
-		tables, err := s.getTablesForSchema(repo, database, schema)
+		tables, err := s.getTablesForSchema(database, schema)
 		if err != nil {
 			return false, err
 		}
@@ -1307,7 +1306,7 @@ func (s *AccessSyncer) createPermissionGrantsForSchema(repo dataAccessRepository
 	return matchFound, nil
 }
 
-func (s *AccessSyncer) createPermissionGrantsForDatabase(repo dataAccessRepository, database, p string, metaData map[string]map[string]struct{}, isShared bool, grants set.Set[Grant]) (bool, error) {
+func (s *AccessSyncer) createPermissionGrantsForDatabase(database, p string, metaData map[string]map[string]struct{}, isShared bool, grants set.Set[Grant]) (bool, error) {
 	matchFound := false
 
 	dbType := ds.Database
@@ -1324,7 +1323,7 @@ func (s *AccessSyncer) createPermissionGrantsForDatabase(repo dataAccessReposito
 
 		grants.Add(Grant{p, dbType, database})
 	} else {
-		schemas, err := s.getSchemasForDatabase(repo, database)
+		schemas, err := s.getSchemasForDatabase(database)
 		if err != nil {
 			return false, err
 		}
@@ -1336,7 +1335,7 @@ func (s *AccessSyncer) createPermissionGrantsForDatabase(repo dataAccessReposito
 
 			schemaMatchFound := false
 
-			schemaMatchFound, err = s.createPermissionGrantsForSchema(repo, database, schema.Name, p, metaData, isShared, grants)
+			schemaMatchFound, err = s.createPermissionGrantsForSchema(database, schema.Name, p, metaData, isShared, grants)
 			if err != nil {
 				return matchFound, err
 			}
@@ -1371,12 +1370,12 @@ func (s *AccessSyncer) createPermissionGrantsForTable(database string, schema st
 	return false
 }
 
-func (s *AccessSyncer) createGrantsForDatabase(repo dataAccessRepository, permissions []string, database string, metaData map[string]map[string]struct{}, isShared bool, grants set.Set[Grant]) error {
+func (s *AccessSyncer) createGrantsForDatabase(permissions []string, database string, metaData map[string]map[string]struct{}, isShared bool, grants set.Set[Grant]) error {
 	var err error
 
 	for _, p := range permissions {
 		databaseMatchFound := false
-		databaseMatchFound, err = s.createPermissionGrantsForDatabase(repo, database, p, metaData, isShared, grants)
+		databaseMatchFound, err = s.createPermissionGrantsForDatabase(database, p, metaData, isShared, grants)
 
 		if err != nil {
 			return err
@@ -1409,7 +1408,7 @@ func (s *AccessSyncer) createGrantsForWarehouse(permissions []string, warehouse 
 	}
 }
 
-func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permissions []string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) error {
+func (s *AccessSyncer) createGrantsForAccount(permissions []string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) error {
 	for _, p := range permissions {
 		matchFound := false
 
@@ -1420,7 +1419,7 @@ func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permiss
 			if _, f2 := metaData["warehouse"][strings.ToUpper(p)]; f2 {
 				matchFound = true
 
-				warehouses, err := s.getWarehouses(repo)
+				warehouses, err := s.getWarehouses()
 				if err != nil {
 					return err
 				}
@@ -1430,12 +1429,12 @@ func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permiss
 				}
 			}
 
-			shareNames, err := s.getShareNames(repo)
+			shareNames, err := s.getShareNames()
 			if err != nil {
 				return err
 			}
 
-			databases, err := s.getAllAvailableDatabases(repo)
+			databases, err := s.getAllAvailableDatabases()
 			if err != nil {
 				return err
 			}
@@ -1445,7 +1444,7 @@ func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permiss
 
 				isShare := slices.Contains(shareNames, database.Name)
 
-				databaseMatchFound, err = s.createPermissionGrantsForDatabase(repo, database.Name, p, metaData, isShare, grants)
+				databaseMatchFound, err = s.createPermissionGrantsForDatabase(database.Name, p, metaData, isShare, grants)
 				if err != nil {
 					return err
 				}
@@ -1470,7 +1469,7 @@ func (s *AccessSyncer) createGrantsForAccount(repo dataAccessRepository, permiss
 	return nil
 }
 
-func (s *AccessSyncer) updateOrCreateFilter(ctx context.Context, repo dataAccessRepository, tableFullName string, aps []*importer.AccessProvider, roleNameMap map[string]string) (string, *string, error) {
+func (s *AccessSyncer) updateOrCreateFilter(ctx context.Context, tableFullName string, aps []*importer.AccessProvider, roleNameMap map[string]string) (string, *string, error) {
 	tableFullnameSplit := strings.Split(tableFullName, ".")
 	database := tableFullnameSplit[0]
 	schema := tableFullnameSplit[1]
@@ -1507,7 +1506,7 @@ func (s *AccessSyncer) updateOrCreateFilter(ctx context.Context, repo dataAccess
 
 	filterName := fmt.Sprintf("raito_%s_%s_%s_filter", schema, table, gonanoid.MustGenerate(idAlphabet, 8))
 
-	err := repo.UpdateFilter(database, schema, table, filterName, arguments.Slice(), strings.Join(filterExpressions, " OR "))
+	err := s.repo.UpdateFilter(database, schema, table, filterName, arguments.Slice(), strings.Join(filterExpressions, " OR "))
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to update filter %s: %w", filterName, err)
 	}
@@ -1515,7 +1514,7 @@ func (s *AccessSyncer) updateOrCreateFilter(ctx context.Context, repo dataAccess
 	return filterName, ptr.String(fmt.Sprintf("%s.%s", tableFullName, filterName)), nil
 }
 
-func (s *AccessSyncer) deleteFilter(repo dataAccessRepository, tableFullName string, aps []*importer.AccessProvider) error {
+func (s *AccessSyncer) deleteFilter(tableFullName string, aps []*importer.AccessProvider) error {
 	tableFullnameSplit := strings.Split(tableFullName, ".")
 	database := tableFullnameSplit[0]
 	schema := tableFullnameSplit[1]
@@ -1533,7 +1532,7 @@ func (s *AccessSyncer) deleteFilter(repo dataAccessRepository, tableFullName str
 	var err error
 
 	for filterName := range filterNames {
-		deleteErr := repo.DropFilter(database, schema, table, filterName)
+		deleteErr := s.repo.DropFilter(database, schema, table, filterName)
 		if deleteErr != nil {
 			err = multierror.Append(err, fmt.Errorf("failed to delete filter %s: %w", filterName, deleteErr))
 		}
@@ -1546,33 +1545,33 @@ func (s *AccessSyncer) deleteFilter(repo dataAccessRepository, tableFullName str
 	return nil
 }
 
-func (s *AccessSyncer) executeGrantOnRole(perm, on, roleName string, apType *string, repo dataAccessRepository) error {
+func (s *AccessSyncer) executeGrantOnRole(perm, on, roleName string, apType *string) error {
 	if isDatabaseRole(apType) {
 		database, parsedRoleName, err := parseDatabaseRoleExternalId(roleName)
 		if err != nil {
 			return err
 		}
 
-		return repo.ExecuteGrantOnDatabaseRole(perm, on, database, parsedRoleName)
+		return s.repo.ExecuteGrantOnDatabaseRole(perm, on, database, parsedRoleName)
 	}
 
-	return repo.ExecuteGrantOnAccountRole(perm, on, roleName)
+	return s.repo.ExecuteGrantOnAccountRole(perm, on, roleName)
 }
 
-func (s *AccessSyncer) executeRevokeOnRole(perm, on, roleName string, apType *string, repo dataAccessRepository) error {
+func (s *AccessSyncer) executeRevokeOnRole(perm, on, roleName string, apType *string) error {
 	if isDatabaseRole(apType) {
 		database, parsedRoleName, err := parseDatabaseRoleExternalId(roleName)
 		if err != nil {
 			return err
 		}
 
-		return repo.ExecuteRevokeOnDatabaseRole(perm, on, database, parsedRoleName)
+		return s.repo.ExecuteRevokeOnDatabaseRole(perm, on, database, parsedRoleName)
 	}
 
-	return repo.ExecuteRevokeOnAccountRole(perm, on, roleName)
+	return s.repo.ExecuteRevokeOnAccountRole(perm, on, roleName)
 }
 
-func (s *AccessSyncer) mergeGrants(repo dataAccessRepository, externalId string, apType *string, found []Grant, expected []Grant, metaData map[string]map[string]struct{}) error {
+func (s *AccessSyncer) mergeGrants(externalId string, apType *string, found []Grant, expected []Grant, metaData map[string]map[string]struct{}) error {
 	toAdd := slice.SliceDifference(expected, found)
 	toRemove := slice.SliceDifference(found, expected)
 
@@ -1580,7 +1579,7 @@ func (s *AccessSyncer) mergeGrants(repo dataAccessRepository, externalId string,
 
 	for _, grant := range toAdd {
 		if verifyGrant(grant, metaData) {
-			err := s.executeGrantOnRole(grant.Permissions, grant.GetGrantOnType()+" "+grant.On, externalId, apType, repo)
+			err := s.executeGrantOnRole(grant.Permissions, grant.GetGrantOnType()+" "+grant.On, externalId, apType)
 			if err != nil {
 				return err
 			}
@@ -1589,7 +1588,7 @@ func (s *AccessSyncer) mergeGrants(repo dataAccessRepository, externalId string,
 
 	for _, grant := range toRemove {
 		if verifyGrant(grant, metaData) {
-			err := s.executeRevokeOnRole(grant.Permissions, grant.GetGrantOnType()+" "+grant.On, externalId, apType, repo)
+			err := s.executeRevokeOnRole(grant.Permissions, grant.GetGrantOnType()+" "+grant.On, externalId, apType)
 			if err != nil {
 				return err
 			}

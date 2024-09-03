@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/blockloop/scan"
+	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/golang-set/set"
@@ -44,6 +45,7 @@ type SnowflakeRepository struct {
 	queryTime      time.Duration
 	role           string
 	usageBatchSize int
+	workerPoolSize int
 
 	maskFactory *MaskFactory
 }
@@ -54,6 +56,16 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 
 		if err != nil {
 			logger.Error("Error while setting snowflake sdk to debug level: %s", err.Error())
+		}
+	}
+
+	workerPoolSize := 10
+	if v, f := params[SfWorkerPoolSize]; f {
+		poolSize, err := strconv.Atoi(v)
+		if err != nil {
+			logger.Warn(fmt.Sprintf("Unable to parse parameter %s: %s", SfWorkerPoolSize, err.Error()))
+		} else if poolSize > 0 {
+			workerPoolSize = poolSize
 		}
 	}
 
@@ -78,6 +90,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 		conn:           conn,
 		role:           role,
 		usageBatchSize: usageBatchSize,
+		workerPoolSize: workerPoolSize,
 
 		maskFactory: NewMaskFactory(),
 	}, nil
@@ -686,34 +699,40 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 		return nil, fmt.Errorf("error while fetching users: %s", err.Error())
 	}
 
+	wp := workerpool.New(repo.workerPoolSize)
+
 	for i := range userRows {
 		userRow := userRows[i]
 		if userRow.Type != nil && *userRow.Type != "" {
 			continue
 		}
 
-		rows, _, err = repo.query(fmt.Sprintf(`DESCRIBE USER "%s"`, userRow.Name)) //nolint:gocritic
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Unable to fetch user details for %q: %s", userRow.Name, err.Error()))
-			continue
-		}
-
-		var userDetails []UserDetails
-		err = scan.Rows(&userDetails, rows)
-
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Unable to parse user details for %q: %s", userRow.Name, err.Error()))
-			continue
-		}
-
-		for _, detail := range userDetails {
-			if strings.EqualFold(detail.Property, "TYPE") {
-				val := detail.Value
-				userRow.Type = &val
-				userRows[i] = userRow
+		wp.Submit(func() {
+			rows, _, err = repo.query(fmt.Sprintf(`DESCRIBE USER "%s"`, userRow.Name)) //nolint:gocritic
+			if err != nil {
+				logger.Warn(fmt.Sprintf("Unable to fetch user details for %q: %s", userRow.Name, err.Error()))
+				return
 			}
-		}
+
+			var userDetails []UserDetails
+			err = scan.Rows(&userDetails, rows)
+
+			if err != nil {
+				logger.Warn(fmt.Sprintf("Unable to parse user details for %q: %s", userRow.Name, err.Error()))
+				return
+			}
+
+			for _, detail := range userDetails {
+				if strings.EqualFold(detail.Property, "TYPE") {
+					val := detail.Value
+					userRow.Type = &val
+					userRows[i] = userRow
+				}
+			}
+		})
 	}
+
+	wp.StopWait()
 
 	return userRows, nil
 }

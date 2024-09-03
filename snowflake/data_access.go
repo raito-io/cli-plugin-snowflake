@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	"github.com/raito-io/cli/base/tag"
@@ -91,6 +93,16 @@ type AccessSyncer struct {
 	namingConstraints             naming_hint.NamingConstraints
 	uniqueRoleNameGeneratorsCache map[*string]naming_hint.UniqueGenerator
 	ignoreLinksToRole             []string
+
+	configMap                         *config.ConfigMap
+	processedAps                      map[string]*exporter.AccessProvider
+	linkToExternalIdentityStoreGroups bool
+	availableTags                     map[string][]*tag.Tag
+	externalGroupOwners               string
+	shares                            []string
+	excludedRoles                     map[string]struct{}
+	repo                              dataAccessRepository
+	lock                              sync.Mutex
 }
 
 func NewDataAccessSyncer(namingConstraints naming_hint.NamingConstraints) *AccessSyncer {
@@ -113,6 +125,9 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 		return err
 	}
 
+	s.configMap = configMap
+	s.repo = repo
+
 	defer func() {
 		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
 		repo.Close()
@@ -120,14 +135,19 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 
 	logger.Info("Reading account and database roles from Snowflake")
 
-	shares, err := s.getShareNames(repo)
+	shares, err := s.getShareNames()
 	if err != nil {
 		return err
 	}
 
+	s.shares = shares
+	s.externalGroupOwners = s.configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
+	s.extractExcludeRoleList()
+	s.linkToExternalIdentityStoreGroups = s.configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
+
 	logger.Info("Reading account roles from Snowflake")
 
-	err = s.importAllRolesOnAccountLevel(accessProviderHandler, repo, shares, configMap)
+	err = s.importAllRolesOnAccountLevel(accessProviderHandler)
 	if err != nil {
 		return err
 	}
@@ -135,9 +155,9 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	databaseRoleSupportEnabled := configMap.GetBoolWithDefault(SfDatabaseRoles, false)
 	if databaseRoleSupportEnabled {
 		logger.Info("Reading database roles from Snowflake")
-		excludedDatabases := s.extractExcludeDatabases(configMap)
+		excludedDatabases := s.extractExcludeDatabases()
 
-		err = s.importAllRolesOnDatabaseLevel(accessProviderHandler, repo, excludedDatabases, shares, configMap)
+		err = s.importAllRolesOnDatabaseLevel(accessProviderHandler, excludedDatabases)
 		if err != nil {
 			return err
 		}
@@ -150,7 +170,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 		if !skipColumns {
 			logger.Info("Reading masking policies from Snowflake")
 
-			err = s.importMaskingPolicies(accessProviderHandler, repo)
+			err = s.importMaskingPolicies(accessProviderHandler)
 			if err != nil {
 				return err
 			}
@@ -160,7 +180,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 
 		logger.Info("Reading row access policies from Snowflake")
 
-		err = s.importRowAccessPolicies(accessProviderHandler, repo)
+		err = s.importRowAccessPolicies(accessProviderHandler)
 		if err != nil {
 			return err
 		}
@@ -176,6 +196,9 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 	if err != nil {
 		return err
 	}
+
+	s.repo = repo
+	s.configMap = configMap
 
 	defer func() {
 		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
@@ -221,7 +244,7 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 
 	// Step 1 first initiate all the masks
 	if len(masksMap)+len(masksToRemove) > 0 {
-		err = s.SyncAccessProviderMasksToTarget(ctx, masksToRemove, masksMap, apIdNameMap, accessProviderFeedbackHandler, configMap, repo)
+		err = s.SyncAccessProviderMasksToTarget(ctx, masksToRemove, masksMap, apIdNameMap, accessProviderFeedbackHandler)
 		if err != nil {
 			return fmt.Errorf("sync masks to target: %w", err)
 		}
@@ -229,14 +252,14 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 
 	// Step 2 then initialize all filters
 	if len(filtersMap)+len(filtersToRemove) > 0 {
-		err = s.SyncAccessProviderFiltersToTarget(ctx, filtersToRemove, filtersMap, apIdNameMap, accessProviderFeedbackHandler, configMap, repo)
+		err = s.SyncAccessProviderFiltersToTarget(ctx, filtersToRemove, filtersMap, apIdNameMap, accessProviderFeedbackHandler)
 		if err != nil {
 			return fmt.Errorf("sync filters to target: %w", err)
 		}
 	}
 
 	// Step 3 then initiate all the roles
-	err = s.SyncAccessProviderRolesToTarget(ctx, rolesToRemove, rolesMap, accessProviderFeedbackHandler, configMap, repo)
+	err = s.SyncAccessProviderRolesToTarget(ctx, rolesToRemove, rolesMap, accessProviderFeedbackHandler)
 	if err != nil {
 		return fmt.Errorf("sync roles to target: %w", err)
 	}
@@ -299,13 +322,13 @@ func raitoMaskUniqueName(name string) string {
 	return raitoMaskName(name) + "_" + gonanoid.MustGenerate(idAlphabet, 8)
 }
 
-func (s *AccessSyncer) getAllAvailableDatabases(repo dataAccessRepository) ([]DbEntity, error) {
+func (s *AccessSyncer) getAllAvailableDatabases() ([]DbEntity, error) {
 	if s.databasesCache != nil {
 		return s.databasesCache, nil
 	}
 
 	var err error
-	s.databasesCache, err = repo.GetDatabases()
+	s.databasesCache, err = s.repo.GetDatabases()
 
 	if err != nil {
 		s.databasesCache = nil
@@ -315,8 +338,8 @@ func (s *AccessSyncer) getAllAvailableDatabases(repo dataAccessRepository) ([]Db
 	return s.databasesCache, nil
 }
 
-func (s *AccessSyncer) getApplicableDatabases(repo dataAccessRepository, dbExcludes set.Set[string]) ([]DbEntity, error) {
-	allDatabases, err := s.getAllAvailableDatabases(repo)
+func (s *AccessSyncer) getApplicableDatabases(dbExcludes set.Set[string]) ([]DbEntity, error) {
+	allDatabases, err := s.getAllAvailableDatabases()
 	if err != nil {
 		return nil, err
 	}
@@ -332,9 +355,9 @@ func (s *AccessSyncer) getApplicableDatabases(repo dataAccessRepository, dbExclu
 	return filteredDatabases, nil
 }
 
-func (s *AccessSyncer) extractExcludeDatabases(configMap *config.ConfigMap) set.Set[string] {
+func (s *AccessSyncer) extractExcludeDatabases() set.Set[string] {
 	excludedDatabases := "SNOWFLAKE"
-	if v, ok := configMap.Parameters[SfExcludedDatabases]; ok {
+	if v, ok := s.configMap.Parameters[SfExcludedDatabases]; ok {
 		excludedDatabases = v
 	}
 

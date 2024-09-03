@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/raito-io/cli/base"
+	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/golang-set/set"
 )
 
@@ -70,6 +71,15 @@ func accountRoleExternalIdGenerator(roleName string) string {
 
 func isDatabaseRole(apType *string) bool {
 	return apType != nil && strings.EqualFold(*apType, apTypeDatabaseRole)
+}
+
+func getWorkerPoolSize(configMap *config.ConfigMap) int {
+	size := configMap.GetInt(SfWorkerPoolSize)
+	if size <= 0 {
+		return 10
+	}
+
+	return size
 }
 
 func isDatabaseRoleByExternalId(externalId string) bool {
