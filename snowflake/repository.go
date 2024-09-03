@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
@@ -46,6 +47,7 @@ type SnowflakeRepository struct {
 	role           string
 	usageBatchSize int
 	workerPoolSize int
+	queryTimeLock  sync.Mutex
 
 	maskFactory *MaskFactory
 }
@@ -1255,7 +1257,7 @@ func (repo *SnowflakeRepository) queryContext(ctx context.Context, query string,
 	startQuery := time.Now()
 	result, err := repo.conn.QueryContext(ctx, query, args...)
 	sec := time.Since(startQuery).Round(time.Millisecond)
-	repo.queryTime += sec
+	repo.addToQueryTime(sec)
 
 	logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
 
@@ -1267,11 +1269,18 @@ func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, 
 	startQuery := time.Now()
 	result, err := QuerySnowflake(repo.conn, query)
 	sec := time.Since(startQuery).Round(time.Millisecond)
-	repo.queryTime += sec
+
+	repo.addToQueryTime(sec)
 
 	logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
 
 	return result, sec, err
+}
+
+func (repo *SnowflakeRepository) addToQueryTime(duration time.Duration) {
+	repo.queryTimeLock.Lock()
+	repo.queryTime += duration
+	repo.queryTimeLock.Unlock()
 }
 
 func (repo *SnowflakeRepository) execute(query ...string) error {
@@ -1291,7 +1300,7 @@ func (repo *SnowflakeRepository) execute(query ...string) error {
 	startQuery := time.Now()
 	err = ExecuteSnowflake(ctx, repo.conn, strings.Join(query, "\n"))
 	sec := time.Since(startQuery).Round(time.Millisecond)
-	repo.queryTime += sec
+	repo.addToQueryTime(sec)
 
 	return err
 }
@@ -1355,7 +1364,7 @@ func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []s
 	startQuery := time.Now()
 	_, err := repo.conn.ExecContext(multiContext, query)
 	sec := time.Since(startQuery).Round(time.Millisecond)
-	repo.queryTime += sec
+	repo.addToQueryTime(sec)
 
 	if err != nil {
 		return sec, fmt.Errorf("error while executing queries: %s: %w", query, err)
