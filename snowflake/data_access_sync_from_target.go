@@ -141,9 +141,9 @@ func (s *AccessFromTargetSyncer) importAllRolesOnAccountLevel(accessProviderHand
 		}
 
 		wp.Submit(func() {
-			err := s.transformAccountRoleToAccessProvider(roleEntity, processedAps, availableTags)
-			if err != nil {
-				logger.Warn(fmt.Sprintf("Error importing SnowFlake role %q: %s", roleEntity.Name, err.Error()))
+			err2 := s.transformAccountRoleToAccessProvider(roleEntity, processedAps, availableTags)
+			if err2 != nil {
+				logger.Warn(fmt.Sprintf("Error importing SnowFlake role %q: %s", roleEntity.Name, err2.Error()))
 			}
 		})
 	}
