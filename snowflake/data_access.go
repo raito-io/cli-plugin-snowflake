@@ -95,6 +95,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 		return err
 	}
 
+	s.repo = repo
 	fromTargetSyncer := NewAccessFromTargetSyncer(ctx, s, repo, accessProviderHandler, configMap)
 
 	return fromTargetSyncer.syncFromTarget()
@@ -106,6 +107,7 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 		return err
 	}
 
+	s.repo = repo
 	toTargetSyncer := NewAccessToTargetSyncer(ctx, s, s.namingConstraints, repo, accessProviders, accessProviderFeedbackHandler, configMap)
 
 	return toTargetSyncer.syncToTarget()
