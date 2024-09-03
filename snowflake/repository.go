@@ -379,7 +379,7 @@ func (repo *SnowflakeRepository) GrantUsersToAccountRole(ctx context.Context, ro
 	statementChan, done := repo.execMultiStatements(ctx)
 
 	for _, user := range users {
-		q := common.FormatQuery(`GRANT ROLE %s TO USER %q`, role, user)
+		q := common.FormatQuery(`GRANT ROLE %s TO USER %s`, role, user)
 		statementChan <- q
 	}
 
@@ -397,7 +397,7 @@ func (repo *SnowflakeRepository) RevokeUsersFromAccountRole(ctx context.Context,
 	statementChan, done := repo.execMultiStatements(ctx)
 
 	for _, user := range users {
-		q := common.FormatQuery(`REVOKE ROLE %s FROM USER %q`, role, user)
+		q := common.FormatQuery(`REVOKE ROLE %s FROM USER %s`, role, user)
 		statementChan <- q
 	}
 
@@ -1357,7 +1357,11 @@ func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []s
 	sec := time.Since(startQuery).Round(time.Millisecond)
 	repo.queryTime += sec
 
-	return sec, err
+	if err != nil {
+		return sec, fmt.Errorf("error while executing queries: %s: %w", query, err)
+	}
+
+	return sec, nil
 }
 
 func (repo *SnowflakeRepository) getColumnInformation(databaseName string, columnFullNames []string, fn func(columnName string, dataType string) error) error {
