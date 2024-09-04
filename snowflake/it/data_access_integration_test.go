@@ -459,12 +459,10 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 		},
 	}
 
-	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
-
 	config := s.getConfig()
 
 	//When
-	err := dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+	err := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
@@ -489,7 +487,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
 	//When updating the mask will be recreated
-	err = dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+	err = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
@@ -519,7 +517,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
 	//When
-	err = dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+	err = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
 	//Then
 	s.NoError(err)
