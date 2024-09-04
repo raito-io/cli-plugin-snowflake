@@ -1,7 +1,6 @@
 package snowflake
 
 import (
-	"context"
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
@@ -251,5 +250,5 @@ func createBasicFromTargetSyncer(repo dataAccessRepository, accessProviderHandle
 		namingConstraints: RoleNameConstraints,
 	}
 
-	return NewAccessFromTargetSyncer(context.Background(), &as, repo, accessProviderHandler, configMap)
+	return NewAccessFromTargetSyncer(&as, repo, accessProviderHandler, configMap)
 }

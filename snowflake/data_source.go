@@ -42,7 +42,7 @@ type DataSourceSyncer struct {
 	excludeChildren   []string
 	skipColumns       bool
 	schemaExcludes    set.Set[string]
-	sharesMap         map[string]struct{}
+	sharesMap         set.Set[string]
 	repo              dataSourceRepository
 	dataSourceHandler wrappers.DataSourceObjectHandler
 	lock              sync.Mutex
@@ -189,7 +189,7 @@ func (s *DataSourceSyncer) handleDatabase(database ExtendedDbEntity) error {
 	}
 
 	doTypePrefix := ""
-	if _, f := s.sharesMap[database.Entity.Name]; f {
+	if s.sharesMap.Contains(database.Entity.Name) {
 		doTypePrefix = SharedPrefix
 	}
 
@@ -408,7 +408,7 @@ func (s *DataSourceSyncer) readDatabases(excludes set.Set[string], shares map[st
 	return enrichedDatabases, nil
 }
 
-func (s *DataSourceSyncer) readShares(excludes set.Set[string], shouldRetrieveTags bool) ([]ExtendedDbEntity, map[string]struct{}, error) {
+func (s *DataSourceSyncer) readShares(excludes set.Set[string], shouldRetrieveTags bool) ([]ExtendedDbEntity, set.Set[string], error) {
 	// main reason is that for export they can only have "IMPORTED PRIVILEGES" granted on the shared db level and nothing else.
 	// for now we can just exclude them but they need to be treated later on
 	shares, err := s.repo.GetShares()
@@ -426,11 +426,11 @@ func (s *DataSourceSyncer) readShares(excludes set.Set[string], shouldRetrieveTa
 		return nil, nil, err
 	}
 
-	sharesMap := make(map[string]struct{}, 0)
+	sharesMap := set.NewSet[string]()
 
 	// exclude shares from database import as we treat them separately
 	for _, share := range enrichedShares {
-		sharesMap[share.Entity.Name] = struct{}{}
+		sharesMap.Add(share.Entity.Name)
 	}
 
 	return enrichedShares, sharesMap, nil

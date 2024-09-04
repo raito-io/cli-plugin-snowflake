@@ -1,7 +1,6 @@
 package snowflake
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -23,7 +22,6 @@ import (
 type AccessFromTargetSyncer struct {
 	configMap             *config.ConfigMap
 	repo                  dataAccessRepository
-	ctx                   context.Context
 	accessSyncer          *AccessSyncer
 	accessProviderHandler wrappers.AccessProviderHandler
 
@@ -34,10 +32,9 @@ type AccessFromTargetSyncer struct {
 	lock                              sync.Mutex
 }
 
-func NewAccessFromTargetSyncer(ctx context.Context, accessSyncer *AccessSyncer, repo dataAccessRepository, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap) *AccessFromTargetSyncer {
+func NewAccessFromTargetSyncer(accessSyncer *AccessSyncer, repo dataAccessRepository, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap) *AccessFromTargetSyncer {
 	return &AccessFromTargetSyncer{
 		accessSyncer:          accessSyncer,
-		ctx:                   ctx,
 		configMap:             configMap,
 		repo:                  repo,
 		accessProviderHandler: accessProviderHandler,
@@ -48,11 +45,6 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 	s.externalGroupOwners = s.configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
 	s.excludedRoles = s.extractExcludeRoleList()
 	s.linkToExternalIdentityStoreGroups = s.configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
-
-	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", s.repo.TotalQueryTime()))
-		s.repo.Close()
-	}()
 
 	logger.Info("Reading account and database roles from Snowflake")
 

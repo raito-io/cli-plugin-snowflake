@@ -1,6 +1,7 @@
 package snowflake
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -921,10 +922,11 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			repoMock := newMockDataAccessRepository(t)
 			fileCreator := tt.fields.setup(repoMock)
 
-			syncer := createBasicFromTargetSyncer(repoMock, fileCreator, &tt.args.configMap)
+			syncer := createAccessSyncer(repoMock)
+			err := syncer.SyncAccessProvidersFromTarget(context.Background(), fileCreator, &tt.args.configMap)
 
 			//When
-			syncer.syncFromTarget()
+			tt.wantErr(t, err)
 			assert.ElementsMatch(t, tt.wantAps, fileCreator.AccessProviders)
 		})
 	}
@@ -1208,13 +1210,20 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 
 			tt.fields.setup(repoMock, feedbackHandler)
 
-			syncer := createBasicToTargetSyncer(repoMock, tt.args.accessProviders, feedbackHandler, tt.args.configMap)
+			syncer := createAccessSyncer(repoMock)
 
 			// When
-			err := syncer.syncToTarget()
+			err := syncer.SyncAccessProviderToTarget(context.Background(), tt.args.accessProviders, feedbackHandler, tt.args.configMap)
 
 			// Then
 			tt.wantErr(t, err)
 		})
+	}
+}
+
+func createAccessSyncer(repo dataAccessRepository) *AccessSyncer {
+	return &AccessSyncer{
+		repo:              repo,
+		namingConstraints: RoleNameConstraints,
 	}
 }

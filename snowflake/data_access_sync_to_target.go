@@ -25,7 +25,6 @@ import (
 )
 
 type AccessToTargetSyncer struct {
-	ctx                           context.Context
 	configMap                     *config.ConfigMap
 	namingConstraints             naming_hint.NamingConstraints
 	repo                          dataAccessRepository
@@ -42,10 +41,9 @@ type AccessToTargetSyncer struct {
 	warehousesCache               []DbEntity
 }
 
-func NewAccessToTargetSyncer(ctx context.Context, accessSyncer *AccessSyncer, namingConstraints naming_hint.NamingConstraints, repo dataAccessRepository, accessProviders *importer.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) *AccessToTargetSyncer {
+func NewAccessToTargetSyncer(accessSyncer *AccessSyncer, namingConstraints naming_hint.NamingConstraints, repo dataAccessRepository, accessProviders *importer.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) *AccessToTargetSyncer {
 	return &AccessToTargetSyncer{
 		accessSyncer:                  accessSyncer,
-		ctx:                           ctx,
 		accessProviders:               accessProviders,
 		accessProviderFeedbackHandler: accessProviderFeedbackHandler,
 		configMap:                     configMap,
@@ -57,12 +55,7 @@ func NewAccessToTargetSyncer(ctx context.Context, accessSyncer *AccessSyncer, na
 	}
 }
 
-func (s *AccessToTargetSyncer) syncToTarget() error {
-	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", s.repo.TotalQueryTime()))
-		s.repo.Close()
-	}()
-
+func (s *AccessToTargetSyncer) syncToTarget(ctx context.Context) error {
 	s.databaseRoleSupportEnabled = s.configMap.GetBoolWithDefault(SfDatabaseRoles, false)
 
 	ignoreLinksToRoles := s.configMap.GetString(SfIgnoreLinksToRoles)
@@ -117,14 +110,14 @@ func (s *AccessToTargetSyncer) syncToTarget() error {
 
 	// Step 2 then initialize all filters
 	if len(filtersMap)+len(filtersToRemove) > 0 {
-		err := s.SyncAccessProviderFiltersToTarget(filtersToRemove, filtersMap, apIdNameMap)
+		err := s.SyncAccessProviderFiltersToTarget(ctx, filtersToRemove, filtersMap, apIdNameMap)
 		if err != nil {
 			return fmt.Errorf("sync filters to target: %w", err)
 		}
 	}
 
 	// Step 3 then initiate all the roles
-	err := s.SyncAccessProviderRolesToTarget(rolesToRemove, rolesMap)
+	err := s.SyncAccessProviderRolesToTarget(ctx, rolesToRemove, rolesMap)
 	if err != nil {
 		return fmt.Errorf("sync roles to target: %w", err)
 	}
@@ -244,7 +237,7 @@ func (s *AccessToTargetSyncer) getUniqueRoleNameGenerator(prefix string, databas
 	return s.uniqueRoleNameGeneratorsCache[database], nil
 }
 
-func (s *AccessToTargetSyncer) SyncAccessProviderRolesToTarget(toRemoveAps map[string]*importer.AccessProvider, toProcessAps map[string]*importer.AccessProvider) error {
+func (s *AccessToTargetSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRemoveAps map[string]*importer.AccessProvider, toProcessAps map[string]*importer.AccessProvider) error {
 	logger.Info("Configuring access providers as roles in Snowflake")
 
 	err := s.removeRolesToRemove(toRemoveAps)
@@ -265,7 +258,7 @@ func (s *AccessToTargetSyncer) SyncAccessProviderRolesToTarget(toRemoveAps map[s
 		return err
 	}
 
-	err = s.generateAccessControls(toProcessAps, existingRoles, toRenameAps)
+	err = s.generateAccessControls(ctx, toProcessAps, existingRoles, toRenameAps)
 	if err != nil {
 		return err
 	}
@@ -320,7 +313,7 @@ func (s *AccessToTargetSyncer) SyncAccessProviderMasksToTarget(apToRemoveMap map
 	return nil
 }
 
-func (s *AccessToTargetSyncer) SyncAccessProviderFiltersToTarget(apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string) error {
+func (s *AccessToTargetSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string) error {
 	if s.configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		if len(apToRemoveMap) > 0 || len(apMap) > 0 {
 			logger.Error("Skipping filter policies due to Snowflake Standard Edition.")
@@ -383,7 +376,7 @@ func (s *AccessToTargetSyncer) SyncAccessProviderFiltersToTarget(apToRemoveMap m
 	updatedTables := set.NewSet[string]()
 
 	for table, filters := range updateGroupedFilters {
-		filterName, externalId, createErr := s.updateOrCreateFilter(table, filters, roleNameMap)
+		filterName, externalId, createErr := s.updateOrCreateFilter(ctx, table, filters, roleNameMap)
 
 		ferr := feedbackFn(filters, &filterName, externalId, createErr)
 		if ferr != nil {
@@ -519,7 +512,7 @@ func (s *AccessToTargetSyncer) buildMetaDataMap(metaData *ds.MetaData) map[strin
 }
 
 //nolint:gocyclo
-func (s *AccessToTargetSyncer) handleAccessProvider(externalId string, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string, rolesCreated map[string]interface{}, metaData map[string]map[string]struct{}) (string, error) {
+func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externalId string, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string, rolesCreated map[string]interface{}, metaData map[string]map[string]struct{}) (string, error) {
 	accessProvider := toProcessAps[externalId]
 	logger.Debug(fmt.Sprintf("Handle access provider with key %q - %+v - %+v", externalId, accessProvider, toProcessAps))
 
@@ -689,7 +682,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(externalId string, toProcess
 						return actualName, fmt.Errorf("error can not assign users from a database role %q", externalId)
 					}
 
-					e := s.repo.GrantUsersToAccountRole(s.ctx, externalId, toAdd...)
+					e := s.repo.GrantUsersToAccountRole(ctx, externalId, toAdd...)
 					if e != nil {
 						return actualName, fmt.Errorf("error while assigning users to role %q: %s", externalId, e.Error())
 					}
@@ -700,7 +693,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(externalId string, toProcess
 						return actualName, fmt.Errorf("error can not unassign users from a database role %q", externalId)
 					}
 
-					e := s.repo.RevokeUsersFromAccountRole(s.ctx, externalId, toRemove...)
+					e := s.repo.RevokeUsersFromAccountRole(ctx, externalId, toRemove...)
 					if e != nil {
 						return actualName, fmt.Errorf("error while unassigning users from role %q: %s", externalId, e.Error())
 					}
@@ -713,14 +706,14 @@ func (s *AccessToTargetSyncer) handleAccessProvider(externalId string, toProcess
 				logger.Info(fmt.Sprintf("Identified %d roles to add and %d roles to remove from role %q", len(toAdd), len(toRemove), externalId))
 
 				if len(toAdd) > 0 {
-					e := s.grantRolesToRole(externalId, accessProvider.Type, toAdd...)
+					e := s.grantRolesToRole(ctx, externalId, accessProvider.Type, toAdd...)
 					if e != nil {
 						return actualName, fmt.Errorf("error while assigning role to role %q: %s", externalId, e.Error())
 					}
 				}
 
 				if len(toRemove) > 0 {
-					e := s.revokeRolesFromRole(externalId, accessProvider.Type, toRemove...)
+					e := s.revokeRolesFromRole(ctx, externalId, accessProvider.Type, toRemove...)
 					if e != nil {
 						return actualName, fmt.Errorf("error while unassigning role from role %q: %s", externalId, e.Error())
 					}
@@ -805,13 +798,13 @@ func (s *AccessToTargetSyncer) handleAccessProvider(externalId string, toProcess
 				return actualName, fmt.Errorf("error can not assign users to a database role %q", externalId)
 			}
 
-			err = s.repo.GrantUsersToAccountRole(s.ctx, externalId, accessProvider.Who.Users...)
+			err = s.repo.GrantUsersToAccountRole(ctx, externalId, accessProvider.Who.Users...)
 			if err != nil {
 				return actualName, fmt.Errorf("error while assigning users to role %q: %s", externalId, err.Error())
 			}
 		}
 
-		err = s.grantRolesToRole(externalId, accessProvider.Type, inheritedRoles...)
+		err = s.grantRolesToRole(ctx, externalId, accessProvider.Type, inheritedRoles...)
 		if err != nil {
 			return actualName, fmt.Errorf("error while assigning roles to role %q: %s", externalId, err.Error())
 		}
@@ -841,7 +834,7 @@ func (s *AccessToTargetSyncer) splitRoles(inheritedRoles []string) ([]string, []
 	return toAddDatabaseRoles, toAddAccountRoles
 }
 
-func (s *AccessToTargetSyncer) grantRolesToRole(targetExternalId string, targetApType *string, roles ...string) error {
+func (s *AccessToTargetSyncer) grantRolesToRole(ctx context.Context, targetExternalId string, targetApType *string, roles ...string) error {
 	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
 
 	var filteredAccountRoles []string
@@ -885,19 +878,19 @@ func (s *AccessToTargetSyncer) grantRolesToRole(targetExternalId string, targetA
 			}
 		}
 
-		err = s.repo.GrantDatabaseRolesToDatabaseRole(s.ctx, database, parsedRoleName, filteredDatabaseRoles...)
+		err = s.repo.GrantDatabaseRolesToDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
 		if err != nil {
 			return err
 		}
 
-		return s.repo.GrantAccountRolesToDatabaseRole(s.ctx, database, parsedRoleName, filteredAccountRoles...)
+		return s.repo.GrantAccountRolesToDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
 	}
 
 	if len(toAddDatabaseRoles) > 0 {
 		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddDatabaseRoles)
 	}
 
-	return s.repo.GrantAccountRolesToAccountRole(s.ctx, targetExternalId, filteredAccountRoles...)
+	return s.repo.GrantAccountRolesToAccountRole(ctx, targetExternalId, filteredAccountRoles...)
 }
 
 func (s *AccessToTargetSyncer) shouldIgnoreLinkedRole(roleName string) (bool, error) {
@@ -909,7 +902,7 @@ func (s *AccessToTargetSyncer) shouldIgnoreLinkedRole(roleName string) (bool, er
 	return matched, nil
 }
 
-func (s *AccessToTargetSyncer) revokeRolesFromRole(targetExternalId string, targetApType *string, roles ...string) error {
+func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetExternalId string, targetApType *string, roles ...string) error {
 	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
 
 	var filteredAccountRoles []string
@@ -949,19 +942,19 @@ func (s *AccessToTargetSyncer) revokeRolesFromRole(targetExternalId string, targ
 			}
 		}
 
-		err = s.repo.RevokeDatabaseRolesFromDatabaseRole(s.ctx, database, parsedRoleName, filteredDatabaseRoles...)
+		err = s.repo.RevokeDatabaseRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
 		if err != nil {
 			return err
 		}
 
-		return s.repo.RevokeAccountRolesFromDatabaseRole(s.ctx, database, parsedRoleName, filteredAccountRoles...)
+		return s.repo.RevokeAccountRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
 	}
 
 	if len(toAddDatabaseRoles) > 0 {
 		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddDatabaseRoles)
 	}
 
-	return s.repo.RevokeAccountRolesFromAccountRole(s.ctx, targetExternalId, filteredAccountRoles...)
+	return s.repo.RevokeAccountRolesFromAccountRole(ctx, targetExternalId, filteredAccountRoles...)
 }
 
 func (s *AccessToTargetSyncer) createRole(externalId string, apType *string) error {
@@ -1029,12 +1022,12 @@ func (s *AccessToTargetSyncer) commentOnRoleIfExists(comment, roleName string) e
 	return s.repo.CommentAccountRoleIfExists(comment, roleName)
 }
 
-func (s *AccessToTargetSyncer) generateAccessControls(toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string) error {
+func (s *AccessToTargetSyncer) generateAccessControls(ctx context.Context, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string) error {
 	// We always need the meta data
 	rolesCreated := make(map[string]interface{})
 	dsSyncer := DataSourceSyncer{}
 
-	md, err := dsSyncer.GetDataSourceMetaData(s.ctx, s.configMap)
+	md, err := dsSyncer.GetDataSourceMetaData(ctx, s.configMap)
 	if err != nil {
 		return err
 	}
@@ -1048,7 +1041,7 @@ func (s *AccessToTargetSyncer) generateAccessControls(toProcessAps map[string]*i
 			Type:           accessProvider.Type,
 		}
 
-		fi.ActualName, err = s.handleAccessProvider(externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, metaData)
+		fi.ActualName, err = s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, metaData)
 
 		err3 := s.handleAccessProviderFeedback(&fi, err)
 		if err3 != nil {
@@ -1475,7 +1468,7 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 	return nil
 }
 
-func (s *AccessToTargetSyncer) updateOrCreateFilter(tableFullName string, aps []*importer.AccessProvider, roleNameMap map[string]string) (string, *string, error) {
+func (s *AccessToTargetSyncer) updateOrCreateFilter(ctx context.Context, tableFullName string, aps []*importer.AccessProvider, roleNameMap map[string]string) (string, *string, error) {
 	tableFullnameSplit := strings.Split(tableFullName, ".")
 	database := tableFullnameSplit[0]
 	schema := tableFullnameSplit[1]
@@ -1485,7 +1478,7 @@ func (s *AccessToTargetSyncer) updateOrCreateFilter(tableFullName string, aps []
 	arguments := set.NewSet[string]()
 
 	for _, ap := range aps {
-		fExpression, apArguments, err := filterExpression(s.ctx, ap)
+		fExpression, apArguments, err := filterExpression(ctx, ap)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to generate filter expression for access provider %s: %w", ap.Name, err)
 		}

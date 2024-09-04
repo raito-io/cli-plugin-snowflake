@@ -2,6 +2,7 @@ package snowflake
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
@@ -90,27 +91,43 @@ func NewDataAccessSyncer(namingConstraints naming_hint.NamingConstraints) *Acces
 }
 
 func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap) error {
-	repo, err := NewSnowflakeRepository(configMap.Parameters, "")
-	if err != nil {
-		return err
+	if s.repo == nil {
+		repo, err := NewSnowflakeRepository(configMap.Parameters, "")
+		if err != nil {
+			return err
+		}
+
+		s.repo = repo
 	}
 
-	s.repo = repo
-	fromTargetSyncer := NewAccessFromTargetSyncer(ctx, s, repo, accessProviderHandler, configMap)
+	defer func() {
+		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", s.repo.TotalQueryTime()))
+		s.repo.Close()
+	}()
+
+	fromTargetSyncer := NewAccessFromTargetSyncer(s, s.repo, accessProviderHandler, configMap)
 
 	return fromTargetSyncer.syncFromTarget()
 }
 
 func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessProviders *sync_to_target.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
-	repo, err := NewSnowflakeRepository(configMap.Parameters, "")
-	if err != nil {
-		return err
+	if s.repo == nil {
+		repo, err := NewSnowflakeRepository(configMap.Parameters, "")
+		if err != nil {
+			return err
+		}
+
+		s.repo = repo
 	}
 
-	s.repo = repo
-	toTargetSyncer := NewAccessToTargetSyncer(ctx, s, s.namingConstraints, repo, accessProviders, accessProviderFeedbackHandler, configMap)
+	defer func() {
+		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", s.repo.TotalQueryTime()))
+		s.repo.Close()
+	}()
 
-	return toTargetSyncer.syncToTarget()
+	toTargetSyncer := NewAccessToTargetSyncer(s, s.namingConstraints, s.repo, accessProviders, accessProviderFeedbackHandler, configMap)
+
+	return toTargetSyncer.syncToTarget(ctx)
 }
 
 //
