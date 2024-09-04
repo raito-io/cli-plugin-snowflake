@@ -121,6 +121,11 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 		return err
 	}
 
+	defer func() {
+		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
+		repo.Close()
+	}()
+
 	s.repo = repo
 
 	// for data source level access import & export convenience we retrieve the snowflake account and use it as datasource name
