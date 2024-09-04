@@ -1223,7 +1223,9 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 
 func createAccessSyncer(repo dataAccessRepository) *AccessSyncer {
 	return &AccessSyncer{
-		repo:              repo,
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
+			return repo, nil
+		},
 		namingConstraints: RoleNameConstraints,
 	}
 }

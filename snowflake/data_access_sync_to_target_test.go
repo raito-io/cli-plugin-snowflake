@@ -560,6 +560,9 @@ func generateAccessControls_view(t *testing.T) {
 
 func createBasicToTargetSyncer(repo dataAccessRepository, accessProviders *importer.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) *AccessToTargetSyncer {
 	as := AccessSyncer{
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
+			return repo, nil
+		},
 		repo:              repo,
 		namingConstraints: RoleNameConstraints,
 	}

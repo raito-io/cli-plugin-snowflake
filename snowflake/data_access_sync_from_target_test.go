@@ -246,6 +246,9 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 
 func createBasicFromTargetSyncer(repo dataAccessRepository, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap) *AccessFromTargetSyncer {
 	as := AccessSyncer{
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
+			return repo, nil
+		},
 		repo:              repo,
 		namingConstraints: RoleNameConstraints,
 	}

@@ -80,6 +80,7 @@ var _ wrappers.AccessProviderSyncer = (*AccessSyncer)(nil)
 
 type AccessSyncer struct {
 	namingConstraints naming_hint.NamingConstraints
+	repoProvider      func(params map[string]string, role string) (dataAccessRepository, error)
 	repo              dataAccessRepository
 	databasesCache    []DbEntity
 }
@@ -87,18 +88,21 @@ type AccessSyncer struct {
 func NewDataAccessSyncer(namingConstraints naming_hint.NamingConstraints) *AccessSyncer {
 	return &AccessSyncer{
 		namingConstraints: namingConstraints,
+		repoProvider:      newDataAccessSnowflakeRepo,
 	}
 }
 
-func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap) error {
-	if s.repo == nil {
-		repo, err := NewSnowflakeRepository(configMap.Parameters, "")
-		if err != nil {
-			return err
-		}
+func newDataAccessSnowflakeRepo(params map[string]string, role string) (dataAccessRepository, error) {
+	return NewSnowflakeRepository(params, role)
+}
 
-		s.repo = repo
+func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap) error {
+	repo, err := s.repoProvider(configMap.Parameters, "")
+	if err != nil {
+		return err
 	}
+
+	s.repo = repo
 
 	defer func() {
 		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", s.repo.TotalQueryTime()))
@@ -111,14 +115,12 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 }
 
 func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessProviders *sync_to_target.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) error {
-	if s.repo == nil {
-		repo, err := NewSnowflakeRepository(configMap.Parameters, "")
-		if err != nil {
-			return err
-		}
-
-		s.repo = repo
+	repo, err := s.repoProvider(configMap.Parameters, "")
+	if err != nil {
+		return err
 	}
+
+	s.repo = repo
 
 	defer func() {
 		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", s.repo.TotalQueryTime()))
