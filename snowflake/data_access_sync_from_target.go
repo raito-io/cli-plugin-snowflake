@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/gammazero/workerpool"
 	"github.com/raito-io/cli/base/access_provider"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -17,17 +19,98 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
-func (s *AccessSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, shares []string, configMap *config.ConfigMap) error {
-	externalGroupOwners := configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
-	excludedRoles := s.extractExcludeRoleList(configMap)
-	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
+type AccessFromTargetSyncer struct {
+	configMap             *config.ConfigMap
+	repo                  dataAccessRepository
+	accessSyncer          *AccessSyncer
+	accessProviderHandler wrappers.AccessProviderHandler
 
+	shares                            []string
+	linkToExternalIdentityStoreGroups bool
+	externalGroupOwners               string
+	excludedRoles                     map[string]struct{}
+	lock                              sync.Mutex
+}
+
+func NewAccessFromTargetSyncer(accessSyncer *AccessSyncer, repo dataAccessRepository, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap) *AccessFromTargetSyncer {
+	return &AccessFromTargetSyncer{
+		accessSyncer:          accessSyncer,
+		configMap:             configMap,
+		repo:                  repo,
+		accessProviderHandler: accessProviderHandler,
+	}
+}
+
+func (s *AccessFromTargetSyncer) syncFromTarget() error {
+	s.externalGroupOwners = s.configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
+	s.excludedRoles = s.extractExcludeRoleList()
+	s.linkToExternalIdentityStoreGroups = s.configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
+
+	logger.Info("Reading account and database roles from Snowflake")
+
+	shares, err := s.accessSyncer.getShareNames()
+	if err != nil {
+		return err
+	}
+
+	s.shares = shares
+	s.externalGroupOwners = s.configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
+	s.extractExcludeRoleList()
+	s.linkToExternalIdentityStoreGroups = s.configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
+
+	logger.Info("Reading account roles from Snowflake")
+
+	err = s.importAllRolesOnAccountLevel(s.accessProviderHandler)
+	if err != nil {
+		return err
+	}
+
+	databaseRoleSupportEnabled := s.configMap.GetBoolWithDefault(SfDatabaseRoles, false)
+	if databaseRoleSupportEnabled {
+		logger.Info("Reading database roles from Snowflake")
+		excludedDatabases := s.extractExcludeDatabases()
+
+		err = s.importAllRolesOnDatabaseLevel(s.accessProviderHandler, excludedDatabases)
+		if err != nil {
+			return err
+		}
+	}
+
+	skipColumns := s.configMap.GetBoolWithDefault(SfSkipColumns, false)
+	standardEdition := s.configMap.GetBoolWithDefault(SfStandardEdition, false)
+
+	if !standardEdition {
+		if !skipColumns {
+			logger.Info("Reading masking policies from Snowflake")
+
+			err = s.importMaskingPolicies()
+			if err != nil {
+				return err
+			}
+		} else {
+			logger.Info("Skipping masking policies")
+		}
+
+		logger.Info("Reading row access policies from Snowflake")
+
+		err = s.importRowAccessPolicies()
+		if err != nil {
+			return err
+		}
+	} else {
+		logger.Info("Skipping masking policies and row access policies due to Snowflake Standard Edition.")
+	}
+
+	return nil
+}
+
+func (s *AccessFromTargetSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappers.AccessProviderHandler) error {
 	availableTags := make(map[string][]*tag.Tag)
 
-	if s.shouldRetrieveTags(configMap) {
+	if s.shouldRetrieveTags() {
 		var err error
 
-		availableTags, err = repo.GetTagsByDomain("ROLE")
+		availableTags, err = s.repo.GetTagsByDomain("ROLE")
 		if err != nil {
 			logger.Error(fmt.Sprintf("Error retrieving tags for account roles: %s", err.Error()))
 		}
@@ -36,22 +119,28 @@ func (s *AccessSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappe
 	processedAps := make(map[string]*exporter.AccessProvider)
 
 	// Get all account roles and import them
-	roleEntities, err := repo.GetAccountRoles()
+	roleEntities, err := s.repo.GetAccountRoles()
 	if err != nil {
 		return err
 	}
 
+	wp := workerpool.New(getWorkerPoolSize(s.configMap))
+
 	for _, roleEntity := range roleEntities {
-		if _, exclude := excludedRoles[roleEntity.Name]; exclude {
+		if _, exclude := s.excludedRoles[roleEntity.Name]; exclude {
 			logger.Info("Skipping SnowFlake ROLE " + roleEntity.Name)
 			continue
 		}
 
-		err = s.transformAccountRoleToAccessProvider(roleEntity, processedAps, linkToExternalIdentityStoreGroups, availableTags, externalGroupOwners, shares, repo)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error importing SnowFlake role %q: %s"+roleEntity.Name, err.Error()))
-		}
+		wp.Submit(func() {
+			err2 := s.transformAccountRoleToAccessProvider(roleEntity, processedAps, availableTags)
+			if err2 != nil {
+				logger.Warn(fmt.Sprintf("Error importing SnowFlake role %q: %s", roleEntity.Name, err2.Error()))
+			}
+		})
 	}
+
+	wp.StopWait()
 
 	err = accessProviderHandler.AddAccessProviders(values(processedAps)...)
 	if err != nil {
@@ -60,27 +149,31 @@ func (s *AccessSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappe
 
 	return nil
 }
-func (s *AccessSyncer) shouldRetrieveTags(configMap *config.ConfigMap) bool {
-	standard := configMap.GetBoolWithDefault(SfStandardEdition, false)
-	skipTags := configMap.GetBoolWithDefault(SfSkipTags, false)
+
+func (s *AccessFromTargetSyncer) shouldRetrieveTags() bool {
+	standard := s.configMap.GetBoolWithDefault(SfStandardEdition, false)
+	skipTags := s.configMap.GetBoolWithDefault(SfSkipTags, false)
 
 	tagSupportEnabled := !standard && !skipTags
 
 	return tagSupportEnabled
 }
 
-func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntity, processedAps map[string]*exporter.AccessProvider, linkToExternalIdentityStoreGroups bool, availableTags map[string][]*tag.Tag, externalGroupOwners string, shares []string, repo dataAccessRepository) error {
+func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntity, processedAps map[string]*exporter.AccessProvider, availableTags map[string][]*tag.Tag) error {
 	logger.Info(fmt.Sprintf("Reading SnowFlake ROLE %s", roleEntity.Name))
 
 	roleName := roleEntity.Name
 	externalId := roleName
 	currentApType := ptr.String(access_provider.Role)
-	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, externalGroupOwners)
+	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, s.externalGroupOwners)
 
-	users, groups, accessProviders, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS, linkToExternalIdentityStoreGroups, repo)
+	users, groups, accessProviders, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS)
 	if err != nil {
 		return err
 	}
+
+	// Locking to make sure only one goroutine can read & write to the processedAps map at a time
+	s.lock.Lock()
 
 	ap, f := processedAps[externalId]
 	if !f {
@@ -101,7 +194,7 @@ func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntit
 		ap = processedAps[externalId]
 
 		if fromExternalIS {
-			if linkToExternalIdentityStoreGroups {
+			if s.linkToExternalIdentityStoreGroups {
 				// If we link to groups in the external identity store, we can just partially lock
 				ap.NameLocked = ptr.Bool(true)
 				ap.NameLockedReason = ptr.String(nameLockedReason)
@@ -122,13 +215,15 @@ func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntit
 		ap.Who.Groups = groups
 	}
 
+	s.lock.Unlock()
+
 	// get objects granted TO role
-	grantToEntities, err := s.getGrantsToRole(ap.ExternalId, ap.Type, repo)
+	grantToEntities, err := s.accessSyncer.getGrantsToRole(ap.ExternalId, ap.Type)
 	if err != nil {
 		return fmt.Errorf("error retrieving grants for role: %s", err.Error())
 	}
 
-	ap.What = append(ap.What, s.mapGrantToRoleToWhatItems(grantToEntities, shares)...)
+	ap.What = append(ap.What, s.mapGrantToRoleToWhatItems(grantToEntities)...)
 
 	if isNotInternalizableRole(ap.ExternalId, ap.Type) {
 		logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", ap.ExternalId))
@@ -143,10 +238,10 @@ func (s *AccessSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntit
 	return nil
 }
 
-func (s *AccessSyncer) extractExcludeRoleList(configMap *config.ConfigMap) map[string]struct{} {
+func (s *AccessFromTargetSyncer) extractExcludeRoleList() map[string]struct{} {
 	excludedRoles := make(map[string]struct{})
 
-	if excludedRoleList, ok := configMap.Parameters[SfExcludedRoles]; ok {
+	if excludedRoleList, ok := s.configMap.Parameters[SfExcludedRoles]; ok {
 		if excludedRoleList != "" {
 			for _, e := range strings.Split(excludedRoleList, ",") {
 				e = strings.TrimSpace(e)
@@ -158,61 +253,64 @@ func (s *AccessSyncer) extractExcludeRoleList(configMap *config.ConfigMap) map[s
 	return excludedRoles
 }
 
-func (s *AccessSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrappers.AccessProviderHandler, repo dataAccessRepository, excludedDatabases set.Set[string], shares []string, configMap *config.ConfigMap) error {
-	externalGroupOwners := configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
-	excludedRoles := s.extractExcludeRoleList(configMap)
-	linkToExternalIdentityStoreGroups := configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
-
+func (s *AccessFromTargetSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrappers.AccessProviderHandler, excludedDatabases set.Set[string]) error {
 	//Get all database roles for each database and import them
-	databases, err := s.getApplicableDatabases(repo, excludedDatabases)
+	databases, err := s.getApplicableDatabases(excludedDatabases)
 	if err != nil {
 		return err
 	}
 
+	wp := workerpool.New(getWorkerPoolSize(s.configMap))
+
+	processedAps := make(map[string]*exporter.AccessProvider)
+
 	for _, database := range databases {
 		logger.Info(fmt.Sprintf("Reading roles from Snowflake inside database %s", database.Name))
-		processedAps := make(map[string]*exporter.AccessProvider)
 
 		// Get all database roles for database
-		roleEntities, err := repo.GetDatabaseRoles(database.Name)
-		if err != nil {
-			return err
+		roleEntities, err2 := s.repo.GetDatabaseRoles(database.Name)
+		if err2 != nil {
+			return err2
 		}
 
 		for _, roleEntity := range roleEntities {
 			fullRoleName := fmt.Sprintf("%s.%s", database.Name, roleEntity.Name)
-			if _, exclude := excludedRoles[fullRoleName]; exclude {
+			if _, exclude := s.excludedRoles[fullRoleName]; exclude {
 				logger.Info("Skipping SnowFlake DATABASE ROLE " + fullRoleName)
 				continue
 			}
 
-			availableTags := make(map[string][]*tag.Tag)
+			wp.Submit(func() {
+				availableTags := make(map[string][]*tag.Tag)
 
-			if s.shouldRetrieveTags(configMap) {
-				var err3 error
+				if s.shouldRetrieveTags() {
+					var err3 error
 
-				availableTags, err3 = repo.GetDatabaseRoleTags(database.Name, roleEntity.Name)
-				if err3 != nil {
-					logger.Error(fmt.Sprintf("Error retrieving tags for database role: %q - %s", fullRoleName, err3.Error()))
+					availableTags, err3 = s.repo.GetDatabaseRoleTags(database.Name, roleEntity.Name)
+					if err3 != nil {
+						logger.Error(fmt.Sprintf("Error retrieving tags for database role: %q - %s", fullRoleName, err3.Error()))
+					}
 				}
-			}
 
-			err2 := s.importAccessForDatabaseRole(database.Name, roleEntity, externalGroupOwners, linkToExternalIdentityStoreGroups, availableTags, repo, processedAps, shares)
-			if err2 != nil {
-				logger.Warn(fmt.Sprintf("Error importing SnowFlake Database role %q: %s", fullRoleName, err2.Error()))
-			}
+				err2 := s.importAccessForDatabaseRole(database.Name, roleEntity, availableTags, processedAps)
+				if err2 != nil {
+					logger.Warn(fmt.Sprintf("Error importing SnowFlake Database role %q: %s", fullRoleName, err2.Error()))
+				}
+			})
 		}
+	}
 
-		err = accessProviderHandler.AddAccessProviders(values(processedAps)...)
-		if err != nil {
-			return fmt.Errorf("error adding access provider to import file: %s", err.Error())
-		}
+	wp.StopWait()
+
+	err = accessProviderHandler.AddAccessProviders(values(processedAps)...)
+	if err != nil {
+		return fmt.Errorf("error adding access provider to import file: %s", err.Error())
 	}
 
 	return nil
 }
 
-func (s *AccessSyncer) comesFromExternalIdentityStore(roleEntity RoleEntity, externalGroupOwners string) bool {
+func (s *AccessFromTargetSyncer) comesFromExternalIdentityStore(roleEntity RoleEntity, externalGroupOwners string) bool {
 	fromExternalIS := false
 
 	// check if Role Owner is part of the ones that should be (partially) locked
@@ -225,18 +323,20 @@ func (s *AccessSyncer) comesFromExternalIdentityStore(roleEntity RoleEntity, ext
 	return fromExternalIS
 }
 
-func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity RoleEntity, externalGroupOwners string, linkToExternalIdentityStoreGroups bool, availableTags map[string][]*tag.Tag, repo dataAccessRepository, processedAps map[string]*exporter.AccessProvider, shares []string) error {
+func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, roleEntity RoleEntity, availableTags map[string][]*tag.Tag, processedAps map[string]*exporter.AccessProvider) error {
 	logger.Info(fmt.Sprintf("Reading SnowFlake DATABASE ROLE %s inside %s", roleEntity.Name, database))
 
 	roleName := roleEntity.Name
 	externalId := databaseRoleExternalIdGenerator(database, roleName)
 	currentApType := ptr.String(apTypeDatabaseRole)
-	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, externalGroupOwners)
+	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, s.externalGroupOwners)
 
-	users, groups, accessProviders, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS, linkToExternalIdentityStoreGroups, repo)
+	users, groups, accessProviders, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS)
 	if err != nil {
 		return err
 	}
+
+	s.lock.Lock()
 
 	ap, f := processedAps[externalId]
 	if !f {
@@ -270,13 +370,15 @@ func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity R
 		ap.Who.Groups = groups
 	}
 
+	s.lock.Unlock()
+
 	// get objects granted TO role
-	grantToEntities, err := s.getGrantsToRole(ap.ExternalId, ap.Type, repo)
+	grantToEntities, err := s.accessSyncer.getGrantsToRole(ap.ExternalId, ap.Type)
 	if err != nil {
 		return fmt.Errorf("error retrieving grants for role: %s", err.Error())
 	}
 
-	ap.What = append(ap.What, s.mapGrantToRoleToWhatItems(grantToEntities, shares)...)
+	ap.What = append(ap.What, s.mapGrantToRoleToWhatItems(grantToEntities)...)
 
 	if isNotInternalizableRole(ap.ExternalId, ap.Type) {
 		logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", ap.ExternalId))
@@ -291,7 +393,7 @@ func (s *AccessSyncer) importAccessForDatabaseRole(database string, roleEntity R
 	return nil
 }
 
-func (s *AccessSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole, shares []string) []exporter.WhatItem {
+func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole) []exporter.WhatItem {
 	var do *ds.DataObjectReference
 
 	whatItems := make([]exporter.WhatItem, 0)
@@ -327,7 +429,7 @@ func (s *AccessSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole, 
 		}
 
 		databaseName := strings.Split(grant.Name, ".")[0]
-		if slices.Contains(shares, databaseName) {
+		if slices.Contains(s.shares, databaseName) {
 			// TODO do we need to do this for all tabular types?
 			if strings.EqualFold(grant.GrantedOn, "TABLE") && !slices.Contains(sharesApplied, databaseName) {
 				whatItems = append(whatItems, exporter.WhatItem{
@@ -365,17 +467,17 @@ func mapPrivilege(privilege string, grantedOn string) string {
 	return privilege
 }
 
-func (s *AccessSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntity, externalId string, apType *string, fromExternalIS bool, linkToExternalIdentityStoreGroups bool, repo dataAccessRepository) (users []string, groups []string, accessProviders []string, err error) {
+func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntity, externalId string, apType *string, fromExternalIS bool) (users []string, groups []string, accessProviders []string, err error) {
 	roleName := roleEntity.Name
 
 	users = make([]string, 0)
 	groups = make([]string, 0)
 	accessProviders = make([]string, 0)
 
-	if fromExternalIS && linkToExternalIdentityStoreGroups {
+	if fromExternalIS && s.linkToExternalIdentityStoreGroups {
 		groups = append(groups, roleName)
 	} else {
-		grantOfEntities, err := s.retrieveGrantsOfRole(externalId, apType, repo)
+		grantOfEntities, err := s.accessSyncer.retrieveGrantsOfRole(externalId, apType)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -399,19 +501,132 @@ func (s *AccessSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntity, externa
 	return users, groups, accessProviders, nil
 }
 
-func (s *AccessSyncer) retrieveGrantsOfRole(externalId string, apType *string, repo dataAccessRepository) (grantOfEntities []GrantOfRole, err error) {
-	if isDatabaseRole(apType) {
-		database, parsedRoleName, err2 := parseDatabaseRoleExternalId(externalId)
-		if err2 != nil {
-			return nil, err2
+func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action exporter.Action) error {
+	policyEntities, err := s.repo.GetPolicies(policyType)
+	if err != nil {
+		// For Standard edition, row access policies are not supported. Failsafe in case `sf-standard-edition` is overlooked.
+		// You can see the Snowflake edition in the UI, or through the 'show organization accounts;' query (ORGADMIN role needed).
+		if strings.Contains(err.Error(), "Unsupported feature") {
+			logger.Warn(fmt.Sprintf("Could not fetch policies of type %s; unsupported feature.", policyType))
+		} else {
+			return fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())
 		}
-
-		grantOfEntities, err = repo.GetGrantsOfDatabaseRole(database, parsedRoleName)
-	} else {
-		grantOfEntities, err = repo.GetGrantsOfAccountRole(externalId)
 	}
 
-	return grantOfEntities, err
+	for _, policy := range policyEntities {
+		if !strings.HasPrefix(strings.Replace(policy.Kind, "_", " ", -1), policyType) {
+			logger.Warn(fmt.Sprintf("Skipping policy %s of kind %s, expected: %s", policy.Name, policyType, policy.Kind))
+			continue
+		} else if strings.HasPrefix(policy.Name, maskPrefix) {
+			logger.Debug(fmt.Sprintf("Masking policy %s defined by RAITO. Not exporting this", policy.Name))
+			continue
+		}
+
+		logger.Info(fmt.Sprintf("Reading SnowFlake %s policy %s in Schema %s, Table %s", policyType, policy.Name, policy.SchemaName, policy.DatabaseName))
+
+		fullName := fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name)
+
+		ap := exporter.AccessProvider{
+			ExternalId:        fullName,
+			Name:              fullName,
+			NamingHint:        policy.Name,
+			Action:            action,
+			NotInternalizable: true,
+			Who:               nil,
+			ActualName:        fullName,
+			What:              make([]exporter.WhatItem, 0),
+		}
+
+		// get policy definition
+		describeMaskingPolicyEntities, err2 := s.repo.DescribePolicy(policyType, policy.DatabaseName, policy.SchemaName, policy.Name)
+		if err2 != nil {
+			logger.Warn(fmt.Sprintf("Error fetching description for policy %s.%s.%s: %s", policy.DatabaseName, policy.SchemaName, policy.Name, err2.Error()))
+
+			continue
+		}
+
+		if len(describeMaskingPolicyEntities) != 1 {
+			logger.Warn(fmt.Sprintf("Found %d definitions for %s policy %s.%s.%s, only expecting one", len(describeMaskingPolicyEntities), policyType, policy.DatabaseName, policy.SchemaName, policy.Name))
+
+			continue
+		}
+
+		ap.Policy = describeMaskingPolicyEntities[0].Body
+
+		// get policy references
+		policyReferenceEntities, err2 := s.repo.GetPolicyReferences(policy.DatabaseName, policy.SchemaName, policy.Name)
+		if err2 != nil {
+			logger.Warn(fmt.Sprintf("Error fetching policy references for %s.%s.%s: %s", policy.DatabaseName, policy.SchemaName, policy.Name, err2.Error()))
+
+			continue
+		}
+
+		for ind := range policyReferenceEntities {
+			policyReference := policyReferenceEntities[ind]
+			if !strings.EqualFold("Active", policyReference.POLICY_STATUS) {
+				continue
+			}
+
+			var dor ds.DataObjectReference
+			if policyReference.REF_COLUMN_NAME.Valid {
+				dor = ds.DataObjectReference{
+					Type:     "COLUMN",
+					FullName: common.FormatQuery(`%s.%s.%s.%s`, policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME, policyReference.REF_COLUMN_NAME.String),
+				}
+			} else {
+				dor = ds.DataObjectReference{
+					Type:     "TABLE",
+					FullName: common.FormatQuery(`%s.%s.%s`, policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME),
+				}
+			}
+
+			ap.What = append(ap.What, exporter.WhatItem{
+				DataObject:  &dor,
+				Permissions: []string{},
+			})
+		}
+
+		err2 = s.accessProviderHandler.AddAccessProviders(&ap)
+		if err2 != nil {
+			return fmt.Errorf("error adding access provider to import file: %s", err2.Error())
+		}
+	}
+
+	return nil
+}
+
+func (s *AccessFromTargetSyncer) importMaskingPolicies() error {
+	return s.importPoliciesOfType("MASKING", exporter.Mask)
+}
+
+func (s *AccessFromTargetSyncer) importRowAccessPolicies() error {
+	return s.importPoliciesOfType("ROW ACCESS", exporter.Filtered)
+}
+
+func (s *AccessFromTargetSyncer) getApplicableDatabases(dbExcludes set.Set[string]) ([]DbEntity, error) {
+	allDatabases, err := s.accessSyncer.getAllAvailableDatabases()
+	if err != nil {
+		return nil, err
+	}
+
+	filteredDatabases := make([]DbEntity, 0)
+
+	for _, db := range allDatabases {
+		if !dbExcludes.Contains(db.Name) {
+			filteredDatabases = append(filteredDatabases, db)
+		}
+	}
+
+	return filteredDatabases, nil
+}
+
+func (s *AccessFromTargetSyncer) extractExcludeDatabases() set.Set[string] {
+	excludedDatabases := "SNOWFLAKE"
+	if v, ok := s.configMap.Parameters[SfExcludedDatabases]; ok {
+		excludedDatabases = v
+	}
+
+	return parseCommaSeparatedList(excludedDatabases)
 }
 
 func isNotInternalizableRole(externalId string, roleType *string) bool {

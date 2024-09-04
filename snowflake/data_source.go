@@ -4,14 +4,16 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/gammazero/workerpool"
+	"github.com/hashicorp/go-multierror"
+	"github.com/raito-io/cli-plugin-snowflake/common"
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/wrappers"
 	"github.com/raito-io/golang-set/set"
-
-	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
 const AccountAdmin = "ACCOUNTADMIN"
@@ -36,8 +38,14 @@ type DataSourceSyncer struct {
 	repoProvider func(params map[string]string, role string) (dataSourceRepository, error)
 	SfSyncRole   string
 
-	startFrom       string
-	excludeChildren []string
+	startFrom         string
+	excludeChildren   []string
+	skipColumns       bool
+	schemaExcludes    set.Set[string]
+	sharesMap         set.Set[string]
+	repo              dataSourceRepository
+	dataSourceHandler wrappers.DataSourceObjectHandler
+	lock              sync.Mutex
 }
 
 func NewDataSourceSyncer() *DataSourceSyncer {
@@ -83,35 +91,13 @@ func (s *DataSourceSyncer) shouldGoInto(fullName string) bool {
 }
 
 func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler wrappers.DataSourceObjectHandler, config *ds.DataSourceSyncConfig) error {
+	// Initializing parameters
 	configParams := config.ConfigMap
-
+	s.dataSourceHandler = dataSourceHandler
 	s.startFrom = config.DataObjectParent
 	s.excludeChildren = config.DataObjectExcludes
-
-	repo, err := s.repoProvider(configParams.Parameters, "")
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
-		repo.Close()
-	}()
-
-	// for data source level access import & export convenience we retrieve the snowflake account and use it as datasource name
-	sfAccount, err := repo.GetSnowFlakeAccountName()
-	if err != nil {
-		return err
-	}
-
+	s.skipColumns = configParams.GetBoolWithDefault(SfSkipColumns, false)
 	s.SfSyncRole = configParams.GetStringWithDefault(SfRole, AccountAdmin)
-
-	dataSourceHandler.SetDataSourceName(sfAccount)
-	dataSourceHandler.SetDataSourceFullname(sfAccount)
-
-	standard := configParams.GetBoolWithDefault(SfStandardEdition, false)
-	skipTags := configParams.GetBoolWithDefault(SfSkipTags, false)
-	skipColumns := configParams.GetBoolWithDefault(SfSkipColumns, false)
 
 	excludedDatabases := "SNOWFLAKE"
 	if v, ok := configParams.Parameters[SfExcludedDatabases]; ok {
@@ -125,20 +111,46 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 		excludedSchemaList += "," + v
 	}
 
-	schemaExcludes := parseCommaSeparatedList(excludedSchemaList)
+	s.schemaExcludes = parseCommaSeparatedList(excludedSchemaList)
+	standard := configParams.GetBoolWithDefault(SfStandardEdition, false)
+	skipTags := configParams.GetBoolWithDefault(SfSkipTags, false)
 	shouldRetrieveTags := !standard && !skipTags
 
-	err = s.readWarehouses(repo, dataSourceHandler, shouldRetrieveTags)
+	repo, err := s.repoProvider(configParams.Parameters, "")
 	if err != nil {
 		return err
 	}
 
-	shares, sharesMap, err := s.readShares(repo, dbExcludes, dataSourceHandler, shouldRetrieveTags)
+	defer func() {
+		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
+		repo.Close()
+	}()
+
+	s.repo = repo
+
+	// for data source level access import & export convenience we retrieve the snowflake account and use it as datasource name
+	sfAccount, err := repo.GetSnowFlakeAccountName()
 	if err != nil {
 		return err
 	}
 
-	databases, err := s.readDatabases(repo, dbExcludes, dataSourceHandler, sharesMap, shouldRetrieveTags)
+	// Initializing the data source handler
+	dataSourceHandler.SetDataSourceName(sfAccount)
+	dataSourceHandler.SetDataSourceFullname(sfAccount)
+
+	err = s.readWarehouses(shouldRetrieveTags)
+	if err != nil {
+		return err
+	}
+
+	shares, sharesMap, err := s.readShares(dbExcludes, shouldRetrieveTags)
+	if err != nil {
+		return err
+	}
+
+	s.sharesMap = sharesMap
+
+	databases, err := s.readDatabases(dbExcludes, sharesMap, shouldRetrieveTags)
 	if err != nil {
 		return err
 	}
@@ -146,50 +158,75 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	// add shares to the list again to fetch their descendants
 	databases = append(databases, shares...)
 
+	wp := workerpool.New(getWorkerPoolSize(configParams))
+
+	var merr error
+
 	for _, database := range databases {
-		logger.Info(fmt.Sprintf("Handling database %q", database.Entity.Name))
-
-		err := s.setupDatabasePermissions(repo, database.Entity)
-
-		if err != nil {
-			return err
-		}
-
-		doTypePrefix := ""
-		if _, f := sharesMap[database.Entity.Name]; f {
-			doTypePrefix = SharedPrefix
-		}
-
-		err = s.readSchemasInDatabase(repo, database.Entity.Name, schemaExcludes, dataSourceHandler, doTypePrefix, database.LinkedTags)
-		if err != nil {
-			return err
-		}
-
-		err = s.readTablesInDatabase(database.Entity.Name, schemaExcludes, dataSourceHandler, doTypePrefix, repo.GetTablesInDatabase, database.LinkedTags)
-		if err != nil {
-			return err
-		}
-
-		if !skipColumns {
-			err = s.readColumnsInDatabase(repo, database.Entity.Name, schemaExcludes, dataSourceHandler, doTypePrefix, database.LinkedTags)
-			if err != nil {
-				return err
+		wp.Submit(func() {
+			err2 := s.handleDatabase(database)
+			if err2 != nil {
+				merr = multierror.Append(merr, err2)
 			}
+		})
+	}
+
+	logger.Info("All databases submitted for processing")
+
+	wp.StopWait()
+
+	logger.Info("All databases processed")
+
+	if merr != nil {
+		return fmt.Errorf("handling databases: %w", merr)
+	}
+
+	return nil
+}
+
+func (s *DataSourceSyncer) handleDatabase(database ExtendedDbEntity) error {
+	logger.Info(fmt.Sprintf("Handling database %q", database.Entity.Name))
+
+	err := s.setupDatabasePermissions(database.Entity)
+
+	if err != nil {
+		return err
+	}
+
+	doTypePrefix := ""
+	if s.sharesMap.Contains(database.Entity.Name) {
+		doTypePrefix = SharedPrefix
+	}
+
+	err = s.readSchemasInDatabase(database.Entity.Name, doTypePrefix, database.LinkedTags)
+	if err != nil {
+		return err
+	}
+
+	err = s.readTablesInDatabase(database.Entity.Name, doTypePrefix, s.repo.GetTablesInDatabase, database.LinkedTags)
+	if err != nil {
+		return err
+	}
+
+	if !s.skipColumns {
+		err = s.readColumnsInDatabase(database.Entity.Name, doTypePrefix, database.LinkedTags)
+		if err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbName string, excludedSchemas set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
+func (s *DataSourceSyncer) readColumnsInDatabase(dbName string, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
 	typeName := doTypePrefix + ds.Column
 
-	return repo.GetColumnsInDatabase(dbName, func(entity interface{}) error {
+	return s.repo.GetColumnsInDatabase(dbName, func(entity interface{}) error {
 		column := entity.(*ColumnEntity)
 		schemaName := column.Schema
 		schemaFullName := column.Database + "." + schemaName
-		ff := excludedSchemas.Contains(schemaFullName)
-		fs := excludedSchemas.Contains(schemaName)
+		ff := s.schemaExcludes.Contains(schemaFullName)
+		fs := s.schemaExcludes.Contains(schemaName)
 
 		fullName := schemaFullName + "." + column.Table + "." + column.Name
 
@@ -197,8 +234,6 @@ func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbNa
 			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
-
-		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", typeName, fullName))
 
 		comment := ""
 		if column.Comment != nil {
@@ -215,27 +250,25 @@ func (s *DataSourceSyncer) readColumnsInDatabase(repo dataSourceRepository, dbNa
 			DataType:         &column.DataType,
 		}
 
-		return dataSourceHandler.AddDataObjects(&do)
+		return s.addDataObjects(&do)
 	})
 }
 
-func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, databaseName string, excludedSchemas set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
+func (s *DataSourceSyncer) readSchemasInDatabase(databaseName string, doTypePrefix string, tagMap map[string][]*tag.Tag) error {
 	typeName := doTypePrefix + ds.Schema
 
-	return repo.GetSchemasInDatabase(databaseName, func(entity interface{}) error {
+	return s.repo.GetSchemasInDatabase(databaseName, func(entity interface{}) error {
 		schema := entity.(*SchemaEntity)
 
 		fullName := schema.Database + "." + schema.Name
 
-		ff := excludedSchemas.Contains(fullName)
-		fs := excludedSchemas.Contains(schema.Name)
+		ff := s.schemaExcludes.Contains(fullName)
+		fs := s.schemaExcludes.Contains(schema.Name)
 
 		if ff || fs || !s.shouldHandle(fullName) {
 			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
-
-		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", typeName, fullName))
 
 		comment := ""
 		if schema.Comment != nil {
@@ -251,11 +284,18 @@ func (s *DataSourceSyncer) readSchemasInDatabase(repo dataSourceRepository, data
 			Tags:             tagMap[fullName],
 		}
 
-		return dataSourceHandler.AddDataObjects(&do)
+		return s.addDataObjects(&do)
 	})
 }
 
-func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSchemas set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, typePrefix string, fetcher func(dbName string, schemaName string, entityHandler EntityHandler) error, tagMap map[string][]*tag.Tag) error {
+func (s *DataSourceSyncer) addDataObjects(dataObjects ...*ds.DataObject) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.dataSourceHandler.AddDataObjects(dataObjects...)
+}
+
+func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, typePrefix string, fetcher func(dbName string, schemaName string, entityHandler EntityHandler) error, tagMap map[string][]*tag.Tag) error {
 	return fetcher(databaseName, "", func(entity interface{}) error {
 		table := entity.(*TableEntity)
 
@@ -270,8 +310,8 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSch
 
 		schemaName := table.Schema
 		schemaFullName := table.Database + "." + schemaName
-		ff := excludedSchemas.Contains(schemaFullName)
-		fs := excludedSchemas.Contains(schemaName)
+		ff := s.schemaExcludes.Contains(schemaFullName)
+		fs := s.schemaExcludes.Contains(schemaName)
 
 		fullName := schemaFullName + "." + table.Name
 
@@ -279,8 +319,6 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSch
 			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
-
-		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", typeName, fullName))
 
 		comment := ""
 		if table.Comment != nil {
@@ -296,17 +334,17 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, excludedSch
 			Tags:             tagMap[fullName],
 		}
 
-		return dataSourceHandler.AddDataObjects(&do)
+		return s.addDataObjects(&do)
 	})
 }
 
-func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, db DbEntity) error {
+func (s *DataSourceSyncer) setupDatabasePermissions(db DbEntity) error {
 	// grant the SYNC role USAGE/IMPORTED PRIVILEGES on each database so it can query the INFORMATION_SCHEMA
 	if s.SfSyncRole != AccountAdmin {
-		err := repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+		err := s.repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 		if err != nil && strings.Contains(err.Error(), "IMPORTED PRIVILEGES") {
-			err2 := repo.ExecuteGrantOnAccountRole("IMPORTED PRIVILEGES", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 := s.repo.ExecuteGrantOnAccountRole("IMPORTED PRIVILEGES", fmt.Sprintf("DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
@@ -314,31 +352,31 @@ func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, d
 		} else if err != nil {
 			return err
 		} else {
-			err2 := repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("ALL SCHEMAS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 := s.repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("ALL SCHEMAS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = s.repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = s.repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = s.repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
 			}
 
-			err2 = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL MATERIALIZED VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
+			err2 = s.repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL MATERIALIZED VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole)
 
 			if err2 != nil {
 				return err2
@@ -349,14 +387,14 @@ func (s *DataSourceSyncer) setupDatabasePermissions(repo dataSourceRepository, d
 	return nil
 }
 
-func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludes set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, shares map[string]struct{}, shouldRetrieveTags bool) ([]ExtendedDbEntity, error) {
-	databases, err := repo.GetDatabases()
+func (s *DataSourceSyncer) readDatabases(excludes set.Set[string], shares map[string]struct{}, shouldRetrieveTags bool) ([]ExtendedDbEntity, error) {
+	databases, err := s.repo.GetDatabases()
 	if err != nil {
 		return nil, err
 	}
 
-	enrichedDatabases, err := s.addDbEntitiesToImporter(dataSourceHandler, databases, ds.Database, "", shouldRetrieveTags,
-		repo.GetTagsLinkedToDatabaseName,
+	enrichedDatabases, err := s.addDbEntitiesToImporter(databases, ds.Database, "", shouldRetrieveTags,
+		s.repo.GetTagsLinkedToDatabaseName,
 		func(name string) string { return name },
 		func(name, fullName string) bool {
 			_, shared := shares[fullName]
@@ -369,16 +407,16 @@ func (s *DataSourceSyncer) readDatabases(repo dataSourceRepository, excludes set
 	return enrichedDatabases, nil
 }
 
-func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludes set.Set[string], dataSourceHandler wrappers.DataSourceObjectHandler, shouldRetrieveTags bool) ([]ExtendedDbEntity, map[string]struct{}, error) {
+func (s *DataSourceSyncer) readShares(excludes set.Set[string], shouldRetrieveTags bool) ([]ExtendedDbEntity, set.Set[string], error) {
 	// main reason is that for export they can only have "IMPORTED PRIVILEGES" granted on the shared db level and nothing else.
 	// for now we can just exclude them but they need to be treated later on
-	shares, err := repo.GetShares()
+	shares, err := s.repo.GetShares()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	enrichedShares, err := s.addDbEntitiesToImporter(dataSourceHandler, shares, "shared-database", "", shouldRetrieveTags,
-		repo.GetTagsLinkedToDatabaseName,
+	enrichedShares, err := s.addDbEntitiesToImporter(shares, "shared-database", "", shouldRetrieveTags,
+		s.repo.GetTagsLinkedToDatabaseName,
 		func(name string) string { return name },
 		func(name, fullName string) bool {
 			return !excludes.Contains(fullName) && s.shouldGoInto(fullName)
@@ -387,18 +425,18 @@ func (s *DataSourceSyncer) readShares(repo dataSourceRepository, excludes set.Se
 		return nil, nil, err
 	}
 
-	sharesMap := make(map[string]struct{}, 0)
+	sharesMap := set.NewSet[string]()
 
 	// exclude shares from database import as we treat them separately
 	for _, share := range enrichedShares {
-		sharesMap[share.Entity.Name] = struct{}{}
+		sharesMap.Add(share.Entity.Name)
 	}
 
 	return enrichedShares, sharesMap, nil
 }
 
-func (s *DataSourceSyncer) readWarehouses(repo dataSourceRepository, dataSourceHandler wrappers.DataSourceObjectHandler, shouldRetrieveTags bool) error {
-	dbWarehouses, err := repo.GetWarehouses()
+func (s *DataSourceSyncer) readWarehouses(shouldRetrieveTags bool) error {
+	dbWarehouses, err := s.repo.GetWarehouses()
 	if err != nil {
 		return err
 	}
@@ -406,14 +444,14 @@ func (s *DataSourceSyncer) readWarehouses(repo dataSourceRepository, dataSourceH
 	allWarehouseTags := make(map[string][]*tag.Tag, 0)
 
 	if shouldRetrieveTags {
-		allWarehouseTags, err = repo.GetTagsByDomain("WAREHOUSE")
+		allWarehouseTags, err = s.repo.GetTagsByDomain("WAREHOUSE")
 
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = s.addDbEntitiesToImporter(dataSourceHandler, dbWarehouses, "warehouse", "", shouldRetrieveTags,
+	_, err = s.addDbEntitiesToImporter(dbWarehouses, "warehouse", "", shouldRetrieveTags,
 		func(name string) (map[string][]*tag.Tag, error) {
 			return allWarehouseTags, nil
 		},
@@ -426,7 +464,7 @@ func (s *DataSourceSyncer) readWarehouses(repo dataSourceRepository, dataSourceH
 	return nil
 }
 
-func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.DataSourceObjectHandler, entities []DbEntity, doType string, parent string, shouldRetrieveTags bool, tagRetrieval func(name string) (map[string][]*tag.Tag, error), externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]ExtendedDbEntity, error) {
+func (s *DataSourceSyncer) addDbEntitiesToImporter(entities []DbEntity, doType string, parent string, shouldRetrieveTags bool, tagRetrieval func(name string) (map[string][]*tag.Tag, error), externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]ExtendedDbEntity, error) {
 	dbEntities := make([]ExtendedDbEntity, 0, 20)
 
 	for _, db := range entities {
@@ -437,8 +475,6 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.Da
 		extendedEntity := ExtendedDbEntity{
 			Entity: db,
 		}
-
-		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", doType, extendedEntity.Entity.Name))
 
 		fullName := externalIdGenerator(extendedEntity.Entity.Name)
 		if filter(extendedEntity.Entity.Name, fullName) {
@@ -475,7 +511,7 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(dataObjectHandler wrappers.Da
 					Tags:             doTags,
 				}
 
-				err := dataObjectHandler.AddDataObjects(&do)
+				err := s.addDataObjects(&do)
 				if err != nil {
 					return nil, err
 				}

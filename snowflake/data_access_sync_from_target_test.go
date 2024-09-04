@@ -5,7 +5,11 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/cli/base/access_provider"
+	"github.com/raito-io/cli/base/access_provider/sync_from_target"
+	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
+	"github.com/raito-io/cli/base/wrappers"
+	"github.com/raito-io/cli/base/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -117,15 +121,137 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 			// Given
 			repoMock := newMockDataAccessRepository(t)
 
-			syncer := createBasicAccessSyncer(func(params map[string]string, role string) (dataAccessRepository, error) {
-				return repoMock, nil
-			})
+			syncer := createBasicFromTargetSyncer(repoMock, nil, &tt.args.configMap)
 
 			//When
-			shouldRetrieveTags := syncer.shouldRetrieveTags(&tt.args.configMap)
+			shouldRetrieveTags := syncer.shouldRetrieveTags()
 
 			// Then
 			assert.Equal(t, tt.want, shouldRetrieveTags)
 		})
 	}
+}
+
+func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
+	//Given
+	repoMock := newMockDataAccessRepository(t)
+	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
+
+	policyType := "policyType"
+
+	repoMock.EXPECT().GetPolicies(policyType).Return([]PolicyEntity{
+		{
+			Name:         "Policy1",
+			Owner:        "PolicyOwner",
+			Kind:         policyType,
+			DatabaseName: "DB1",
+			SchemaName:   "Schema1",
+		},
+		{
+			Name:         "Policy2",
+			Kind:         policyType,
+			DatabaseName: "DB1",
+			SchemaName:   "Schema2",
+		},
+		{
+			Name:         "Policy3",
+			Kind:         "OtherKind",
+			DatabaseName: "DB1",
+			SchemaName:   "Schema2",
+		},
+	}, nil).Once()
+
+	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema1", "Policy1").Return([]DescribePolicyEntity{
+		{
+			Name: "Policy1",
+			Body: "PolicyBody1",
+		},
+	}, nil).Once()
+
+	repoMock.EXPECT().DescribePolicy(policyType, "DB1", "Schema2", "Policy2").Return([]DescribePolicyEntity{
+		{
+			Name: "Policy2",
+			Body: "PolicyBody2",
+		},
+	}, nil).Once()
+
+	repoMock.EXPECT().GetPolicyReferences("DB1", "Schema1", "Policy1").Return([]PolicyReferenceEntity{
+		{
+			POLICY_STATUS:     "Active",
+			REF_COLUMN_NAME:   NullString{String: "ColumnName1", Valid: true},
+			REF_DATABASE_NAME: "DB1",
+			REF_SCHEMA_NAME:   "Schema1",
+			REF_ENTITY_NAME:   "EntityName1",
+		},
+	}, nil).Once()
+
+	repoMock.EXPECT().GetPolicyReferences("DB1", "Schema2", "Policy2").Return([]PolicyReferenceEntity{
+		{
+			POLICY_STATUS:     "Active",
+			REF_COLUMN_NAME:   NullString{Valid: false},
+			REF_DATABASE_NAME: "DB1",
+			REF_SCHEMA_NAME:   "Schema1",
+			REF_ENTITY_NAME:   "EntityName1",
+		},
+	}, nil).Once()
+
+	syncer := createBasicFromTargetSyncer(repoMock, fileCreator, nil)
+
+	//When
+	err := syncer.importPoliciesOfType(policyType, sync_from_target.Grant)
+
+	//Then
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []sync_from_target.AccessProvider{
+		{
+			ExternalId:        "DB1-Schema1-Policy1",
+			NotInternalizable: true,
+			Name:              "DB1-Schema1-Policy1",
+			NamingHint:        "Policy1",
+			Who:               nil,
+			ActualName:        "DB1-Schema1-Policy1",
+			What: []sync_from_target.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.Schema1.EntityName1.ColumnName1",
+						Type:     "COLUMN",
+					},
+					Permissions: []string{},
+				},
+			},
+			Action: sync_from_target.Grant,
+			Policy: "PolicyBody1",
+		},
+		{
+			ExternalId:        "DB1-Schema2-Policy2",
+			NotInternalizable: true,
+			Name:              "DB1-Schema2-Policy2",
+			NamingHint:        "Policy2",
+			Who:               nil,
+			ActualName:        "DB1-Schema2-Policy2",
+			What: []sync_from_target.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "DB1.Schema1.EntityName1",
+						Type:     "TABLE",
+					},
+					Permissions: []string{},
+				},
+			},
+			Action: sync_from_target.Grant,
+			Policy: "PolicyBody2",
+		},
+	}, fileCreator.AccessProviders)
+}
+
+func createBasicFromTargetSyncer(repo dataAccessRepository, accessProviderHandler wrappers.AccessProviderHandler, configMap *config.ConfigMap) *AccessFromTargetSyncer {
+	as := AccessSyncer{
+		repoProvider: func(params map[string]string, role string) (dataAccessRepository, error) {
+			return repo, nil
+		},
+		repo:              repo,
+		namingConstraints: RoleNameConstraints,
+	}
+
+	return NewAccessFromTargetSyncer(&as, repo, accessProviderHandler, configMap)
 }

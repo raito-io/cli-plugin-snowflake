@@ -8,10 +8,12 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/blockloop/scan"
+	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/golang-set/set"
@@ -44,6 +46,8 @@ type SnowflakeRepository struct {
 	queryTime      time.Duration
 	role           string
 	usageBatchSize int
+	workerPoolSize int
+	queryTimeLock  sync.Mutex
 
 	maskFactory *MaskFactory
 }
@@ -54,6 +58,17 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 
 		if err != nil {
 			logger.Error("Error while setting snowflake sdk to debug level: %s", err.Error())
+		}
+	}
+
+	workerPoolSize := 10
+
+	if v, f := params[SfWorkerPoolSize]; f {
+		poolSize, err := strconv.Atoi(v)
+		if err != nil {
+			logger.Warn(fmt.Sprintf("Unable to parse parameter %s: %s", SfWorkerPoolSize, err.Error()))
+		} else if poolSize > 0 {
+			workerPoolSize = poolSize
 		}
 	}
 
@@ -78,6 +93,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 		conn:           conn,
 		role:           role,
 		usageBatchSize: usageBatchSize,
+		workerPoolSize: workerPoolSize,
 
 		maskFactory: NewMaskFactory(),
 	}, nil
@@ -365,7 +381,7 @@ func (repo *SnowflakeRepository) GrantUsersToAccountRole(ctx context.Context, ro
 	statementChan, done := repo.execMultiStatements(ctx)
 
 	for _, user := range users {
-		q := common.FormatQuery(`GRANT ROLE %s TO USER %q`, role, user)
+		q := common.FormatQuery(`GRANT ROLE %s TO USER %s`, role, user)
 		statementChan <- q
 	}
 
@@ -383,7 +399,7 @@ func (repo *SnowflakeRepository) RevokeUsersFromAccountRole(ctx context.Context,
 	statementChan, done := repo.execMultiStatements(ctx)
 
 	for _, user := range users {
-		q := common.FormatQuery(`REVOKE ROLE %s FROM USER %q`, role, user)
+		q := common.FormatQuery(`REVOKE ROLE %s FROM USER %s`, role, user)
 		statementChan <- q
 	}
 
@@ -686,34 +702,40 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 		return nil, fmt.Errorf("error while fetching users: %s", err.Error())
 	}
 
+	wp := workerpool.New(repo.workerPoolSize)
+
 	for i := range userRows {
 		userRow := userRows[i]
 		if userRow.Type != nil && *userRow.Type != "" {
 			continue
 		}
 
-		rows, _, err = repo.query(fmt.Sprintf(`DESCRIBE USER "%s"`, userRow.Name)) //nolint:gocritic
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Unable to fetch user details for %q: %s", userRow.Name, err.Error()))
-			continue
-		}
-
-		var userDetails []UserDetails
-		err = scan.Rows(&userDetails, rows)
-
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Unable to parse user details for %q: %s", userRow.Name, err.Error()))
-			continue
-		}
-
-		for _, detail := range userDetails {
-			if strings.EqualFold(detail.Property, "TYPE") {
-				val := detail.Value
-				userRow.Type = &val
-				userRows[i] = userRow
+		wp.Submit(func() {
+			describeRows, _, err := repo.query(fmt.Sprintf(`DESCRIBE USER "%s"`, userRow.Name)) //nolint:gocritic
+			if err != nil {
+				logger.Warn(fmt.Sprintf("Unable to fetch user details for %q: %s", userRow.Name, err.Error()))
+				return
 			}
-		}
+
+			var userDetails []UserDetails
+			err = scan.Rows(&userDetails, describeRows)
+
+			if err != nil {
+				logger.Warn(fmt.Sprintf("Unable to parse user details for %q: %s", userRow.Name, err.Error()))
+				return
+			}
+
+			for _, detail := range userDetails {
+				if strings.EqualFold(detail.Property, "TYPE") {
+					val := detail.Value
+					userRow.Type = &val
+					userRows[i] = userRow
+				}
+			}
+		})
 	}
+
+	wp.StopWait()
 
 	return userRows, nil
 }
@@ -1235,7 +1257,7 @@ func (repo *SnowflakeRepository) queryContext(ctx context.Context, query string,
 	startQuery := time.Now()
 	result, err := repo.conn.QueryContext(ctx, query, args...)
 	sec := time.Since(startQuery).Round(time.Millisecond)
-	repo.queryTime += sec
+	repo.addToQueryTime(sec)
 
 	logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
 
@@ -1247,11 +1269,18 @@ func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, 
 	startQuery := time.Now()
 	result, err := QuerySnowflake(repo.conn, query)
 	sec := time.Since(startQuery).Round(time.Millisecond)
-	repo.queryTime += sec
+
+	repo.addToQueryTime(sec)
 
 	logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
 
 	return result, sec, err
+}
+
+func (repo *SnowflakeRepository) addToQueryTime(duration time.Duration) {
+	repo.queryTimeLock.Lock()
+	repo.queryTime += duration
+	repo.queryTimeLock.Unlock()
 }
 
 func (repo *SnowflakeRepository) execute(query ...string) error {
@@ -1271,7 +1300,7 @@ func (repo *SnowflakeRepository) execute(query ...string) error {
 	startQuery := time.Now()
 	err = ExecuteSnowflake(ctx, repo.conn, strings.Join(query, "\n"))
 	sec := time.Since(startQuery).Round(time.Millisecond)
-	repo.queryTime += sec
+	repo.addToQueryTime(sec)
 
 	return err
 }
@@ -1335,9 +1364,13 @@ func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []s
 	startQuery := time.Now()
 	_, err := repo.conn.ExecContext(multiContext, query)
 	sec := time.Since(startQuery).Round(time.Millisecond)
-	repo.queryTime += sec
+	repo.addToQueryTime(sec)
 
-	return sec, err
+	if err != nil {
+		return sec, fmt.Errorf("error while executing queries: %s: %w", query, err)
+	}
+
+	return sec, nil
 }
 
 func (repo *SnowflakeRepository) getColumnInformation(databaseName string, columnFullNames []string, fn func(columnName string, dataType string) error) error {

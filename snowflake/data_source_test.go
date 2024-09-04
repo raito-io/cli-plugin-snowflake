@@ -159,7 +159,6 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter(t *testing.T) {
 			return true
 		}
 	}
-	shouldRetrieveTags := true
 
 	externalIdGenerator := func(name string) string {
 		return "external-" + name
@@ -169,9 +168,10 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter(t *testing.T) {
 	repoMock.EXPECT().GetTagsLinkedToDatabaseName("Object2").Once().Return(nil, nil)
 
 	syncer := createSyncer(nil)
+	syncer.dataSourceHandler = dataSourceObjectHandlerMock
 
 	//When
-	returnedEntities, err := syncer.addDbEntitiesToImporter(dataSourceObjectHandlerMock, entities, doType, parent, shouldRetrieveTags, repoMock.GetTagsLinkedToDatabaseName, externalIdGenerator, filter)
+	returnedEntities, err := syncer.addDbEntitiesToImporter(entities, doType, parent, true, repoMock.GetTagsLinkedToDatabaseName, externalIdGenerator, filter)
 
 	//Then
 	assert.NoError(t, err)
@@ -212,16 +212,16 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter_ErrorOnAddDataO
 			return true
 		}
 	}
-	shouldRetrieveTags := false
 
 	externalIdGenerator := func(name string) string {
 		return "external-" + name
 	}
 
 	syncer := createSyncer(nil)
+	syncer.dataSourceHandler = dataSourceObjectHandlerMock
 
 	//When
-	returnedEntities, err := syncer.addDbEntitiesToImporter(dataSourceObjectHandlerMock, entities, doType, parent, shouldRetrieveTags, repoMock.GetTagsLinkedToDatabaseName, externalIdGenerator, filter)
+	returnedEntities, err := syncer.addDbEntitiesToImporter(entities, doType, parent, false, repoMock.GetTagsLinkedToDatabaseName, externalIdGenerator, filter)
 
 	//Then
 	assert.Error(t, err)
@@ -245,9 +245,11 @@ func TestDataSourceSyncer_SyncDataSource_readWarehouses(t *testing.T) {
 	}, nil).Once()
 
 	syncer := createSyncer(nil)
+	syncer.repo = repoMock
+	syncer.dataSourceHandler = dataSourceObjectHandlerMock
 
 	//When
-	err := syncer.readWarehouses(repoMock, dataSourceObjectHandlerMock, true)
+	err := syncer.readWarehouses(true)
 
 	//Then
 	assert.NoError(t, err)
@@ -281,9 +283,11 @@ func TestDataSourceSyncer_SyncDataSource_readShares(t *testing.T) {
 	}, nil).Once()
 
 	syncer := createSyncer(nil)
+	syncer.repo = repoMock
+	syncer.dataSourceHandler = dataSourceObjectHandlerMock
 
 	//When
-	shares, shareMap, err := syncer.readShares(repoMock, excludedDatabases, dataSourceObjectHandlerMock, false)
+	shares, shareMap, err := syncer.readShares(excludedDatabases, false)
 
 	//Then
 	assert.NoError(t, err)
@@ -302,7 +306,7 @@ func TestDataSourceSyncer_SyncDataSource_readShares(t *testing.T) {
 	})
 
 	assert.Equal(t, []ExtendedDbEntity{{Entity: DbEntity{Name: "Share1"}}, {Entity: DbEntity{Name: "Share2"}}}, shares)
-	assert.Equal(t, map[string]struct{}{"Share1": {}, "Share2": {}}, shareMap)
+	assert.ElementsMatch(t, []string{"Share1", "Share2"}, shareMap.Slice())
 }
 
 func TestDataSourceSyncer_SyncDataSource_readDatabases(t *testing.T) {
@@ -328,11 +332,12 @@ func TestDataSourceSyncer_SyncDataSource_readDatabases(t *testing.T) {
 		},
 	}, nil).Once()
 
-	shouldRetrieveTags := true
 	syncer := createSyncer(nil)
+	syncer.repo = repoMock
+	syncer.dataSourceHandler = dataSourceObjectHandlerMock
 
 	//When
-	entities, err := syncer.readDatabases(repoMock, excludedDatabases, dataSourceObjectHandlerMock, map[string]struct{}{}, shouldRetrieveTags)
+	entities, err := syncer.readDatabases(excludedDatabases, map[string]struct{}{}, true)
 
 	//Then
 	assert.NoError(t, err)
@@ -393,9 +398,12 @@ func TestDataSourceSyncer_SyncDataSource_readSchemaInDatabase(t *testing.T) {
 	}).Once()
 
 	syncer := createSyncer(nil)
+	syncer.repo = repoMock
+	syncer.dataSourceHandler = dataSourceObjectHandlerMock
+	syncer.schemaExcludes = excludeSchemas
 
 	//When
-	err := syncer.readSchemasInDatabase(repoMock, databaseName, excludeSchemas, dataSourceObjectHandlerMock, "prefix-", map[string][]*tag.Tag{})
+	err := syncer.readSchemasInDatabase(databaseName, "prefix-", map[string][]*tag.Tag{})
 
 	//Then
 	assert.NoError(t, err)
