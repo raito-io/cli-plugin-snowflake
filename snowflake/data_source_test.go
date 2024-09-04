@@ -306,7 +306,7 @@ func TestDataSourceSyncer_SyncDataSource_readShares(t *testing.T) {
 	})
 
 	assert.Equal(t, []ExtendedDbEntity{{Entity: DbEntity{Name: "Share1"}}, {Entity: DbEntity{Name: "Share2"}}}, shares)
-	assert.Equal(t, map[string]struct{}{"Share1": {}, "Share2": {}}, shareMap)
+	assert.ElementsMatch(t, []string{"Share1", "Share2"}, shareMap.Slice())
 }
 
 func TestDataSourceSyncer_SyncDataSource_readDatabases(t *testing.T) {
