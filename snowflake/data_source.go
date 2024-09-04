@@ -91,38 +91,13 @@ func (s *DataSourceSyncer) shouldGoInto(fullName string) bool {
 }
 
 func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler wrappers.DataSourceObjectHandler, config *ds.DataSourceSyncConfig) error {
+	// Initializing parameters
 	configParams := config.ConfigMap
-
 	s.dataSourceHandler = dataSourceHandler
 	s.startFrom = config.DataObjectParent
 	s.excludeChildren = config.DataObjectExcludes
-
-	repo, err := s.repoProvider(configParams.Parameters, "")
-	if err != nil {
-		return err
-	}
-
-	s.repo = repo
-
-	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
-		repo.Close()
-	}()
-
-	// for data source level access import & export convenience we retrieve the snowflake account and use it as datasource name
-	sfAccount, err := repo.GetSnowFlakeAccountName()
-	if err != nil {
-		return err
-	}
-
-	s.SfSyncRole = configParams.GetStringWithDefault(SfRole, AccountAdmin)
-
-	dataSourceHandler.SetDataSourceName(sfAccount)
-	dataSourceHandler.SetDataSourceFullname(sfAccount)
-
-	standard := configParams.GetBoolWithDefault(SfStandardEdition, false)
-	skipTags := configParams.GetBoolWithDefault(SfSkipTags, false)
 	s.skipColumns = configParams.GetBoolWithDefault(SfSkipColumns, false)
+	s.SfSyncRole = configParams.GetStringWithDefault(SfRole, AccountAdmin)
 
 	excludedDatabases := "SNOWFLAKE"
 	if v, ok := configParams.Parameters[SfExcludedDatabases]; ok {
@@ -137,7 +112,26 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	}
 
 	s.schemaExcludes = parseCommaSeparatedList(excludedSchemaList)
+	standard := configParams.GetBoolWithDefault(SfStandardEdition, false)
+	skipTags := configParams.GetBoolWithDefault(SfSkipTags, false)
 	shouldRetrieveTags := !standard && !skipTags
+
+	repo, err := s.repoProvider(configParams.Parameters, "")
+	if err != nil {
+		return err
+	}
+
+	s.repo = repo
+
+	// for data source level access import & export convenience we retrieve the snowflake account and use it as datasource name
+	sfAccount, err := repo.GetSnowFlakeAccountName()
+	if err != nil {
+		return err
+	}
+
+	// Initializing the data source handler
+	dataSourceHandler.SetDataSourceName(sfAccount)
+	dataSourceHandler.SetDataSourceFullname(sfAccount)
 
 	err = s.readWarehouses(shouldRetrieveTags)
 	if err != nil {
