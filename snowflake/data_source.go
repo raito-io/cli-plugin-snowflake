@@ -235,8 +235,6 @@ func (s *DataSourceSyncer) readColumnsInDatabase(dbName string, doTypePrefix str
 			return nil
 		}
 
-		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", typeName, fullName))
-
 		comment := ""
 		if column.Comment != nil {
 			comment = *column.Comment
@@ -271,8 +269,6 @@ func (s *DataSourceSyncer) readSchemasInDatabase(databaseName string, doTypePref
 			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
-
-		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", typeName, fullName))
 
 		comment := ""
 		if schema.Comment != nil {
@@ -323,8 +319,6 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, typePrefix 
 			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
-
-		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", typeName, fullName))
 
 		comment := ""
 		if table.Comment != nil {
@@ -481,8 +475,6 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(entities []DbEntity, doType s
 		extendedEntity := ExtendedDbEntity{
 			Entity: db,
 		}
-
-		logger.Debug(fmt.Sprintf("Handling data object (type %s) '%s'", doType, extendedEntity.Entity.Name))
 
 		fullName := externalIdGenerator(extendedEntity.Entity.Name)
 		if filter(extendedEntity.Entity.Name, fullName) {
