@@ -25,4 +25,6 @@ const (
 	TagSource = "Snowflake"
 
 	SharedPrefix = "shared-"
+
+	AccountAdminRole = "ACCOUNTADMIN"
 )
