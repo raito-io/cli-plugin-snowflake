@@ -1189,6 +1189,7 @@ func (repo *SnowflakeRepository) UpdateFilter(databaseName string, schema string
 		err = repo.ExecuteGrantOnAccountRole("CREATE ROW ACCESS POLICY", fmt.Sprintf("SCHEMA %s.%s", databaseName, schema), repo.role)
 		if err != nil {
 			return err
+		}
 	}
 
 	q := make([]string, 0, 3)
