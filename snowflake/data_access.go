@@ -40,9 +40,9 @@ type dataAccessRepository interface {
 	DropDatabaseRole(database string, roleName string) error
 	DropFilter(databaseName string, schema string, tableName string, filterName string) error
 	DropMaskingPolicy(databaseName string, schema string, maskName string) (err error)
-	ExecuteGrantOnAccountRole(perm, on, role string) error
+	ExecuteGrantOnAccountRole(perm, on, role string, isSystemGrant bool) error
 	ExecuteGrantOnDatabaseRole(perm, on, database, databaseRole string) error
-	ExecuteRevokeOnAccountRole(perm, on, role string) error
+	ExecuteRevokeOnAccountRole(perm, on, role string, isSystemGrant bool) error
 	ExecuteRevokeOnDatabaseRole(perm, on, database, databaseRole string) error
 	GetAccountRoles() ([]RoleEntity, error)
 	GetAccountRolesWithPrefix(prefix string) ([]RoleEntity, error)

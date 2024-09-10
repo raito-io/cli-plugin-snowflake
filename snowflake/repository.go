@@ -109,7 +109,7 @@ func (repo *SnowflakeRepository) TotalQueryTime() time.Duration {
 
 func (repo *SnowflakeRepository) isProtectedRoleName(rn string) bool {
 	// if sync role is not account admin, we protect this role both on import & export
-	return !strings.EqualFold(repo.role, "ACCOUNTADMIN") && strings.EqualFold(repo.role, rn)
+	return !strings.EqualFold(repo.role, AccountAdminRole) && strings.EqualFold(repo.role, rn)
 }
 
 func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time) <-chan stream.MaybeError[UsageQueryResult] {
@@ -408,8 +408,8 @@ func (repo *SnowflakeRepository) RevokeUsersFromAccountRole(ctx context.Context,
 	return <-done
 }
 
-func (repo *SnowflakeRepository) ExecuteGrantOnAccountRole(perm, on, accountRole string) error {
-	if repo.isProtectedRoleName(accountRole) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "REFERENCES") {
+func (repo *SnowflakeRepository) ExecuteGrantOnAccountRole(perm, on, accountRole string, isSystemGrant bool) error {
+	if repo.isProtectedRoleName(accountRole) && !isSystemGrant {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
 		return nil
 	}
@@ -427,8 +427,8 @@ func (repo *SnowflakeRepository) ExecuteGrantOnAccountRole(perm, on, accountRole
 	return nil
 }
 
-func (repo *SnowflakeRepository) ExecuteRevokeOnAccountRole(perm, on, accountRole string) error {
-	if repo.isProtectedRoleName(accountRole) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "SELECT") {
+func (repo *SnowflakeRepository) ExecuteRevokeOnAccountRole(perm, on, accountRole string, isSystemRevoke bool) error {
+	if repo.isProtectedRoleName(accountRole) && !isSystemRevoke {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
 		return nil
 	}
@@ -785,14 +785,14 @@ func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, poli
 
 func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName string) ([]PolicyReferenceEntity, error) {
 	// to fetch policy references we need to have USAGE on dbName and schema
-	if !strings.EqualFold(repo.role, "ACCOUNTADMIN") && repo.role != "" {
-		err := repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("DATABASE %s", dbName), repo.role)
+	if !strings.EqualFold(repo.role, AccountAdminRole) && repo.role != "" {
+		err := repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("DATABASE %s", dbName), repo.role, true)
 
 		if err != nil {
 			return nil, err
 		}
 
-		err = repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("SCHEMA %s.%s", dbName, schema), repo.role)
+		err = repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("SCHEMA %s.%s", dbName, schema), repo.role, true)
 
 		if err != nil {
 			return nil, err
@@ -998,6 +998,14 @@ func (repo *SnowflakeRepository) CommentDatabaseRoleIfExists(comment, database, 
 }
 
 func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) (err error) {
+	// Ensure we have permission to create masks
+	if repo.role != AccountAdminRole {
+		err = repo.ExecuteGrantOnAccountRole("CREATE MASKING POLICY", fmt.Sprintf("SCHEMA %s.%s", databaseName, schema), repo.role, true)
+		if err != nil {
+			return err
+		}
+	}
+
 	dataObjectTypeMap := map[string][]string{}
 	columnTypes := set.Set[string]{}
 
@@ -1125,6 +1133,13 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 	}
 
 	for _, policy := range policies {
+		if repo.role != AccountAdminRole {
+			err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", fmt.Sprintf("MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name), repo.role, true)
+			if err != nil {
+				return err
+			}
+		}
+
 		_, err = tx.Exec(fmt.Sprintf("DROP MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name))
 		if err != nil {
 			return err
@@ -1170,6 +1185,13 @@ func (repo *SnowflakeRepository) UpdateFilter(databaseName string, schema string
 		deleteOldPolicy = ptr.String(fmt.Sprintf("DROP ROW ACCESS POLICY IF EXISTS %s.%s.%s;", databaseName, schema, *existingPolicy))
 	}
 
+	if repo.role != AccountAdminRole {
+		err = repo.ExecuteGrantOnAccountRole("CREATE ROW ACCESS POLICY", fmt.Sprintf("SCHEMA %s.%s", databaseName, schema), repo.role, true)
+		if err != nil {
+			return err
+		}
+	}
+
 	q := make([]string, 0, 3)
 	q = append(q, fmt.Sprintf(`CREATE ROW ACCESS POLICY %s.%s.%s AS (%s) returns boolean ->
 			%s;`, databaseName, schema, filterName, strings.Join(functionArguments, ", "), expression),
@@ -1191,6 +1213,13 @@ func (repo *SnowflakeRepository) DropFilter(databaseName string, schema string, 
 	existingPolicy, err := repo.getRowFilterForTableIfExists(databaseName, schema, tableName)
 	if err != nil {
 		return fmt.Errorf("load possible existing row filter: %w", err)
+	}
+
+	if repo.role != AccountAdminRole {
+		err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", fmt.Sprintf("ROW ACCESS POLICY %s.%s.%s", databaseName, schema, filterName), repo.role, true)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = repo.execute(

@@ -67,17 +67,17 @@ func (_c *mockDataSourceRepository_Close_Call) RunAndReturn(run func() error) *m
 	return _c
 }
 
-// ExecuteGrantOnAccountRole provides a mock function with given fields: perm, on, role
-func (_m *mockDataSourceRepository) ExecuteGrantOnAccountRole(perm string, on string, role string) error {
-	ret := _m.Called(perm, on, role)
+// ExecuteGrantOnAccountRole provides a mock function with given fields: perm, on, role, isSystemGrant
+func (_m *mockDataSourceRepository) ExecuteGrantOnAccountRole(perm string, on string, role string, isSystemGrant bool) error {
+	ret := _m.Called(perm, on, role, isSystemGrant)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecuteGrantOnAccountRole")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(perm, on, role)
+	if rf, ok := ret.Get(0).(func(string, string, string, bool) error); ok {
+		r0 = rf(perm, on, role, isSystemGrant)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -94,13 +94,14 @@ type mockDataSourceRepository_ExecuteGrantOnAccountRole_Call struct {
 //   - perm string
 //   - on string
 //   - role string
-func (_e *mockDataSourceRepository_Expecter) ExecuteGrantOnAccountRole(perm interface{}, on interface{}, role interface{}) *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call {
-	return &mockDataSourceRepository_ExecuteGrantOnAccountRole_Call{Call: _e.mock.On("ExecuteGrantOnAccountRole", perm, on, role)}
+//   - isSystemGrant bool
+func (_e *mockDataSourceRepository_Expecter) ExecuteGrantOnAccountRole(perm interface{}, on interface{}, role interface{}, isSystemGrant interface{}) *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call {
+	return &mockDataSourceRepository_ExecuteGrantOnAccountRole_Call{Call: _e.mock.On("ExecuteGrantOnAccountRole", perm, on, role, isSystemGrant)}
 }
 
-func (_c *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call) Run(run func(perm string, on string, role string)) *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call {
+func (_c *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call) Run(run func(perm string, on string, role string, isSystemGrant bool)) *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string))
+		run(args[0].(string), args[1].(string), args[2].(string), args[3].(bool))
 	})
 	return _c
 }
@@ -110,7 +111,7 @@ func (_c *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call) Return(_a0 er
 	return _c
 }
 
-func (_c *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call) RunAndReturn(run func(string, string, string) error) *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call {
+func (_c *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call) RunAndReturn(run func(string, string, string, bool) error) *mockDataSourceRepository_ExecuteGrantOnAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }

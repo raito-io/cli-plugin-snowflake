@@ -559,17 +559,17 @@ func (_c *mockDataAccessRepository_DropMaskingPolicy_Call) RunAndReturn(run func
 	return _c
 }
 
-// ExecuteGrantOnAccountRole provides a mock function with given fields: perm, on, role
-func (_m *mockDataAccessRepository) ExecuteGrantOnAccountRole(perm string, on string, role string) error {
-	ret := _m.Called(perm, on, role)
+// ExecuteGrantOnAccountRole provides a mock function with given fields: perm, on, role, isSystemGrant
+func (_m *mockDataAccessRepository) ExecuteGrantOnAccountRole(perm string, on string, role string, isSystemGrant bool) error {
+	ret := _m.Called(perm, on, role, isSystemGrant)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecuteGrantOnAccountRole")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(perm, on, role)
+	if rf, ok := ret.Get(0).(func(string, string, string, bool) error); ok {
+		r0 = rf(perm, on, role, isSystemGrant)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -586,13 +586,14 @@ type mockDataAccessRepository_ExecuteGrantOnAccountRole_Call struct {
 //   - perm string
 //   - on string
 //   - role string
-func (_e *mockDataAccessRepository_Expecter) ExecuteGrantOnAccountRole(perm interface{}, on interface{}, role interface{}) *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call {
-	return &mockDataAccessRepository_ExecuteGrantOnAccountRole_Call{Call: _e.mock.On("ExecuteGrantOnAccountRole", perm, on, role)}
+//   - isSystemGrant bool
+func (_e *mockDataAccessRepository_Expecter) ExecuteGrantOnAccountRole(perm interface{}, on interface{}, role interface{}, isSystemGrant interface{}) *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call {
+	return &mockDataAccessRepository_ExecuteGrantOnAccountRole_Call{Call: _e.mock.On("ExecuteGrantOnAccountRole", perm, on, role, isSystemGrant)}
 }
 
-func (_c *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call) Run(run func(perm string, on string, role string)) *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call {
+func (_c *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call) Run(run func(perm string, on string, role string, isSystemGrant bool)) *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string))
+		run(args[0].(string), args[1].(string), args[2].(string), args[3].(bool))
 	})
 	return _c
 }
@@ -602,7 +603,7 @@ func (_c *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call) Return(_a0 er
 	return _c
 }
 
-func (_c *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call) RunAndReturn(run func(string, string, string) error) *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call {
+func (_c *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call) RunAndReturn(run func(string, string, string, bool) error) *mockDataAccessRepository_ExecuteGrantOnAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -656,17 +657,17 @@ func (_c *mockDataAccessRepository_ExecuteGrantOnDatabaseRole_Call) RunAndReturn
 	return _c
 }
 
-// ExecuteRevokeOnAccountRole provides a mock function with given fields: perm, on, role
-func (_m *mockDataAccessRepository) ExecuteRevokeOnAccountRole(perm string, on string, role string) error {
-	ret := _m.Called(perm, on, role)
+// ExecuteRevokeOnAccountRole provides a mock function with given fields: perm, on, role, isSystemGrant
+func (_m *mockDataAccessRepository) ExecuteRevokeOnAccountRole(perm string, on string, role string, isSystemGrant bool) error {
+	ret := _m.Called(perm, on, role, isSystemGrant)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecuteRevokeOnAccountRole")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(perm, on, role)
+	if rf, ok := ret.Get(0).(func(string, string, string, bool) error); ok {
+		r0 = rf(perm, on, role, isSystemGrant)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -683,13 +684,14 @@ type mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call struct {
 //   - perm string
 //   - on string
 //   - role string
-func (_e *mockDataAccessRepository_Expecter) ExecuteRevokeOnAccountRole(perm interface{}, on interface{}, role interface{}) *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call {
-	return &mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call{Call: _e.mock.On("ExecuteRevokeOnAccountRole", perm, on, role)}
+//   - isSystemGrant bool
+func (_e *mockDataAccessRepository_Expecter) ExecuteRevokeOnAccountRole(perm interface{}, on interface{}, role interface{}, isSystemGrant interface{}) *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call {
+	return &mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call{Call: _e.mock.On("ExecuteRevokeOnAccountRole", perm, on, role, isSystemGrant)}
 }
 
-func (_c *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call) Run(run func(perm string, on string, role string)) *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call {
+func (_c *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call) Run(run func(perm string, on string, role string, isSystemGrant bool)) *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string))
+		run(args[0].(string), args[1].(string), args[2].(string), args[3].(bool))
 	})
 	return _c
 }
@@ -699,7 +701,7 @@ func (_c *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call) Return(_a0 e
 	return _c
 }
 
-func (_c *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call) RunAndReturn(run func(string, string, string) error) *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call {
+func (_c *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call) RunAndReturn(run func(string, string, string, bool) error) *mockDataAccessRepository_ExecuteRevokeOnAccountRole_Call {
 	_c.Call.Return(run)
 	return _c
 }

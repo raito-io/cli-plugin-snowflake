@@ -960,9 +960,9 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 					expectGrantUsersToRole(repoMock, "ACCESS_PROVIDER1", "User1", "User2")
 					repoMock.EXPECT().GrantAccountRolesToAccountRole(mock.Anything, "ACCESS_PROVIDER1").Return(nil).Once()
 
-					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "ACCESS_PROVIDER1").Return(nil).Once()
-					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema1", "ACCESS_PROVIDER1").Return(nil).Once()
-					repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema1.Table1", "ACCESS_PROVIDER1").Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "ACCESS_PROVIDER1", false).Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema1", "ACCESS_PROVIDER1", false).Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema1.Table1", "ACCESS_PROVIDER1", false).Return(nil).Once()
 
 					repoMock.EXPECT().CreateDatabaseRole("TEST_DB", "DATABASE_ROLE1").Return(nil).Once()
 					repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.Anything, "TEST_DB", "DATABASE_ROLE1").Return(nil).Once()
@@ -1026,9 +1026,9 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 					repoMock.EXPECT().GetGrantsToAccountRole("ACCESS_PROVIDER1").Return([]GrantToRole{}, nil).Once()
 
 					expectGrantUsersToRole(repoMock, "ACCESS_PROVIDER1", "User1", "User2")
-					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "ACCESS_PROVIDER1").Return(nil).Once()
-					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema1", "ACCESS_PROVIDER1").Return(nil).Once()
-					repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema1.Table1", "ACCESS_PROVIDER1").Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "ACCESS_PROVIDER1", false).Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema1", "ACCESS_PROVIDER1", false).Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema1.Table1", "ACCESS_PROVIDER1", false).Return(nil).Once()
 
 					repoMock.EXPECT().RenameDatabaseRole("TEST_DB", "DATABASE_ROLE1_OLD", "DATABASE_ROLE1").Return(nil).Once()
 					repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.Anything, "TEST_DB", "DATABASE_ROLE1").Return(nil).Once()
