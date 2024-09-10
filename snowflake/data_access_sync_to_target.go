@@ -1554,7 +1554,7 @@ func (s *AccessToTargetSyncer) executeGrantOnRole(perm, on, roleName string, apT
 		return s.repo.ExecuteGrantOnDatabaseRole(perm, on, database, parsedRoleName)
 	}
 
-	return s.repo.ExecuteGrantOnAccountRole(perm, on, roleName)
+	return s.repo.ExecuteGrantOnAccountRole(perm, on, roleName, false)
 }
 
 func (s *AccessToTargetSyncer) executeRevokeOnRole(perm, on, roleName string, apType *string) error {
@@ -1567,7 +1567,7 @@ func (s *AccessToTargetSyncer) executeRevokeOnRole(perm, on, roleName string, ap
 		return s.repo.ExecuteRevokeOnDatabaseRole(perm, on, database, parsedRoleName)
 	}
 
-	return s.repo.ExecuteRevokeOnAccountRole(perm, on, roleName)
+	return s.repo.ExecuteRevokeOnAccountRole(perm, on, roleName, false)
 }
 
 func (s *AccessToTargetSyncer) mergeGrants(externalId string, apType *string, found []Grant, expected []Grant, metaData map[string]map[string]struct{}) error {

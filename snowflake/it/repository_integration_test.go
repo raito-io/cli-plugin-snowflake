@@ -291,7 +291,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnAccountRole(
 	s.NoError(err)
 
 	//When
-	err = s.repo.ExecuteGrantOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName)
+	err = s.repo.ExecuteGrantOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName, true)
 
 	//Then
 	s.NoError(err)
@@ -313,11 +313,11 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevokeOnAccountRole
 	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_REVOKE_TEST", testId)
 	err := s.repo.CreateAccountRole(roleName)
 	s.NoError(err)
-	err = s.repo.ExecuteGrantOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName)
+	err = s.repo.ExecuteGrantOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName, true)
 	s.NoError(err)
 
 	//When
-	err = s.repo.ExecuteRevokeOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName)
+	err = s.repo.ExecuteRevokeOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName, true)
 
 	//Then
 	s.NoError(err)
