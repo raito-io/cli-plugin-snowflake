@@ -1409,6 +1409,10 @@ func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []s
 }
 
 func (repo *SnowflakeRepository) getColumnInformation(databaseName string, columnFullNames []string, fn func(columnName string, dataType string) error) error {
+	if len(columnFullNames) == 0 {
+		return nil
+	}
+
 	columnLiterats := make([]string, 0, len(columnFullNames))
 	for _, fullName := range columnFullNames {
 		columnLiterats = append(columnLiterats, fmt.Sprintf("'%s'", fullName))
