@@ -99,10 +99,10 @@ func (g *SimpleMaskGenerator) Generate(maskName string, columnType string, benef
 	if len(beneficiaries.Roles) > 0 {
 		var roles []string
 		for _, role := range beneficiaries.Roles {
-			roles = append(roles, fmt.Sprintf("'%s'", role))
+			roles = append(roles, fmt.Sprintf("IS_ROLE_IN_SESSION('%s')", role))
 		}
 
-		cases = append(cases, fmt.Sprintf("WHEN current_role() IN (%s) THEN val", strings.Join(roles, ", ")))
+		cases = append(cases, fmt.Sprintf("WHEN (%s) THEN val", strings.Join(roles, " OR ")))
 	}
 
 	if len(beneficiaries.Users) > 0 {

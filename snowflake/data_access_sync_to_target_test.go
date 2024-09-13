@@ -279,8 +279,8 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 		assert.True(t, strings.HasPrefix(filterName, "raito_Schema1_Table1_"))
 		assert.ElementsMatch(t, []string{"Column1", "state"}, arguments)
 
-		queryPart1 := "(current_user() IN ('User2') OR current_role() IN ('Role3')) AND ((100 >= Column1))"
-		queryPart2 := "(current_user() IN ('User1', 'User2') OR current_role() IN ('Role1')) AND (state = 'NJ')"
+		queryPart1 := "(current_user() IN ('User2') OR IS_ROLE_IN_SESSION('Role3')) AND ((100 >= Column1))"
+		queryPart2 := "(current_user() IN ('User1', 'User2') OR IS_ROLE_IN_SESSION('Role1')) AND (state = 'NJ')"
 
 		queryOption1 := fmt.Sprintf("%s OR %s", queryPart1, queryPart2)
 		queryOption2 := fmt.Sprintf("%s OR %s", queryPart2, queryPart1)

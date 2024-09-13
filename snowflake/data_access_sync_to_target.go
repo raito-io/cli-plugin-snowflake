@@ -1653,15 +1653,15 @@ func filterWhoExpression(ap *importer.AccessProvider, roleNameMap map[string]str
 		for _, role := range ap.Who.InheritFrom {
 			if strings.HasPrefix(role, "ID:") {
 				if roleName, found := roleNameMap[role[3:]]; found {
-					roles = append(roles, fmt.Sprintf("'%s'", roleName))
+					roles = append(roles, fmt.Sprintf("IS_ROLE_IN_SESSION('%s')", roleName))
 				}
 			} else {
-				roles = append(roles, fmt.Sprintf("'%s'", role))
+				roles = append(roles, fmt.Sprintf("IS_ROLE_IN_SESSION('%s')", role))
 			}
 		}
 
 		if len(roles) > 0 {
-			whoExpressionParts = append(whoExpressionParts, fmt.Sprintf("current_role() IN (%s)", strings.Join(roles, ", ")))
+			whoExpressionParts = append(whoExpressionParts, strings.Join(roles, " OR "))
 		}
 	}
 
