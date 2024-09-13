@@ -1661,7 +1661,7 @@ func filterWhoExpression(ap *importer.AccessProvider, roleNameMap map[string]str
 		}
 
 		if len(roles) > 0 {
-			whoExpressionParts = append(whoExpressionParts, fmt.Sprintf("current_role() IN (%s)", strings.Join(roles, ", ")))
+			whoExpressionParts = append(whoExpressionParts, fmt.Sprintf("IS_ROLE_IN_SESSION(%s)", strings.Join(roles, " OR ")))
 		}
 	}
 

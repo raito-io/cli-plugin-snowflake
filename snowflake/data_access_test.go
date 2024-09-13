@@ -1149,7 +1149,7 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 						assert.True(t, strings.HasPrefix(filterName, "raito_Schema1_Table1_"))
 						assert.ElementsMatch(t, []string{"state"}, arguments)
 
-						assert.Equal(t, "(current_user() IN ('User1', 'User2') OR current_role() IN ('Role1')) AND (state = 'NJ')", query)
+						assert.Equal(t, "(current_user() IN ('User1', 'User2') OR IS_ROLE_IN_SESSION('Role1')) AND (state = 'NJ')", query)
 
 						return nil
 					})
