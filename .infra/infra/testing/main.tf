@@ -261,7 +261,7 @@ resource "snowflake_materialized_view" "customers_limited" {
 // SHARE
 resource "snowflake_shared_database" "shared_db" {
   name       = "SNOWFLAKE_SAMPLE_DATA"
-  from_share = "SFC_SAMPLES.SAMPLE_DATA.SNOWFLAKE_SAMPLE_DATA"
+  from_share = "SFSALESSHARED.SFC_SAMPLES_EUFRANKFURT.SAMPLE_DATA"
 }
 
 // Role what
