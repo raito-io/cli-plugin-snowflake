@@ -9,8 +9,8 @@ resource "snowflake_user" "benjamin" {
   comment           = "Raito - Access Manager"
   password          = random_password.persona_password.result
   default_warehouse = snowflake_warehouse.warehouse.id
-  default_role = "PUBLIC"
-  disabled = "false"
+  default_role      = "PUBLIC"
+  disabled          = "false"
 }
 
 resource "snowflake_user" "nick" {
@@ -23,8 +23,8 @@ resource "snowflake_user" "nick" {
   comment           = "Raito - Admin"
   password          = random_password.persona_password.result
   default_warehouse = snowflake_warehouse.warehouse.id
-  default_role = "PUBLIC"
-  disabled = "false"
+  default_role      = "PUBLIC"
+  disabled          = "false"
 }
 
 resource "snowflake_user" "carla" {
@@ -37,8 +37,8 @@ resource "snowflake_user" "carla" {
   comment           = "Raito - Observer"
   password          = random_password.persona_password.result
   default_warehouse = snowflake_warehouse.warehouse.id
-  default_role = "PUBLIC"
-  disabled = "false"
+  default_role      = "PUBLIC"
+  disabled          = "false"
 }
 
 resource "snowflake_user" "dustin" {
@@ -51,8 +51,8 @@ resource "snowflake_user" "dustin" {
   comment           = "Raito - Owner"
   password          = random_password.persona_password.result
   default_warehouse = snowflake_warehouse.warehouse.id
-  default_role = "PUBLIC"
-  disabled = "false"
+  default_role      = "PUBLIC"
+  disabled          = "false"
 }
 
 resource "snowflake_user" "mary" {
@@ -65,8 +65,8 @@ resource "snowflake_user" "mary" {
   comment           = "Raito - User"
   password          = random_password.persona_password.result
   default_warehouse = snowflake_warehouse.warehouse.id
-  default_role = "PUBLIC"
-  disabled = "false"
+  default_role      = "PUBLIC"
+  disabled          = "false"
 }
 
 resource "snowflake_user" "luis_garcia_stork" {
