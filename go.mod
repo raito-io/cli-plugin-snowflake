@@ -17,7 +17,7 @@ require (
 	github.com/raito-io/golang-set v0.0.4
 	github.com/snowflakedb/gosnowflake v1.11.1
 	github.com/stretchr/testify v1.9.0
-	github.com/vektra/mockery/v2 v2.45.0
+	github.com/vektra/mockery/v2 v2.45.1
 )
 
 require (
