@@ -17,7 +17,7 @@ module "testing" {
   }
 
   snowflake_warehouse      = snowflake_warehouse.warehouse.id
-  existing_snowflake_roles = [snowflake_role.data_analyst.name, snowflake_role.finance.name, snowflake_role.human_resources.name, snowflake_role.marketing.name, snowflake_role.sales.name, snowflake_role.sales_analysis.name, snowflake_role.sales_ext.name]
+  existing_snowflake_roles = [snowflake_account_role.data_analyst.name, snowflake_account_role.finance.name, snowflake_account_role.human_resources.name, snowflake_account_role.marketing.name, snowflake_account_role.sales.name, snowflake_account_role.sales_analysis.name, snowflake_account_role.sales_ext.name]
 }
 
 module "demo" {
@@ -31,5 +31,5 @@ module "demo" {
   }
 
   snowflake_warehouse      = snowflake_warehouse.warehouse.id
-  existing_snowflake_roles = [snowflake_role.data_analyst.name, snowflake_role.finance.name, snowflake_role.human_resources.name, snowflake_role.marketing.name, snowflake_role.sales.name, snowflake_role.sales_analysis.name, snowflake_role.sales_ext.name]
+  existing_snowflake_roles = [snowflake_account_role.data_analyst.name, snowflake_account_role.finance.name, snowflake_account_role.human_resources.name, snowflake_account_role.marketing.name, snowflake_account_role.sales.name, snowflake_account_role.sales_analysis.name, snowflake_account_role.sales_ext.name]
 }

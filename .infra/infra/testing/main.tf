@@ -154,7 +154,7 @@ resource "snowflake_table" "ordering_supplier" {
   column {
     name           = "NAME"
     type           = "VARCHAR"
-    masking_policy = snowflake_masking_policy.masking_policy.qualified_name
+    masking_policy = snowflake_masking_policy.masking_policy.fully_qualified_name
   }
 
   column {
@@ -236,10 +236,10 @@ resource "snowflake_view" "orders_limited" {
   name     = "ORDERS_LIMITED"
   comment  = "Non-materialized view with limited data"
 
-  statement  = <<-SQL
+  statement   = <<-SQL
     SELECT ORDERKEY, ORDERSTATUS, CUSTKEY FROM ${snowflake_table.ordering_orders.name};
   SQL
-  or_replace = true
+  copy_grants = true
 }
 
 resource "snowflake_materialized_view" "customers_limited" {
@@ -248,24 +248,20 @@ resource "snowflake_materialized_view" "customers_limited" {
   name     = "CUSTOMERS_LIMITED"
   comment  = "Materialized view with limited data"
 
-  statement  = <<-SQL
+  statement = <<-SQL
     SELECT CUSTKEY, ACCTBAL, MKTSEGMENT FROM ${snowflake_table.ordering_customer.name};
   SQL
-  or_replace = true
 
-  warehouse = var.snowflake_warehouse
+  warehouse  = var.snowflake_warehouse
+  or_replace = true
 }
 
 // TODO external table
 
 // SHARE
-resource "snowflake_database" "shared_db" {
-  name = "SNOWFLAKE_SAMPLE_DATA"
-  from_share = {
-    provider = "SFC_SAMPLES"
-    share    = "SAMPLE_DATA"
-  }
-  data_retention_time_in_days = 0
+resource "snowflake_shared_database" "shared_db" {
+  name       = "SNOWFLAKE_SAMPLE_DATA"
+  from_share = "SFC_SAMPLES.SAMPLE_DATA.SNOWFLAKE_SAMPLE_DATA"
 }
 
 // Role what
@@ -282,7 +278,7 @@ resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_s
   privileges        = ["SELECT", "REFERENCES"]
   account_role_name = "DATA_ANALYST"
   on_schema_object {
-    object_name = snowflake_table.ordering_supplier.qualified_name
+    object_name = snowflake_table.ordering_supplier.fully_qualified_name
     object_type = "TABLE"
   }
 }
@@ -291,7 +287,7 @@ resource "snowflake_grant_privileges_to_account_role" "sales_privileges_orders" 
   privileges        = ["SELECT", "INSERT"]
   account_role_name = "SALES"
   on_schema_object {
-    object_name = snowflake_table.ordering_orders.qualified_name
+    object_name = snowflake_table.ordering_orders.fully_qualified_name
     object_type = "TABLE"
   }
 }
@@ -344,7 +340,7 @@ resource "snowflake_grant_privileges_to_database_role" "database_role_privileges
   privileges         = ["SELECT"]
   database_role_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_database_role.database_role.name}\""
   on_schema_object {
-    object_name = snowflake_table.ordering_orders.qualified_name
+    object_name = snowflake_table.ordering_orders.fully_qualified_name
     object_type = "TABLE"
   }
 }
