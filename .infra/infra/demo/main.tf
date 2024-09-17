@@ -328,19 +328,19 @@ resource "snowflake_table" "address" {
   column {
     name           = "AddressLine1"
     type           = "VARCHAR"
-    masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
+    masking_policy = snowflake_masking_policy.pserson_pii.fully_qualified_name
   }
 
   column {
     name           = "AddressLine2"
     type           = "VARCHAR"
-    masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
+    masking_policy = snowflake_masking_policy.pserson_pii.fully_qualified_name
   }
 
   column {
     name           = "City"
     type           = "VARCHAR"
-    masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
+    masking_policy = snowflake_masking_policy.pserson_pii.fully_qualified_name
   }
 
   column {
@@ -351,7 +351,7 @@ resource "snowflake_table" "address" {
   column {
     name           = "PostalCode"
     type           = "VARCHAR"
-    masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
+    masking_policy = snowflake_masking_policy.pserson_pii.fully_qualified_name
   }
 
   column {
@@ -548,7 +548,7 @@ resource "snowflake_table" "email_address" {
   column {
     name           = "EmailAddress"
     type           = "VARCHAR"
-    masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
+    masking_policy = snowflake_masking_policy.pserson_pii.fully_qualified_name
   }
 
   column {
@@ -587,7 +587,7 @@ resource "snowflake_table" "person_phone" {
   column {
     name           = "PhoneNumber"
     type           = "VARCHAR"
-    masking_policy = snowflake_masking_policy.pserson_pii.qualified_name
+    masking_policy = snowflake_masking_policy.pserson_pii.fully_qualified_name
   }
 
   column {
@@ -2204,7 +2204,7 @@ resource "snowflake_materialized_view" "customer_eu" {
   schema    = snowflake_schema.sales.name
   name      = "CUSTOMER_EU"
   warehouse = var.snowflake_warehouse
-  statement = "SELECT * FROM ${snowflake_table.customer.qualified_name} WHERE \"TerritoryID\" between 1 and 200"
+  statement = "SELECT * FROM ${snowflake_table.customer.fully_qualified_name} WHERE \"TerritoryID\" between 1 and 200"
 }
 
 // -- -- Table PERSONCREDITCARD

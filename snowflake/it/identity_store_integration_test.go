@@ -42,10 +42,10 @@ func (s *IdentityStoreTestSuite) TestIdentityStoreSync() {
 
 	s.True(len(identityHandler.Users) >= 3)
 	s.Contains(identityHandler.Users, identity_store.User{
-		ExternalId:       "SNOWFLAKE",
-		Name:             "SNOWFLAKE",
-		UserName:         "SNOWFLAKE",
-		Email:            "",
+		ExternalId:       "BENJAMINSTEWART",
+		Name:             "Benjamin Stewart",
+		UserName:         "BENJAMINSTEWART",
+		Email:            "b_stewart@raito.io",
 		GroupExternalIds: nil,
 		Tags:             nil,
 		IsMachine:        ptr.Bool(false),
@@ -67,7 +67,7 @@ func (s *IdentityStoreTestSuite) TestIdentityStoreSync() {
 		Email:            "data_engineer@raito.io",
 		GroupExternalIds: nil,
 		Tags:             nil,
-		IsMachine:        ptr.Bool(true),
+		IsMachine:        ptr.Bool(false),
 	})
 
 	s.Empty(identityHandler.Groups)

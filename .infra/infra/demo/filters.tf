@@ -9,10 +9,10 @@ resource "snowflake_row_access_policy" "rls_sales_data" {
 
   row_access_expression = <<-EOF
     current_role() in ('SALES_EXEC') or exists (
-     select 1 from ${snowflake_table.sales_person.qualified_name} WHERE
+     select 1 from ${snowflake_table.sales_person.fully_qualified_name} WHERE
       current_role() in ('SALES') AND
-      ${snowflake_table.sales_person.qualified_name}."TerritoryID" = TerritoryID AND
-      ${snowflake_table.sales_person.qualified_name}.NAME = current_user()
+      ${snowflake_table.sales_person.fully_qualified_name}."TerritoryID" = TerritoryID AND
+      ${snowflake_table.sales_person.fully_qualified_name}.NAME = current_user()
     )
   EOF
 }
