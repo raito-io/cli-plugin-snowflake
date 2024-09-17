@@ -462,7 +462,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 		Owner:       "ACCOUNTADMIN",
 		DisplayName: "Data Engineer service account",
 		LoginName:   "DATA_ENGINEERING",
-		Type:        ptr.String("SERVICE"),
+		Type:        ptr.String("null"),
 	})
 }
 
