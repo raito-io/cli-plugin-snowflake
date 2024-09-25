@@ -604,7 +604,7 @@ func (s *AccessFromTargetSyncer) importRowAccessPolicies() error {
 }
 
 func (s *AccessFromTargetSyncer) getApplicableDatabases(dbExcludes set.Set[string]) ([]DbEntity, error) {
-	allDatabases, err := s.accessSyncer.getAllAvailableDatabases()
+	allDatabases, err := s.accessSyncer.getAllAvailableDatabasesAndShares()
 	if err != nil {
 		return nil, err
 	}

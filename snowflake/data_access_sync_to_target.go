@@ -476,7 +476,7 @@ func (s *AccessToTargetSyncer) findRoles(prefix string) (set.Set[string], error)
 	}
 
 	//Get all database roles for each database and add database roles to existing roles
-	databases, err := s.accessSyncer.getAllAvailableDatabases()
+	databases, err := s.accessSyncer.getAllAvailableDatabasesAndShares()
 	if err != nil {
 		return nil, err
 	}
@@ -1433,7 +1433,7 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 				return err
 			}
 
-			databases, err := s.accessSyncer.getAllAvailableDatabases()
+			databases, err := s.accessSyncer.getAllAvailableDatabasesAndShares()
 			if err != nil {
 				return err
 			}

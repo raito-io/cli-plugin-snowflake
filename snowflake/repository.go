@@ -945,7 +945,7 @@ func (repo *SnowflakeRepository) GetDatabases() ([]DbEntity, error) {
 
 	for _, db := range dbs {
 		// As we don't support databases of kind "APPLICATION" but still want to support the SNOWFLAKE database
-		if db.Kind != nil && strings.EqualFold(*db.Kind, "STANDARD") || db.Name == "SNOWFLAKE" {
+		if db.Kind != nil && strings.EqualFold(*db.Kind, "STANDARD") {
 			ret = append(ret, db)
 		}
 	}

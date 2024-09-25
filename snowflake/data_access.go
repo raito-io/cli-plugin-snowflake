@@ -163,17 +163,37 @@ func (s *AccessSyncer) getGrantsToRole(externalId string, apType *string) ([]Gra
 	return s.repo.GetGrantsToAccountRole(externalId)
 }
 
-func (s *AccessSyncer) getAllAvailableDatabases() ([]DbEntity, error) {
+func (s *AccessSyncer) getAllAvailableDatabasesAndShares() ([]DbEntity, error) {
 	if s.databasesCache != nil {
 		return s.databasesCache, nil
 	}
 
-	var err error
-	s.databasesCache, err = s.repo.GetDatabases()
-
+	allDatabases, err := s.repo.GetDatabases()
 	if err != nil {
 		s.databasesCache = nil
 		return nil, err
+	}
+
+	var uniqueDatabases = make(map[string]DbEntity)
+	for _, database := range allDatabases {
+		uniqueDatabases[database.Name] = database
+	}
+
+	shares, err := s.repo.GetShares()
+	if err != nil {
+		s.databasesCache = nil
+		return nil, err
+	}
+
+	for _, share := range shares {
+		if _, exists := uniqueDatabases[share.Name]; !exists {
+			uniqueDatabases[share.Name] = share
+		}
+	}
+
+	s.databasesCache = make([]DbEntity, 0, len(uniqueDatabases))
+	for _, db := range uniqueDatabases {
+		s.databasesCache = append(s.databasesCache, db)
 	}
 
 	return s.databasesCache, nil
