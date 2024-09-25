@@ -44,6 +44,7 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 		{Name: "ExistingRole1", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 		{Name: "ExistingRole2", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 	}, nil).Once()
+	repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Once()
 	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
 		{Name: "SNOWFLAKE"},
 		{Name: "TEST_DB"},

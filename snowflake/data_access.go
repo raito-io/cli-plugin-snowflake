@@ -10,6 +10,7 @@ import (
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
+	"github.com/raito-io/golang-set/set"
 )
 
 var RolesNotInternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
@@ -82,7 +83,6 @@ type AccessSyncer struct {
 	namingConstraints naming_hint.NamingConstraints
 	repoProvider      func(params map[string]string, role string) (dataAccessRepository, error)
 	repo              dataAccessRepository
-	databasesCache    []DbEntity
 }
 
 func NewDataAccessSyncer(namingConstraints naming_hint.NamingConstraints) *AccessSyncer {
@@ -142,12 +142,44 @@ func (s *AccessSyncer) getShareNames() ([]string, error) {
 		return nil, err
 	}
 
-	shareNames := make([]string, len(dbShares))
+	shareNames := make([]string, 0)
 	for _, e := range dbShares {
 		shareNames = append(shareNames, e.Name)
 	}
 
 	return shareNames, nil
+}
+
+func (s *AccessSyncer) getDatabaseNames() ([]string, error) {
+	databases, err := s.repo.GetDatabases()
+	if err != nil {
+		return nil, err
+	}
+
+	databaseNames := make([]string, 0)
+	for _, e := range databases {
+		databaseNames = append(databaseNames, e.Name)
+	}
+
+	return databaseNames, nil
+}
+
+func (s *AccessSyncer) getAllDatabaseAndShareNames() (set.Set[string], error) {
+	databases, err := s.getDatabaseNames()
+	if err != nil {
+		return nil, err
+	}
+
+	shares, err := s.getShareNames()
+	if err != nil {
+		return nil, err
+	}
+
+	combinedList := set.NewSet[string]()
+	combinedList.Add(databases...)
+	combinedList.Add(shares...)
+
+	return combinedList, nil
 }
 
 func (s *AccessSyncer) getGrantsToRole(externalId string, apType *string) ([]GrantToRole, error) {
@@ -161,42 +193,6 @@ func (s *AccessSyncer) getGrantsToRole(externalId string, apType *string) ([]Gra
 	}
 
 	return s.repo.GetGrantsToAccountRole(externalId)
-}
-
-func (s *AccessSyncer) getAllAvailableDatabasesAndShares() ([]DbEntity, error) {
-	if s.databasesCache != nil {
-		return s.databasesCache, nil
-	}
-
-	allDatabases, err := s.repo.GetDatabases()
-	if err != nil {
-		s.databasesCache = nil
-		return nil, err
-	}
-
-	var uniqueDatabases = make(map[string]DbEntity)
-	for _, database := range allDatabases {
-		uniqueDatabases[database.Name] = database
-	}
-
-	shares, err := s.repo.GetShares()
-	if err != nil {
-		s.databasesCache = nil
-		return nil, err
-	}
-
-	for _, share := range shares {
-		if _, exists := uniqueDatabases[share.Name]; !exists {
-			uniqueDatabases[share.Name] = share
-		}
-	}
-
-	s.databasesCache = make([]DbEntity, 0, len(uniqueDatabases))
-	for _, db := range uniqueDatabases {
-		s.databasesCache = append(s.databasesCache, db)
-	}
-
-	return s.databasesCache, nil
 }
 
 func (s *AccessSyncer) retrieveGrantsOfRole(externalId string, apType *string) (grantOfEntities []GrantOfRole, err error) {
