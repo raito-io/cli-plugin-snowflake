@@ -264,17 +264,17 @@ func (s *AccessFromTargetSyncer) importAllRolesOnDatabaseLevel(accessProviderHan
 
 	processedAps := make(map[string]*exporter.AccessProvider)
 
-	for _, database := range databases {
-		logger.Info(fmt.Sprintf("Reading roles from Snowflake inside database %s", database.Name))
+	for database := range databases {
+		logger.Info(fmt.Sprintf("Reading roles from Snowflake inside database %s", database))
 
 		// Get all database roles for database
-		roleEntities, err2 := s.repo.GetDatabaseRoles(database.Name)
+		roleEntities, err2 := s.repo.GetDatabaseRoles(database)
 		if err2 != nil {
 			return err2
 		}
 
 		for _, roleEntity := range roleEntities {
-			fullRoleName := fmt.Sprintf("%s.%s", database.Name, roleEntity.Name)
+			fullRoleName := fmt.Sprintf("%s.%s", database, roleEntity.Name)
 			if _, exclude := s.excludedRoles[fullRoleName]; exclude {
 				logger.Info("Skipping SnowFlake DATABASE ROLE " + fullRoleName)
 				continue
@@ -286,13 +286,13 @@ func (s *AccessFromTargetSyncer) importAllRolesOnDatabaseLevel(accessProviderHan
 				if s.shouldRetrieveTags() {
 					var err3 error
 
-					availableTags, err3 = s.repo.GetDatabaseRoleTags(database.Name, roleEntity.Name)
+					availableTags, err3 = s.repo.GetDatabaseRoleTags(database, roleEntity.Name)
 					if err3 != nil {
 						logger.Error(fmt.Sprintf("Error retrieving tags for database role: %q - %s", fullRoleName, err3.Error()))
 					}
 				}
 
-				err2 := s.importAccessForDatabaseRole(database.Name, roleEntity, availableTags, processedAps)
+				err2 := s.importAccessForDatabaseRole(database, roleEntity, availableTags, processedAps)
 				if err2 != nil {
 					logger.Warn(fmt.Sprintf("Error importing SnowFlake Database role %q: %s", fullRoleName, err2.Error()))
 				}
@@ -603,17 +603,17 @@ func (s *AccessFromTargetSyncer) importRowAccessPolicies() error {
 	return s.importPoliciesOfType("ROW ACCESS", exporter.Filtered)
 }
 
-func (s *AccessFromTargetSyncer) getApplicableDatabases(dbExcludes set.Set[string]) ([]DbEntity, error) {
-	allDatabases, err := s.accessSyncer.getAllAvailableDatabases()
+func (s *AccessFromTargetSyncer) getApplicableDatabases(dbExcludes set.Set[string]) (set.Set[string], error) {
+	allDatabases, err := s.accessSyncer.getAllDatabaseAndShareNames()
 	if err != nil {
 		return nil, err
 	}
 
-	filteredDatabases := make([]DbEntity, 0)
+	filteredDatabases := set.NewSet[string]()
 
-	for _, db := range allDatabases {
-		if !dbExcludes.Contains(db.Name) {
-			filteredDatabases = append(filteredDatabases, db)
+	for db := range allDatabases {
+		if !dbExcludes.Contains(db) {
+			filteredDatabases.Add(db)
 		}
 	}
 

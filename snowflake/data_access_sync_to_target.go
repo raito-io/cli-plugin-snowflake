@@ -476,20 +476,20 @@ func (s *AccessToTargetSyncer) findRoles(prefix string) (set.Set[string], error)
 	}
 
 	//Get all database roles for each database and add database roles to existing roles
-	databases, err := s.accessSyncer.getAllAvailableDatabases()
+	databases, err := s.accessSyncer.getAllDatabaseAndShareNames()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, database := range databases {
+	for database := range databases {
 		// Get all database roles for database
-		roleEntities, err := s.repo.GetDatabaseRolesWithPrefix(database.Name, prefix)
+		roleEntities, err := s.repo.GetDatabaseRolesWithPrefix(database, prefix)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, roleEntity := range roleEntities {
-			existingRoles.Add(databaseRoleExternalIdGenerator(database.Name, roleEntity.Name))
+			existingRoles.Add(databaseRoleExternalIdGenerator(database, roleEntity.Name))
 		}
 	}
 
@@ -1433,17 +1433,19 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 				return err
 			}
 
-			databases, err := s.accessSyncer.getAllAvailableDatabases()
+			databaseNames, err := s.accessSyncer.getDatabaseNames()
 			if err != nil {
 				return err
 			}
 
-			for _, database := range databases {
+			databaseNames = append(databaseNames, shareNames...)
+
+			for _, database := range databaseNames {
 				databaseMatchFound := false
 
-				isShare := slices.Contains(shareNames, database.Name)
+				isShare := slices.Contains(shareNames, database)
 
-				databaseMatchFound, err = s.createPermissionGrantsForDatabase(database.Name, p, metaData, isShare, grants)
+				databaseMatchFound, err = s.createPermissionGrantsForDatabase(database, p, metaData, isShare, grants)
 				if err != nil {
 					return err
 				}
@@ -1452,7 +1454,7 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 
 				// Only generate the USAGE grant if any applicable permissions were applied or any item below
 				if databaseMatchFound && !isShare {
-					dsName := database.Name
+					dsName := database
 					sfDBObject := common.SnowflakeObject{Database: &dsName, Schema: nil, Table: nil, Column: nil}
 					grants.Add(Grant{USAGE, ds.Database, sfDBObject.GetFullName(true)})
 				}

@@ -206,8 +206,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
 					repoMock.EXPECT().GetShares().Return([]DbEntity{
-						{Name: "Share1"}, {Name: "Share2"},
-					}, nil).Once()
+						{Name: "Share1"},
+					}, nil).Twice()
 
 					repoMock.EXPECT().GetDatabases().Return([]DbEntity{
 						{Name: "SNOWFLAKE"},
@@ -218,7 +218,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{Name: "DatabaseRole2", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
 						{Name: "DatabaseRole3", AssignedToUsers: 0, GrantedRoles: 1, GrantedToRoles: 0, Owner: "Owner2"},
 					}, nil).Once()
-
+					repoMock.EXPECT().GetDatabaseRoles("Share1").Return([]RoleEntity{}, nil).Once()
 					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
 						{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
 						{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
@@ -731,7 +731,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-					repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Once()
+					repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Twice()
 
 					repoMock.EXPECT().GetTagsByDomain("ROLE").Return(map[string][]*tag.Tag{
 						"Role1": {
@@ -839,7 +839,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-					repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Once()
+					repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Twice()
 
 					repoMock.EXPECT().GetDatabases().Return([]DbEntity{
 						{Name: "SNOWFLAKE"},
