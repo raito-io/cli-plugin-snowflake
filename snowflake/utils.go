@@ -2,7 +2,6 @@ package snowflake
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"github.com/raito-io/cli/base"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/golang-set/set"
+	"github.com/youmark/pkcs8"
 )
 
 const (
@@ -109,7 +109,7 @@ func parseCommaSeparatedList(list string) set.Set[string] {
 	return ret
 }
 
-func loadPrivateKey(file string) (*rsa.PrivateKey, error) {
+func loadPrivateKey(file string, passphrase string) (*rsa.PrivateKey, error) {
 	pemData, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("opening file %q: %w", file, err)
@@ -120,11 +120,20 @@ func loadPrivateKey(file string) (*rsa.PrivateKey, error) {
 		return nil, fmt.Errorf("failed to decode PEM block containing the private key; block is nil")
 	}
 
-	if block.Type != "PRIVATE KEY" {
-		return nil, fmt.Errorf("failed to decode PEM block containing the private key; wrong block type %q", block.Type)
+	var key interface{}
+
+	if block.Type == "ENCRYPTED PRIVATE KEY" {
+		if passphrase == "" {
+			return nil, fmt.Errorf("private key is encrypted but the parameter %s is not provided", SfPrivateKeyPassphrase)
+		}
+
+		key, err = pkcs8.ParsePKCS8PrivateKey(block.Bytes, []byte(passphrase))
+	} else if block.Type == "PRIVATE KEY" {
+		key, err = pkcs8.ParsePKCS8PrivateKey(block.Bytes, nil)
+	} else {
+		return nil, fmt.Errorf("unsupported private key block type %q", block.Type)
 	}
 
-	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("parsing private key: %w", err)
 	}

@@ -5,6 +5,7 @@ const (
 	SfUser                              = "sf-user"
 	SfPassword                          = "sf-password"
 	SfPrivateKey                        = "sf-private-key"
+	SfPrivateKeyPassphrase              = "sf-private-key-passphrase"
 	SfRole                              = "sf-role"
 	SfExcludedDatabases                 = "sf-excluded-databases"
 	SfExcludedSchemas                   = "sf-excluded-schemas"

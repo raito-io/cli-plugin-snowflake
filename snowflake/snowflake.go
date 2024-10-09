@@ -21,6 +21,7 @@ func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string,
 
 	sfPassword, foundPassword := params[SfPassword]
 	sfPrivateKey, foundPrivateKey := params[SfPrivateKey]
+	sfPrivateKeyPassphrase, _ := params[SfPrivateKeyPassphrase]
 
 	if (!foundPassword || sfPassword == "") && (!foundPrivateKey || sfPrivateKey == "") {
 		return nil, "", fmt.Errorf("either parameter %q or %q need to be specified", SfPassword, SfPrivateKey)
@@ -55,7 +56,7 @@ func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string,
 	}
 
 	if foundPrivateKey && sfPrivateKey != "" {
-		privateKey, err := loadPrivateKey(sfPrivateKey)
+		privateKey, err := loadPrivateKey(sfPrivateKey, sfPrivateKeyPassphrase)
 		if err != nil {
 			return nil, "", e.CreateBadInputParameterError(SfPrivateKey, sfPrivateKey, fmt.Sprintf("Failed to parse private key: %s", err.Error()))
 		}
