@@ -5,19 +5,20 @@ go 1.23
 toolchain go1.23.0
 
 require (
-	github.com/aws/smithy-go v1.20.4
+	github.com/aws/smithy-go v1.22.0
 	github.com/blockloop/scan v1.3.0
 	github.com/gammazero/workerpool v1.1.3
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/matoous/go-nanoid/v2 v2.1.0
 	github.com/raito-io/bexpression v0.1.2
-	github.com/raito-io/cli v0.66.2
+	github.com/raito-io/cli v0.66.3
 	github.com/raito-io/enumer v0.1.4
 	github.com/raito-io/golang-set v0.0.4
-	github.com/snowflakedb/gosnowflake v1.11.1
+	github.com/snowflakedb/gosnowflake v1.11.2
 	github.com/stretchr/testify v1.9.0
-	github.com/vektra/mockery/v2 v2.45.0
+	github.com/vektra/mockery/v2 v2.46.2
+	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
 )
 
 require (
@@ -100,7 +101,6 @@ require (
 	github.com/spf13/viper v1.19.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
