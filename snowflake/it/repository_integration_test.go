@@ -24,6 +24,7 @@ type RepositoryTestSuite struct {
 
 func TestRepositoryTestSuite(t *testing.T) {
 	ts := RepositoryTestSuite{}
+
 	repo, err := snowflake.NewSnowflakeRepository(ts.getConfig().Parameters, "")
 
 	if err != nil {
