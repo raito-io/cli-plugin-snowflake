@@ -7,6 +7,7 @@ const (
 	SfPrivateKey                        = "sf-private-key"
 	SfPrivateKeyPassphrase              = "sf-private-key-passphrase" //nolint:gosec
 	SfRole                              = "sf-role"
+	SfWarehouse                         = "sf-warehouse"
 	SfExcludedDatabases                 = "sf-excluded-databases"
 	SfExcludedSchemas                   = "sf-excluded-schemas"
 	SfExcludedRoles                     = "sf-excluded-roles"
