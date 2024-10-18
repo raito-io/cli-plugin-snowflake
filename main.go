@@ -37,6 +37,7 @@ func main() {
 					{Name: snowflake.SfPrivateKey, Description: fmt.Sprintf("The path of the file containing the private key to authenticate against the Snowflake account. Either this or %s must be specified.", snowflake.SfPassword), Mandatory: false},
 					{Name: snowflake.SfPrivateKeyPassphrase, Description: "The passphrase for the private key in case it is encrypted.", Mandatory: false},
 					{Name: snowflake.SfRole, Description: "The name of the role to use for executing the necessary queries. If not specified 'ACCOUNTADMIN' is used.", Mandatory: false},
+					{Name: snowflake.SfWarehouse, Description: "The name of the warehouse to use for executing the necessary queries. If not specified, the default warehouse for the user is used.", Mandatory: false},
 					{Name: snowflake.SfExcludedDatabases, Description: "The optional comma-separated list of databases that should be skipped.", Mandatory: false},
 					{Name: snowflake.SfExcludedSchemas, Description: "The optional comma-separated list of schemas that should be skipped. This can either be in a specific database (as <database>.<schema>) or a just a schema name that should be skipped in all databases. By default INFORMATION_SCHEMA is skipped since there are no access controls to manage", Mandatory: false},
 					{Name: snowflake.SfExcludedRoles, Description: "The optional comma-separated list of roles that should be skipped. You should not exclude roles which others (not-excluded) roles depend on as that would break the hierarchy.", Mandatory: false},

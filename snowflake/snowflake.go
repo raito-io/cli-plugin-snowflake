@@ -67,6 +67,12 @@ func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string,
 		dsnConfig.Password = sfPassword
 	}
 
+	if sfWarehouse, foundWh := params[SfWarehouse]; foundWh {
+		if sfWarehouse != "" {
+			dsnConfig.Warehouse = sfWarehouse
+		}
+	}
+
 	dsn, err := sf.DSN(&dsnConfig)
 	if err != nil {
 		return nil, "", fmt.Errorf("snowflake DSN: %w", err)
