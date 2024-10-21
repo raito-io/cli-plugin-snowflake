@@ -77,7 +77,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 		return nil, err
 	}
 
-	usageBatchSize := 0
+	usageBatchSize := 100000 // Default batch size 100.000
 	if v, f := params[SfUsageBatchSize]; f && v != "" {
 		usageBatchSize, err = strconv.Atoi(v)
 		if err != nil {
@@ -85,7 +85,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 		}
 
 		if usageBatchSize != 0 && (usageBatchSize < 10000 || usageBatchSize > 1000000) {
-			return nil, fmt.Errorf("invalid value %d for %q parameter (If set, it must be between 10.000 and 1.000.000)", usageBatchSize, SfUsageBatchSize)
+			return nil, fmt.Errorf("invalid value %d for %q parameter (If set, it must be between 10.000 and 1.000.000, or 0 to disable batching)", usageBatchSize, SfUsageBatchSize)
 		}
 	}
 
@@ -131,23 +131,38 @@ func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.
 			}
 		}()
 
-		arguments := make([]any, 0, 2)
-		arguments = append(arguments, minTime)
+		queryGen := func(startTime time.Time) (string, []any) {
+			strBuilder := strings.Builder{}
+			args := make([]any, 0, 3)
 
-		endTime := ""
+			// First query only the QUERY_HISTORY (to avoid a join without LIMIT)
+			strBuilder.WriteString("WITH history as (\n")
+			strBuilder.WriteString(`SELECT QUERY_HISTORY.QUERY_ID as QUERY_ID, QUERY_HISTORY.QUERY_TEXT as QUERY_TEXT, DATABASE_NAME, SCHEMA_NAME, QUERY_TYPE, SESSION_ID, QUERY_HISTORY.USER_NAME as USER_NAME, ROLE_NAME, EXECUTION_STATUS, START_TIME, END_TIME, TOTAL_ELAPSED_TIME, BYTES_SCANNED, BYTES_WRITTEN, BYTES_WRITTEN_TO_RESULT, ROWS_PRODUCED, ROWS_INSERTED, ROWS_UPDATED, ROWS_DELETED, ROWS_UNLOADED, CREDITS_USED_CLOUD_SERVICES FROM "SNOWFLAKE"."ACCOUNT_USAGE"."QUERY_HISTORY" WHERE START_TIME > ? `)
 
-		if maxTime != nil {
-			endTime = "AND START_TIME <= ?"
+			args = append(args, startTime)
 
-			arguments = append(arguments, *maxTime)
+			if maxTime != nil {
+				strBuilder.WriteString("AND START_TIME <= ? ")
+
+				args = append(args, *maxTime)
+			}
+
+			if repo.usageBatchSize > 0 {
+				strBuilder.WriteString(" ORDER BY START_TIME asc LIMIT ?")
+
+				args = append(args, repo.usageBatchSize)
+			}
+
+			strBuilder.WriteString(")")
+
+			// THEN join with ACCESS_HISTORY
+			strBuilder.WriteString(` SELECT QUERY_HISTORY.QUERY_ID as QUERY_ID, QUERY_HISTORY.QUERY_TEXT as QUERY_TEXT, DATABASE_NAME, SCHEMA_NAME, QUERY_TYPE, SESSION_ID, QUERY_HISTORY.USER_NAME as USER_NAME, ROLE_NAME, EXECUTION_STATUS, START_TIME, END_TIME, TOTAL_ELAPSED_TIME, BYTES_SCANNED, BYTES_WRITTEN, BYTES_WRITTEN_TO_RESULT, ROWS_PRODUCED, ROWS_INSERTED, ROWS_UPDATED, ROWS_DELETED, ROWS_UNLOADED, CREDITS_USED_CLOUD_SERVICES, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED, OBJECT_MODIFIED_BY_DDL, PARENT_QUERY_ID, ROOT_QUERY_ID 
+										FROM history QUERY_HISTORY LEFT JOIN "SNOWFLAKE"."ACCOUNT_USAGE"."ACCESS_HISTORY" where QUERY_HISTORY.QUERY_ID = ACCESS_HISTORY.QUERY_ID`)
+
+			return strBuilder.String(), args
 		}
 
-		query := fmt.Sprintf(`SELECT QUERY_HISTORY.QUERY_ID as QUERY_ID, QUERY_HISTORY.QUERY_TEXT as QUERY_TEXT, DATABASE_NAME, SCHEMA_NAME, QUERY_TYPE, SESSION_ID, QUERY_HISTORY.USER_NAME as USER_NAME, ROLE_NAME, EXECUTION_STATUS, START_TIME, END_TIME, TOTAL_ELAPSED_TIME, BYTES_SCANNED, BYTES_WRITTEN, BYTES_WRITTEN_TO_RESULT, ROWS_PRODUCED, ROWS_INSERTED, ROWS_UPDATED, ROWS_DELETED, ROWS_UNLOADED, CREDITS_USED_CLOUD_SERVICES, DIRECT_OBJECTS_ACCESSED, BASE_OBJECTS_ACCESSED, OBJECTS_MODIFIED, OBJECT_MODIFIED_BY_DDL, PARENT_QUERY_ID, ROOT_QUERY_ID
-FROM "SNOWFLAKE"."ACCOUNT_USAGE"."QUERY_HISTORY" INNER JOIN "SNOWFLAKE"."ACCOUNT_USAGE"."ACCESS_HISTORY" ON QUERY_HISTORY.QUERY_ID = ACCESS_HISTORY.QUERY_ID
-WHERE START_TIME >= ? %s`, endTime)
-
 		i := 0
-		var mostRecentQueryStartTime sql.NullTime
 
 		totalDuration := time.Duration(0)
 
@@ -162,7 +177,7 @@ WHERE START_TIME >= ? %s`, endTime)
 		}
 
 		for {
-			newMostRecentQueryStartTime, numberOfStatements, duration, nextPage := repo.dataUsageBatch(ctx, outputChannel, mostRecentQueryStartTime, query, arguments...)
+			newMostRecentQueryStartTime, numberOfStatements, duration, nextPage := repo.dataUsageBatch(ctx, outputChannel, minTime, queryGen)
 
 			if repo.usageBatchSize != 0 {
 				logger.Debug(fmt.Sprintf("Fetched batch of %d rows from Snowflake in %s", numberOfStatements, duration))
@@ -170,7 +185,10 @@ WHERE START_TIME >= ? %s`, endTime)
 
 			i += numberOfStatements
 			totalDuration += duration
-			mostRecentQueryStartTime = newMostRecentQueryStartTime
+
+			if newMostRecentQueryStartTime != nil {
+				minTime = *newMostRecentQueryStartTime
+			}
 
 			if repo.usageBatchSize == 0 || !nextPage {
 				break
@@ -181,7 +199,7 @@ WHERE START_TIME >= ? %s`, endTime)
 	return outputChannel
 }
 
-func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChannel chan<- stream.MaybeError[UsageQueryResult], mostRecentQueryStartTime sql.NullTime, query string, args ...interface{}) (sql.NullTime, int, time.Duration, bool) {
+func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChannel chan<- stream.MaybeError[UsageQueryResult], startTime time.Time, queryGen func(startTime time.Time) (string, []any)) (*time.Time, int, time.Duration, bool) {
 	sendError := func(err error) {
 		select {
 		case <-ctx.Done():
@@ -200,31 +218,18 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 		}
 	}
 
-	batchQuery := query
-	allArgs := args
+	query, args := queryGen(startTime)
 
-	if repo.usageBatchSize > 0 {
-		if mostRecentQueryStartTime.Valid {
-			batchQuery += " AND QUERY_HISTORY.START_TIME < ?"
-
-			allArgs = append(allArgs, mostRecentQueryStartTime)
-		}
-
-		batchQuery += " ORDER BY QUERY_HISTORY.QUERY_ID DESC LIMIT ?"
-
-		allArgs = append(allArgs, repo.usageBatchSize)
-	}
-
-	rows, sec, err := repo.queryContext(ctx, batchQuery, allArgs...)
+	rows, sec, err := repo.queryContext(ctx, query, args...)
 	if err != nil {
 		sendError(err)
-		return sql.NullTime{}, 0, 0, false
+		return nil, 0, 0, false
 	}
 
 	defer rows.Close()
 
 	i := 0
-	var newMostRecentQueryStartTime sql.NullTime
+	var newMostRecentQueryStartTime *time.Time
 
 	for rows.Next() {
 		var result UsageQueryResult
@@ -242,7 +247,12 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 		}
 
 		i += 1
-		newMostRecentQueryStartTime = result.StartTime
+
+		if result.StartTime.Valid {
+			if newMostRecentQueryStartTime == nil || result.StartTime.Time.After(*newMostRecentQueryStartTime) {
+				newMostRecentQueryStartTime = &result.StartTime.Time
+			}
+		}
 	}
 
 	return newMostRecentQueryStartTime, i, sec, repo.usageBatchSize != 0 && i == repo.usageBatchSize
