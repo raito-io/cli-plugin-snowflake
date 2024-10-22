@@ -300,7 +300,7 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, typePrefix 
 	return fetcher(databaseName, "", func(entity interface{}) error {
 		table := entity.(*TableEntity)
 
-		typeName := convertSnowflakeTableTypeToRaito(table.TableType)
+		typeName := convertSnowflakeTableTypeToRaito(table)
 		if typeName == "" {
 			return fmt.Errorf("unknown table type '%s'", table.TableType)
 		}

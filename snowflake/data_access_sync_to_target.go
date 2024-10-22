@@ -1160,6 +1160,10 @@ func (s *AccessToTargetSyncer) createGrantsForTableOrView(doType string, permiss
 		return fmt.Errorf("expected fullName %q to have 3 parts (database.schema.view)", fullName)
 	}
 
+	if doType == IcebergTable {
+		doType = ds.Table
+	}
+
 	for _, p := range permissions {
 		if _, f := metaData[doType][strings.ToUpper(p)]; f {
 			grants.Add(Grant{p, doType, common.FormatQuery(`%s.%s.%s`, *sfObject.Database, *sfObject.Schema, *sfObject.Table)})
@@ -1355,7 +1359,7 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForDatabase(database, p str
 
 func (s *AccessToTargetSyncer) createPermissionGrantsForTable(database string, schema string, table TableEntity, p string, metaData map[string]map[string]struct{}, isShared bool, grants set.Set[Grant]) bool {
 	// Get the corresponding Raito data object type
-	tableType := convertSnowflakeTableTypeToRaito(table.TableType)
+	tableType := convertSnowflakeTableTypeToRaito(&table)
 	if isShared {
 		tableType = SharedPrefix + tableType
 	}
