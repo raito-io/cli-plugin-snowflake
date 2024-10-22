@@ -15,7 +15,7 @@ require (
 	github.com/raito-io/cli v0.68.0
 	github.com/raito-io/enumer v0.1.4
 	github.com/raito-io/golang-set v0.0.4
-	github.com/snowflakedb/gosnowflake v1.11.1
+	github.com/snowflakedb/gosnowflake v1.11.2
 	github.com/stretchr/testify v1.9.0
 	github.com/vektra/mockery/v2 v2.46.3
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78

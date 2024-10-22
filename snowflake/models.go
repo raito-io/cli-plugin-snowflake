@@ -71,11 +71,16 @@ func (t *TagEntity) GetFullName() string {
 }
 
 type TableEntity struct {
-	Database  string  `db:"TABLE_CATALOG"`
-	Schema    string  `db:"TABLE_SCHEMA"`
-	Name      string  `db:"TABLE_NAME"`
-	TableType string  `db:"TABLE_TYPE"`
-	Comment   *string `db:"COMMENT"`
+	Database     string  `db:"TABLE_CATALOG"`
+	Schema       string  `db:"TABLE_SCHEMA"`
+	Name         string  `db:"TABLE_NAME"`
+	TableType    string  `db:"TABLE_TYPE"`
+	Comment      *string `db:"COMMENT"`
+	IsIcebergStr string  `db:"IS_ICEBERG"`
+}
+
+func (t *TableEntity) IsIceberg() bool {
+	return t.IsIcebergStr == "YES"
 }
 
 type ColumnEntity struct {

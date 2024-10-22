@@ -15,6 +15,7 @@ const USAGE_ON_SCHEMA = "USAGE on SCHEMA"
 
 const apTypeDatabaseRole = "databaseRole"
 const ExternalTable = "external-" + ds.Table
+const IcebergTable = "iceberg-" + ds.Table
 const MaterializedView = "materialized-" + ds.View
 
 // RoleNameConstraints is based onhttps://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
@@ -357,7 +358,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						CannotBeGranted:        true,
 					},
 				},
-				Children: []string{ds.Table, ds.View, ExternalTable, MaterializedView},
+				Children: []string{ds.Table, ds.View, ExternalTable, MaterializedView, IcebergTable},
 			},
 			{
 				Name: ds.Table,
@@ -404,6 +405,82 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						Description:            "Grants full control over the table. Required to alter most properties of a table, with the exception of reclustering. Only a single role can hold this privilege on a specific object at a time. Note that in a managed access schema, only the schema owner (i.e. the role with the OWNERSHIP privilege on the schema) or a role with the MANAGE GRANTS privilege can grant or revoke privileges on objects in the schema, including future grants.",
 						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
 						CannotBeGranted:        true,
+					},
+				},
+				Actions: []*ds.DataObjectTypeAction{
+					{
+						Action:        "SELECT",
+						GlobalActions: []string{ds.Read},
+					},
+					{
+						Action:        "INSERT",
+						GlobalActions: []string{ds.Write},
+					},
+					{
+						Action:        "UPDATE",
+						GlobalActions: []string{ds.Write},
+					},
+					{
+						Action:        "DELETE",
+						GlobalActions: []string{ds.Write},
+					},
+					{
+						Action:        "TRUNCATE",
+						GlobalActions: []string{ds.Write},
+					},
+				},
+				Children: []string{ds.Column},
+			},
+			{
+				Name:  IcebergTable,
+				Label: "Iceberg Table",
+				Type:  ds.Table,
+				Permissions: []*ds.DataObjectTypePermission{
+					{
+						Permission:             "SELECT",
+						Description:            "Enables executing a SELECT statement on a table.",
+						UsageGlobalPermissions: []string{ds.Read},
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
+					},
+					{
+						Permission:             "INSERT",
+						Description:            "Enables executing an INSERT command on a table. Also enables using the ALTER TABLE command with a RECLUSTER clause to manually recluster a table with a clustering key.",
+						UsageGlobalPermissions: []string{ds.Write},
+						GlobalPermissions:      ds.WriteGlobalPermission().StringValues(),
+					},
+					{
+						Permission:             "UPDATE",
+						Description:            "Enables executing an UPDATE command on a table.",
+						UsageGlobalPermissions: []string{ds.Write},
+						GlobalPermissions:      ds.WriteGlobalPermission().StringValues(),
+					},
+					{
+						Permission:             "TRUNCATE",
+						Description:            "Enables executing a TRUNCATE TABLE command on a table.",
+						UsageGlobalPermissions: []string{ds.Write},
+						GlobalPermissions:      ds.WriteGlobalPermission().StringValues(),
+					},
+					{
+						Permission:             "DELETE",
+						Description:            "Enables executing a DELETE command on a table.",
+						UsageGlobalPermissions: []string{ds.Write},
+						GlobalPermissions:      ds.WriteGlobalPermission().StringValues(),
+					},
+					{
+						Permission:             "REFERENCES",
+						Description:            "Enables referencing a table as the unique/primary key table for a foreign key constraint. Also enables viewing the structure of a table (but not the data) via the DESCRIBE or SHOW command or by querying the Information Schema.",
+						UsageGlobalPermissions: []string{ds.Read},
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
+					},
+					{
+						Permission:             "OWNERSHIP",
+						Description:            "Grants full control over the table. Required to alter most properties of a table, with the exception of reclustering. Only a single role can hold this privilege on a specific object at a time. Note that in a managed access schema, only the schema owner (i.e. the role with the OWNERSHIP privilege on the schema) or a role with the MANAGE GRANTS privilege can grant or revoke privileges on objects in the schema, including future grants.",
+						UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
+						CannotBeGranted:        true,
+					},
+					{
+						Permission:  "APPLYBUDGET",
+						Description: "Enables adding or removing an Iceberg table from a budget.",
 					},
 				},
 				Actions: []*ds.DataObjectTypeAction{

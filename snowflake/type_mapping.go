@@ -19,17 +19,21 @@ var raitoTypeToSnowflakeGrantType = map[string]string{
 }
 
 func isTableType(t string) bool {
-	return t == ds.Table || t == ds.View || t == MaterializedView || t == ExternalTable
+	return t == ds.Table || t == ds.View || t == MaterializedView || t == ExternalTable || t == IcebergTable
 }
 
 // convertSnowflakeTableTypeToRaito maps the Snowflake types coming from the INFORMATION_SCHEMA views to the corresponding Raito type
 // If unknown, it returns a lower case version of the input
-func convertSnowflakeTableTypeToRaito(sfType string) string {
-	if raitoType, f2 := snowflakeTableTypeToRaito[sfType]; f2 {
+func convertSnowflakeTableTypeToRaito(entity *TableEntity) string {
+	if raitoType, f2 := snowflakeTableTypeToRaito[entity.TableType]; f2 {
+		if raitoType == ds.Table && entity.IsIceberg() {
+			return IcebergTable
+		}
+
 		return raitoType
 	}
 
-	return strings.ToLower(sfType)
+	return strings.ToLower(entity.TableType)
 }
 
 var snowflakeTableTypeToRaito = map[string]string{
