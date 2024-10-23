@@ -412,7 +412,7 @@ resource "snowflake_grant_database_role" "special_database_role" {
   parent_role_name   = "HUMAN_RESOURCES"
 }
 
-resource "snowflake_database_role" "database_role" {
+resource "snowflake_database_role" "special_role" {
   database = snowflake_database.special_db.name
   name     = "SPECIAL DåTABASE RøLE"
   comment  = "Database role for RAITO testing and demo"
