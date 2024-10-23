@@ -796,13 +796,13 @@ func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, poli
 func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName string) ([]PolicyReferenceEntity, error) {
 	// to fetch policy references we need to have USAGE on dbName and schema
 	if !strings.EqualFold(repo.role, AccountAdminRole) && repo.role != "" {
-		err := repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("DATABASE %q", dbName), repo.role, true)
+		err := repo.ExecuteGrantOnAccountRole("USAGE", common.FormatQuery("DATABASE %s", dbName), repo.role, true)
 
 		if err != nil {
 			return nil, err
 		}
 
-		err = repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("SCHEMA %q.%q", dbName, schema), repo.role, true)
+		err = repo.ExecuteGrantOnAccountRole("USAGE", common.FormatQuery("SCHEMA %s.%s", dbName, schema), repo.role, true)
 
 		if err != nil {
 			return nil, err
@@ -1144,7 +1144,7 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 
 	for _, policy := range policies {
 		if repo.role != AccountAdminRole {
-			err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", fmt.Sprintf("MASKING POLICY %q.%q.%q", policy.DatabaseName, policy.SchemaName, policy.Name), repo.role, true)
+			err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", common.FormatQuery("MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name), repo.role, true)
 			if err != nil {
 				return err
 			}
@@ -1191,12 +1191,12 @@ func (repo *SnowflakeRepository) UpdateFilter(databaseName string, schema string
 	var deleteOldPolicy *string
 
 	if existingPolicy != nil {
-		dropOldPolicy = fmt.Sprintf("DROP ROW ACCESS POLICY %q.%q.%q,", databaseName, schema, *existingPolicy)
-		deleteOldPolicy = ptr.String(fmt.Sprintf("DROP ROW ACCESS POLICY IF EXISTS %q.%q.%q;", databaseName, schema, *existingPolicy))
+		dropOldPolicy = common.FormatQuery("DROP ROW ACCESS POLICY %s.%s.%s,", databaseName, schema, *existingPolicy)
+		deleteOldPolicy = ptr.String(common.FormatQuery("DROP ROW ACCESS POLICY IF EXISTS %s.%s.%s;", databaseName, schema, *existingPolicy))
 	}
 
 	if repo.role != AccountAdminRole {
-		err = repo.ExecuteGrantOnAccountRole("CREATE ROW ACCESS POLICY", fmt.Sprintf("SCHEMA %q.%q", databaseName, schema), repo.role, true)
+		err = repo.ExecuteGrantOnAccountRole("CREATE ROW ACCESS POLICY", common.FormatQuery("SCHEMA %s.%s", databaseName, schema), repo.role, true)
 		if err != nil {
 			return err
 		}
@@ -1226,7 +1226,7 @@ func (repo *SnowflakeRepository) DropFilter(databaseName string, schema string, 
 	}
 
 	if repo.role != AccountAdminRole {
-		err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", fmt.Sprintf("ROW ACCESS POLICY %q.%q.%q", databaseName, schema, filterName), repo.role, true)
+		err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", common.FormatQuery("ROW ACCESS POLICY %s.%s.%s", databaseName, schema, filterName), repo.role, true)
 		if err != nil {
 			return err
 		}

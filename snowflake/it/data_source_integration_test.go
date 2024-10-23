@@ -40,7 +40,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	sourceName := strings.ToUpper(strings.Split(sfAccount, ".")[0])
 
 	s.NoError(err)
-	s.Len(dataSourceObjectHandler.DataObjects, 40)
+	s.Len(dataSourceObjectHandler.DataObjects, 52)
 
 	warehouses := getByType(dataSourceObjectHandler.DataObjects, "warehouse")
 	s.Len(warehouses, 2)
