@@ -146,9 +146,11 @@ func loadDatabases(db *sql.DB) ([]DbEntity, error) {
 }
 
 func loadDatabaseRoles(db *sql.DB, database string) ([]snowflake.RoleEntity, error) {
-	rows, err := db.Query(fmt.Sprintf("SHOW DATABASE ROLES IN DATABASE %s", database))
+	query := common.FormatQuery("SHOW DATABASE ROLES IN DATABASE %s", database)
+
+	rows, err := db.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("query snowflake database roles: %w", err)
+		return nil, fmt.Errorf("query snowflake database roles: %w (%s)", err, query)
 	}
 
 	defer rows.Close()
@@ -179,19 +181,6 @@ func dropRole(db *sql.DB, role snowflake.RoleEntity, database *string) error {
 	_, err := db.Exec(fmt.Sprintf("DROP %s ROLE IF EXISTS %s", databaseRole, roleName))
 	if err != nil {
 		return fmt.Errorf("drop role %s: %w", role.Name, err)
-	}
-
-	return nil
-}
-
-func dropDatabaseRole(db *sql.DB, database string, role snowflake.RoleEntity) error {
-	if !nonDryRun {
-		return nil
-	}
-
-	_, err := db.Exec(fmt.Sprintf("DROP DATAROLE IF EXISTS %s.%s", database, role.Name))
-	if err != nil {
-		return fmt.Errorf("drop role %s.%s: %w", database, role.Name, err)
 	}
 
 	return nil
