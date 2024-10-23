@@ -4,9 +4,20 @@ resource "snowflake_database" "db" {
   comment = "Database for RAITO testing and demo"
 }
 
+resource "snowflake_database" "special_db" {
+  name    = "DATABASE WITH SPECIAL CASES"
+  comment = "Database for RAITO testing and demo"
+}
+
 resource "snowflake_schema" "ordering" {
   database = snowflake_database.db.name
   name     = "ORDERING"
+  comment  = "Schema for RAITO testing and demo"
+}
+
+resource "snowflake_schema" "special_schema" {
+  database = snowflake_database.special_db.name
+  name     = "SCHEMA NAME WITH S†RANGE çhars"
   comment  = "Schema for RAITO testing and demo"
 }
 
@@ -183,6 +194,52 @@ resource "snowflake_table" "ordering_supplier" {
   }
 }
 
+resource "snowflake_table" "special_table" {
+  database = snowflake_database.special_db.name
+  schema   = snowflake_schema.special_schema.name
+  name     = "SPECIAL †ABLE NAME😀"
+
+  column {
+    name = "CUSTKEY"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "NAME"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "ADDRESS"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "NATIONKEY"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "PHONE"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "ACCTBAL"
+    type = "NUMBER(38,0)"
+  }
+
+  column {
+    name = "MKTSEGMENT"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "COMMENT"
+    type = "VARCHAR"
+  }
+}
+
 resource "snowflake_masking_policy" "masking_policy" {
   name     = "ORDERING_MASKING_POLICY"
   database = snowflake_database.db.name
@@ -262,6 +319,11 @@ resource "snowflake_materialized_view" "customers_limited" {
 resource "snowflake_shared_database" "shared_db" {
   name       = "SNOWFLAKE_SAMPLE_DATA"
   from_share = "SFSALESSHARED.SFC_SAMPLES_EUFRANKFURT.SAMPLE_DATA"
+}
+
+resource "snowflake_account_role" "special_account_role" {
+  name    = "SπECIAL åCCOUNT RØLE"
+  comment = "Account role for special cases"
 }
 
 // Role what
@@ -345,8 +407,13 @@ resource "snowflake_grant_privileges_to_database_role" "database_role_privileges
   }
 }
 
-resource "snowflake_grant_database_role" "database_role_grant" {
+resource "snowflake_grant_database_role" "special_database_role" {
   database_role_name = "\"${snowflake_database_role.database_role.database}\".\"${snowflake_database_role.database_role.name}\""
   parent_role_name   = "HUMAN_RESOURCES"
+}
 
+resource "snowflake_database_role" "special_role" {
+  database = snowflake_database.special_db.name
+  name     = "SPECIAL DåTABASE RøLE"
+  comment  = "Database role for RAITO testing and demo"
 }

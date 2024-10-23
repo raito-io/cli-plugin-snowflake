@@ -425,7 +425,7 @@ func (repo *SnowflakeRepository) ExecuteGrantOnAccountRole(perm, on, accountRole
 	}
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
-	q := fmt.Sprintf(`GRANT %s ON %s TO ROLE %q`, perm, on, accountRole)
+	q := fmt.Sprintf(`GRANT %s ON %s TO ROLE %s`, perm, on, common.FormatQuery("%s", accountRole))
 	logger.Debug("Executing grant query", "query", q)
 
 	_, _, err := repo.query(q)
@@ -445,7 +445,7 @@ func (repo *SnowflakeRepository) ExecuteRevokeOnAccountRole(perm, on, accountRol
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
 	// q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
-	q := fmt.Sprintf(`REVOKE %s ON %s FROM ROLE %q`, perm, on, accountRole)
+	q := fmt.Sprintf(`REVOKE %s ON %s FROM ROLE %s`, perm, on, common.FormatQuery("%s", accountRole))
 	logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
 
 	_, _, err := repo.query(q)
@@ -529,7 +529,7 @@ func (repo *SnowflakeRepository) DropDatabaseRole(database string, roleName stri
 }
 func (repo *SnowflakeRepository) RenameDatabaseRole(database, oldName, newName string) error {
 	if repo.isProtectedRoleName(oldName) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, oldName))
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, oldName))
 		return nil
 	}
 
@@ -585,7 +585,7 @@ func (repo *SnowflakeRepository) GrantDatabaseRolesToDatabaseRole(ctx context.Co
 
 func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error {
 	if repo.isProtectedRoleName(databaseRole) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
 		return nil
 	}
 
@@ -603,7 +603,7 @@ func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.
 
 func (repo *SnowflakeRepository) RevokeDatabaseRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error {
 	if repo.isProtectedRoleName(databaseRole) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
 		return nil
 	}
 
@@ -626,7 +626,7 @@ func (repo *SnowflakeRepository) ExecuteGrantOnDatabaseRole(perm, on, database, 
 	}
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
-	q := fmt.Sprintf(`GRANT %s ON %s TO DATABASE ROLE %s.%s`, perm, on, database, databaseRole)
+	q := fmt.Sprintf(`GRANT %s ON %s TO DATABASE ROLE %s`, perm, on, common.FormatQuery("%s.%s", database, databaseRole))
 	logger.Debug("Executing grant query", "query", q)
 
 	_, _, err := repo.query(q)
@@ -646,7 +646,7 @@ func (repo *SnowflakeRepository) ExecuteRevokeOnDatabaseRole(perm, on, database,
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
 	// q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
-	q := fmt.Sprintf(`REVOKE %s ON %s FROM DATABASE ROLE %s.%s`, perm, on, database, databaseRole)
+	q := fmt.Sprintf(`REVOKE %s ON %s FROM DATABASE ROLE %s`, perm, on, common.FormatQuery("%s.%s", database, databaseRole))
 	logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
 
 	_, _, err := repo.query(q)
@@ -796,13 +796,13 @@ func (repo *SnowflakeRepository) DescribePolicy(policyType, dbName, schema, poli
 func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName string) ([]PolicyReferenceEntity, error) {
 	// to fetch policy references we need to have USAGE on dbName and schema
 	if !strings.EqualFold(repo.role, AccountAdminRole) && repo.role != "" {
-		err := repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("DATABASE %s", dbName), repo.role, true)
+		err := repo.ExecuteGrantOnAccountRole("USAGE", common.FormatQuery("DATABASE %s", dbName), repo.role, true)
 
 		if err != nil {
 			return nil, err
 		}
 
-		err = repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("SCHEMA %s.%s", dbName, schema), repo.role, true)
+		err = repo.ExecuteGrantOnAccountRole("USAGE", common.FormatQuery("SCHEMA %s.%s", dbName, schema), repo.role, true)
 
 		if err != nil {
 			return nil, err
@@ -997,7 +997,7 @@ func (repo *SnowflakeRepository) CommentAccountRoleIfExists(comment, objectName 
 	return nil
 }
 func (repo *SnowflakeRepository) CommentDatabaseRoleIfExists(comment, database, roleName string) error {
-	q := fmt.Sprintf(`COMMENT IF EXISTS ON DATABASE ROLE %s.%s IS '%s'`, database, roleName, strings.Replace(comment, "'", "", -1))
+	q := fmt.Sprintf(`COMMENT IF EXISTS ON DATABASE ROLE %s IS '%s'`, common.FormatQuery("%s.%s", database, roleName), strings.Replace(comment, "'", "", -1))
 	_, _, err := repo.query(q)
 
 	if err != nil {
@@ -1010,7 +1010,7 @@ func (repo *SnowflakeRepository) CommentDatabaseRoleIfExists(comment, database, 
 func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) (err error) {
 	// Ensure we have permission to create masks
 	if repo.role != AccountAdminRole {
-		err = repo.ExecuteGrantOnAccountRole("CREATE MASKING POLICY", fmt.Sprintf("SCHEMA %s.%s", databaseName, schema), repo.role, true)
+		err = repo.ExecuteGrantOnAccountRole("CREATE MASKING POLICY", common.FormatQuery("SCHEMA %s.%s", databaseName, schema), repo.role, true)
 		if err != nil {
 			return err
 		}
@@ -1085,7 +1085,7 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 }
 
 func (repo *SnowflakeRepository) GetPoliciesLike(policy string, like string) ([]PolicyEntity, error) {
-	q := fmt.Sprintf("SHOW %s POLICIES LIKE '%s';", policy, strings.ToUpper(like))
+	q := fmt.Sprintf("SHOW %s POLICIES LIKE '%s';", common.FormatQuery("%s", policy), strings.ToUpper(like))
 
 	var policyEntities []PolicyEntity
 
@@ -1136,7 +1136,7 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 	}()
 
 	for i := range policyEntries {
-		_, err = tx.Exec(fmt.Sprintf("ALTER TABLE %s.%s.%s ALTER COLUMN %s UNSET MASKING POLICY", databaseName, schema, policyEntries[i].REF_ENTITY_NAME, policyEntries[i].REF_COLUMN_NAME.String))
+		_, err = tx.Exec(common.FormatQuery("ALTER TABLE %s.%s.%s ALTER COLUMN %s UNSET MASKING POLICY", databaseName, schema, policyEntries[i].REF_ENTITY_NAME, policyEntries[i].REF_COLUMN_NAME.String))
 		if err != nil {
 			return err
 		}
@@ -1144,13 +1144,13 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 
 	for _, policy := range policies {
 		if repo.role != AccountAdminRole {
-			err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", fmt.Sprintf("MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name), repo.role, true)
+			err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", common.FormatQuery("MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name), repo.role, true)
 			if err != nil {
 				return err
 			}
 		}
 
-		_, err = tx.Exec(fmt.Sprintf("DROP MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name))
+		_, err = tx.Exec(common.FormatQuery("DROP MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name))
 		if err != nil {
 			return err
 		}
@@ -1191,21 +1191,21 @@ func (repo *SnowflakeRepository) UpdateFilter(databaseName string, schema string
 	var deleteOldPolicy *string
 
 	if existingPolicy != nil {
-		dropOldPolicy = fmt.Sprintf("DROP ROW ACCESS POLICY %s.%s.%s,", databaseName, schema, *existingPolicy)
-		deleteOldPolicy = ptr.String(fmt.Sprintf("DROP ROW ACCESS POLICY IF EXISTS %s.%s.%s;", databaseName, schema, *existingPolicy))
+		dropOldPolicy = common.FormatQuery("DROP ROW ACCESS POLICY %s.%s.%s,", databaseName, schema, *existingPolicy)
+		deleteOldPolicy = ptr.String(common.FormatQuery("DROP ROW ACCESS POLICY IF EXISTS %s.%s.%s;", databaseName, schema, *existingPolicy))
 	}
 
 	if repo.role != AccountAdminRole {
-		err = repo.ExecuteGrantOnAccountRole("CREATE ROW ACCESS POLICY", fmt.Sprintf("SCHEMA %s.%s", databaseName, schema), repo.role, true)
+		err = repo.ExecuteGrantOnAccountRole("CREATE ROW ACCESS POLICY", common.FormatQuery("SCHEMA %s.%s", databaseName, schema), repo.role, true)
 		if err != nil {
 			return err
 		}
 	}
 
 	q := make([]string, 0, 3)
-	q = append(q, fmt.Sprintf(`CREATE ROW ACCESS POLICY %s.%s.%s AS (%s) returns boolean ->
-			%s;`, databaseName, schema, filterName, strings.Join(functionArguments, ", "), expression),
-		fmt.Sprintf("ALTER TABLE %[1]s.%[2]s.%[3]s %[4]s ADD ROW ACCESS POLICY %[1]s.%[2]s.%[5]s on (%[6]s);", databaseName, schema, tableName, dropOldPolicy, filterName, strings.Join(argumentNames, ", ")))
+	q = append(q, fmt.Sprintf(`CREATE ROW ACCESS POLICY %s AS (%s) returns boolean ->
+			%s;`, common.FormatQuery("%s.%s.%s", databaseName, schema, filterName), strings.Join(functionArguments, ", "), expression),
+		common.FormatQuery("ALTER TABLE %[1]s.%[2]s.%[3]s %[4]s ADD ROW ACCESS POLICY %[1]s.%[2]s.%[5]s on (%[6]s);", databaseName, schema, tableName, dropOldPolicy, filterName, strings.Join(argumentNames, ", ")))
 
 	if deleteOldPolicy != nil {
 		q = append(q, *deleteOldPolicy)
@@ -1226,21 +1226,21 @@ func (repo *SnowflakeRepository) DropFilter(databaseName string, schema string, 
 	}
 
 	if repo.role != AccountAdminRole {
-		err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", fmt.Sprintf("ROW ACCESS POLICY %s.%s.%s", databaseName, schema, filterName), repo.role, true)
+		err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", common.FormatQuery("ROW ACCESS POLICY %s.%s.%s", databaseName, schema, filterName), repo.role, true)
 		if err != nil {
 			return err
 		}
 	}
 
 	if existingPolicy != nil {
-		err = repo.execute(fmt.Sprintf("ALTER TABLE %[1]s.%[2]s.%[3]s DROP ROW ACCESS POLICY %[1]s.%[2]s.%[4]s;", databaseName, schema, tableName, *existingPolicy))
+		err = repo.execute(common.FormatQuery("ALTER TABLE %[1]s.%[2]s.%[3]s DROP ROW ACCESS POLICY %[1]s.%[2]s.%[4]s;", databaseName, schema, tableName, *existingPolicy))
 		if err != nil {
 			return err
 		}
 	}
 
 	err = repo.execute(
-		fmt.Sprintf(`DROP ROW ACCESS POLICY IF EXISTS %s.%s.%s;`, databaseName, schema, filterName),
+		common.FormatQuery(`DROP ROW ACCESS POLICY IF EXISTS %s.%s.%s;`, databaseName, schema, filterName),
 	)
 	if err != nil {
 		return err
@@ -1250,12 +1250,12 @@ func (repo *SnowflakeRepository) DropFilter(databaseName string, schema string, 
 }
 
 func (repo *SnowflakeRepository) getRowFilterForTableIfExists(databaseName string, schema string, tableName string) (*string, error) {
-	_, _, err := repo.query(fmt.Sprintf("USE DATABASE %s;", databaseName))
+	_, _, err := repo.query(common.FormatQuery("USE DATABASE %s;", databaseName))
 	if err != nil {
-		return nil, fmt.Errorf("connect to database %s: %w", databaseName, err)
+		return nil, fmt.Errorf("connect to database %q: %w", databaseName, err)
 	}
 
-	q := fmt.Sprintf(`select POLICY_NAME from table(%s.information_schema.policy_references(REF_ENTITY_NAME => '%s.%s.%s', REF_ENTITY_DOMAIN => 'table')) WHERE POLICY_KIND = 'ROW_ACCESS_POLICY'`, databaseName, databaseName, schema, tableName)
+	q := common.FormatQuery(`select POLICY_NAME from table(%s.information_schema.policy_references(REF_ENTITY_NAME => '%s.%s.%s', REF_ENTITY_DOMAIN => 'table')) WHERE POLICY_KIND = 'ROW_ACCESS_POLICY'`, databaseName, databaseName, schema, tableName)
 
 	rows, _, err := repo.query(q)
 	if err != nil {

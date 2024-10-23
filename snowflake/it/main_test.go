@@ -13,6 +13,7 @@ import (
 
 	"github.com/blockloop/scan"
 
+	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
 )
 
@@ -37,17 +38,17 @@ func setup() error {
 
 	config := readDatabaseConfig()
 
-	_, err := connectAndQuery(config.Parameters, "", fmt.Sprintf("CREATE USER IF NOT EXISTS %s", snowflakeUserName))
+	_, err := connectAndQuery(config.Parameters, "", common.FormatQuery("CREATE USER IF NOT EXISTS %s", snowflakeUserName))
 	if err != nil {
 		return err
 	}
 
-	_, err = connectAndQuery(config.Parameters, "", fmt.Sprintf("CREATE WAREHOUSE IF NOT EXISTS %s with warehouse_size='X-SMALL'", snowflakeWarehouse))
+	_, err = connectAndQuery(config.Parameters, "", common.FormatQuery("CREATE WAREHOUSE IF NOT EXISTS %s with warehouse_size='X-SMALL'", snowflakeWarehouse))
 	if err != nil {
 		return err
 	}
 
-	_, err = connectAndQuery(config.Parameters, "", fmt.Sprintf("ALTER USER %s SET DEFAULT_WAREHOUSE=%s", config.Parameters[snowflake.SfUser], snowflakeWarehouse))
+	_, err = connectAndQuery(config.Parameters, "", common.FormatQuery("ALTER USER %s SET DEFAULT_WAREHOUSE=%s", config.Parameters[snowflake.SfUser], snowflakeWarehouse))
 	if err != nil {
 		return err
 	}
@@ -72,7 +73,7 @@ func teardown() error {
 
 	for _, role := range roleEntities {
 		if strings.HasPrefix(role.Name, testId) {
-			_, err = connectAndQuery(config.Parameters, "", fmt.Sprintf("DROP ROLE IF EXISTS %s", role.Name))
+			_, err = connectAndQuery(config.Parameters, "", common.FormatQuery("DROP ROLE IF EXISTS %s", role.Name))
 			if err != nil {
 				return err
 			}
@@ -80,7 +81,7 @@ func teardown() error {
 	}
 
 	database := "RAITO_DATABASE"
-	databaseRoles, err := connectAndQuery(config.Parameters, "", fmt.Sprintf("SHOW DATABASE ROLES IN DATABASE %s", database))
+	databaseRoles, err := connectAndQuery(config.Parameters, "", common.FormatQuery("SHOW DATABASE ROLES IN DATABASE %s", database))
 	if err != nil {
 		return err
 	}
@@ -94,14 +95,14 @@ func teardown() error {
 
 	for _, role := range databaseRoleEntities {
 		if strings.HasPrefix(role.Name, testId) {
-			_, err = connectAndQuery(config.Parameters, "", fmt.Sprintf("DROP DATABASE ROLE IF EXISTS %s.%s", database, role.Name))
+			_, err = connectAndQuery(config.Parameters, "", common.FormatQuery("DROP DATABASE ROLE IF EXISTS %s.%s", database, role.Name))
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	_, err = connectAndQuery(config.Parameters, "", fmt.Sprintf("DROP USER IF EXISTS %s", snowflakeUserName))
+	_, err = connectAndQuery(config.Parameters, "", common.FormatQuery("DROP USER IF EXISTS %s", snowflakeUserName))
 	if err != nil {
 		return err
 	}

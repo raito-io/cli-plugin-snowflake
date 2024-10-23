@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
 )
 
@@ -79,70 +80,102 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetAccountRolesWithPrefix(
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateAccountRole() {
-	//Given
-	roleName := fmt.Sprintf("%s_REPO_TEST_CREATE_ROLE_TEST", testId)
+	test := func(roleName string) {
+		//Given
+		roleName = fmt.Sprintf("%s_%s", testId, roleName)
 
-	//When
-	err := s.repo.CreateAccountRole(roleName)
+		//When
+		err := s.repo.CreateAccountRole(roleName)
 
-	//Then
-	s.NoError(err)
+		//Then
+		s.NoError(err)
 
-	roles, err := s.repo.GetAccountRolesWithPrefix(testId)
-	s.NoError(err)
-	s.Contains(roles, snowflake.RoleEntity{
-		Name:            roleName,
-		Owner:           "ACCOUNTADMIN",
-		GrantedRoles:    0,
-		GrantedToRoles:  0,
-		AssignedToUsers: 0,
+		roles, err := s.repo.GetAccountRolesWithPrefix(testId)
+		s.NoError(err)
+		s.Contains(roles, snowflake.RoleEntity{
+			Name:            roleName,
+			Owner:           "ACCOUNTADMIN",
+			GrantedRoles:    0,
+			GrantedToRoles:  0,
+			AssignedToUsers: 0,
+		})
+	}
+
+	s.Run("Regular role name", func() {
+		test("REPO_TEST_CREATE_ROLE_TEST")
+	})
+
+	s.Run("Role name with special characters", func() {
+		test("CREATE ROLE WI†H SP€C!AL CHår@CT€R$")
 	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_DropAccountRole() {
-	//Given
-	roleName := fmt.Sprintf("%s_REPO_TEST_CREATE_ROLE_TEST", testId)
-	err := s.repo.CreateAccountRole(roleName)
-	s.NoError(err)
+	test := func(roleName string) {
+		//Given
+		roleName = fmt.Sprintf("%s_%s", testId, roleName)
+		err := s.repo.CreateAccountRole(roleName)
+		s.NoError(err)
 
-	//When
-	err = s.repo.DropAccountRole(roleName)
+		//When
+		err = s.repo.DropAccountRole(roleName)
 
-	//Then
-	s.NoError(err)
-	roles, err := s.repo.GetAccountRolesWithPrefix(testId)
-	s.NoError(err)
+		//Then
+		s.NoError(err)
+		roles, err := s.repo.GetAccountRolesWithPrefix(testId)
+		s.NoError(err)
 
-	roleNames := make([]string, 0, len(roles))
-	for _, role := range roles {
-		roleNames = append(roleNames, role.Name)
+		roleNames := make([]string, 0, len(roles))
+		for _, role := range roles {
+			roleNames = append(roleNames, role.Name)
+		}
+
+		s.NotContains(roleNames, roleName)
 	}
 
-	s.NotContains(roleNames, roleName)
+	s.Run("Regular role name", func() {
+		test("REPO_TEST_DROP_ROLE_TEST")
+	})
+
+	s.Run("Role name with special characters", func() {
+		test("DROP ROLE WI†H SP€C!AL CHår@CT€R$")
+	})
+
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_RenameAccountRole() {
-	//Given
-	originalRoleName := fmt.Sprintf("%s_REPO_TEST_RENAME_ROLE_TEST", testId)
-	newExpectedRoleName := fmt.Sprintf("%s_REPO_TEST_RENAME_ROLE_TEST_NEW", testId)
-	err := s.repo.CreateAccountRole(originalRoleName)
-	s.NoError(err)
+	test := func(originalRoleName, newRoleName string) {
+		//Given
+		originalRoleName = fmt.Sprintf("%s_%s", testId, originalRoleName)
+		newExpectedRoleName := fmt.Sprintf("%s_%s", testId, newRoleName)
 
-	//When
-	err = s.repo.RenameAccountRole(originalRoleName, newExpectedRoleName)
+		err := s.repo.CreateAccountRole(originalRoleName)
+		s.NoError(err)
 
-	//Then
-	s.NoError(err)
-	roles, err := s.repo.GetAccountRolesWithPrefix(testId)
-	s.NoError(err)
+		//When
+		err = s.repo.RenameAccountRole(originalRoleName, newExpectedRoleName)
 
-	roleNames := make([]string, 0, len(roles))
-	for _, role := range roles {
-		roleNames = append(roleNames, role.Name)
+		//Then
+		s.NoError(err)
+		roles, err := s.repo.GetAccountRolesWithPrefix(testId)
+		s.NoError(err)
+
+		roleNames := make([]string, 0, len(roles))
+		for _, role := range roles {
+			roleNames = append(roleNames, role.Name)
+		}
+
+		s.NotContains(roleNames, originalRoleName)
+		s.Contains(roleNames, newExpectedRoleName)
 	}
 
-	s.NotContains(roleNames, originalRoleName)
-	s.Contains(roleNames, newExpectedRoleName)
+	s.Run("Regular role names", func() {
+		test("REPO_TEST_RENAME_ROLE_TEST", "REPO_TEST_RENAME_ROLE_TEST_NEW")
+	})
+
+	s.Run("Role names with special characters", func() {
+		test("RENAME ROLE WI†H SP€C!AL CHår@CT€R$", "RENAME ROLE WI†H SP€C!AL CHår@CT€R$ NEW")
+	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsToAccountRole() {
@@ -183,149 +216,209 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetGrantsOfAccountRole() {
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantAccountRolesToAccountRole() {
-	//When
-	originalRoleName := fmt.Sprintf("%s_REPO_TEST_GRANT_R2R", testId)
-	rolesToGrants := make([]string, 0, 5)
+	test := func(roleName string) {
+		//When
+		originalRoleName := fmt.Sprintf("%s_%s", testId, roleName)
+		rolesToGrants := make([]string, 0, 5)
 
-	for i := 1; i <= 5; i++ {
-		rolesToGrants = append(rolesToGrants, fmt.Sprintf("%s_REPO_TEST_GRANT_R2R_%d", testId, i))
+		for i := 1; i <= 5; i++ {
+			rolesToGrants = append(rolesToGrants, fmt.Sprintf("%s_%s_%d", testId, roleName, i))
+		}
+
+		err := s.repo.CreateAccountRole(originalRoleName)
+		s.NoError(err)
+
+		//When
+		err = s.repo.GrantAccountRolesToAccountRole(context.Background(), originalRoleName, rolesToGrants...)
+
+		//Then
+		s.NoError(err)
+
+		grants, err := s.repo.GetGrantsOfAccountRole(originalRoleName)
+		s.NoError(err)
+
+		expectedGrants := make([]snowflake.GrantOfRole, 0, len(grants))
+
+		for _, granteeName := range rolesToGrants {
+			expectedGrants = append(expectedGrants, snowflake.GrantOfRole{
+				GrantedTo:   "ROLE",
+				GranteeName: common.FormatQuery("%s", granteeName),
+			})
+		}
+
+		s.Equal(grants, expectedGrants)
 	}
 
-	err := s.repo.CreateAccountRole(originalRoleName)
-	s.NoError(err)
+	s.Run("Regular role names", func() {
+		test("REPO_TEST_GRANT_R2R")
+	})
 
-	//When
-	err = s.repo.GrantAccountRolesToAccountRole(context.Background(), originalRoleName, rolesToGrants...)
-
-	//Then
-	s.NoError(err)
-
-	grants, err := s.repo.GetGrantsOfAccountRole(originalRoleName)
-	s.NoError(err)
-
-	expectedGrants := make([]snowflake.GrantOfRole, 0, len(grants))
-
-	for _, granteeName := range rolesToGrants {
-		expectedGrants = append(expectedGrants, snowflake.GrantOfRole{
-			GrantedTo:   "ROLE",
-			GranteeName: granteeName,
-		})
-	}
-
-	s.Equal(grants, expectedGrants)
+	s.Run("Role names with special characters", func() {
+		test("GRANT R2R GRANT ROLE WI†H SP€C!AL CHår@CT€R$")
+	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeAccountRolesFromAccountRole() {
-	//When
-	originalRoleName := fmt.Sprintf("%s_REPO_TEST_REVOKE_R2R", testId)
-	rolesToGrants := make([]string, 0, 5)
+	test := func(roleName string) {
+		//When
+		originalRoleName := fmt.Sprintf("%s_%s", testId, roleName)
+		rolesToGrants := make([]string, 0, 5)
 
-	for i := 1; i <= 5; i++ {
-		rolesToGrants = append(rolesToGrants, fmt.Sprintf("%s_REPO_TEST_REVOKE_R2R_%d", testId, i))
+		for i := 1; i <= 5; i++ {
+			rolesToGrants = append(rolesToGrants, fmt.Sprintf("%s_%s_%d", testId, roleName, i))
+		}
+
+		err := s.repo.CreateAccountRole(originalRoleName)
+		s.NoError(err)
+
+		err = s.repo.GrantAccountRolesToAccountRole(context.Background(), originalRoleName, rolesToGrants...)
+		s.NoError(err)
+
+		//When
+		err = s.repo.RevokeAccountRolesFromAccountRole(context.Background(), originalRoleName, rolesToGrants...)
+
+		//Then
+		s.NoError(err)
+
+		grants, err := s.repo.GetGrantsOfAccountRole(originalRoleName)
+		s.NoError(err)
+		s.Empty(grants)
 	}
 
-	err := s.repo.CreateAccountRole(originalRoleName)
-	s.NoError(err)
+	s.Run("Regular role names", func() {
+		test("REPO_TEST_REVOKE_R2R")
+	})
 
-	err = s.repo.GrantAccountRolesToAccountRole(context.Background(), originalRoleName, rolesToGrants...)
-	s.NoError(err)
-
-	//When
-	err = s.repo.RevokeAccountRolesFromAccountRole(context.Background(), originalRoleName, rolesToGrants...)
-
-	//Then
-	s.NoError(err)
-
-	grants, err := s.repo.GetGrantsOfAccountRole(originalRoleName)
-	s.NoError(err)
-	s.Empty(grants)
+	s.Run("Role names with special characters", func() {
+		test("REVOKE R2R REVOKE ROLE WI†H SP€C!AL CHår@CT€R$")
+	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantUsersToAccountRole() {
-	//Given
-	roleName := fmt.Sprintf("%s_REPO_TEST_GRANT_USER_TEST", testId)
-	err := s.repo.CreateAccountRole(roleName)
+	test := func(roleName string) {
+		//Given
+		roleName = fmt.Sprintf("%s_%s", testId, roleName)
+		err := s.repo.CreateAccountRole(roleName)
 
-	s.NoError(err)
+		s.NoError(err)
 
-	//When
-	err = s.repo.GrantUsersToAccountRole(context.Background(), roleName, snowflakeUserName)
+		//When
+		err = s.repo.GrantUsersToAccountRole(context.Background(), roleName, snowflakeUserName)
 
-	//Then
-	s.NoError(err)
+		//Then
+		s.NoError(err)
 
-	grants, err := s.repo.GetGrantsOfAccountRole(roleName)
-	s.NoError(err)
+		grants, err := s.repo.GetGrantsOfAccountRole(roleName)
+		s.NoError(err)
 
-	s.Equal(grants, []snowflake.GrantOfRole{
-		{
-			GrantedTo:   "USER",
-			GranteeName: snowflakeUserName,
-		},
+		s.Equal(grants, []snowflake.GrantOfRole{
+			{
+				GrantedTo:   "USER",
+				GranteeName: snowflakeUserName,
+			},
+		})
+	}
+
+	s.Run("Regular role names", func() {
+		test("REPO_TEST_GRANT_USER_TEST")
+	})
+
+	s.Run("Role names with special characters", func() {
+		test("GRANT USER WI†H SP€C!AL CHår@CT€R$")
 	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeUsersFromAccountRole() {
-	//Given
-	roleName := fmt.Sprintf("%s_REPO_TEST_GRANT_USER_TEST", testId)
-	err := s.repo.CreateAccountRole(roleName)
-	s.NoError(err)
+	test := func(roleName string) {
+		//Given
+		roleName = fmt.Sprintf("%s_%s", testId, roleName)
+		err := s.repo.CreateAccountRole(roleName)
+		s.NoError(err)
 
-	err = s.repo.GrantUsersToAccountRole(context.Background(), roleName, snowflakeUserName)
-	s.NoError(err)
+		err = s.repo.GrantUsersToAccountRole(context.Background(), roleName, snowflakeUserName)
+		s.NoError(err)
 
-	//When
-	err = s.repo.RevokeUsersFromAccountRole(context.Background(), roleName, snowflakeUserName)
+		//When
+		err = s.repo.RevokeUsersFromAccountRole(context.Background(), roleName, snowflakeUserName)
 
-	//Then
-	s.NoError(err)
+		//Then
+		s.NoError(err)
 
-	grants, err := s.repo.GetGrantsOfAccountRole(roleName)
-	s.NoError(err)
-	s.Empty(grants)
+		grants, err := s.repo.GetGrantsOfAccountRole(roleName)
+		s.NoError(err)
+		s.Empty(grants)
+	}
+
+	s.Run("Regular role names", func() {
+		test("REPO_TEST_REVOKE_USER_TEST")
+	})
+
+	s.Run("Role names with special characters", func() {
+		test("REVOKE USER WI†H SP€C!AL CHår@CT€R$")
+	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnAccountRole() {
-	//Given
-	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_GRANT_TEST", testId)
-	err := s.repo.CreateAccountRole(roleName)
-	s.NoError(err)
+	test := func(roleName string, on string, onType string) {
+		//Given
+		roleName = fmt.Sprintf("%s_%s", testId, roleName)
+		err := s.repo.CreateAccountRole(roleName)
+		s.NoError(err)
 
-	//When
-	err = s.repo.ExecuteGrantOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName, true)
+		//When
+		err = s.repo.ExecuteGrantOnAccountRole("SELECT", on, roleName, true)
 
-	//Then
-	s.NoError(err)
+		//Then
+		s.NoError(err)
 
-	grantsTo, err := s.repo.GetGrantsToAccountRole(roleName)
-	s.NoError(err)
+		grantsTo, err := s.repo.GetGrantsToAccountRole(roleName)
+		s.NoError(err)
 
-	s.Equal(grantsTo, []snowflake.GrantToRole{
-		{
-			Name:      "RAITO_DATABASE.ORDERING.ORDERS",
-			GrantedOn: "TABLE",
-			Privilege: "SELECT",
-		},
+		s.Equal([]snowflake.GrantToRole{
+			{
+				Name:      on,
+				GrantedOn: onType,
+				Privilege: "SELECT",
+			},
+		}, grantsTo)
+	}
+
+	s.Run("Regular role names", func() {
+		test("REPO_TEST_EXECUTE_GRANT_TEST", "RAITO_DATABASE.ORDERING.ORDERS", "TABLE")
+	})
+
+	s.Run("Role names with special characters", func() {
+		test("EXECUTE GRANT WI†H SP€C!AL CHår@CT€R$", "\"DATABASE WITH SPECIAL CASES\".\"SCHEMA NAME WITH S†RANGE çhars\".\"SPECIAL †ABLE NAME😀\"", "TABLE")
 	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteRevokeOnAccountRole() {
-	//Given
-	roleName := fmt.Sprintf("%s_REPO_TEST_EXECUTE_REVOKE_TEST", testId)
-	err := s.repo.CreateAccountRole(roleName)
-	s.NoError(err)
-	err = s.repo.ExecuteGrantOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName, true)
-	s.NoError(err)
+	test := func(roleName string, on string) {
+		//Given
+		roleName = fmt.Sprintf("%s_%s", testId, roleName)
+		err := s.repo.CreateAccountRole(roleName)
+		s.NoError(err)
+		err = s.repo.ExecuteGrantOnAccountRole("SELECT", on, roleName, true)
+		s.NoError(err)
 
-	//When
-	err = s.repo.ExecuteRevokeOnAccountRole("SELECT", "RAITO_DATABASE.ORDERING.ORDERS", roleName, true)
+		//When
+		err = s.repo.ExecuteRevokeOnAccountRole("SELECT", on, roleName, true)
 
-	//Then
-	s.NoError(err)
+		//Then
+		s.NoError(err)
 
-	grantsTo, err := s.repo.GetGrantsToAccountRole(roleName)
-	s.NoError(err)
-	s.Empty(grantsTo)
+		grantsTo, err := s.repo.GetGrantsToAccountRole(roleName)
+		s.NoError(err)
+		s.Empty(grantsTo)
+	}
+
+	s.Run("Regular role names", func() {
+		test("REPO_TEST_EXECUTE_REVOKE_TEST", "RAITO_DATABASE.ORDERING.ORDERS")
+	})
+
+	s.Run("Role names with special characters", func() {
+		test("EXECUTE REVOKE WI†H SP€C!AL CHår@CT€R$", "\"DATABASE WITH SPECIAL CASES\".\"SCHEMA NAME WITH S†RANGE çhars\".\"SPECIAL †ABLE NAME😀\"")
+	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabaseRolesWithPrefix() {
@@ -349,86 +442,116 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabaseRolesWithPrefix
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateDatabaseRole() {
-	//Given
-	roleName := fmt.Sprintf("%s_REPO_TEST_CREATE_DATABASE_ROLE_TEST", testId)
-	database := "RAITO_DATABASE"
+	test := func(roleName string) {
+		//Given
+		roleName = fmt.Sprintf("%s_%s", testId, roleName)
+		database := "RAITO_DATABASE"
 
-	//When
-	err := s.repo.CreateDatabaseRole(database, roleName)
+		//When
+		err := s.repo.CreateDatabaseRole(database, roleName)
 
-	//Then
-	s.NoError(err)
+		//Then
+		s.NoError(err)
 
-	roles, err := s.repo.GetDatabaseRolesWithPrefix(database, testId)
-	s.NoError(err)
-	s.Contains(roles, snowflake.RoleEntity{
-		Name:            roleName,
-		Owner:           "ACCOUNTADMIN",
-		GrantedRoles:    0,
-		GrantedToRoles:  0,
-		AssignedToUsers: 0,
+		roles, err := s.repo.GetDatabaseRolesWithPrefix(database, testId)
+		s.NoError(err)
+		s.Contains(roles, snowflake.RoleEntity{
+			Name:            roleName,
+			Owner:           "ACCOUNTADMIN",
+			GrantedRoles:    0,
+			GrantedToRoles:  0,
+			AssignedToUsers: 0,
+		})
+	}
+
+	s.Run("Regular role names", func() {
+		test("REPO_TEST_CREATE_DATABASE_ROLE_TEST")
+	})
+
+	s.Run("Role names with special characters", func() {
+		test("DATABASE CREATE ROLE WI†H SP€C!AL CHår@CT€R$")
 	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_DropDatabaseRole() {
-	//Given
-	roleName := fmt.Sprintf("%s_REPO_TEST_DROP_DATABASE_ROLE_TEST", testId)
-	database := "RAITO_DATABASE"
+	test := func(roleName string) {
+		//Given
+		roleName = fmt.Sprintf("%s_%s", testId, roleName)
+		database := "RAITO_DATABASE"
 
-	//When
-	err := s.repo.CreateDatabaseRole(database, roleName)
-	s.NoError(err)
+		//When
+		err := s.repo.CreateDatabaseRole(database, roleName)
+		s.NoError(err)
 
-	//Then
-	roles, err := s.repo.GetDatabaseRolesWithPrefix(database, testId)
-	s.NoError(err)
+		//Then
+		roles, err := s.repo.GetDatabaseRolesWithPrefix(database, testId)
+		s.NoError(err)
 
-	roleNames := make([]string, 0, len(roles))
-	for _, role := range roles {
-		roleNames = append(roleNames, role.Name)
+		roleNames := make([]string, 0, len(roles))
+		for _, role := range roles {
+			roleNames = append(roleNames, role.Name)
+		}
+
+		s.Contains(roleNames, roleName)
+
+		//When
+		err = s.repo.DropDatabaseRole(database, roleName)
+
+		//Then
+		s.NoError(err)
+		roles, err = s.repo.GetDatabaseRolesWithPrefix(database, testId)
+		s.NoError(err)
+
+		roleNames = make([]string, 0, len(roles))
+		for _, role := range roles {
+			roleNames = append(roleNames, role.Name)
+		}
+
+		s.NotContains(roleNames, roleName)
 	}
 
-	s.Contains(roleNames, roleName)
+	s.Run("Regular role names", func() {
+		test("REPO_TEST_DROP_DATABASE_ROLE_TEST")
+	})
 
-	//When
-	err = s.repo.DropDatabaseRole(database, roleName)
-
-	//Then
-	s.NoError(err)
-	roles, err = s.repo.GetDatabaseRolesWithPrefix(database, testId)
-	s.NoError(err)
-
-	roleNames = make([]string, 0, len(roles))
-	for _, role := range roles {
-		roleNames = append(roleNames, role.Name)
-	}
-
-	s.NotContains(roleNames, roleName)
+	s.Run("Role names with special characters", func() {
+		test("DATABASE DROP ROLE WI†H SP€C!AL CHår@CT€R$")
+	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_RenameDatabaseRole() {
-	//Given
-	originalRoleName := fmt.Sprintf("%s_REPO_TEST_RENAME_DATABASE_ROLE_TEST", testId)
-	newExpectedRoleName := fmt.Sprintf("%s_REPO_TEST_RENAME_ROLE_DATABASE_TEST_NEW", testId)
-	database := "RAITO_DATABASE"
-	err := s.repo.CreateDatabaseRole(database, originalRoleName)
-	s.NoError(err)
+	test := func(originalRoleName, newRoleName string) {
+		//Given
+		originalRoleName = fmt.Sprintf("%s_%s", testId, originalRoleName)
+		newExpectedRoleName := fmt.Sprintf("%s_%s", testId, newRoleName)
+		database := "RAITO_DATABASE"
+		err := s.repo.CreateDatabaseRole(database, originalRoleName)
+		s.NoError(err)
 
-	//When
-	err = s.repo.RenameDatabaseRole(database, originalRoleName, newExpectedRoleName)
+		//When
+		err = s.repo.RenameDatabaseRole(database, originalRoleName, newExpectedRoleName)
 
-	//Then
-	s.NoError(err)
-	roles, err := s.repo.GetDatabaseRolesWithPrefix(database, testId)
-	s.NoError(err)
+		//Then
+		s.NoError(err)
+		roles, err := s.repo.GetDatabaseRolesWithPrefix(database, testId)
+		s.NoError(err)
 
-	roleNames := make([]string, 0, len(roles))
-	for _, role := range roles {
-		roleNames = append(roleNames, role.Name)
+		roleNames := make([]string, 0, len(roles))
+		for _, role := range roles {
+			roleNames = append(roleNames, role.Name)
+		}
+
+		s.NotContains(roleNames, originalRoleName)
+		s.Contains(roleNames, newExpectedRoleName)
 	}
 
-	s.NotContains(roleNames, originalRoleName)
-	s.Contains(roleNames, newExpectedRoleName)
+	s.Run("Regular role names", func() {
+		test("REPO_TEST_RENAME_DATABASE_ROLE_TEST", "REPO_TEST_RENAME_ROLE_DATABASE_TEST_NEW")
+	})
+
+	s.Run("Role names with special characters", func() {
+		test("RENAME DATABASE ROLE WI†H SP€C!AL CHår@CT€R$", "RENAME ROLE DATABASE WI†H SP€C!AL CHår@CT€R$ NEW")
+	})
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
@@ -798,10 +921,16 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabases() {
 
 	//Then
 	s.NoError(err)
-	s.Len(databases, 1)
+	s.Len(databases, 2)
 
 	s.Contains(databases, snowflake.DbEntity{
 		Name:    "RAITO_DATABASE",
+		Comment: ptr.String("Database for RAITO testing and demo"),
+		Kind:    ptr.String("STANDARD"),
+	})
+
+	s.Contains(databases, snowflake.DbEntity{
+		Name:    "DATABASE WITH SPECIAL CASES",
 		Comment: ptr.String("Database for RAITO testing and demo"),
 		Kind:    ptr.String("STANDARD"),
 	})
