@@ -9,6 +9,7 @@ import (
 	"github.com/raito-io/golang-set/set"
 	sf "github.com/snowflakedb/gosnowflake"
 
+	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
 )
 
@@ -168,11 +169,11 @@ func dropRole(db *sql.DB, role snowflake.RoleEntity, database *string) error {
 	}
 
 	databaseRole := ""
-	roleName := role.Name
+	roleName := common.FormatQuery("%s", role.Name)
 
 	if database != nil {
 		databaseRole = "DATABASE"
-		roleName = fmt.Sprintf("%s.%s", *database, role.Name)
+		roleName = common.FormatQuery("%s.%s", *database, role.Name)
 	}
 
 	_, err := db.Exec(fmt.Sprintf("DROP %s ROLE IF EXISTS %s", databaseRole, roleName))

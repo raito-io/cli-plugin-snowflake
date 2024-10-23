@@ -322,8 +322,8 @@ resource "snowflake_shared_database" "shared_db" {
 }
 
 resource "snowflake_account_role" "special_account_role" {
-    name    = "SπECIAL åCCOUNT RØLE"
-    comment = "Account role for special cases"
+  name    = "SπECIAL åCCOUNT RØLE"
+  comment = "Account role for special cases"
 }
 
 // Role what
