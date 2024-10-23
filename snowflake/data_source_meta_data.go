@@ -18,7 +18,7 @@ const ExternalTable = "external-" + ds.Table
 const IcebergTable = "iceberg-" + ds.Table
 const MaterializedView = "materialized-" + ds.View
 
-// RoleNameConstraints is based onhttps://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
+// RoleNameConstraints is based on https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
 var RoleNameConstraints = naming_hint.NamingConstraints{
 	UpperCaseLetters:  true,
 	LowerCaseLetters:  false,
