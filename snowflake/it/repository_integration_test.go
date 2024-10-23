@@ -146,7 +146,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_RenameAccountRole() {
 	test := func(originalRoleName, newRoleName string) {
 		//Given
 		originalRoleName = fmt.Sprintf("%s_%s", testId, originalRoleName)
-		newExpectedRoleName := fmt.Sprintf("%s_%", testId, newRoleName)
+		newExpectedRoleName := fmt.Sprintf("%s_%s", testId, newRoleName)
 
 		err := s.repo.CreateAccountRole(originalRoleName)
 		s.NoError(err)
@@ -260,7 +260,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantAccountRolesToAccount
 func (s *RepositoryTestSuite) TestSnowflakeRepository_RevokeAccountRolesFromAccountRole() {
 	test := func(roleName string) {
 		//When
-		originalRoleName := fmt.Sprintf("%s_%", testId, roleName)
+		originalRoleName := fmt.Sprintf("%s_%s", testId, roleName)
 		rolesToGrants := make([]string, 0, 5)
 
 		for i := 1; i <= 5; i++ {
