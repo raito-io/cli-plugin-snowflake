@@ -425,7 +425,7 @@ func (repo *SnowflakeRepository) ExecuteGrantOnAccountRole(perm, on, accountRole
 	}
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
-	q := fmt.Sprintf(`GRANT %s ON %s TO ROLE %s`, perm, on, accountRole)
+	q := fmt.Sprintf(`GRANT %s ON %s TO ROLE %s`, perm, on, common.FormatQuery("%s", accountRole))
 	logger.Debug("Executing grant query", "query", q)
 
 	_, _, err := repo.query(q)
@@ -445,7 +445,7 @@ func (repo *SnowflakeRepository) ExecuteRevokeOnAccountRole(perm, on, accountRol
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
 	// q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
-	q := fmt.Sprintf(`REVOKE %s ON %s FROM ROLE %s`, perm, on, accountRole)
+	q := fmt.Sprintf(`REVOKE %s ON %s FROM ROLE %s`, perm, on, common.FormatQuery("%s", accountRole))
 	logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
 
 	_, _, err := repo.query(q)

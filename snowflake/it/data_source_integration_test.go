@@ -58,7 +58,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	s.Empty(sharedDatabases)
 
 	databases := getByType(dataSourceObjectHandler.DataObjects, "database")
-	s.Len(databases, 1)
+	s.Len(databases, 2)
 	s.Contains(databases, data_source.DataObject{
 		ExternalId:       "RAITO_DATABASE",
 		Name:             "RAITO_DATABASE",
@@ -70,7 +70,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	})
 
 	schemas := getByType(dataSourceObjectHandler.DataObjects, "schema")
-	s.Len(schemas, 2)
+	s.Len(schemas, 4)
 	s.Contains(schemas, data_source.DataObject{
 		ExternalId:       "RAITO_DATABASE.ORDERING",
 		Name:             "ORDERING",
@@ -93,7 +93,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	})
 
 	tables := getByType(dataSourceObjectHandler.DataObjects, "table")
-	s.Len(tables, 3)
+	s.Len(tables, 4)
 	s.Contains(tables, data_source.DataObject{
 		ExternalId:       "RAITO_DATABASE.ORDERING.ORDERS",
 		Name:             "ORDERS",
@@ -105,7 +105,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	})
 
 	column := getByType(dataSourceObjectHandler.DataObjects, "column")
-	s.Len(column, 30)
+	s.Len(column, 38)
 	s.Contains(column, data_source.DataObject{
 		ExternalId:       "RAITO_DATABASE.ORDERING.ORDERS.ORDERKEY",
 		Name:             "ORDERKEY",

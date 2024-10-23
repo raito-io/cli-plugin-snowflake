@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
 )
 
@@ -241,7 +242,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantAccountRolesToAccount
 		for _, granteeName := range rolesToGrants {
 			expectedGrants = append(expectedGrants, snowflake.GrantOfRole{
 				GrantedTo:   "ROLE",
-				GranteeName: granteeName,
+				GranteeName: common.FormatQuery("%s", granteeName),
 			})
 		}
 
@@ -373,13 +374,13 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_ExecuteGrantOnAccountRole(
 		grantsTo, err := s.repo.GetGrantsToAccountRole(roleName)
 		s.NoError(err)
 
-		s.Equal(grantsTo, []snowflake.GrantToRole{
+		s.Equal([]snowflake.GrantToRole{
 			{
-				Name:      "RAITO_DATABASE.ORDERING.ORDERS",
+				Name:      on,
 				GrantedOn: onType,
 				Privilege: "SELECT",
 			},
-		})
+		}, grantsTo)
 	}
 
 	s.Run("Regular role names", func() {
