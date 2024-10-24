@@ -1205,7 +1205,8 @@ func (repo *SnowflakeRepository) UpdateFilter(databaseName string, schema string
 	q := make([]string, 0, 3)
 	q = append(q, fmt.Sprintf(`CREATE ROW ACCESS POLICY %s AS (%s) returns boolean ->
 			%s;`, common.FormatQuery("%s.%s.%s", databaseName, schema, filterName), strings.Join(functionArguments, ", "), expression),
-		common.FormatQuery("ALTER TABLE %[1]s.%[2]s.%[3]s %[4]s ADD ROW ACCESS POLICY %[1]s.%[2]s.%[5]s on (%[6]s);", databaseName, schema, tableName, dropOldPolicy, filterName, strings.Join(argumentNames, ", ")))
+		fmt.Sprintf("ALTER TABLE %[1]s %[2]s ADD ROW ACCESS POLICY %[3]s on (%[4]s);", common.FormatQuery("%s.%s.%s", databaseName, schema, tableName), dropOldPolicy,
+			common.FormatQuery("%s.%s.%s", databaseName, schema, filterName), strings.Join(argumentNames, ", ")))
 
 	if deleteOldPolicy != nil {
 		q = append(q, *deleteOldPolicy)

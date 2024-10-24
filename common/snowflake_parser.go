@@ -67,6 +67,10 @@ func convertToValidSnowflakeResource(name string, withQuotes bool) string {
 // - Contain only letters, underscores, decimal digits (0-9), and dollar signs (“$”).
 // - Are stored and resolved as uppercase characters (e.g. id is stored and resolved as ID).
 func isSimpleSnowflakeName(name string) bool {
+	if name == "" {
+		return true
+	}
+
 	startRegex := regexp.MustCompile("[a-zA-Z_]")
 	contentRegex := regexp.MustCompile("[a-zA-Z0-9_$]")
 
@@ -83,7 +87,7 @@ func isSimpleSnowflakeName(name string) bool {
 
 // Wrapper around fmt.Sprintf to properly format queries for Snowflake
 func FormatQuery(query string, objects ...string) string {
-	newObjects := []interface{}{}
+	newObjects := make([]interface{}, 0, len(objects))
 
 	for _, obj := range objects {
 		formattedObject := obj
