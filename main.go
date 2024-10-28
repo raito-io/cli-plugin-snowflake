@@ -50,6 +50,7 @@ func main() {
 					{Name: snowflake.SfDatabaseRoles, Description: "If set, database-roles for all databases will be fetched.", Mandatory: false},
 					{Name: snowflake.SfIgnoreLinksToRoles, Description: "This comma separated list of regular expressions can be used to indicate that role hierarchy links to certain roles are never added or removed. e.g. 'SYS.+,ADMIN.+' will match all roles starting with 'SYS' or 'ADMIN', meaning that all grants to these roles will remain untouched during the sync.", Mandatory: false},
 					{Name: snowflake.SfUsageBatchSize, Description: "If not set, no batching is done when fetching usage statements. This will be the fastest, however it uses more memory. If memory usage is a problem, this can be set to a number between 10.000 and 1.000.000 (higher is recommended) to fetch usage in batches of that size.", Mandatory: false},
+					{Name: snowflake.SfUsageUserExcludes, Description: "The optional comma-separated list of user names to exclude when fetching data. This is typically used for service accounts that do a large amount of operations.", Mandatory: false},
 				},
 				TagSource: snowflake.TagSource,
 			},

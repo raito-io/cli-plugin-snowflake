@@ -26,8 +26,11 @@ func (s *DataUsageTestSuite) TestDataUsage() {
 	fileCreator := mocks.NewSimpleDataUsageStatementHandler(s.T())
 	dataUsage := snowflake.NewDataUsageSyncer()
 
+	config := s.getConfig()
+	config.Parameters[snowflake.SfUsageUserExcludes] = "SYSTEM,RAITO"
+
 	//When
-	err := dataUsage.SyncDataUsage(context.Background(), fileCreator, s.getConfig())
+	err := dataUsage.SyncDataUsage(context.Background(), fileCreator, config)
 
 	//Then
 	s.NoError(err)

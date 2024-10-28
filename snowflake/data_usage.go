@@ -14,6 +14,7 @@ import (
 	du "github.com/raito-io/cli/base/data_usage"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
+	"github.com/raito-io/golang-set/set"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli-plugin-snowflake/common/stream"
@@ -23,7 +24,7 @@ import (
 type dataUsageRepository interface {
 	Close() error
 	TotalQueryTime() time.Duration
-	GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time) <-chan stream.MaybeError[UsageQueryResult]
+	GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time, excludedUsers set.Set[string]) <-chan stream.MaybeError[UsageQueryResult]
 }
 
 type DataUsageSyncer struct {
@@ -84,7 +85,9 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	queryCtx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
 
-	usageStatementSqlRows := repo.GetDataUsage(queryCtx, startDate, nil)
+	excludedUsers := parseCommaSeparatedList(configParams.GetString(SfUsageUserExcludes))
+
+	usageStatementSqlRows := repo.GetDataUsage(queryCtx, startDate, nil, excludedUsers)
 
 	i := 0
 
