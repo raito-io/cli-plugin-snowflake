@@ -150,6 +150,7 @@ func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.
 			if len(excludedUsers) > 0 {
 				excluded := excludedUsers.Slice()
 				strBuilder.WriteString(fmt.Sprintf(" AND USER_NAME NOT IN (%s)", generatePlaceholders(len(excluded))))
+
 				for _, user := range excluded {
 					args = append(args, user)
 				}
@@ -212,6 +213,7 @@ func generatePlaceholders(count int) string {
 	for i := range placeholders {
 		placeholders[i] = "?"
 	}
+
 	return strings.Join(placeholders, ", ")
 }
 
