@@ -112,7 +112,7 @@ func (repo *SnowflakeRepository) isProtectedRoleName(rn string) bool {
 	return !strings.EqualFold(repo.role, AccountAdminRole) && strings.EqualFold(repo.role, rn)
 }
 
-func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time) <-chan stream.MaybeError[UsageQueryResult] {
+func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time, excludedUsers set.Set[string]) <-chan stream.MaybeError[UsageQueryResult] {
 	outputChannel := make(chan stream.MaybeError[UsageQueryResult], 10000)
 
 	go func() {
@@ -145,6 +145,14 @@ func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.
 				strBuilder.WriteString("AND START_TIME <= ? ")
 
 				args = append(args, *maxTime)
+			}
+
+			if len(excludedUsers) > 0 {
+				excluded := excludedUsers.Slice()
+				strBuilder.WriteString(fmt.Sprintf(" AND USER_NAME NOT IN (%s)", generatePlaceholders(len(excluded))))
+				for _, user := range excluded {
+					args = append(args, user)
+				}
 			}
 
 			if repo.usageBatchSize > 0 {
@@ -197,6 +205,14 @@ func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.
 	}()
 
 	return outputChannel
+}
+
+func generatePlaceholders(count int) string {
+	placeholders := make([]string, count)
+	for i := range placeholders {
+		placeholders[i] = "?"
+	}
+	return strings.Join(placeholders, ", ")
 }
 
 func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChannel chan<- stream.MaybeError[UsageQueryResult], startTime time.Time, queryGen func(startTime time.Time) (string, []any)) (*time.Time, int, time.Duration, bool) {

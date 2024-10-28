@@ -29,7 +29,7 @@ func TestDataUsageSyncer_SyncDataUsage(t *testing.T) {
 
 	repoMock.EXPECT().Close().Return(nil)
 	repoMock.EXPECT().TotalQueryTime().Return(time.Minute)
-	repoMock.EXPECT().GetDataUsage(mock.Anything, mock.AnythingOfType("time.Time"), mock.AnythingOfType("*time.Time")).Return(stream.ArrayToChannel(context.Background(), []stream.MaybeError[UsageQueryResult]{
+	repoMock.EXPECT().GetDataUsage(mock.Anything, mock.AnythingOfType("time.Time"), mock.AnythingOfType("*time.Time"), mock.Anything).Return(stream.ArrayToChannel(context.Background(), []stream.MaybeError[UsageQueryResult]{
 		stream.NewMaybeErrorValue(UsageQueryResult{
 			ExternalId:           "queryId1",
 			Query:                "UPDATE table1 SET column1 = 1 WHERE column2 IN (SELECT column3 FROM view1)",

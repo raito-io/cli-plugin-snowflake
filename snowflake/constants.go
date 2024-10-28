@@ -22,6 +22,7 @@ const (
 	SfDriverInsecureMode                = "sf-driver-insecure-mode"
 	SfIgnoreLinksToRoles                = "sf-ignore-links-to-roles"
 	SfUsageBatchSize                    = "sf-usage-batch-size"
+	SfUsageUserExcludes                 = "sf-usage-user-excludes"
 	SfWorkerPoolSize                    = "sf-worker-pool-size"
 
 	TagSource = "Snowflake"
