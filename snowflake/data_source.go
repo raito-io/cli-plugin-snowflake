@@ -25,7 +25,7 @@ type dataSourceRepository interface {
 	TotalQueryTime() time.Duration
 	GetSnowFlakeAccountName() (string, error)
 	GetWarehouses() ([]DbEntity, error)
-	GetShares() ([]DbEntity, error)
+	GetInboundShares() ([]DbEntity, error)
 	GetDatabases() ([]DbEntity, error)
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
@@ -43,7 +43,7 @@ type DataSourceSyncer struct {
 	excludeChildren   []string
 	skipColumns       bool
 	schemaExcludes    set.Set[string]
-	sharesMap         set.Set[string]
+	inboundSharesMap  set.Set[string]
 	repo              dataSourceRepository
 	dataSourceHandler wrappers.DataSourceObjectHandler
 	lock              sync.Mutex
@@ -144,20 +144,20 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 		return err
 	}
 
-	shares, sharesMap, err := s.readShares(dbExcludes, shouldRetrieveTags)
+	inboundShares, inboundSharesMap, err := s.readShares(dbExcludes, shouldRetrieveTags)
 	if err != nil {
 		return err
 	}
 
-	s.sharesMap = sharesMap
+	s.inboundSharesMap = inboundSharesMap
 
-	databases, err := s.readDatabases(dbExcludes, sharesMap, shouldRetrieveTags)
+	databases, err := s.readDatabases(dbExcludes, inboundSharesMap, shouldRetrieveTags)
 	if err != nil {
 		return err
 	}
 
-	// add shares to the list again to fetch their descendants
-	databases = append(databases, shares...)
+	// add inboundShares to the list again to fetch their descendants
+	databases = append(databases, inboundShares...)
 
 	wp := workerpool.New(getWorkerPoolSize(configParams))
 
@@ -195,7 +195,7 @@ func (s *DataSourceSyncer) handleDatabase(database ExtendedDbEntity) error {
 	}
 
 	doTypePrefix := ""
-	if s.sharesMap.Contains(database.Entity.Name) {
+	if s.inboundSharesMap.Contains(database.Entity.Name) {
 		doTypePrefix = SharedPrefix
 	}
 
@@ -411,12 +411,12 @@ func (s *DataSourceSyncer) readDatabases(excludes set.Set[string], shares map[st
 func (s *DataSourceSyncer) readShares(excludes set.Set[string], shouldRetrieveTags bool) ([]ExtendedDbEntity, set.Set[string], error) {
 	// main reason is that for export they can only have "IMPORTED PRIVILEGES" granted on the shared db level and nothing else.
 	// for now we can just exclude them but they need to be treated later on
-	shares, err := s.repo.GetShares()
+	inboundShares, err := s.repo.GetInboundShares()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	enrichedShares, err := s.addDbEntitiesToImporter(shares, "shared-database", "", shouldRetrieveTags,
+	enrichedInboundShares, err := s.addDbEntitiesToImporter(inboundShares, "shared-database", "", shouldRetrieveTags,
 		s.repo.GetTagsLinkedToDatabaseName,
 		func(name string) string { return name },
 		func(name, fullName string) bool {
@@ -426,14 +426,14 @@ func (s *DataSourceSyncer) readShares(excludes set.Set[string], shouldRetrieveTa
 		return nil, nil, err
 	}
 
-	sharesMap := set.NewSet[string]()
+	inboundSharesMap := set.NewSet[string]()
 
-	// exclude shares from database import as we treat them separately
-	for _, share := range enrichedShares {
-		sharesMap.Add(share.Entity.Name)
+	// exclude inboundShares from database import as we treat them separately
+	for _, share := range enrichedInboundShares {
+		inboundSharesMap.Add(share.Entity.Name)
 	}
 
-	return enrichedShares, sharesMap, nil
+	return enrichedInboundShares, inboundSharesMap, nil
 }
 
 func (s *DataSourceSyncer) readWarehouses(shouldRetrieveTags bool) error {

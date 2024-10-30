@@ -268,11 +268,11 @@ func (_c *mockDataSourceRepository_GetSchemasInDatabase_Call) RunAndReturn(run f
 }
 
 // GetShares provides a mock function with given fields:
-func (_m *mockDataSourceRepository) GetShares() ([]DbEntity, error) {
+func (_m *mockDataSourceRepository) GetInboundShares() ([]DbEntity, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetShares")
+		panic("no return value specified for GetInboundShares")
 	}
 
 	var r0 []DbEntity
@@ -297,14 +297,14 @@ func (_m *mockDataSourceRepository) GetShares() ([]DbEntity, error) {
 	return r0, r1
 }
 
-// mockDataSourceRepository_GetShares_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetShares'
+// mockDataSourceRepository_GetShares_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInboundShares'
 type mockDataSourceRepository_GetShares_Call struct {
 	*mock.Call
 }
 
 // GetShares is a helper method to define mock.On call
 func (_e *mockDataSourceRepository_Expecter) GetShares() *mockDataSourceRepository_GetShares_Call {
-	return &mockDataSourceRepository_GetShares_Call{Call: _e.mock.On("GetShares")}
+	return &mockDataSourceRepository_GetShares_Call{Call: _e.mock.On("GetInboundShares")}
 }
 
 func (_c *mockDataSourceRepository_GetShares_Call) Run(run func()) *mockDataSourceRepository_GetShares_Call {

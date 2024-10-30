@@ -1566,7 +1566,7 @@ func (_m *mockDataAccessRepository) GetShares() ([]DbEntity, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetShares")
+		panic("no return value specified for GetInboundShares")
 	}
 
 	var r0 []DbEntity
@@ -1591,14 +1591,14 @@ func (_m *mockDataAccessRepository) GetShares() ([]DbEntity, error) {
 	return r0, r1
 }
 
-// mockDataAccessRepository_GetShares_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetShares'
+// mockDataAccessRepository_GetShares_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInboundShares'
 type mockDataAccessRepository_GetShares_Call struct {
 	*mock.Call
 }
 
 // GetShares is a helper method to define mock.On call
 func (_e *mockDataAccessRepository_Expecter) GetShares() *mockDataAccessRepository_GetShares_Call {
-	return &mockDataAccessRepository_GetShares_Call{Call: _e.mock.On("GetShares")}
+	return &mockDataAccessRepository_GetShares_Call{Call: _e.mock.On("GetInboundShares")}
 }
 
 func (_c *mockDataAccessRepository_GetShares_Call) Run(run func()) *mockDataAccessRepository_GetShares_Call {

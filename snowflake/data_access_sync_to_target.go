@@ -1432,7 +1432,7 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 				}
 			}
 
-			shareNames, err := s.accessSyncer.getShareNames()
+			inboundShareNames, err := s.accessSyncer.getInboundShareNames()
 			if err != nil {
 				return err
 			}
@@ -1442,12 +1442,12 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 				return err
 			}
 
-			databaseNames = append(databaseNames, shareNames...)
+			databaseNames = append(databaseNames, inboundShareNames...)
 
 			for _, database := range databaseNames {
 				databaseMatchFound := false
 
-				isShare := slices.Contains(shareNames, database)
+				isShare := slices.Contains(inboundShareNames, database)
 
 				databaseMatchFound, err = s.createPermissionGrantsForDatabase(database, p, metaData, isShare, grants)
 				if err != nil {

@@ -948,7 +948,7 @@ func (repo *SnowflakeRepository) GetWarehouses() ([]DbEntity, error) {
 	return repo.getDbEntities(q)
 }
 
-func (repo *SnowflakeRepository) GetShares() ([]DbEntity, error) {
+func (repo *SnowflakeRepository) GetInboundShares() ([]DbEntity, error) {
 	q := "SHOW SHARES"
 	_, err := repo.getDbEntities(q)
 

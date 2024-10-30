@@ -14,6 +14,7 @@ const USAGE_ON_DATABASE = "USAGE on DATABASE"
 const USAGE_ON_SCHEMA = "USAGE on SCHEMA"
 
 const apTypeDatabaseRole = "databaseRole"
+const apTypeShare = "share"
 const ExternalTable = "external-" + ds.Table
 const IcebergTable = "iceberg-" + ds.Table
 const MaterializedView = "materialized-" + ds.View
@@ -138,7 +139,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 					},
 					{
 						Permission:        "IMPORT SHARE",
-						Description:       "Enables a data consumer to view shares shared with their account. Also grants the ability to create databases from shares; requires the global CREATE DATABASE privilege.",
+						Description:       "Enables a data consumer to view inboundShares shared with their account. Also grants the ability to create databases from inboundShares; requires the global CREATE DATABASE privilege.",
 						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
 					{
@@ -692,6 +693,15 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				CanBeAssumed:                  false,
 				CanAssumeMultiple:             false,
 				AllowedWhoAccessProviderTypes: []string{access_provider.Role, apTypeDatabaseRole},
+			},
+			{
+				Type:                          apTypeShare,
+				Label:                         "Share",
+				IsNamedEntity:                 true,
+				CanBeCreated:                  false,
+				CanBeAssumed:                  false,
+				CanAssumeMultiple:             false,
+				AllowedWhoAccessProviderTypes: []string{},
 			},
 		},
 		MaskingMetadata: &ds.MaskingMetadata{

@@ -900,7 +900,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetWarehouses() {
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetShares() {
 	//When
-	shares, err := s.repo.GetShares()
+	shares, err := s.repo.GetInboundShares()
 
 	//Then
 	s.NoError(err)

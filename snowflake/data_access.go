@@ -58,7 +58,7 @@ type dataAccessRepository interface {
 	GetPoliciesLike(policy string, like string) ([]PolicyEntity, error)
 	GetPolicyReferences(dbName, schema, policyName string) ([]PolicyReferenceEntity, error)
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
-	GetShares() ([]DbEntity, error)
+	GetInboundShares() ([]DbEntity, error)
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	GetDatabaseRoleTags(databaseName string, roleName string) (map[string][]*tag.Tag, error)
@@ -136,8 +136,8 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 // Functions used in both the from target and the to target syncers
 //
 
-func (s *AccessSyncer) getShareNames() ([]string, error) {
-	dbShares, err := s.repo.GetShares()
+func (s *AccessSyncer) getInboundShareNames() ([]string, error) {
+	dbShares, err := s.repo.GetInboundShares()
 	if err != nil {
 		return nil, err
 	}
@@ -170,14 +170,14 @@ func (s *AccessSyncer) getAllDatabaseAndShareNames() (set.Set[string], error) {
 		return nil, err
 	}
 
-	shares, err := s.getShareNames()
+	inboundShares, err := s.getInboundShareNames()
 	if err != nil {
 		return nil, err
 	}
 
 	combinedList := set.NewSet[string]()
 	combinedList.Add(databases...)
-	combinedList.Add(shares...)
+	combinedList.Add(inboundShares...)
 
 	return combinedList, nil
 }

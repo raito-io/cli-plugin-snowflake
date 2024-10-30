@@ -25,7 +25,7 @@ type AccessFromTargetSyncer struct {
 	accessSyncer          *AccessSyncer
 	accessProviderHandler wrappers.AccessProviderHandler
 
-	shares                            []string
+	inboundShares                     []string
 	linkToExternalIdentityStoreGroups bool
 	externalGroupOwners               string
 	excludedRoles                     map[string]struct{}
@@ -48,12 +48,12 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 
 	logger.Info("Reading account and database roles from Snowflake")
 
-	shares, err := s.accessSyncer.getShareNames()
+	inboundShares, err := s.accessSyncer.getInboundShareNames()
 	if err != nil {
 		return err
 	}
 
-	s.shares = shares
+	s.inboundShares = inboundShares
 	s.externalGroupOwners = s.configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
 	s.extractExcludeRoleList()
 	s.linkToExternalIdentityStoreGroups = s.configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
@@ -429,7 +429,7 @@ func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []Gra
 		}
 
 		databaseName := strings.Split(grant.Name, ".")[0]
-		if slices.Contains(s.shares, databaseName) {
+		if slices.Contains(s.inboundShares, databaseName) {
 			// TODO do we need to do this for all tabular types?
 			if strings.EqualFold(grant.GrantedOn, "TABLE") && !slices.Contains(sharesApplied, databaseName) {
 				whatItems = append(whatItems, exporter.WhatItem{
