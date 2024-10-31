@@ -220,6 +220,63 @@ func (_c *mockDataSourceRepository_GetDatabases_Call) RunAndReturn(run func() ([
 	return _c
 }
 
+// GetInboundShares provides a mock function with given fields:
+func (_m *mockDataSourceRepository) GetInboundShares() ([]DbEntity, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetInboundShares")
+	}
+
+	var r0 []DbEntity
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]DbEntity, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]DbEntity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataSourceRepository_GetInboundShares_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInboundShares'
+type mockDataSourceRepository_GetInboundShares_Call struct {
+	*mock.Call
+}
+
+// GetInboundShares is a helper method to define mock.On call
+func (_e *mockDataSourceRepository_Expecter) GetInboundShares() *mockDataSourceRepository_GetInboundShares_Call {
+	return &mockDataSourceRepository_GetInboundShares_Call{Call: _e.mock.On("GetInboundShares")}
+}
+
+func (_c *mockDataSourceRepository_GetInboundShares_Call) Run(run func()) *mockDataSourceRepository_GetInboundShares_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockDataSourceRepository_GetInboundShares_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetInboundShares_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockDataSourceRepository_GetInboundShares_Call) RunAndReturn(run func() ([]DbEntity, error)) *mockDataSourceRepository_GetInboundShares_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSchemasInDatabase provides a mock function with given fields: databaseName, handleEntity
 func (_m *mockDataSourceRepository) GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error {
 	ret := _m.Called(databaseName, handleEntity)
@@ -263,63 +320,6 @@ func (_c *mockDataSourceRepository_GetSchemasInDatabase_Call) Return(_a0 error) 
 }
 
 func (_c *mockDataSourceRepository_GetSchemasInDatabase_Call) RunAndReturn(run func(string, EntityHandler) error) *mockDataSourceRepository_GetSchemasInDatabase_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetShares provides a mock function with given fields:
-func (_m *mockDataSourceRepository) GetInboundShares() ([]DbEntity, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetInboundShares")
-	}
-
-	var r0 []DbEntity
-	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]DbEntity, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]DbEntity)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockDataSourceRepository_GetShares_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInboundShares'
-type mockDataSourceRepository_GetShares_Call struct {
-	*mock.Call
-}
-
-// GetShares is a helper method to define mock.On call
-func (_e *mockDataSourceRepository_Expecter) GetShares() *mockDataSourceRepository_GetShares_Call {
-	return &mockDataSourceRepository_GetShares_Call{Call: _e.mock.On("GetInboundShares")}
-}
-
-func (_c *mockDataSourceRepository_GetShares_Call) Run(run func()) *mockDataSourceRepository_GetShares_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *mockDataSourceRepository_GetShares_Call) Return(_a0 []DbEntity, _a1 error) *mockDataSourceRepository_GetShares_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockDataSourceRepository_GetShares_Call) RunAndReturn(run func() ([]DbEntity, error)) *mockDataSourceRepository_GetShares_Call {
 	_c.Call.Return(run)
 	return _c
 }

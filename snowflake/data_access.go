@@ -46,6 +46,7 @@ type dataAccessRepository interface {
 	ExecuteRevokeOnAccountRole(perm, on, role string, isSystemGrant bool) error
 	ExecuteRevokeOnDatabaseRole(perm, on, database, databaseRole string) error
 	GetAccountRoles() ([]RoleEntity, error)
+	GetOutboundShares() ([]ShareEntity, error)
 	GetAccountRolesWithPrefix(prefix string) ([]RoleEntity, error)
 	GetDatabaseRoles(database string) ([]RoleEntity, error)
 	GetDatabaseRolesWithPrefix(database string, prefix string) ([]RoleEntity, error)
@@ -53,6 +54,7 @@ type dataAccessRepository interface {
 	GetGrantsOfAccountRole(roleName string) ([]GrantOfRole, error)
 	GetGrantsOfDatabaseRole(database, roleName string) ([]GrantOfRole, error)
 	GetGrantsToAccountRole(roleName string) ([]GrantToRole, error)
+	GetGrantsToShare(shareName string) ([]GrantToRole, error)
 	GetGrantsToDatabaseRole(database, roleName string) ([]GrantToRole, error)
 	GetPolicies(policy string) ([]PolicyEntity, error)
 	GetPoliciesLike(policy string, like string) ([]PolicyEntity, error)

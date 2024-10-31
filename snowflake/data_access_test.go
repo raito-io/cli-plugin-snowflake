@@ -44,10 +44,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-					repoMock.EXPECT().GetShares().Return([]DbEntity{
+					repoMock.EXPECT().GetInboundShares().Return([]DbEntity{
 						{Name: "Share1"}, {Name: "Share2"},
 					}, nil).Once()
-
+					repoMock.EXPECT().GetOutboundShares().Return([]ShareEntity{}, nil).Once()
 					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
 						{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
 						{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
@@ -198,6 +198,110 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			wantErr: require.NoError,
 		},
 		{
+			name: "share",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
+					fileCreator := mocks.NewSimpleAccessProviderHandler(t, 3)
+
+					repoMock.EXPECT().GetDatabases().Return([]DbEntity{
+						{Name: "TEST_DB"},
+					}, nil).Once()
+					repoMock.EXPECT().GetDatabaseRoles("TEST_DB").Return([]RoleEntity{
+						{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 1, Owner: "Owner1"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantOfRole{
+						{GrantedTo: "SHARE", GranteeName: "Share1"},
+					}, nil).Once()
+					repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantToRole{
+						{GrantedOn: "TABLE", Name: "TEST_DB.Schema1.Table1", Privilege: "UPDATE"},
+					}, nil).Once()
+
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetInboundShares().Return([]DbEntity{}, nil)
+					repoMock.EXPECT().GetOutboundShares().Return([]ShareEntity{
+						{
+							Name:  "Share1",
+							Owner: "owner1",
+							To:    "acc1, acc2",
+						},
+					}, nil).Once()
+					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{}, nil).Once()
+
+					repoMock.EXPECT().GetGrantsToShare("Share1").Return([]GrantToRole{
+						{GrantedOn: "SCHEMA", Name: "TEST_DB.Schema1", Privilege: "USAGE"},
+						{GrantedOn: "TABLE", Name: "TEST_DB.Schema1.Table1", Privilege: "SELECT"},
+					}, nil).Once()
+
+					repoMock.EXPECT().GetPolicies("MASKING").Return([]PolicyEntity{}, nil).Once()
+					repoMock.EXPECT().GetPolicies("ROW ACCESS").Return([]PolicyEntity{}, nil).Once()
+
+					return fileCreator
+				},
+			},
+			args: args{
+				configMap: config.ConfigMap{
+					Parameters: map[string]string{SfExternalIdentityStoreOwners: "ExternalOwner1,ExternalOwner2", SfDatabaseRoles: "true", SfSkipTags: "true"},
+				},
+			},
+			wantAps: []sync_from_target.AccessProvider{
+				{
+					ExternalId:        apTypeSharePrefix + "Share1",
+					NotInternalizable: false,
+					Name:              "Share1",
+					NamingHint:        "Share1",
+					Who:               nil,
+					ActualName:        "Share1",
+					Type:              ptr.String(apTypeShare),
+					WhoLocked:         ptr.Bool(true),
+					WhoLockedReason:   ptr.String("A share cannot be directly linked to a user, group or role"),
+					What: []sync_from_target.WhatItem{
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "TEST_DB.Schema1",
+								Type:     "",
+							},
+							Permissions: []string{"USAGE on SCHEMA"},
+						},
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "TEST_DB.Schema1.Table1",
+								Type:     "",
+							},
+							Permissions: []string{"SELECT"},
+						},
+					},
+					Action: 1,
+					Policy: "acc1, acc2",
+				},
+				{
+					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",
+					NotInternalizable: false,
+					Name:              "TEST_DB.DatabaseRole1",
+					NamingHint:        "DatabaseRole1",
+					Who:               &sync_from_target.WhoItem{Users: []string{}, Groups: []string{}, AccessProviders: []string{"share:Share1"}},
+					ActualName:        "DatabaseRole1",
+					Type:              ptr.String(apTypeDatabaseRole),
+					WhoLocked:         ptr.Bool(true),
+					WhoLockedReason:   ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					WhatLocked:        ptr.Bool(true),
+					WhatLockedReason:  ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					What: []sync_from_target.WhatItem{
+						{
+							DataObject: &data_source.DataObjectReference{
+								FullName: "TEST_DB.Schema1.Table1",
+								Type:     "",
+							},
+							Permissions: []string{"UPDATE"},
+						},
+					},
+					Action: 1,
+					Policy: "",
+				},
+			},
+			wantErr: require.NoError,
+		},
+		{
 			name: "with database roles",
 			fields: fields{
 				setup: func(repoMock *mockDataAccessRepository) *mocks.SimpleAccessProviderHandler {
@@ -205,7 +309,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-					repoMock.EXPECT().GetShares().Return([]DbEntity{
+					repoMock.EXPECT().GetInboundShares().Return([]DbEntity{
 						{Name: "Share1"},
 					}, nil).Twice()
 
@@ -224,6 +328,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
 						{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner1"},
 					}, nil).Once()
+					repoMock.EXPECT().GetOutboundShares().Return([]ShareEntity{}, nil).Once()
 					repoMock.EXPECT().GetGrantsOfAccountRole("Role1").Return([]GrantOfRole{
 						{GrantedTo: "USER", GranteeName: "GranteeRole1Number1"},
 						{GrantedTo: "ROLE", GranteeName: "GranteeRole1Number2"},
@@ -477,9 +582,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-					repoMock.EXPECT().GetShares().Return([]DbEntity{
+					repoMock.EXPECT().GetInboundShares().Return([]DbEntity{
 						{Name: "Share1"}, {Name: "Share2"},
 					}, nil).Once()
+					repoMock.EXPECT().GetOutboundShares().Return([]ShareEntity{}, nil).Once()
 					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
 						{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
 						{Name: "Role3", AssignedToUsers: 1, GrantedRoles: 1, GrantedToRoles: 1, Owner: "ExternalOwner1"},
@@ -611,10 +717,10 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-					repoMock.EXPECT().GetShares().Return([]DbEntity{
+					repoMock.EXPECT().GetInboundShares().Return([]DbEntity{
 						{Name: "Share1"}, {Name: "Share2"},
 					}, nil).Once()
-
+					repoMock.EXPECT().GetOutboundShares().Return([]ShareEntity{}, nil).Once()
 					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{
 						{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
 						{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
@@ -731,7 +837,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-					repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Twice()
+					repoMock.EXPECT().GetInboundShares().Return([]DbEntity{}, nil).Twice()
 
 					repoMock.EXPECT().GetTagsByDomain("ROLE").Return(map[string][]*tag.Tag{
 						"Role1": {
@@ -739,7 +845,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 							{Key: "an_other_key", Value: "...."},
 						},
 					}, nil).Once()
-
+					repoMock.EXPECT().GetOutboundShares().Return([]ShareEntity{}, nil).Once()
 					repoMock.EXPECT().GetDatabaseRoleTags("TEST_DB", "DatabaseRole1").Return(map[string][]*tag.Tag{
 						"TEST_DB.DatabaseRole1": {
 							{Key: "a_key", Value: "override_name_2"},
@@ -839,8 +945,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-					repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Twice()
-
+					repoMock.EXPECT().GetInboundShares().Return([]DbEntity{}, nil).Twice()
+					repoMock.EXPECT().GetOutboundShares().Return([]ShareEntity{}, nil).Once()
 					repoMock.EXPECT().GetDatabases().Return([]DbEntity{
 						{Name: "SNOWFLAKE"},
 						{Name: "TEST_DB"},

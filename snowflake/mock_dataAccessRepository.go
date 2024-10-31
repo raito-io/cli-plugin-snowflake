@@ -1337,6 +1337,178 @@ func (_c *mockDataAccessRepository_GetGrantsToDatabaseRole_Call) RunAndReturn(ru
 	return _c
 }
 
+// GetGrantsToShare provides a mock function with given fields: shareName
+func (_m *mockDataAccessRepository) GetGrantsToShare(shareName string) ([]GrantToRole, error) {
+	ret := _m.Called(shareName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetGrantsToShare")
+	}
+
+	var r0 []GrantToRole
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) ([]GrantToRole, error)); ok {
+		return rf(shareName)
+	}
+	if rf, ok := ret.Get(0).(func(string) []GrantToRole); ok {
+		r0 = rf(shareName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]GrantToRole)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(shareName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataAccessRepository_GetGrantsToShare_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetGrantsToShare'
+type mockDataAccessRepository_GetGrantsToShare_Call struct {
+	*mock.Call
+}
+
+// GetGrantsToShare is a helper method to define mock.On call
+//   - shareName string
+func (_e *mockDataAccessRepository_Expecter) GetGrantsToShare(shareName interface{}) *mockDataAccessRepository_GetGrantsToShare_Call {
+	return &mockDataAccessRepository_GetGrantsToShare_Call{Call: _e.mock.On("GetGrantsToShare", shareName)}
+}
+
+func (_c *mockDataAccessRepository_GetGrantsToShare_Call) Run(run func(shareName string)) *mockDataAccessRepository_GetGrantsToShare_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetGrantsToShare_Call) Return(_a0 []GrantToRole, _a1 error) *mockDataAccessRepository_GetGrantsToShare_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetGrantsToShare_Call) RunAndReturn(run func(string) ([]GrantToRole, error)) *mockDataAccessRepository_GetGrantsToShare_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetInboundShares provides a mock function with given fields:
+func (_m *mockDataAccessRepository) GetInboundShares() ([]DbEntity, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetInboundShares")
+	}
+
+	var r0 []DbEntity
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]DbEntity, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]DbEntity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataAccessRepository_GetInboundShares_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInboundShares'
+type mockDataAccessRepository_GetInboundShares_Call struct {
+	*mock.Call
+}
+
+// GetInboundShares is a helper method to define mock.On call
+func (_e *mockDataAccessRepository_Expecter) GetInboundShares() *mockDataAccessRepository_GetInboundShares_Call {
+	return &mockDataAccessRepository_GetInboundShares_Call{Call: _e.mock.On("GetInboundShares")}
+}
+
+func (_c *mockDataAccessRepository_GetInboundShares_Call) Run(run func()) *mockDataAccessRepository_GetInboundShares_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetInboundShares_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetInboundShares_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetInboundShares_Call) RunAndReturn(run func() ([]DbEntity, error)) *mockDataAccessRepository_GetInboundShares_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetOutboundShares provides a mock function with given fields:
+func (_m *mockDataAccessRepository) GetOutboundShares() ([]ShareEntity, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOutboundShares")
+	}
+
+	var r0 []ShareEntity
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]ShareEntity, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []ShareEntity); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ShareEntity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataAccessRepository_GetOutboundShares_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOutboundShares'
+type mockDataAccessRepository_GetOutboundShares_Call struct {
+	*mock.Call
+}
+
+// GetOutboundShares is a helper method to define mock.On call
+func (_e *mockDataAccessRepository_Expecter) GetOutboundShares() *mockDataAccessRepository_GetOutboundShares_Call {
+	return &mockDataAccessRepository_GetOutboundShares_Call{Call: _e.mock.On("GetOutboundShares")}
+}
+
+func (_c *mockDataAccessRepository_GetOutboundShares_Call) Run(run func()) *mockDataAccessRepository_GetOutboundShares_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetOutboundShares_Call) Return(_a0 []ShareEntity, _a1 error) *mockDataAccessRepository_GetOutboundShares_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetOutboundShares_Call) RunAndReturn(run func() ([]ShareEntity, error)) *mockDataAccessRepository_GetOutboundShares_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetPolicies provides a mock function with given fields: policy
 func (_m *mockDataAccessRepository) GetPolicies(policy string) ([]PolicyEntity, error) {
 	ret := _m.Called(policy)
@@ -1557,63 +1729,6 @@ func (_c *mockDataAccessRepository_GetSchemasInDatabase_Call) Return(_a0 error) 
 }
 
 func (_c *mockDataAccessRepository_GetSchemasInDatabase_Call) RunAndReturn(run func(string, EntityHandler) error) *mockDataAccessRepository_GetSchemasInDatabase_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetShares provides a mock function with given fields:
-func (_m *mockDataAccessRepository) GetShares() ([]DbEntity, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetInboundShares")
-	}
-
-	var r0 []DbEntity
-	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]DbEntity, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]DbEntity)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockDataAccessRepository_GetShares_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInboundShares'
-type mockDataAccessRepository_GetShares_Call struct {
-	*mock.Call
-}
-
-// GetShares is a helper method to define mock.On call
-func (_e *mockDataAccessRepository_Expecter) GetShares() *mockDataAccessRepository_GetShares_Call {
-	return &mockDataAccessRepository_GetShares_Call{Call: _e.mock.On("GetInboundShares")}
-}
-
-func (_c *mockDataAccessRepository_GetShares_Call) Run(run func()) *mockDataAccessRepository_GetShares_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetShares_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetShares_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetShares_Call) RunAndReturn(run func() ([]DbEntity, error)) *mockDataAccessRepository_GetShares_Call {
 	_c.Call.Return(run)
 	return _c
 }

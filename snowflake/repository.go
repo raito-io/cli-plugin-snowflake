@@ -276,6 +276,36 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 	return newMostRecentQueryStartTime, i, sec, repo.usageBatchSize != 0 && i == repo.usageBatchSize
 }
 
+func (repo *SnowflakeRepository) GetOutboundShares() ([]ShareEntity, error) {
+	q := "SHOW SHARES"
+	_, err := repo.getDbEntities(q)
+
+	if err != nil {
+		return nil, err
+	}
+
+	q = `select "name", "owner", "to" from table(result_scan(LAST_QUERY_ID())) WHERE "kind" = 'OUTBOUND'`
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	var shareEntities []ShareEntity
+
+	err = scan.Rows(&shareEntities, rows)
+	if err != nil {
+		return nil, fmt.Errorf("fetching all outbound shares: %s", err.Error())
+	}
+
+	err = CheckSFLimitExceeded(q, len(shareEntities))
+	if err != nil {
+		return nil, fmt.Errorf("finding existing outbound shares: %s", err.Error())
+	}
+
+	return shareEntities, nil
+}
+
 func (repo *SnowflakeRepository) GetAccountRoles() ([]RoleEntity, error) {
 	return repo.GetAccountRolesWithPrefix("")
 }
@@ -367,6 +397,12 @@ func (repo *SnowflakeRepository) GetGrantsOfAccountRole(roleName string) ([]Gran
 
 func (repo *SnowflakeRepository) GetGrantsToAccountRole(roleName string) ([]GrantToRole, error) {
 	q := common.FormatQuery(`SHOW GRANTS TO ROLE %s`, roleName)
+
+	return repo.grantsToRoleMapper(q)
+}
+
+func (repo *SnowflakeRepository) GetGrantsToShare(shareName string) ([]GrantToRole, error) {
+	q := common.FormatQuery(`SHOW GRANTS TO SHARE %s`, shareName)
 
 	return repo.grantsToRoleMapper(q)
 }

@@ -168,6 +168,12 @@ type RoleEntity struct {
 	Owner           string `db:"owner"`
 }
 
+type ShareEntity struct {
+	Name  string `db:"name"`
+	Owner string `db:"owner"`
+	To    string `db:"to"`
+}
+
 type GrantOfRole struct {
 	GrantedTo   string `db:"granted_to"`
 	GranteeName string `db:"grantee_name"`
