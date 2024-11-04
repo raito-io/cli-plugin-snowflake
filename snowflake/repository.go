@@ -1075,11 +1075,6 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 			return fmt.Errorf("creation of mask %s: %w", maskingName, err)
 		}
 
-		_, err = tx.Exec(fmt.Sprintf("GRANT OWNERSHIP ON MASKING POLICY %s TO ROLE %s", maskingName, repo.role))
-		if err != nil {
-			return err
-		}
-
 		maskingForDataObjects[maskingName] = dataObjectTypeMap[columnType]
 	}
 
@@ -1161,13 +1156,6 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 	}
 
 	for _, policy := range policies {
-		if repo.role != AccountAdminRole {
-			err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", common.FormatQuery("MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name), repo.role, true)
-			if err != nil {
-				return err
-			}
-		}
-
 		_, err = tx.Exec(common.FormatQuery("DROP MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name))
 		if err != nil {
 			return err
@@ -1242,13 +1230,6 @@ func (repo *SnowflakeRepository) DropFilter(databaseName string, schema string, 
 	existingPolicy, err := repo.getRowFilterForTableIfExists(databaseName, schema, tableName)
 	if err != nil {
 		return fmt.Errorf("load possible existing row filter: %w", err)
-	}
-
-	if repo.role != AccountAdminRole {
-		err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", common.FormatQuery("ROW ACCESS POLICY %s.%s.%s", databaseName, schema, filterName), repo.role, true)
-		if err != nil {
-			return err
-		}
 	}
 
 	if existingPolicy != nil {
