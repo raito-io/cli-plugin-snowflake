@@ -273,7 +273,7 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 		}
 	}
 
-	return newMostRecentQueryStartTime, i, sec, repo.usageBatchSize != 0 && i == repo.usageBatchSize
+	return newMostRecentQueryStartTime, i, sec, repo.usageBatchSize != 0 && i >= repo.usageBatchSize
 }
 
 func (repo *SnowflakeRepository) GetAccountRoles() ([]RoleEntity, error) {
