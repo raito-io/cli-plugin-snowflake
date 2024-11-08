@@ -669,6 +669,8 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					}
 
 					rolesOfRole = append(rolesOfRole, databaseRoleExternalIdGenerator(database, parsedRoleName))
+				} else if strings.EqualFold(gor.GrantedTo, "SHARE") {
+					rolesOfRole = append(rolesOfRole, shareExternalIdGenerator(gor.GranteeName))
 				}
 			}
 
@@ -820,22 +822,26 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 	return actualName, nil
 }
 
-func (s *AccessToTargetSyncer) splitRoles(inheritedRoles []string) ([]string, []string) {
-	toAddDatabaseRoles := []string{}
+func (s *AccessToTargetSyncer) splitRoles(inheritedRoles []string) ([]string, []string, []string) {
+	databaseRoles := []string{}
+	accountRoles := []string{}
+	shares := []string{}
 
 	for _, role := range inheritedRoles {
 		if isDatabaseRoleByExternalId(role) {
-			toAddDatabaseRoles = append(toAddDatabaseRoles, role)
+			databaseRoles = append(databaseRoles, role)
+		} else if isShareByExternalId(role) {
+			shares = append(shares, role)
+		} else {
+			accountRoles = append(accountRoles, role)
 		}
 	}
 
-	toAddAccountRoles := slice.SliceDifference(inheritedRoles, toAddDatabaseRoles)
-
-	return toAddDatabaseRoles, toAddAccountRoles
+	return databaseRoles, shares, accountRoles
 }
 
 func (s *AccessToTargetSyncer) grantRolesToRole(ctx context.Context, targetExternalId string, targetApType *string, roles ...string) error {
-	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
+	toAddDatabaseRoles, toAddShares, toAddAccountRoles := s.splitRoles(roles)
 
 	var filteredAccountRoles []string
 
@@ -857,6 +863,7 @@ func (s *AccessToTargetSyncer) grantRolesToRole(ctx context.Context, targetExter
 		}
 
 		var filteredDatabaseRoles []string
+		var filteredShares []string
 
 		for _, dbRole := range toAddDatabaseRoles {
 			toDatabase, toParsedRoleName, err2 := parseDatabaseRoleExternalId(dbRole)
@@ -878,7 +885,23 @@ func (s *AccessToTargetSyncer) grantRolesToRole(ctx context.Context, targetExter
 			}
 		}
 
+		for _, share := range toAddShares {
+			shouldIgnore, err2 := s.shouldIgnoreLinkedRole(share)
+			if err2 != nil {
+				return err2
+			}
+
+			if !shouldIgnore {
+				filteredShares = append(filteredShares, share)
+			}
+		}
+
 		err = s.repo.GrantDatabaseRolesToDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
+		if err != nil {
+			return err
+		}
+
+		err = s.repo.GrantSharesToDatabaseRole(ctx, database, parsedRoleName, filteredShares...)
 		if err != nil {
 			return err
 		}
@@ -903,11 +926,11 @@ func (s *AccessToTargetSyncer) shouldIgnoreLinkedRole(roleName string) (bool, er
 }
 
 func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetExternalId string, targetApType *string, roles ...string) error {
-	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
+	toRemoveDatabaseRoles, toRemoveShares, toRemoveAccountRoles := s.splitRoles(roles)
 
 	var filteredAccountRoles []string
 
-	for _, accountRole := range toAddAccountRoles {
+	for _, accountRole := range toRemoveAccountRoles {
 		shouldIgnore, err2 := s.shouldIgnoreLinkedRole(accountRole)
 		if err2 != nil {
 			return err2
@@ -925,8 +948,9 @@ func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetEx
 		}
 
 		var filteredDatabaseRoles []string
+		var filteredShares []string
 
-		for _, dbRole := range toAddDatabaseRoles {
+		for _, dbRole := range toRemoveDatabaseRoles {
 			_, toParsedRoleName, err2 := parseDatabaseRoleExternalId(dbRole)
 			if err2 != nil {
 				return err2
@@ -942,7 +966,23 @@ func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetEx
 			}
 		}
 
+		for _, share := range toRemoveShares {
+			shouldIgnore, err2 := s.shouldIgnoreLinkedRole(share)
+			if err2 != nil {
+				return err2
+			}
+
+			if !shouldIgnore {
+				filteredShares = append(filteredShares, share)
+			}
+		}
+
 		err = s.repo.RevokeDatabaseRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
+		if err != nil {
+			return err
+		}
+
+		err = s.repo.RevokeSharesFromDatabaseRole(ctx, database, parsedRoleName, filteredShares...)
 		if err != nil {
 			return err
 		}
@@ -950,8 +990,8 @@ func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetEx
 		return s.repo.RevokeAccountRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
 	}
 
-	if len(toAddDatabaseRoles) > 0 {
-		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddDatabaseRoles)
+	if len(toRemoveDatabaseRoles) > 0 {
+		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toRemoveDatabaseRoles)
 	}
 
 	return s.repo.RevokeAccountRolesFromAccountRole(ctx, targetExternalId, filteredAccountRoles...)

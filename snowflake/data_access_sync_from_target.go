@@ -8,7 +8,6 @@ import (
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/gammazero/workerpool"
-	"github.com/hashicorp/go-multierror"
 	"github.com/raito-io/cli/base/access_provider"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -119,7 +118,7 @@ func (s *AccessFromTargetSyncer) importOutboundShares(accessProviderHandler wrap
 
 	wp := workerpool.New(getWorkerPoolSize(s.configMap))
 
-	var handlingErrors error
+	processedAps := make(map[string]*exporter.AccessProvider)
 
 	for _, shareEntity := range shareEntities {
 		if _, exclude := s.excludedRoles[shareEntity.Name]; exclude {
@@ -128,25 +127,22 @@ func (s *AccessFromTargetSyncer) importOutboundShares(accessProviderHandler wrap
 		}
 
 		wp.Submit(func() {
-			ap, err2 := s.transformShareToAccessProvider(shareEntity)
+			err2 := s.transformShareToAccessProvider(shareEntity, processedAps)
 			if err2 != nil {
-				handlingErrors = multierror.Append(handlingErrors, fmt.Errorf("importing SnowFlake share %q: %w", shareEntity.Name, err2))
+				logger.Warn(fmt.Sprintf("Error importing SnowFlake share %q: %s", shareEntity.Name, err2.Error()))
 				return
-			}
-
-			s.lock.Lock()
-			defer s.lock.Unlock()
-
-			err = accessProviderHandler.AddAccessProviders(ap)
-			if err != nil {
-				handlingErrors = multierror.Append(handlingErrors, fmt.Errorf("adding access providers to import file: %w", err))
 			}
 		})
 	}
 
 	wp.StopWait()
 
-	return handlingErrors
+	err = accessProviderHandler.AddAccessProviders(values(processedAps)...)
+	if err != nil {
+		return fmt.Errorf("error adding shares to import file: %s", err.Error())
+	}
+
+	return nil
 }
 
 func (s *AccessFromTargetSyncer) importAllRolesOnAccountLevel(accessProviderHandler wrappers.AccessProviderHandler) error {
@@ -189,7 +185,7 @@ func (s *AccessFromTargetSyncer) importAllRolesOnAccountLevel(accessProviderHand
 
 	err = accessProviderHandler.AddAccessProviders(values(processedAps)...)
 	if err != nil {
-		return fmt.Errorf("error adding access provider to import file: %s", err.Error())
+		return fmt.Errorf("error adding account roles to import file: %s", err.Error())
 	}
 
 	return nil
@@ -204,35 +200,46 @@ func (s *AccessFromTargetSyncer) shouldRetrieveTags() bool {
 	return tagSupportEnabled
 }
 
-func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareEntity ShareEntity) (*exporter.AccessProvider, error) {
+func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareEntity ShareEntity, processedAps map[string]*exporter.AccessProvider) error {
 	logger.Info(fmt.Sprintf("Reading SnowFlake SHARE %s", shareEntity.Name))
 
 	shareName := shareEntity.Name
+	externalId := apTypeSharePrefix + shareName
 
-	ap := &exporter.AccessProvider{
-		Type:              ptr.String(apTypeShare),
-		ExternalId:        apTypeSharePrefix + shareName,
-		ActualName:        shareName,
-		Name:              shareName,
-		NamingHint:        shareName,
-		Action:            exporter.Grant,
-		Who:               nil,
-		NotInternalizable: true, // TODO until we make it internalizable
-		WhoLocked:         ptr.Bool(true),
-		WhoLockedReason:   ptr.String("A share cannot be directly linked to a user, group or role"),
-		What:              make([]exporter.WhatItem, 0),
-		Policy:            shareEntity.To,
+	// Locking to make sure only one goroutine can read & write to the processedAps map at a time
+	s.lock.Lock()
+
+	ap, f := processedAps[externalId]
+	if !f {
+		processedAps[externalId] = &exporter.AccessProvider{
+			Type:              ptr.String(apTypeShare),
+			ExternalId:        apTypeSharePrefix + shareName,
+			ActualName:        shareName,
+			Name:              shareName,
+			NamingHint:        shareName,
+			Action:            exporter.Grant,
+			Who:               nil,
+			NotInternalizable: true, // TODO until we make it internalizable
+			WhoLocked:         ptr.Bool(true),
+			WhoLockedReason:   ptr.String("A share cannot be directly linked to a user, group or role"),
+			What:              make([]exporter.WhatItem, 0),
+			Policy:            shareEntity.To,
+		}
+
+		ap = processedAps[externalId]
 	}
+
+	s.lock.Unlock()
 
 	// get objects granted TO share
 	grantToEntities, err := s.repo.GetGrantsToShare(shareName)
 	if err != nil {
-		return nil, fmt.Errorf("retrieving grants for share: %s", err.Error())
+		return fmt.Errorf("retrieving grants for share: %s", err.Error())
 	}
 
-	ap.What = s.mapGrantToRoleToWhatItems(grantToEntities)
+	ap.What = append(ap.What, s.mapGrantToRoleToWhatItems(grantToEntities)...)
 
-	return ap, nil
+	return nil
 }
 
 func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntity, processedAps map[string]*exporter.AccessProvider, availableTags map[string][]*tag.Tag) error {

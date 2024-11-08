@@ -97,6 +97,10 @@ func isDatabaseRoleByExternalId(externalId string) bool {
 	return false
 }
 
+func isShareByExternalId(externalId string) bool {
+	return strings.HasPrefix(externalId, apTypeSharePrefix)
+}
+
 func parseCommaSeparatedList(list string) set.Set[string] {
 	list = strings.TrimSpace(list)
 

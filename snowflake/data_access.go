@@ -68,12 +68,14 @@ type dataAccessRepository interface {
 	GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error
 	GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
 	GrantDatabaseRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
+	GrantSharesToDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error
 	GrantUsersToAccountRole(ctx context.Context, role string, users ...string) error
 	RenameAccountRole(oldName, newName string) error
 	RenameDatabaseRole(database, oldName, newName string) error
 	RevokeAccountRolesFromAccountRole(ctx context.Context, role string, roles ...string) error
 	RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
 	RevokeDatabaseRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
+	RevokeSharesFromDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error
 	RevokeUsersFromAccountRole(ctx context.Context, role string, users ...string) error
 	TotalQueryTime() time.Duration
 	UpdateFilter(databaseName string, schema string, tableName string, filterName string, argumentNames []string, expression string) error

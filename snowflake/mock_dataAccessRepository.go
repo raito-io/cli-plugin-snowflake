@@ -2084,6 +2084,69 @@ func (_c *mockDataAccessRepository_GrantDatabaseRolesToDatabaseRole_Call) RunAnd
 	return _c
 }
 
+// GrantSharesToDatabaseRole provides a mock function with given fields: ctx, database, databaseRole, shares
+func (_m *mockDataAccessRepository) GrantSharesToDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error {
+	_va := make([]interface{}, len(shares))
+	for _i := range shares {
+		_va[_i] = shares[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, database, databaseRole)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GrantSharesToDatabaseRole")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...string) error); ok {
+		r0 = rf(ctx, database, databaseRole, shares...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_GrantSharesToDatabaseRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GrantSharesToDatabaseRole'
+type mockDataAccessRepository_GrantSharesToDatabaseRole_Call struct {
+	*mock.Call
+}
+
+// GrantSharesToDatabaseRole is a helper method to define mock.On call
+//   - ctx context.Context
+//   - database string
+//   - databaseRole string
+//   - shares ...string
+func (_e *mockDataAccessRepository_Expecter) GrantSharesToDatabaseRole(ctx interface{}, database interface{}, databaseRole interface{}, shares ...interface{}) *mockDataAccessRepository_GrantSharesToDatabaseRole_Call {
+	return &mockDataAccessRepository_GrantSharesToDatabaseRole_Call{Call: _e.mock.On("GrantSharesToDatabaseRole",
+		append([]interface{}{ctx, database, databaseRole}, shares...)...)}
+}
+
+func (_c *mockDataAccessRepository_GrantSharesToDatabaseRole_Call) Run(run func(ctx context.Context, database string, databaseRole string, shares ...string)) *mockDataAccessRepository_GrantSharesToDatabaseRole_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]string, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(string)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(string), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GrantSharesToDatabaseRole_Call) Return(_a0 error) *mockDataAccessRepository_GrantSharesToDatabaseRole_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GrantSharesToDatabaseRole_Call) RunAndReturn(run func(context.Context, string, string, ...string) error) *mockDataAccessRepository_GrantSharesToDatabaseRole_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GrantUsersToAccountRole provides a mock function with given fields: ctx, role, users
 func (_m *mockDataAccessRepository) GrantUsersToAccountRole(ctx context.Context, role string, users ...string) error {
 	_va := make([]interface{}, len(users))
@@ -2425,6 +2488,69 @@ func (_c *mockDataAccessRepository_RevokeDatabaseRolesFromDatabaseRole_Call) Ret
 }
 
 func (_c *mockDataAccessRepository_RevokeDatabaseRolesFromDatabaseRole_Call) RunAndReturn(run func(context.Context, string, string, ...string) error) *mockDataAccessRepository_RevokeDatabaseRolesFromDatabaseRole_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RevokeSharesFromDatabaseRole provides a mock function with given fields: ctx, database, databaseRole, shares
+func (_m *mockDataAccessRepository) RevokeSharesFromDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error {
+	_va := make([]interface{}, len(shares))
+	for _i := range shares {
+		_va[_i] = shares[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, database, databaseRole)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RevokeSharesFromDatabaseRole")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...string) error); ok {
+		r0 = rf(ctx, database, databaseRole, shares...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_RevokeSharesFromDatabaseRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeSharesFromDatabaseRole'
+type mockDataAccessRepository_RevokeSharesFromDatabaseRole_Call struct {
+	*mock.Call
+}
+
+// RevokeSharesFromDatabaseRole is a helper method to define mock.On call
+//   - ctx context.Context
+//   - database string
+//   - databaseRole string
+//   - shares ...string
+func (_e *mockDataAccessRepository_Expecter) RevokeSharesFromDatabaseRole(ctx interface{}, database interface{}, databaseRole interface{}, shares ...interface{}) *mockDataAccessRepository_RevokeSharesFromDatabaseRole_Call {
+	return &mockDataAccessRepository_RevokeSharesFromDatabaseRole_Call{Call: _e.mock.On("RevokeSharesFromDatabaseRole",
+		append([]interface{}{ctx, database, databaseRole}, shares...)...)}
+}
+
+func (_c *mockDataAccessRepository_RevokeSharesFromDatabaseRole_Call) Run(run func(ctx context.Context, database string, databaseRole string, shares ...string)) *mockDataAccessRepository_RevokeSharesFromDatabaseRole_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]string, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(string)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(string), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_RevokeSharesFromDatabaseRole_Call) Return(_a0 error) *mockDataAccessRepository_RevokeSharesFromDatabaseRole_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_RevokeSharesFromDatabaseRole_Call) RunAndReturn(run func(context.Context, string, string, ...string) error) *mockDataAccessRepository_RevokeSharesFromDatabaseRole_Call {
 	_c.Call.Return(run)
 	return _c
 }

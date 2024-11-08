@@ -637,6 +637,22 @@ func (repo *SnowflakeRepository) GrantDatabaseRolesToDatabaseRole(ctx context.Co
 	return <-done
 }
 
+func (repo *SnowflakeRepository) GrantSharesToDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error {
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, share := range shares {
+		q := common.FormatQuery(`CREATE SHARE IF NOT EXISTS %s`, share)
+		statementChan <- q
+
+		q = common.FormatQuery(`GRANT DATABASE ROLE %s.%s TO SHARE %s`, database, databaseRole, share)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
 func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error {
 	if repo.isProtectedRoleName(databaseRole) {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
@@ -647,6 +663,24 @@ func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.
 
 	for _, otherRole := range accountRoles {
 		q := common.FormatQuery(`REVOKE DATABASE ROLE %s.%s FROM ROLE %s`, database, databaseRole, otherRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) RevokeSharesFromDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error {
+	if repo.isProtectedRoleName(databaseRole) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
+		return nil
+	}
+
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, share := range shares {
+		q := common.FormatQuery(`REVOKE DATABASE ROLE %s.%s FROM SHARE %s`, database, databaseRole, share)
 		statementChan <- q
 	}
 
