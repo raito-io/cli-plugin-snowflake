@@ -1034,7 +1034,7 @@ func (s *AccessToTargetSyncer) generateAccessControls(ctx context.Context, toPro
 	}
 
 	metaData := s.buildMetaDataMap(md)
-	
+
 	for externalId, accessProvider := range toProcessAps {
 		// Making sure we always set a type. If not set by Raito cloud, we take Account Role as default.
 		apType := access_provider.Role
