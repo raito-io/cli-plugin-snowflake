@@ -180,16 +180,19 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 			AccessProvider: "AccessProviderId2",
 			ActualName:     "ExistingRole1",
 			ExternalId:     ptr.String("ExistingRole1"),
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: "AccessProviderId3",
 			ActualName:     "RoleName3",
 			ExternalId:     ptr.String("RoleName3"),
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: "AccessProviderId1",
 			ActualName:     "RoleName1",
 			ExternalId:     ptr.String("RoleName1"),
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: "AccessProviderId4",
@@ -1132,6 +1135,7 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 			AccessProvider: "AccessProviderId",
 			ActualName:     "NewRoleName",
 			ExternalId:     ptr.String("NewRoleName"),
+			Type:           ptr.String(access_provider.Role),
 		}, {
 			AccessProvider: "TEST_DB_DBRole",
 			ActualName:     "newDBRole",
@@ -1229,11 +1233,13 @@ func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T)
 			AccessProvider: "AccessProviderId",
 			ActualName:     "NewRoleName",
 			ExternalId:     ptr.String("NewRoleName"),
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: "AccessProviderId2",
 			ActualName:     "OldRoleName",
 			ExternalId:     ptr.String("OldRoleName"),
+			Type:           ptr.String(access_provider.Role),
 		},
 	})
 }
