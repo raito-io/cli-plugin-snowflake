@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/data_source"
@@ -213,6 +214,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			AccessProvider: accountRoleId,
 			ActualName:     actualRoleName,
 			ExternalId:     &actualRoleName,
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1", testId),
@@ -333,6 +335,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			AccessProvider: accountRoleId,
 			ActualName:     actualRoleName,
 			ExternalId:     &actualRoleName,
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1", testId),
