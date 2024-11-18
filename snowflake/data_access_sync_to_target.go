@@ -12,6 +12,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/hashicorp/go-multierror"
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	"github.com/raito-io/cli/base/access_provider"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -1033,12 +1034,18 @@ func (s *AccessToTargetSyncer) generateAccessControls(ctx context.Context, toPro
 	}
 
 	metaData := s.buildMetaDataMap(md)
-
+	
 	for externalId, accessProvider := range toProcessAps {
+		// Making sure we always set a type. If not set by Raito cloud, we take Account Role as default.
+		apType := access_provider.Role
+		if accessProvider.Type != nil && *accessProvider.Type != "" {
+			apType = *accessProvider.Type
+		}
+
 		fi := importer.AccessProviderSyncFeedback{
 			AccessProvider: accessProvider.Id,
 			ExternalId:     ptr.String(externalId),
-			Type:           accessProvider.Type,
+			Type:           &apType,
 		}
 
 		fi.ActualName, err = s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, metaData)
