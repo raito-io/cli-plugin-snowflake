@@ -8,15 +8,10 @@ import (
 var _maskFactory *MaskFactory
 
 const (
-	NullMaskId   = "NULL"
-	SHA256MaskId = "SHA256"
+	NullMaskId    = "NULL"
+	SHA256MaskId  = "SHA256"
+	EncryptMaskId = "ENCRYPT"
 )
-
-func init() {
-	_maskFactory = NewMaskFactory()
-	_maskFactory.RegisterMaskGenerator(NullMaskId, NullMask())
-	_maskFactory.RegisterMaskGenerator(SHA256MaskId, Sha256Mask())
-}
 
 //go:generate go run github.com/vektra/mockery/v2 --name=MaskGenerator --with-expecter --inpackage
 type MaskGenerator interface {
@@ -44,10 +39,19 @@ type MaskFactory struct {
 
 type MaskingPolicy string
 
-func NewMaskFactory() *MaskFactory {
+func NewMaskFactory(params map[string]string) *MaskFactory {
 	if _maskFactory == nil {
 		_maskFactory = &MaskFactory{
 			maskGenerators: make(map[string]MaskGenerator),
+		}
+
+		_maskFactory.RegisterMaskGenerator(NullMaskId, NullMask())
+		_maskFactory.RegisterMaskGenerator(SHA256MaskId, Sha256Mask())
+
+		if decryptFunction, f := params[SfMaskDecryptFunction]; f {
+			columnTag := params[SfMaskDecryptColumnTag]
+
+			_maskFactory.RegisterMaskGenerator(EncryptMaskId, EncryptMask(decryptFunction, columnTag))
 		}
 	}
 
@@ -175,4 +179,69 @@ func (m *shaHashMaskMethod) SupportedType(columnType string) bool {
 	}
 
 	return false
+}
+
+//////////////////
+// ENCRYPT MASK //
+//////////////////
+
+func EncryptMask(decryptFunction string, columnTag string) MaskGenerator {
+	return &encryptMaskMethod{
+		decryptFunction: decryptFunction,
+		columnTag:       columnTag,
+	}
+}
+
+type encryptMaskMethod struct {
+	decryptFunction string
+	columnTag       string
+}
+
+func (m *encryptMaskMethod) Generate(maskName string, columnType string, beneficiaries *MaskingBeneficiaries) (MaskingPolicy, error) {
+	var maskingPolicyBuilder strings.Builder
+
+	maskingPolicyBuilder.WriteString(fmt.Sprintf("CREATE MASKING POLICY %[1]s AS (val %[2]s) RETURNS %[2]s ->\n", maskName, columnType))
+
+	maskFn := fmt.Sprintf("%s(val)", m.decryptFunction)
+
+	if m.columnTag != "" {
+		maskFn = fmt.Sprintf(`%s(val, SYSTEM$GET_TAG_ON_CURRENT_COLUMN('%s'))`, m.decryptFunction, m.columnTag)
+	}
+
+	var cases []string
+
+	if len(beneficiaries.Roles) > 0 {
+		var roles []string
+		for _, role := range beneficiaries.Roles {
+			roles = append(roles, fmt.Sprintf("IS_ROLE_IN_SESSION('%s')", role))
+		}
+
+		cases = append(cases, fmt.Sprintf("WHEN (%s) THEN %s", strings.Join(roles, " OR "), maskFn))
+	}
+
+	if len(beneficiaries.Users) > 0 {
+		var users []string
+		for _, user := range beneficiaries.Users {
+			users = append(users, fmt.Sprintf("'%s'", user))
+		}
+
+		cases = append(cases, fmt.Sprintf("WHEN current_user() IN (%s) THEN %s", strings.Join(users, ", "), maskFn))
+	}
+
+	if len(cases) == 0 {
+		maskingPolicyBuilder.WriteString(maskFn)
+	} else {
+		maskingPolicyBuilder.WriteString("CASE\n")
+
+		for _, c := range cases {
+			maskingPolicyBuilder.WriteString(fmt.Sprintf("\t%s\n", c))
+		}
+
+		maskingPolicyBuilder.WriteString("\tELSE val\n")
+		maskingPolicyBuilder.WriteString("END")
+	}
+
+	maskingPolicyBuilder.WriteString(";")
+
+	return MaskingPolicy(maskingPolicyBuilder.String()), nil
 }
