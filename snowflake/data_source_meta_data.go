@@ -716,7 +716,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 		metaData.MaskingMetadata.MaskTypes = append(metaData.MaskingMetadata.MaskTypes, &ds.MaskingType{
 			DisplayName: "ENCRYPT",
 			ExternalId:  EncryptMaskId,
-			Description: "Returns the encrypted value instead of the decrypted version.",
+			Description: "Returns the encrypted value (as stored in the database) instead of the decrypted version.",
 			DataTypes:   []string{"varchar", "char", "string", "text"},
 		})
 	}
