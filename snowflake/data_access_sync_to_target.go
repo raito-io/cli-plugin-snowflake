@@ -1453,6 +1453,7 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForFunction(database string
 		argumentSignature := convertFunctionArgumentSignature(function.ArgumentSignature)
 
 		grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, database, schema) + function.Name + argumentSignature})
+
 		return true
 	}
 

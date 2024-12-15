@@ -400,11 +400,11 @@ func getFullNameFromGrant(name, objectType string) string {
 	if objectType == Function && sfObject.Table != nil {
 		function := *sfObject.Table
 		if strings.Contains(function, "(") {
-			funcName := function[:strings.Index(function, "(")]
+			funcName := function[:strings.Index(function, "(")] //nolint:gocritic
 
 			paramString := function[strings.Index(function, "(")+1:]
 			if strings.Contains(paramString, "):") {
-				paramString = paramString[:strings.Index(paramString, "):")]
+				paramString = paramString[:strings.Index(paramString, "):")] //nolint:gocritic
 			}
 
 			paramString = strings.TrimSuffix(paramString, ")")
