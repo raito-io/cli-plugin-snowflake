@@ -354,6 +354,29 @@ resource "snowflake_grant_privileges_to_account_role" "sales_privileges_orders" 
   }
 }
 
+resource "snowflake_function_sql" "decrypt_function" {
+  database       = snowflake_database.db.name
+  schema         = snowflake_schema.ordering.name
+  name     = "decrypt"
+  arguments {
+    arg_data_type = "STRING"
+    arg_name      = "val"
+  }
+  function_definition = <<EOF
+    'Decrypted: ' || val
+  EOF
+  return_type         = "STRING"
+}
+
+resource "snowflake_grant_privileges_to_account_role" "sales_privileges_decrypt" {
+  privileges        = ["USAGE"]
+  account_role_name = "SALES"
+  on_schema_object {
+    object_name = decrypt_function.fully_qualified_name
+    object_type = "FUNCTION"
+  }
+}
+
 resource "snowflake_grant_privileges_to_account_role" "usage_on_database" {
   privileges = ["USAGE"]
 
