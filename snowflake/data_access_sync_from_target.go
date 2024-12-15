@@ -393,6 +393,35 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 	return nil
 }
 
+// getFullNameFromGrant creates the full name for Raito WHAT item based on the name and type from the grant definition in Snowflake
+func getFullNameFromGrant(name, objectType string) string {
+	sfObject := common.ParseFullName(name)
+
+	if objectType == Function && sfObject.Table != nil {
+		function := *sfObject.Table
+		if strings.Contains(function, "(") {
+			funcName := function[:strings.Index(function, "(")]
+
+			paramString := function[strings.Index(function, "(")+1:]
+			if strings.Contains(paramString, "):") {
+				paramString = paramString[:strings.Index(paramString, "):")]
+			}
+
+			paramString = strings.TrimSuffix(paramString, ")")
+
+			params := strings.Split(paramString, ",")
+			for i, param := range params {
+				p := strings.TrimSpace(param)
+				params[i] = p[strings.LastIndex(p, " ")+1:]
+			}
+
+			sfObject.Table = ptr.String(fmt.Sprintf("%s(%s)", funcName, strings.Join(params, ", ")))
+		}
+	}
+
+	return sfObject.GetFullName(false)
+}
+
 func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole) []exporter.WhatItem {
 	var do *ds.DataObjectReference
 
@@ -402,10 +431,9 @@ func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []Gra
 
 	for k, grant := range grantToEntities {
 		if k == 0 {
-			sfObject := common.ParseFullName(grant.Name)
 			// We set type to empty string because that's not needed by the importer to match the data object
 			// + we cannot make the mapping to the correct Raito data object types here.
-			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: ""}
+			do = &ds.DataObjectReference{FullName: getFullNameFromGrant(grant.Name, grant.GrantedOn), Type: ""}
 		} else if do.FullName != grant.Name {
 			if len(permissions) > 0 {
 				whatItems = append(whatItems, exporter.WhatItem{
@@ -413,10 +441,10 @@ func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []Gra
 					Permissions: permissions,
 				})
 			}
-			sfObject := common.ParseFullName(grant.Name)
+
 			// We set type to empty string because that's not needed by the importer to match the data object
 			// + we cannot make the mapping to the correct Raito data object types here.
-			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: ""}
+			do = &ds.DataObjectReference{FullName: getFullNameFromGrant(grant.Name, grant.GrantedOn), Type: ""}
 			permissions = make([]string, 0)
 		}
 

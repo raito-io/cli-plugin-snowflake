@@ -16,6 +16,7 @@ const USAGE_ON_SCHEMA = "USAGE on SCHEMA"
 const apTypeDatabaseRole = "databaseRole"
 const ExternalTable = "external-" + ds.Table
 const IcebergTable = "iceberg-" + ds.Table
+const Function = "function"
 const MaterializedView = "materialized-" + ds.View
 
 // RoleNameConstraints is based on https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
@@ -358,7 +359,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						CannotBeGranted:        true,
 					},
 				},
-				Children: []string{ds.Table, ds.View, ExternalTable, MaterializedView, IcebergTable},
+				Children: []string{ds.Table, ds.View, ExternalTable, MaterializedView, IcebergTable, Function},
 			},
 			{
 				Name: ds.Table,
@@ -430,6 +431,19 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 					},
 				},
 				Children: []string{ds.Column},
+			},
+			{
+				Name:  Function,
+				Label: "User Defined Function",
+				Type:  Function,
+				Permissions: []*ds.DataObjectTypePermission{
+					{
+						Permission:             "USAGE",
+						Description:            "Enables using this function",
+						UsageGlobalPermissions: []string{ds.Read},
+						GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
+					},
+				},
 			},
 			{
 				Name:  IcebergTable,

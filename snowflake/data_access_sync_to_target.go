@@ -574,6 +574,11 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 				if err2 != nil {
 					return actualName, err2
 				}
+			} else if what.DataObject.Type == Function {
+				err2 := s.createGrantsForFunction(permissions, what.DataObject.FullName, metaData, expectedGrants)
+				if err2 != nil {
+					return actualName, err2
+				}
 			} else if what.DataObject.Type == "shared-schema" {
 				err2 := s.createGrantsForSchema(permissions, what.DataObject.FullName, metaData, true, expectedGrants)
 				if err2 != nil {
@@ -1176,6 +1181,28 @@ func (s *AccessToTargetSyncer) createGrantsForTableOrView(doType string, permiss
 			grants.Add(Grant{p, doType, common.FormatQuery(`%s.%s.%s`, *sfObject.Database, *sfObject.Schema, *sfObject.Table)})
 		} else {
 			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(doType)))
+		}
+	}
+
+	if len(grants) > 0 {
+		grants.Add(Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, *sfObject.Database)},
+			Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
+	}
+
+	return nil
+}
+
+func (s *AccessToTargetSyncer) createGrantsForFunction(permissions []string, fullName string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) error {
+	sfObject := common.ParseFullName(fullName)
+	if sfObject.Database == nil || sfObject.Schema == nil || sfObject.Table == nil {
+		return fmt.Errorf("expected fullName %q to have 3 parts (database.schema.function)", fullName)
+	}
+
+	for _, p := range permissions {
+		if _, f := metaData[Function][strings.ToUpper(p)]; f {
+			grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, *sfObject.Database, *sfObject.Schema) + *sfObject.Table})
+		} else {
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(Function)))
 		}
 	}
 

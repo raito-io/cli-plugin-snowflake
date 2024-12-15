@@ -988,6 +988,14 @@ func (repo *SnowflakeRepository) GetSchemasInDatabase(databaseName string, handl
 	}, handleEntity)
 }
 
+func (repo *SnowflakeRepository) GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error {
+	q := getFunctionsInDatabaseQuery(databaseName)
+
+	return handleDbEntities(repo, q, func() interface{} {
+		return &FunctionEntity{}
+	}, handleEntity)
+}
+
 func (repo *SnowflakeRepository) GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {
 	q := getTablesInDatabaseQuery(databaseName, schemaName)
 
@@ -1469,6 +1477,10 @@ func handleDbEntities(repo *SnowflakeRepository, query string, createEntity Enti
 
 func getSchemasInDatabaseQuery(dbName string) string {
 	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.SCHEMATA`, common.FormatQuery("%s", dbName))
+}
+
+func getFunctionsInDatabaseQuery(dbName string) string {
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.FUNCTIONS`, common.FormatQuery("%s", dbName))
 }
 
 func getTablesInDatabaseQuery(dbName string, schemaName string) string {
