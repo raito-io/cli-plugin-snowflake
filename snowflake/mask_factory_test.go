@@ -191,3 +191,42 @@ func TestSha256Mask_Generate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, MaskingPolicy("CREATE MASKING POLICY test_mask AS (val text) RETURNS text ->\nCASE\n\tWHEN (IS_ROLE_IN_SESSION('test_role1') OR IS_ROLE_IN_SESSION('test_role2') OR IS_ROLE_IN_SESSION('test_role3')) THEN val\n\tWHEN current_user() IN ('test_user1', 'test_user2', 'test_user3') THEN val\n\tELSE SHA2(val, 256)\nEND;"), result)
 }
+
+func TestEncryptMask_Generate(t *testing.T) {
+	// Given
+	beneficiaries := MaskingBeneficiaries{
+		Roles: []string{"test_role1", "test_role2"},
+		Users: []string{"test_user1", "test_user2"},
+	}
+
+	tests := []struct {
+		name      string
+		generator MaskGenerator
+		maskName  string
+		result    string
+	}{
+		{
+			name:      "encrypt with column tag",
+			generator: EncryptMask("decryptIt", "encryption_type"),
+			result:    "CREATE MASKING POLICY test_mask AS (val column_type) RETURNS column_type ->\nCASE\n\tWHEN (IS_ROLE_IN_SESSION('test_role1') OR IS_ROLE_IN_SESSION('test_role2')) THEN decryptIt(val, SYSTEM$GET_TAG_ON_CURRENT_COLUMN('encryption_type'))\n\tWHEN current_user() IN ('test_user1', 'test_user2') THEN decryptIt(val, SYSTEM$GET_TAG_ON_CURRENT_COLUMN('encryption_type'))\n\tELSE val\nEND;",
+			maskName:  "test_mask",
+		},
+		{
+			name:      "encrypt without column tag",
+			generator: EncryptMask("decryptIt", ""),
+			result:    "CREATE MASKING POLICY test_mask AS (val column_type) RETURNS column_type ->\nCASE\n\tWHEN (IS_ROLE_IN_SESSION('test_role1') OR IS_ROLE_IN_SESSION('test_role2')) THEN decryptIt(val)\n\tWHEN current_user() IN ('test_user1', 'test_user2') THEN decryptIt(val)\n\tELSE val\nEND;",
+			maskName:  "test_mask",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			result, err := tt.generator.Generate(tt.maskName, "column_type", &beneficiaries)
+
+			// Then
+			require.NoError(t, err)
+			assert.Equal(t, MaskingPolicy(tt.result), result)
+		})
+	}
+}

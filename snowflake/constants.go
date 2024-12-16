@@ -25,6 +25,9 @@ const (
 	SfUsageUserExcludes                 = "sf-usage-user-excludes"
 	SfWorkerPoolSize                    = "sf-worker-pool-size"
 
+	SfMaskDecryptFunction  = "sf-mask-decrypt-function"
+	SfMaskDecryptColumnTag = "sf-mask-decrypt-column-tag"
+
 	TagSource = "Snowflake"
 
 	SharedPrefix = "shared-"

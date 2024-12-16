@@ -35,7 +35,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 		supportedFeatures = append(supportedFeatures, ds.RowFiltering, ds.ColumnMasking)
 	}
 
-	return &ds.MetaData{
+	metaData := &ds.MetaData{
 		Type:                  "snowflake",
 		SupportedFeatures:     supportedFeatures,
 		SupportsApInheritance: true,
@@ -710,5 +710,16 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 			},
 			DefaultMaskExternalName: NullMaskId,
 		},
-	}, nil
+	}
+
+	if _, f := configParam.GetParameters()[SfMaskDecryptFunction]; f {
+		metaData.MaskingMetadata.MaskTypes = append(metaData.MaskingMetadata.MaskTypes, &ds.MaskingType{
+			DisplayName: "ENCRYPT",
+			ExternalId:  EncryptMaskId,
+			Description: "Returns the encrypted value (as stored in the database) instead of the decrypted version.",
+			DataTypes:   []string{"varchar", "char", "string", "text"},
+		})
+	}
+
+	return metaData, nil
 }
