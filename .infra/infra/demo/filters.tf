@@ -3,7 +3,7 @@ resource "snowflake_row_access_policy" "rls_sales_data" {
   database = snowflake_schema.sales.database
   schema   = snowflake_schema.sales.name
 
-  argument = {
+  argument {
     name = "TerritoryID"
     type = "NUMBER(38,0)"
   }
