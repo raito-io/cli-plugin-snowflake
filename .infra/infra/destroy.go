@@ -23,6 +23,8 @@ var (
 func dropAllRoles() error {
 	account := sfOrganization + "-" + sfAccount
 
+	fmt.Printf("Using account: %s\n", account)
+
 	dsn, err := sf.DSN(&sf.Config{
 		Account:  account,
 		User:     sfUser,
