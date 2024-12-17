@@ -76,23 +76,7 @@ resource "snowflake_table" "ordering_customer" {
 }
 
 resource "snowflake_tag_association" "customer_pii" {
-  object_identifier {
-    name     = "${snowflake_table.ordering_customer.name}.ADDRESS"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
-
-  object_identifier {
-    name     = "${snowflake_table.ordering_customer.name}.NAME"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
-
-  object_identifier {
-    name     = "${snowflake_table.ordering_customer.name}.PHONE"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
+  object_identifiers = ["${snowflake_table.ordering_customer.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_customer.fully_qualified_name}.NAME", "${snowflake_table.ordering_customer.fully_qualified_name}.PHONE"]
 
   object_type = "COLUMN"
   tag_id      = snowflake_tag.sensitivity.id
@@ -244,13 +228,11 @@ resource "snowflake_masking_policy" "masking_policy" {
   name     = "ORDERING_MASKING_POLICY"
   database = snowflake_database.db.name
   schema   = snowflake_schema.ordering.name
-  signature {
-    column {
-      name = "val"
-      type = "VARCHAR"
-    }
+  argument {
+    name = "val"
+    type = "VARCHAR"
   }
-  masking_expression = <<-EOF
+  body = <<-EOF
     case
       when current_role() in ('ACCOUNTADMIN', 'SYSADMIN') then
         val
@@ -263,23 +245,7 @@ resource "snowflake_masking_policy" "masking_policy" {
 }
 
 resource "snowflake_tag_association" "supplier_pii" {
-  object_identifier {
-    name     = "${snowflake_table.ordering_supplier.name}.ADDRESS"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
-
-  object_identifier {
-    name     = "${snowflake_table.ordering_supplier.name}.NAME"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
-
-  object_identifier {
-    name     = "${snowflake_table.ordering_supplier.name}.PHONE"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
+  object_identifiers = ["${snowflake_table.ordering_supplier.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_supplier.fully_qualified_name}.NAME", "${snowflake_table.ordering_supplier.fully_qualified_name}.PHONE"] {
 
   object_type = "COLUMN"
   tag_id      = snowflake_tag.sensitivity.id
