@@ -845,7 +845,7 @@ func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName 
 }
 
 func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
-	rows, _, err := repo.query("select current_account()")
+	rows, _, err := repo.query(`select CONCAT(CURRENT_ORGANIZATION_NAME(), '-', CURRENT_ACCOUNT_NAME())`)
 	if err != nil {
 		return "", err
 	}
