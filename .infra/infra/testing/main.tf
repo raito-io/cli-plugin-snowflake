@@ -318,6 +318,15 @@ resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_s
   }
 }
 
+resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_decrypt" {
+  privileges        = ["USAGE"]
+  account_role_name = "DATA_ANALYST"
+  on_schema_object {
+    object_name = snowflake_function_sql.decrypt_function.fully_qualified_name
+    object_type = "FUNCTION"
+  }
+}
+
 resource "snowflake_grant_privileges_to_account_role" "sales_privileges_orders" {
   privileges        = ["SELECT", "INSERT"]
   account_role_name = "SALES"
