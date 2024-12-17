@@ -79,7 +79,7 @@ resource "snowflake_tag_association" "customer_pii" {
   object_identifiers = ["${snowflake_table.ordering_customer.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_customer.fully_qualified_name}.NAME", "${snowflake_table.ordering_customer.fully_qualified_name}.PHONE"]
 
   object_type = "COLUMN"
-  tag_id      = snowflake_tag.sensitivity.id
+  tag_id      = snowflake_tag.sensitivity.fully_qualified_name
   tag_value   = "PII"
 }
 
@@ -248,7 +248,7 @@ resource "snowflake_tag_association" "supplier_pii" {
   object_identifiers = ["${snowflake_table.ordering_supplier.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_supplier.fully_qualified_name}.NAME", "${snowflake_table.ordering_supplier.fully_qualified_name}.PHONE"]
 
   object_type = "COLUMN"
-  tag_id      = snowflake_tag.sensitivity.id
+  tag_id      = snowflake_tag.sensitivity.fully_qualified_name
   tag_value   = "PII"
 }
 

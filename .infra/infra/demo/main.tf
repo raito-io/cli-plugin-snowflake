@@ -2021,7 +2021,7 @@ resource "snowflake_tag_association" "sales_sensitivity" {
   object_identifiers = [snowflake_schema.sales.fully_qualified_name]
 
   object_type = "SCHEMA"
-  tag_id      = "${snowflake_tag.sales_sensitivity.database}.${snowflake_tag.sales_sensitivity.schema}.${snowflake_tag.sales_sensitivity.name}"
+  tag_id      = snowflake_tag.sales_sensitivity.fully_qualified_name
   tag_value   = "PII"
 }
 
@@ -2231,7 +2231,7 @@ resource "snowflake_tag_association" "preson_creditcard_sensitivity" {
   object_identifiers = ["${snowflake_table.person_creditcard.fully_qualified_name}.CreditCardID"]
 
   object_type = "COLUMN"
-  tag_id      = snowflake_tag.sales_sensitivity.id
+  tag_id      = snowflake_tag.sales_sensitivity.fully_qualified_name
   tag_value   = "PCI"
 }
 
