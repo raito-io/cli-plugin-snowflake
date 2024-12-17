@@ -2018,10 +2018,7 @@ resource "snowflake_tag" "sales_sensitivity" {
 }
 
 resource "snowflake_tag_association" "sales_sensitivity" {
-  object_identifier {
-    name     = snowflake_schema.sales.name
-    database = snowflake_schema.sales.database
-  }
+  object_identifiers = [snowflake_schema.sales.fully_qualified_name]
 
   object_type = "SCHEMA"
   tag_id      = "${snowflake_tag.sales_sensitivity.database}.${snowflake_tag.sales_sensitivity.schema}.${snowflake_tag.sales_sensitivity.name}"
@@ -2231,6 +2228,7 @@ resource "snowflake_table" "person_creditcard" {
 }
 
 resource "snowflake_tag_association" "preson_creditcard_sensitivity" {
+  object_identifiers = ["${snowflake_table.person_creditcard.fully_qualified_name}.CreditCardID"]
   object_identifier {
     name     = "${snowflake_table.person_creditcard.name}.CreditCardID"
     database = snowflake_table.person_creditcard.database
