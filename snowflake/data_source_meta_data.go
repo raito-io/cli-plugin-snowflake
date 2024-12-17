@@ -614,12 +614,26 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						Description:       "Enables roles other than the owning role to access a shared database; applies only to shared databases.",
 						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 					},
+					{
+						// Defining a USAGE permission specifically for database level as it should not be inherited by the schema level.
+						Permission:        USAGE_ON_DATABASE,
+						Description:       "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
+						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
+					},
 				},
 				Children: []string{SharedPrefix + ds.Schema},
 			},
 			{
-				Name:     SharedPrefix + ds.Schema,
-				Type:     ds.Schema,
+				Name: SharedPrefix + ds.Schema,
+				Type: ds.Schema,
+				Permissions: []*ds.DataObjectTypePermission{
+					{
+						// Defining a USAGE permission specifically for schema level as we should not inherit it from the database level.
+						Permission:        USAGE_ON_SCHEMA,
+						Description:       "Enables using a schema, including returning the schema details in the SHOW SCHEMAS command output. To execute SHOW <objects> commands for objects (tables, views, stages, file formats, sequences, pipes, or functions) in the schema, a role must have at least one privilege granted on the object.",
+						GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
+					},
+				},
 				Children: []string{SharedPrefix + ds.Table, SharedPrefix + ds.View},
 			},
 			{
