@@ -95,7 +95,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 		usageBatchSize: usageBatchSize,
 		workerPoolSize: workerPoolSize,
 
-		maskFactory: NewMaskFactory(),
+		maskFactory: NewMaskFactory(params),
 	}, nil
 }
 

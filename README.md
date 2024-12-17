@@ -102,6 +102,11 @@ The following configuration parameters are available
 | `sf-data-usage-window`                      | The maximum number of days of usage data to retrieve. Maximum is 90 days.                                                                                                                                                                                                                                                                                                                                                                       | False     | `90`                 |
 | `sf-database-roles`                         | If set, database-roles for all databases will be fetched.                                                                                                                                                                                                                                                                                                                                                                                       | False     | `false`              |
 
+To get a full list of all the parameters. You can run the following command in your terminal:
+```bash
+$> raito info raito-io/cli-plugin-snowflake
+```
+
 ## Supported features
 
 | Feature             | Supported | Remarks                                                                                                                                                                                                                                                                |
@@ -164,6 +169,28 @@ Purposes will be implemented exactly the same as grants.
 #### Masks
 Each mask will be exported as masking policy to all schemas associated with the what-items of the mask.
 Within each schema a masking policy function is created for each required data type.
+
+It is possible to define a custom decrypt masking policy. This is done using the parameters 'sf-mask-decrypt-function'.
+When this parameter is set, a new masking type is made available to Raito Cloud users, called 'Decrypt'.
+This will generate a mask that will decrypt the value of the column using the specified function when the current user or role is part of the beneficiaries of the mask in Raito Cloud.
+
+When you need to pass an additional parameter to the decrypt function, you can use the parameter 'sf-mask-decrypt-column-tag'. 
+This will fetch the value of the given tag on the column to (un)mask and pass that value to your decrypt function as well. This is typically used to pass the encryption type to the decrypt function.
+
+As an example, if you specified the following parameters in your target configuration:
+```yaml
+    sf-mask-decrypt-function: GLOBAL.HELPERS.DECRYPT_IT
+    sf-mask-decrypt-column-tag: GLOBAL.TAGS.ENCRYPTION_TYPE
+```
+
+And you define a mask in Raito Cloud on columns in schema `MY_DATABASE.MY_SCHEMA`, a mask like this will be generated in Snowflake:
+```sql
+CREATE MASKING POLICY MY_DATABASE.MY_SCHEMA.DECRYPTTEST_JH3EIhVr_TEXT AS (val TEXT) RETURNS TEXT ->
+  CASE
+	WHEN current_user() IN ('my-user') THEN GLOBAL.HELPERS.DECRYPT_IT(val, SYSTEM$GET_TAG_ON_CURRENT_COLUMN('GLOBAL.TAGS.ENCRYPTION_TYPE'))
+	ELSE val
+  END;
+```
 
 #### Filters
 Each filter will be exported as row access policy to exactly one table.
