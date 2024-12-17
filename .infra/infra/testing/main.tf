@@ -220,6 +220,7 @@ resource "snowflake_masking_policy" "masking_policy" {
   name     = "ORDERING_MASKING_POLICY"
   database = snowflake_database.db.name
   schema   = snowflake_schema.ordering.name
+  exempt_other_policies = false
   argument {
     name = "val"
     type = "VARCHAR"
@@ -234,6 +235,14 @@ resource "snowflake_masking_policy" "masking_policy" {
   EOF
 
   return_data_type = "VARCHAR"
+}
+
+resource "snowflake_tag_association" "customer_pii" {
+  object_identifiers = ["${snowflake_table.ordering_customer.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_customer.fully_qualified_name}.NAME", "${snowflake_table.ordering_customer.fully_qualified_name}.PHONE", "${snowflake_table.ordering_supplier.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_supplier.fully_qualified_name}.NAME", "${snowflake_table.ordering_supplier.fully_qualified_name}.PHONE"]
+
+  object_type = "COLUMN"
+  tag_id      = snowflake_tag.sensitivity.fully_qualified_name
+  tag_value   = "PII"
 }
 
 // ORDERS VIEW
