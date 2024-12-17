@@ -75,14 +75,6 @@ resource "snowflake_table" "ordering_customer" {
   }
 }
 
-resource "snowflake_tag_association" "customer_pii" {
-  object_identifiers = ["${snowflake_table.ordering_customer.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_customer.fully_qualified_name}.NAME", "${snowflake_table.ordering_customer.fully_qualified_name}.PHONE"]
-
-  object_type = "COLUMN"
-  tag_id      = "RAITO_DATABASE.ORDERING.SENSITIVITY"
-  tag_value   = "PII"
-}
-
 // ORDERS TABLE
 resource "snowflake_table" "ordering_orders" {
   database = snowflake_database.db.name
@@ -242,14 +234,6 @@ resource "snowflake_masking_policy" "masking_policy" {
   EOF
 
   return_data_type = "VARCHAR"
-}
-
-resource "snowflake_tag_association" "supplier_pii" {
-  object_identifiers = ["${snowflake_table.ordering_supplier.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_supplier.fully_qualified_name}.NAME", "${snowflake_table.ordering_supplier.fully_qualified_name}.PHONE"]
-
-  object_type = "COLUMN"
-  tag_id      = snowflake_tag.sensitivity.fully_qualified_name
-  tag_value   = "PII"
 }
 
 // ORDERS VIEW
