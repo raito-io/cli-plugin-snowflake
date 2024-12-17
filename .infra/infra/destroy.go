@@ -198,7 +198,7 @@ func main() {
 	flag.BoolVar(&nonDryRun, "drop", false, "Execute drop roles. If not set or false a dry run will be executed.")
 	flag.Parse()
 
-	if sfAccount == "" || sfUser == "" || sfPassword == "" {
+	if sfAccount == "" || sfOrganization == "" || sfUser == "" || sfPassword == "" {
 		fmt.Println("Missing required arguments")
 		return
 	}
