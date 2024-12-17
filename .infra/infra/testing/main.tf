@@ -340,7 +340,7 @@ resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_s
   privileges        = ["SELECT", "REFERENCES"]
   account_role_name = "DATA_ANALYST"
   on_schema_object {
-    object_name = snowflake_table.ordering_supplier.fully_qualified_name
+    object_name = snowflake_table.ordering_supplier..fully_qualified_name
     object_type = "TABLE"
   }
 }
