@@ -217,9 +217,9 @@ resource "snowflake_table" "special_table" {
 }
 
 resource "snowflake_masking_policy" "masking_policy" {
-  name     = "ORDERING_MASKING_POLICY"
-  database = snowflake_database.db.name
-  schema   = snowflake_schema.ordering.name
+  name                  = "ORDERING_MASKING_POLICY"
+  database              = snowflake_database.db.name
+  schema                = snowflake_schema.ordering.name
   exempt_other_policies = false
   argument {
     name = "val"
