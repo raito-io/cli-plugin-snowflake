@@ -2229,7 +2229,7 @@ resource "snowflake_table" "person_creditcard" {
 
 resource "snowflake_tag_association" "preson_creditcard_sensitivity" {
   object_identifiers = ["${snowflake_table.person_creditcard.fully_qualified_name}.CreditCardID"]
-  
+
   object_type = "COLUMN"
   tag_id      = snowflake_tag.sales_sensitivity.id
   tag_value   = "PCI"
