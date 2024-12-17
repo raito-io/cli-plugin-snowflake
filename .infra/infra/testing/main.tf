@@ -15,6 +15,20 @@ resource "snowflake_schema" "ordering" {
   comment  = "Schema for RAITO testing and demo"
 }
 
+resource "snowflake_function_sql" "decrypt_function" {
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "decrypt"
+  arguments {
+    arg_data_type = "STRING"
+    arg_name      = "val"
+  }
+  function_definition = <<EOF
+    'Decrypted: ' || val
+  EOF
+  return_type         = "STRING"
+}
+
 resource "snowflake_schema" "special_schema" {
   database = snowflake_database.special_db.name
   name     = "SCHEMA NAME WITH S†RANGE çhars"
