@@ -23,7 +23,7 @@ gen-test-infra:
 	cd .infra/infra; terraform apply -auto-approve
 
 destroy-test-infra:
-	cd .infra/infra; terraform apply -destroy -auto-approve; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfUser ${SF_USER} --sfPassword ${SF_PASSWORD} --drop=true
+	cd .infra/infra; terraform apply -destroy -auto-approve; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfOrganization ${SF_ORGANIZATION} --sfUser ${SF_USER} --sfPassword ${SF_PASSWORD} --drop=true
 
 destroy-roles:
 	cd .infra/infra; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfUser ${SF_USER} --sfPassword ${SF_PASSWORD} --drop=true
