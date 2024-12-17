@@ -397,7 +397,7 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 func getFullNameFromGrant(name, objectType string) string {
 	sfObject := common.ParseFullName(name)
 
-	if objectType == Function && sfObject.Table != nil {
+	if strings.EqualFold(objectType, Function) && sfObject.Table != nil {
 		function := *sfObject.Table
 		if strings.Contains(function, "(") {
 			funcName := function[:strings.Index(function, "(")] //nolint:gocritic

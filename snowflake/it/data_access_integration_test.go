@@ -95,6 +95,33 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 					Permissions: []string{"OPERATE", "USAGE"},
 				},
 			})
+		} else if ap.Name == "DATA_ANALYST" {
+			s.Len(ap.What, 5)
+			s.ElementsMatch(ap.What, []sync_from_target.WhatItem{
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE", Type: ""},
+					Permissions: []string{"USAGE on DATABASE"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE.ORDERING", Type: ""},
+					Permissions: []string{"USAGE on SCHEMA"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE.ORDERING.SUPPLIER", Type: ""},
+					Permissions: []string{"REFERENCES", "SELECT"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_WAREHOUSE", Type: ""},
+					Permissions: []string{"OPERATE", "USAGE"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE.ORDERING.decrypt(VARCHAR)", Type: ""},
+					Permissions: []string{"USAGE"},
+				},
+			})
+
+			s.Len(ap.Who.Users, 1)
+			s.ElementsMatch([]string{"BENJAMINSTEWART"}, ap.Who.Users)
 		}
 	}
 }
