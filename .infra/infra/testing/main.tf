@@ -245,7 +245,7 @@ resource "snowflake_masking_policy" "masking_policy" {
 }
 
 resource "snowflake_tag_association" "supplier_pii" {
-  object_identifiers = ["${snowflake_table.ordering_supplier.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_supplier.fully_qualified_name}.NAME", "${snowflake_table.ordering_supplier.fully_qualified_name}.PHONE"] {
+  object_identifiers = ["${snowflake_table.ordering_supplier.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_supplier.fully_qualified_name}.NAME", "${snowflake_table.ordering_supplier.fully_qualified_name}.PHONE"]
 
   object_type = "COLUMN"
   tag_id      = snowflake_tag.sensitivity.id
