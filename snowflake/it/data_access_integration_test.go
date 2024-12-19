@@ -276,20 +276,24 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 
 	grants, err := s.sfRepo.GetGrantsToAccountRole(actualRoleName)
 	s.NoError(err)
-	s.Len(grants, 4)
+	s.Len(grants, 5)
 	dbUsageFound := false
 	schemaUsageFound := false
+	functionUsageFound := false
 
 	for _, grant := range grants {
 		if strings.EqualFold(grant.GrantedOn, "DATABASE") && grant.Name == "RAITO_DATABASE" && grant.Privilege == "USAGE" {
 			dbUsageFound = true
 		} else if strings.EqualFold(grant.GrantedOn, "SCHEMA") && grant.Name == "RAITO_DATABASE.ORDERING" && grant.Privilege == "USAGE" {
 			schemaUsageFound = true
+		} else if strings.EqualFold(grant.GrantedOn, "FUNCTION") && grant.Name == "RAITO_DATABASE.ORDERING.\"decrypt(val VARCHAR):VARCHAR(16777216)\"" && grant.Privilege == "USAGE" {
+			functionUsageFound = true
 		}
 	}
 
 	s.True(dbUsageFound)
 	s.True(schemaUsageFound)
+	s.True(functionUsageFound)
 
 	databaseRoles, err := s.sfRepo.GetDatabaseRoles("RAITO_DATABASE")
 	s.NoError(err)
