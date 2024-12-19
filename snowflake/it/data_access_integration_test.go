@@ -115,7 +115,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 					Permissions: []string{"OPERATE", "USAGE"},
 				},
 				{
-					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE.ORDERING.decrypt(VARCHAR)", Type: ""},
+					DataObject:  &data_source.DataObjectReference{FullName: `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`, Type: ""},
 					Permissions: []string{"USAGE"},
 				},
 			})
@@ -175,7 +175,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 					},
 					{
 						DataObject: &data_source.DataObjectReference{
-							FullName: "RAITO_DATABASE.ORDERING.decrypt(VARCHAR)",
+							FullName: `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`,
 							Type:     "function",
 						},
 						Permissions: []string{"USAGE"},

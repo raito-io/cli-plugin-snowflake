@@ -331,7 +331,7 @@ func (s *DataSourceSyncer) readFunctionsInDatabase(databaseName string, tagMap m
 		function := entity.(*FunctionEntity)
 
 		parent := function.Database + "." + function.Schema
-		fullName := parent + "." + function.Name
+		fullName := parent + `."` + function.Name + `"`
 
 		argumentSignature := convertFunctionArgumentSignature(function.ArgumentSignature)
 
@@ -348,7 +348,7 @@ func (s *DataSourceSyncer) readFunctionsInDatabase(databaseName string, tagMap m
 		}
 		do := ds.DataObject{
 			ExternalId:       fullName + argumentSignature, // Adding the signature for full uniqueness
-			Name:             function.Name,
+			Name:             function.Name + argumentSignature,
 			FullName:         fullName + argumentSignature, // Adding the signature because it is needed to reference it when setting grants
 			Type:             typeName,
 			Description:      comment,

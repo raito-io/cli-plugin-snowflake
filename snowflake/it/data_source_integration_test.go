@@ -106,9 +106,9 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	functions := getByType(dataSourceObjectHandler.DataObjects, snowflake.Function)
 	s.Len(functions, 1)
 	s.Contains(functions, data_source.DataObject{
-		ExternalId:       "RAITO_DATABASE.ORDERING.decrypt(VARCHAR)",
-		Name:             "decrypt",
-		FullName:         "RAITO_DATABASE.ORDERING.decrypt(VARCHAR)",
+		ExternalId:       `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`,
+		Name:             "decrypt(VARCHAR)",
+		FullName:         `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`,
 		Type:             "function",
 		Description:      "user-defined function",
 		ParentExternalId: "RAITO_DATABASE.ORDERING",

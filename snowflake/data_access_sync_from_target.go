@@ -399,6 +399,7 @@ func getFullNameFromGrant(name, objectType string) string {
 
 	if strings.EqualFold(objectType, Function) && sfObject.Table != nil {
 		function := *sfObject.Table
+		
 		if strings.Contains(function, "(") {
 			funcName := function[:strings.Index(function, "(")] //nolint:gocritic
 
@@ -415,7 +416,7 @@ func getFullNameFromGrant(name, objectType string) string {
 				params[i] = p[strings.LastIndex(p, " ")+1:]
 			}
 
-			sfObject.Table = ptr.String(fmt.Sprintf("%s(%s)", funcName, strings.Join(params, ", ")))
+			sfObject.Table = ptr.String(fmt.Sprintf(`"%s"(%s)`, funcName, strings.Join(params, ", ")))
 		}
 	}
 
