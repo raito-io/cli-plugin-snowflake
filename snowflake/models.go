@@ -29,6 +29,14 @@ type SchemaEntity struct {
 	Comment  *string `db:"COMMENT"`
 }
 
+type FunctionEntity struct {
+	Database          string  `db:"FUNCTION_CATALOG"`
+	Schema            string  `db:"FUNCTION_SCHEMA"`
+	Name              string  `db:"FUNCTION_NAME"`
+	Comment           *string `db:"COMMENT"`
+	ArgumentSignature string  `db:"ARGUMENT_SIGNATURE"`
+}
+
 type TagEntity struct {
 	Database *string `db:"OBJECT_DATABASE"`
 	Schema   *string `db:"OBJECT_SCHEMA"`
@@ -54,6 +62,8 @@ func (t *TagEntity) GetFullName() string {
 	case "SCHEMA":
 		return *t.Database + "." + t.Name
 	case "TABLE":
+		return *t.Database + "." + *t.Schema + "." + t.Name
+	case "FUNCTION":
 		return *t.Database + "." + *t.Schema + "." + t.Name
 	case "COLUMN":
 		return *t.Database + "." + *t.Schema + "." + t.Name + "." + *t.Column

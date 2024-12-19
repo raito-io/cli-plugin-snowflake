@@ -879,7 +879,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetSnowFlakeAccountName() 
 
 	//Then
 	s.NoError(err)
-	s.Equal(strings.ToUpper(strings.Split(sfAccount, ".")[0]), accountName)
+	s.Equal(sfOrganization+"-"+sfAccount, accountName)
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetWarehouses() {

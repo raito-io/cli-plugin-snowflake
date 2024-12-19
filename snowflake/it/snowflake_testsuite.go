@@ -15,6 +15,7 @@ import (
 
 var (
 	sfAccount              string
+	sfOrganization         string
 	sfUser                 string
 	sfPassword             string
 	sfPrivateKey           string
@@ -31,6 +32,7 @@ func readDatabaseConfig() *config.ConfigMap {
 
 	if sfAccount == "" {
 		sfAccount = os.Getenv("SF_ACCOUNT")
+		sfOrganization = os.Getenv("SF_ORGANIZATION")
 		sfUser = os.Getenv("SF_USER")
 		sfPassword = os.Getenv("SF_PASSWORD")
 		sfRole = os.Getenv("SF_ROLE")
@@ -49,7 +51,7 @@ func readDatabaseConfig() *config.ConfigMap {
 
 	return &config.ConfigMap{
 		Parameters: map[string]string{
-			snowflake.SfAccount:              sfAccount,
+			snowflake.SfAccount:              sfOrganization + "-" + sfAccount,
 			snowflake.SfUser:                 sfUser,
 			snowflake.SfPassword:             sfPassword,
 			snowflake.SfPrivateKey:           sfPrivateKey,

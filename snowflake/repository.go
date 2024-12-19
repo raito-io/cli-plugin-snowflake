@@ -845,7 +845,7 @@ func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName 
 }
 
 func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
-	rows, _, err := repo.query("select current_account()")
+	rows, _, err := repo.query(`select CONCAT(CURRENT_ORGANIZATION_NAME(), '-', CURRENT_ACCOUNT_NAME())`)
 	if err != nil {
 		return "", err
 	}
@@ -985,6 +985,14 @@ func (repo *SnowflakeRepository) GetSchemasInDatabase(databaseName string, handl
 
 	return handleDbEntities(repo, q, func() interface{} {
 		return &SchemaEntity{}
+	}, handleEntity)
+}
+
+func (repo *SnowflakeRepository) GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error {
+	q := getFunctionsInDatabaseQuery(databaseName)
+
+	return handleDbEntities(repo, q, func() interface{} {
+		return &FunctionEntity{}
 	}, handleEntity)
 }
 
@@ -1469,6 +1477,10 @@ func handleDbEntities(repo *SnowflakeRepository, query string, createEntity Enti
 
 func getSchemasInDatabaseQuery(dbName string) string {
 	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.SCHEMATA`, common.FormatQuery("%s", dbName))
+}
+
+func getFunctionsInDatabaseQuery(dbName string) string {
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.FUNCTIONS`, common.FormatQuery("%s", dbName))
 }
 
 func getTablesInDatabaseQuery(dbName string, schemaName string) string {

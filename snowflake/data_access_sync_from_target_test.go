@@ -132,6 +132,11 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 	}
 }
 
+func TestAccessSyncer_GetFullNameFromGrant(t *testing.T) {
+	assert.Equal(t, "DB1.Schema1.Entity1", getFullNameFromGrant("DB1.Schema1.Entity1", "table"))
+	assert.Equal(t, `MASTER_DATA.PUBLIC.DECRYPTIT(VARCHAR, VARCHAR)`, getFullNameFromGrant(`MASTER_DATA.PUBLIC."DECRYPTIT(VAL VARCHAR, ENCRYPTIONTYPE VARCHAR):VARCHAR(16777216)"`, Function))
+}
+
 func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)

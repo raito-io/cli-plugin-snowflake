@@ -16,13 +16,17 @@ import (
 var systemRoles = set.Set[string]{"ORGADMIN": {}, "ACCOUNTADMIN": {}, "SECURITYADMIN": {}, "USERADMIN": {}, "SYSADMIN": {}, "PUBLIC": {}}
 
 var (
-	sfAccount, sfUser, sfPassword string
-	nonDryRun                     bool
+	sfAccount, sfOrganization, sfUser, sfPassword string
+	nonDryRun                                     bool
 )
 
 func dropAllRoles() error {
+	account := sfOrganization + "-" + sfAccount
+
+	fmt.Printf("Using account: %s\n", account)
+
 	dsn, err := sf.DSN(&sf.Config{
-		Account:  sfAccount,
+		Account:  account,
 		User:     sfUser,
 		Password: sfPassword,
 		Role:     "ACCOUNTADMIN",
@@ -188,12 +192,13 @@ func dropRole(db *sql.DB, role snowflake.RoleEntity, database *string) error {
 
 func main() {
 	flag.StringVar(&sfAccount, "sfAccount", "", "Snowflake account")
+	flag.StringVar(&sfOrganization, "sfOrganization", "", "Snowflake organization")
 	flag.StringVar(&sfUser, "sfUser", "", "Snowflake user")
 	flag.StringVar(&sfPassword, "sfPassword", "", "Snowflake password")
 	flag.BoolVar(&nonDryRun, "drop", false, "Execute drop roles. If not set or false a dry run will be executed.")
 	flag.Parse()
 
-	if sfAccount == "" || sfUser == "" || sfPassword == "" {
+	if sfAccount == "" || sfOrganization == "" || sfUser == "" || sfPassword == "" {
 		fmt.Println("Missing required arguments")
 		return
 	}

@@ -28,6 +28,7 @@ type dataSourceRepository interface {
 	GetShares() ([]DbEntity, error)
 	GetDatabases() ([]DbEntity, error)
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTagsLinkedToDatabaseName(databaseName string) (map[string][]*tag.Tag, error)
@@ -204,6 +205,13 @@ func (s *DataSourceSyncer) handleDatabase(database ExtendedDbEntity) error {
 		return err
 	}
 
+	if doTypePrefix == "" {
+		err = s.readFunctionsInDatabase(database.Entity.Name, database.LinkedTags)
+		if err != nil {
+			return err
+		}
+	}
+
 	err = s.readTablesInDatabase(database.Entity.Name, doTypePrefix, s.repo.GetTablesInDatabase, database.LinkedTags)
 	if err != nil {
 		return err
@@ -294,6 +302,62 @@ func (s *DataSourceSyncer) addDataObjects(dataObjects ...*ds.DataObject) error {
 	defer s.lock.Unlock()
 
 	return s.dataSourceHandler.AddDataObjects(dataObjects...)
+}
+
+// convertFunctionArgumentSignature converts the ARGUMENT_SIGNATURE field of a function to remove the argument names
+// For example: "(val VARCHAR, type VARCHAR)" -> "(VARCHAR, VARCHAR)"
+func convertFunctionArgumentSignature(signature string) string {
+	signature = strings.TrimSpace(signature)
+	signature, f := strings.CutPrefix(signature, "(")
+	signature, f2 := strings.CutSuffix(signature, ")")
+
+	if !f || !f2 { // Not the expected format
+		return signature
+	}
+
+	args := strings.Split(signature, ",")
+	for i, arg := range args {
+		arg = strings.TrimSpace(arg)
+		args[i] = arg[strings.LastIndex(arg, " ")+1:]
+	}
+
+	return fmt.Sprintf("(%s)", strings.Join(args, ", "))
+}
+
+func (s *DataSourceSyncer) readFunctionsInDatabase(databaseName string, tagMap map[string][]*tag.Tag) error {
+	typeName := Function
+
+	return s.repo.GetFunctionsInDatabase(databaseName, func(entity interface{}) error {
+		function := entity.(*FunctionEntity)
+
+		parent := function.Database + "." + function.Schema
+		fullName := parent + `."` + function.Name + `"`
+
+		argumentSignature := convertFunctionArgumentSignature(function.ArgumentSignature)
+
+		ff := s.schemaExcludes.Contains(function.Database + "." + function.Schema)
+
+		if ff || !s.shouldHandle(fullName) {
+			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
+			return nil
+		}
+
+		comment := ""
+		if function.Comment != nil {
+			comment = *function.Comment
+		}
+		do := ds.DataObject{
+			ExternalId:       fullName + argumentSignature, // Adding the signature for full uniqueness
+			Name:             function.Name + argumentSignature,
+			FullName:         fullName + argumentSignature, // Adding the signature because it is needed to reference it when setting grants
+			Type:             typeName,
+			Description:      comment,
+			ParentExternalId: parent,
+			Tags:             tagMap[fullName],
+		}
+
+		return s.addDataObjects(&do)
+	})
 }
 
 func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, typePrefix string, fetcher func(dbName string, schemaName string, entityHandler EntityHandler) error, tagMap map[string][]*tag.Tag) error {

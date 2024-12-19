@@ -119,6 +119,12 @@ func TestFullNameParser(t *testing.T) {
 	tableName = `ADULT"."_TABLE`
 	assert.EqualValues(t, SnowflakeObject{&databaseName, &schemaName, &tableName, nil}, ParseFullName(fullName))
 
+	fullName = `MASTER_DATA.PUBLIC."DECRYPTIT(VAL VARCHAR, ENCRYPTIONTYPE VARCHAR):VARCHAR(16777216)"`
+	databaseName = "MASTER_DATA"
+	schemaName = `PUBLIC`
+	tableName = `DECRYPTIT(VAL VARCHAR, ENCRYPTIONTYPE VARCHAR):VARCHAR(16777216)`
+	assert.EqualValues(t, SnowflakeObject{&databaseName, &schemaName, &tableName, nil}, ParseFullName(fullName))
+
 	fullName = "\"d``''b🫘\".\"🛟sc\"\"he\"\"ma\".\"ta🥹b...le\".\"c🫶o,?lu\"\"mn\""
 	databaseName = "d``''b🫘"
 	schemaName = `🛟sc"he"ma`
