@@ -769,8 +769,13 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					logger.Debug(fmt.Sprintf("Ignoring USAGE permission on %s %q", grant.GrantedOn, grant.Name))
 				} else {
 					onType := convertSnowflakeGrantTypeToRaito(grant.GrantedOn)
+					name := grant.Name
 
-					foundGrants = append(foundGrants, Grant{grant.Privilege, onType, grant.Name})
+					if onType == Function { // For functions we need to do a special conversion
+						name = getFullNameFromGrant(name, onType)
+					}
+
+					foundGrants = append(foundGrants, Grant{grant.Privilege, onType, name})
 				}
 			}
 		}
