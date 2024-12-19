@@ -492,7 +492,7 @@ func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
 	//Then
 	assert.NoError(t, err)
 	assert.Len(t, dataSourceObjectHandlerMock.DataObjects, 3)
-	assert.Equal(t, "Database1.schema1.Decrypt(VARCHAR)", dataSourceObjectHandlerMock.DataObjects[0].FullName)
+	assert.Equal(t, `Database1.schema1."Decrypt"(VARCHAR)`, dataSourceObjectHandlerMock.DataObjects[0].FullName)
 	assert.Equal(t, "Database1.schema1.Table1", dataSourceObjectHandlerMock.DataObjects[1].FullName)
 	assert.Equal(t, "Database1.schema1.Table1.IDColumn", dataSourceObjectHandlerMock.DataObjects[2].FullName)
 }

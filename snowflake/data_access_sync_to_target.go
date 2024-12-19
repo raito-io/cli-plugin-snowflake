@@ -1199,28 +1199,21 @@ func (s *AccessToTargetSyncer) createGrantsForTableOrView(doType string, permiss
 }
 
 func (s *AccessToTargetSyncer) createGrantsForFunction(permissions []string, fullName string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) error {
-	sfObject := common.ParseFullName(fullName)
-	if sfObject.Database == nil || sfObject.Schema == nil || sfObject.Table == nil {
-		return fmt.Errorf("expected fullName %q to have 3 parts (database.schema.function)", fullName)
-	}
-
 	for _, p := range permissions {
 		if _, f := metaData[Function][strings.ToUpper(p)]; f {
-			function := *sfObject.Table
-
-			if strings.Contains(function, "(") && !strings.HasPrefix(function, `"`) {
-				function = `"` + function[0:strings.Index(function, "(")] + `"` + function[strings.Index(function, "("):] //nolint:gocritic
-			}
-
-			grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, *sfObject.Database, *sfObject.Schema) + function})
+			grants.Add(Grant{p, Function, fullName}) // fullName should already be in the right format
 		} else {
 			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(Function)))
 		}
 	}
 
 	if len(grants) > 0 {
-		grants.Add(Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, *sfObject.Database)},
-			Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
+		split := strings.Split(fullName, ".")
+
+		if len(split) >= 3 {
+			grants.Add(Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, split[0])},
+				Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, split[0], split[1])})
+		}
 	}
 
 	return nil
