@@ -4,7 +4,6 @@ package it
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
@@ -37,10 +36,10 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	err := dataSourceSyncer.SyncDataSource(context.Background(), dataSourceObjectHandler, &data_source.DataSourceSyncConfig{ConfigMap: config})
 
 	//Then
-	sourceName := strings.ToUpper(strings.Split(sfAccount, ".")[0])
+	sourceName := sfOrganization + "-" + sfAccount
 
 	s.NoError(err)
-	s.Len(dataSourceObjectHandler.DataObjects, 52)
+	s.Len(dataSourceObjectHandler.DataObjects, 53)
 
 	warehouses := getByType(dataSourceObjectHandler.DataObjects, "warehouse")
 	s.Len(warehouses, 2)
@@ -100,6 +99,18 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 		FullName:         "RAITO_DATABASE.ORDERING.ORDERS",
 		Type:             "table",
 		Description:      "",
+		ParentExternalId: "RAITO_DATABASE.ORDERING",
+		Tags:             nil,
+	})
+
+	functions := getByType(dataSourceObjectHandler.DataObjects, snowflake.Function)
+	s.Len(functions, 1)
+	s.Contains(functions, data_source.DataObject{
+		ExternalId:       `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`,
+		Name:             "decrypt(VARCHAR)",
+		FullName:         `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`,
+		Type:             "function",
+		Description:      "user-defined function",
 		ParentExternalId: "RAITO_DATABASE.ORDERING",
 		Tags:             nil,
 	})

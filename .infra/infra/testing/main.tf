@@ -15,6 +15,20 @@ resource "snowflake_schema" "ordering" {
   comment  = "Schema for RAITO testing and demo"
 }
 
+resource "snowflake_function_sql" "decrypt_function" {
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "decrypt"
+  arguments {
+    arg_data_type = "STRING"
+    arg_name      = "val"
+  }
+  function_definition = <<EOF
+    'Decrypted: ' || val
+  EOF
+  return_type         = "STRING"
+}
+
 resource "snowflake_schema" "special_schema" {
   database = snowflake_database.special_db.name
   name     = "SCHEMA NAME WITH S†RANGE çhars"
@@ -73,30 +87,6 @@ resource "snowflake_table" "ordering_customer" {
     name = "COMMENT"
     type = "VARCHAR"
   }
-}
-
-resource "snowflake_tag_association" "customer_pii" {
-  object_identifier {
-    name     = "${snowflake_table.ordering_customer.name}.ADDRESS"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
-
-  object_identifier {
-    name     = "${snowflake_table.ordering_customer.name}.NAME"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
-
-  object_identifier {
-    name     = "${snowflake_table.ordering_customer.name}.PHONE"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
-
-  object_type = "COLUMN"
-  tag_id      = snowflake_tag.sensitivity.id
-  tag_value   = "PII"
 }
 
 // ORDERS TABLE
@@ -241,16 +231,15 @@ resource "snowflake_table" "special_table" {
 }
 
 resource "snowflake_masking_policy" "masking_policy" {
-  name     = "ORDERING_MASKING_POLICY"
-  database = snowflake_database.db.name
-  schema   = snowflake_schema.ordering.name
-  signature {
-    column {
-      name = "val"
-      type = "VARCHAR"
-    }
+  name                  = "ORDERING_MASKING_POLICY"
+  database              = snowflake_database.db.name
+  schema                = snowflake_schema.ordering.name
+  exempt_other_policies = false
+  argument {
+    name = "val"
+    type = "VARCHAR"
   }
-  masking_expression = <<-EOF
+  body = <<-EOF
     case
       when current_role() in ('ACCOUNTADMIN', 'SYSADMIN') then
         val
@@ -262,27 +251,11 @@ resource "snowflake_masking_policy" "masking_policy" {
   return_data_type = "VARCHAR"
 }
 
-resource "snowflake_tag_association" "supplier_pii" {
-  object_identifier {
-    name     = "${snowflake_table.ordering_supplier.name}.ADDRESS"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
-
-  object_identifier {
-    name     = "${snowflake_table.ordering_supplier.name}.NAME"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
-
-  object_identifier {
-    name     = "${snowflake_table.ordering_supplier.name}.PHONE"
-    database = snowflake_database.db.name
-    schema   = snowflake_schema.ordering.name
-  }
+resource "snowflake_tag_association" "customer_pii" {
+  object_identifiers = ["${snowflake_table.ordering_customer.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_customer.fully_qualified_name}.NAME", "${snowflake_table.ordering_customer.fully_qualified_name}.PHONE", "${snowflake_table.ordering_supplier.fully_qualified_name}.ADDRESS", "${snowflake_table.ordering_supplier.fully_qualified_name}.NAME", "${snowflake_table.ordering_supplier.fully_qualified_name}.PHONE"]
 
   object_type = "COLUMN"
-  tag_id      = snowflake_tag.sensitivity.id
+  tag_id      = snowflake_tag.sensitivity.fully_qualified_name
   tag_value   = "PII"
 }
 
@@ -342,6 +315,15 @@ resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_s
   on_schema_object {
     object_name = snowflake_table.ordering_supplier.fully_qualified_name
     object_type = "TABLE"
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_decrypt" {
+  privileges        = ["USAGE"]
+  account_role_name = "DATA_ANALYST"
+  on_schema_object {
+    object_name = snowflake_function_sql.decrypt_function.fully_qualified_name
+    object_type = "FUNCTION"
   }
 }
 

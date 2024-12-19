@@ -2,7 +2,15 @@
 variable "snowflake_account" {
   type        = string
   sensitive   = true
-  description = "Snowflake account url"
+  description = "Snowflake account "
+  nullable    = false
+}
+
+// SNOWFLAKE PROVIDER
+variable "snowflake_organization" {
+  type        = string
+  sensitive   = true
+  description = "Snowflake organization"
   nullable    = false
 }
 
