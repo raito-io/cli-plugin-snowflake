@@ -1201,7 +1201,12 @@ func (s *AccessToTargetSyncer) createGrantsForFunction(permissions []string, ful
 
 	for _, p := range permissions {
 		if _, f := metaData[Function][strings.ToUpper(p)]; f {
-			grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, *sfObject.Database, *sfObject.Schema) + *sfObject.Table})
+			function := *sfObject.Table
+			if strings.Contains(function, "(") && !strings.HasPrefix(function, `"`) {
+				function = `"` + function[0:strings.Index(function, "(")] + `"` + function[strings.Index(function, "("):]
+			}
+
+			grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, *sfObject.Database, *sfObject.Schema) + function})
 		} else {
 			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(Function)))
 		}
