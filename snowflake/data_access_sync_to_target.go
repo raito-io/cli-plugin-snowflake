@@ -1202,8 +1202,9 @@ func (s *AccessToTargetSyncer) createGrantsForFunction(permissions []string, ful
 	for _, p := range permissions {
 		if _, f := metaData[Function][strings.ToUpper(p)]; f {
 			function := *sfObject.Table
+
 			if strings.Contains(function, "(") && !strings.HasPrefix(function, `"`) {
-				function = `"` + function[0:strings.Index(function, "(")] + `"` + function[strings.Index(function, "("):]
+				function = `"` + function[0:strings.Index(function, "(")] + `"` + function[strings.Index(function, "("):] //nolint:gocritic
 			}
 
 			grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, *sfObject.Database, *sfObject.Schema) + function})
