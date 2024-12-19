@@ -1452,7 +1452,7 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForFunction(database string
 	if _, f2 := metaData[Function][strings.ToUpper(p)]; f2 {
 		argumentSignature := convertFunctionArgumentSignature(function.ArgumentSignature)
 
-		grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, database, schema) + function.Name + argumentSignature})
+		grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, database, schema) + `"` + function.Name + `"` + argumentSignature})
 
 		return true
 	}
