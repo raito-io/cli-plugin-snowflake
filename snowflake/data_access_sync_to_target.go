@@ -576,10 +576,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					return actualName, err2
 				}
 			} else if what.DataObject.Type == Function {
-				err2 := s.createGrantsForFunction(permissions, what.DataObject.FullName, metaData, expectedGrants)
-				if err2 != nil {
-					return actualName, err2
-				}
+				s.createGrantsForFunction(permissions, what.DataObject.FullName, metaData, expectedGrants)
 			} else if what.DataObject.Type == "shared-schema" {
 				err2 := s.createGrantsForSchema(permissions, what.DataObject.FullName, metaData, true, expectedGrants)
 				if err2 != nil {
@@ -1198,7 +1195,7 @@ func (s *AccessToTargetSyncer) createGrantsForTableOrView(doType string, permiss
 	return nil
 }
 
-func (s *AccessToTargetSyncer) createGrantsForFunction(permissions []string, fullName string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) error {
+func (s *AccessToTargetSyncer) createGrantsForFunction(permissions []string, fullName string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) {
 	for _, p := range permissions {
 		if _, f := metaData[Function][strings.ToUpper(p)]; f {
 			grants.Add(Grant{p, Function, fullName}) // fullName should already be in the right format
@@ -1215,8 +1212,6 @@ func (s *AccessToTargetSyncer) createGrantsForFunction(permissions []string, ful
 				Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, split[0], split[1])})
 		}
 	}
-
-	return nil
 }
 
 func (s *AccessToTargetSyncer) getTablesForSchema(database, schema string) ([]TableEntity, error) {
