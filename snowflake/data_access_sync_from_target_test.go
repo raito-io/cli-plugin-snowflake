@@ -184,6 +184,7 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 		{
 			POLICY_STATUS:     "Active",
 			REF_COLUMN_NAME:   NullString{String: "ColumnName1", Valid: true},
+			POLICY_KIND:       "MASKING_POLICY",
 			REF_DATABASE_NAME: "DB1",
 			REF_SCHEMA_NAME:   "Schema1",
 			REF_ENTITY_NAME:   "EntityName1",
@@ -194,6 +195,7 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 		{
 			POLICY_STATUS:     "Active",
 			REF_COLUMN_NAME:   NullString{Valid: false},
+			POLICY_KIND:       "ROW_ACCESS_POLICY",
 			REF_DATABASE_NAME: "DB1",
 			REF_SCHEMA_NAME:   "Schema1",
 			REF_ENTITY_NAME:   "EntityName1",
