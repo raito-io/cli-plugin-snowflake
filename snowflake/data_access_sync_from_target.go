@@ -597,6 +597,7 @@ func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action 
 			}
 
 			var dor *ds.DataObjectReference
+
 			if policyReference.POLICY_KIND == "MASKING_POLICY" {
 				if policyReference.REF_COLUMN_NAME.Valid {
 					dor = &ds.DataObjectReference{
