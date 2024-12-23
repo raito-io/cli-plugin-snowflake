@@ -11,6 +11,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
+	"github.com/raito-io/cli/base/access_provider/types"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
@@ -494,7 +495,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 							Permissions: []string{"SELECT"},
 						},
 					},
-					Action:           sync_from_target.Grant,
+					Action:           types.Grant,
 					Policy:           "",
 					Type:             ptr.String("databaseRole"),
 					WhoLocked:        ptr.Bool(true),
@@ -913,7 +914,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					Name:              "TEST_DB.DatabaseRole1",
 					NamingHint:        "DatabaseRole1",
 					ActualName:        "DatabaseRole1",
-					Action:            sync_from_target.Grant,
+					Action:            types.Grant,
 					Policy:            "",
 
 					Who: &sync_from_target.WhoItem{
@@ -1085,7 +1086,7 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 					AccessProviders: []*importer.AccessProvider{
 						{
 							Id:         "AccessProviderId1",
-							Action:     importer.Grant,
+							Action:     types.Grant,
 							Type:       ptr.String(access_provider.Role),
 							Name:       "AccessProvider1",
 							NamingHint: "AccessProvider1",
@@ -1097,7 +1098,7 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 							},
 						}, {
 							Id:         "AccessProviderId2",
-							Action:     importer.Grant,
+							Action:     types.Grant,
 							Type:       ptr.String("databaseRole"),
 							NamingHint: "DatabaseRole1",
 							Who: importer.WhoItem{
@@ -1155,7 +1156,7 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 						{
 							Id:         "AccessProviderId1",
 							ExternalId: ptr.String("ACCESS_PROVIDER1_OLD"),
-							Action:     importer.Grant,
+							Action:     types.Grant,
 							Type:       ptr.String(access_provider.Role),
 							Name:       "AccessProvider1",
 							NamingHint: "AccessProvider1",
@@ -1167,7 +1168,7 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 							},
 						}, {
 							Id:         "AccessProviderId2",
-							Action:     importer.Grant,
+							Action:     types.Grant,
 							ExternalId: ptr.String("DATABASEROLE###DATABASE:TEST_DB###ROLE:DATABASE_ROLE1_OLD"),
 							Type:       ptr.String("databaseRole"),
 							NamingHint: "DatabaseRole1",
@@ -1209,12 +1210,12 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 								{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1.Column1", Type: "column"}},
 								{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2.Table1.Column1", Type: "column"}},
 							},
-							Action: importer.Mask,
+							Action: types.Mask,
 							Type:   ptr.String("SHA256"),
 						}, {
 							Id:     "RAITO_FILTER1",
 							Name:   "RAITO_FILTER1",
-							Action: importer.Filtered,
+							Action: types.Filtered,
 							What: []importer.WhatItem{
 								{
 									DataObject: &data_source.DataObjectReference{
@@ -1276,12 +1277,12 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 								{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1.Column1", Type: "column"}},
 								{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2.Table1.Column1", Type: "column"}},
 							},
-							Action: importer.Mask,
+							Action: types.Mask,
 							Type:   ptr.String("SHA256"),
 						}, {
 							Id:     "RAITO_FILTER1",
 							Name:   "RAITO_FILTER1",
-							Action: importer.Filtered,
+							Action: types.Filtered,
 							What: []importer.WhatItem{
 								{
 									DataObject: &data_source.DataObjectReference{
