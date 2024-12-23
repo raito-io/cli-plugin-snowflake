@@ -75,6 +75,7 @@ jobs:
         run: make test
         env:
           SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SF_ORGANIZATION: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
           SF_USER: ${{ secrets.SNOWFLAKE_USER }}
           SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SF_ROLE: ${{ secrets.sf_role }}

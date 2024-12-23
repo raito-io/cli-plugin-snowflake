@@ -180,16 +180,19 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 			AccessProvider: "AccessProviderId2",
 			ActualName:     "ExistingRole1",
 			ExternalId:     ptr.String("ExistingRole1"),
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: "AccessProviderId3",
 			ActualName:     "RoleName3",
 			ExternalId:     ptr.String("RoleName3"),
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: "AccessProviderId1",
 			ActualName:     "RoleName1",
 			ExternalId:     ptr.String("RoleName1"),
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: "AccessProviderId4",
@@ -596,6 +599,11 @@ func generateAccessControls_schema(t *testing.T) {
 		return nil
 	}).Once()
 
+	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
 	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
 			Id:   "AccessProviderId1",
@@ -676,6 +684,11 @@ func generateAccessControls_existing_schema(t *testing.T) {
 	repoMock.EXPECT().GetTablesInDatabase(database, schema, mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
 		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3", TableType: "BASE TABLE"})
 		handler(&TableEntity{Database: s, Schema: s2, Name: "View3", TableType: "VIEW"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -761,6 +774,11 @@ func generateAccessControls_database(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema2.Table3", "RoleName1", false).Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "VIEW DB1.Schema2.View3", "RoleName1", false).Return(nil).Once()
 
+	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
 	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
 			Id:   "AccessProviderId1",
@@ -804,6 +822,11 @@ func generateAccessControls_existing_database(t *testing.T) {
 
 	repoMock.EXPECT().GetSchemasInDatabase("DB1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&SchemaEntity{Database: s, Name: "Schema2"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -1132,6 +1155,7 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 			AccessProvider: "AccessProviderId",
 			ActualName:     "NewRoleName",
 			ExternalId:     ptr.String("NewRoleName"),
+			Type:           ptr.String(access_provider.Role),
 		}, {
 			AccessProvider: "TEST_DB_DBRole",
 			ActualName:     "newDBRole",
@@ -1229,11 +1253,13 @@ func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T)
 			AccessProvider: "AccessProviderId",
 			ActualName:     "NewRoleName",
 			ExternalId:     ptr.String("NewRoleName"),
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: "AccessProviderId2",
 			ActualName:     "OldRoleName",
 			ExternalId:     ptr.String("OldRoleName"),
+			Type:           ptr.String(access_provider.Role),
 		},
 	})
 }

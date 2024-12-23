@@ -476,6 +476,36 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 	return nil
 }
 
+// getFullNameFromGrant creates the full name for Raito WHAT item based on the name and type from the grant definition in Snowflake
+func getFullNameFromGrant(name, objectType string) string {
+	sfObject := common.ParseFullName(name)
+
+	if strings.EqualFold(objectType, Function) && sfObject.Table != nil {
+		function := *sfObject.Table
+
+		if strings.Contains(function, "(") {
+			funcName := function[:strings.Index(function, "(")] //nolint:gocritic
+
+			paramString := function[strings.Index(function, "(")+1:]
+			if strings.Contains(paramString, "):") {
+				paramString = paramString[:strings.Index(paramString, "):")] //nolint:gocritic
+			}
+
+			paramString = strings.TrimSuffix(paramString, ")")
+
+			params := strings.Split(paramString, ",")
+			for i, param := range params {
+				p := strings.TrimSpace(param)
+				params[i] = p[strings.LastIndex(p, " ")+1:]
+			}
+
+			sfObject.Table = ptr.String(fmt.Sprintf(`%q(%s)`, funcName, strings.Join(params, ", ")))
+		}
+	}
+
+	return sfObject.GetFullName(false)
+}
+
 func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []GrantToRole) []exporter.WhatItem {
 	var do *ds.DataObjectReference
 
@@ -491,10 +521,9 @@ func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []Gra
 		}
 
 		if first {
-			sfObject := common.ParseFullName(grant.Name)
 			// We set type to empty string because that's not needed by the importer to match the data object
 			// + we cannot make the mapping to the correct Raito data object types here.
-			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: ""}
+			do = &ds.DataObjectReference{FullName: getFullNameFromGrant(grant.Name, grant.GrantedOn), Type: ""}
 			first = false
 		} else if do.FullName != grant.Name {
 			if len(permissions) > 0 {
@@ -503,10 +532,10 @@ func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []Gra
 					Permissions: permissions,
 				})
 			}
-			sfObject := common.ParseFullName(grant.Name)
+
 			// We set type to empty string because that's not needed by the importer to match the data object
 			// + we cannot make the mapping to the correct Raito data object types here.
-			do = &ds.DataObjectReference{FullName: sfObject.GetFullName(false), Type: ""}
+			do = &ds.DataObjectReference{FullName: getFullNameFromGrant(grant.Name, grant.GrantedOn), Type: ""}
 			permissions = make([]string, 0)
 		}
 
@@ -659,23 +688,30 @@ func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action 
 				continue
 			}
 
-			var dor ds.DataObjectReference
-			if policyReference.REF_COLUMN_NAME.Valid {
-				dor = ds.DataObjectReference{
-					Type:     "COLUMN",
-					FullName: common.FormatQuery(`%s.%s.%s.%s`, policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME, policyReference.REF_COLUMN_NAME.String),
+			var dor *ds.DataObjectReference
+
+			if policyReference.POLICY_KIND == "MASKING_POLICY" {
+				if policyReference.REF_COLUMN_NAME.Valid {
+					dor = &ds.DataObjectReference{
+						Type:     "COLUMN",
+						FullName: common.FormatQuery(`%s.%s.%s.%s`, policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME, policyReference.REF_COLUMN_NAME.String),
+					}
+				} else {
+					logger.Info(fmt.Sprintf("Masking policy %s.%s.%s refers to something that isn't a column. Skipping", policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.POLICY_NAME))
 				}
-			} else {
-				dor = ds.DataObjectReference{
+			} else if policyReference.POLICY_KIND == "ROW_ACCESS_POLICY" {
+				dor = &ds.DataObjectReference{
 					Type:     "TABLE",
 					FullName: common.FormatQuery(`%s.%s.%s`, policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME),
 				}
 			}
 
-			ap.What = append(ap.What, exporter.WhatItem{
-				DataObject:  &dor,
-				Permissions: []string{},
-			})
+			if dor != nil {
+				ap.What = append(ap.What, exporter.WhatItem{
+					DataObject:  dor,
+					Permissions: []string{},
+				})
+			}
 		}
 
 		err2 = s.accessProviderHandler.AddAccessProviders(&ap)

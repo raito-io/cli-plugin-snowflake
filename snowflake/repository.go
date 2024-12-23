@@ -95,7 +95,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 		usageBatchSize: usageBatchSize,
 		workerPoolSize: workerPoolSize,
 
-		maskFactory: NewMaskFactory(),
+		maskFactory: NewMaskFactory(params),
 	}, nil
 }
 
@@ -273,7 +273,7 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 		}
 	}
 
-	return newMostRecentQueryStartTime, i, sec, repo.usageBatchSize != 0 && i == repo.usageBatchSize
+	return newMostRecentQueryStartTime, i, sec, repo.usageBatchSize != 0 && i >= repo.usageBatchSize
 }
 
 func (repo *SnowflakeRepository) GetOutboundShares() ([]ShareEntity, error) {
@@ -915,7 +915,7 @@ func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName 
 }
 
 func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
-	rows, _, err := repo.query("select current_account()")
+	rows, _, err := repo.query(`select CONCAT(CURRENT_ORGANIZATION_NAME(), '-', CURRENT_ACCOUNT_NAME())`)
 	if err != nil {
 		return "", err
 	}
@@ -1058,6 +1058,14 @@ func (repo *SnowflakeRepository) GetSchemasInDatabase(databaseName string, handl
 	}, handleEntity)
 }
 
+func (repo *SnowflakeRepository) GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error {
+	q := getFunctionsInDatabaseQuery(databaseName)
+
+	return handleDbEntities(repo, q, func() interface{} {
+		return &FunctionEntity{}
+	}, handleEntity)
+}
+
 func (repo *SnowflakeRepository) GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {
 	q := getTablesInDatabaseQuery(databaseName, schemaName)
 
@@ -1145,11 +1153,6 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 			return fmt.Errorf("creation of mask %s: %w", maskingName, err)
 		}
 
-		_, err = tx.Exec(fmt.Sprintf("GRANT OWNERSHIP ON MASKING POLICY %s TO ROLE %s", maskingName, repo.role))
-		if err != nil {
-			return err
-		}
-
 		maskingForDataObjects[maskingName] = dataObjectTypeMap[columnType]
 	}
 
@@ -1231,13 +1234,6 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 	}
 
 	for _, policy := range policies {
-		if repo.role != AccountAdminRole {
-			err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", common.FormatQuery("MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name), repo.role, true)
-			if err != nil {
-				return err
-			}
-		}
-
 		_, err = tx.Exec(common.FormatQuery("DROP MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name))
 		if err != nil {
 			return err
@@ -1312,13 +1308,6 @@ func (repo *SnowflakeRepository) DropFilter(databaseName string, schema string, 
 	existingPolicy, err := repo.getRowFilterForTableIfExists(databaseName, schema, tableName)
 	if err != nil {
 		return fmt.Errorf("load possible existing row filter: %w", err)
-	}
-
-	if repo.role != AccountAdminRole {
-		err = repo.ExecuteGrantOnAccountRole("OWNERSHIP", common.FormatQuery("ROW ACCESS POLICY %s.%s.%s", databaseName, schema, filterName), repo.role, true)
-		if err != nil {
-			return err
-		}
 	}
 
 	if existingPolicy != nil {
@@ -1558,6 +1547,10 @@ func handleDbEntities(repo *SnowflakeRepository, query string, createEntity Enti
 
 func getSchemasInDatabaseQuery(dbName string) string {
 	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.SCHEMATA`, common.FormatQuery("%s", dbName))
+}
+
+func getFunctionsInDatabaseQuery(dbName string) string {
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.FUNCTIONS`, common.FormatQuery("%s", dbName))
 }
 
 func getTablesInDatabaseQuery(dbName string, schemaName string) string {

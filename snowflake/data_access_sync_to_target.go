@@ -12,6 +12,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/hashicorp/go-multierror"
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	"github.com/raito-io/cli/base/access_provider"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -37,6 +38,7 @@ type AccessToTargetSyncer struct {
 
 	uniqueRoleNameGeneratorsCache map[*string]naming_hint.UniqueGenerator
 	tablesPerSchemaCache          map[string][]TableEntity
+	functionsPerSchemaCache       map[string][]FunctionEntity
 	schemasPerDataBaseCache       map[string][]SchemaEntity
 	warehousesCache               []DbEntity
 }
@@ -49,6 +51,7 @@ func NewAccessToTargetSyncer(accessSyncer *AccessSyncer, namingConstraints namin
 		configMap:                     configMap,
 		repo:                          repo,
 		tablesPerSchemaCache:          make(map[string][]TableEntity),
+		functionsPerSchemaCache:       make(map[string][]FunctionEntity),
 		schemasPerDataBaseCache:       make(map[string][]SchemaEntity),
 		uniqueRoleNameGeneratorsCache: make(map[*string]naming_hint.UniqueGenerator),
 		namingConstraints:             namingConstraints,
@@ -514,7 +517,6 @@ func (s *AccessToTargetSyncer) buildMetaDataMap(metaData *ds.MetaData) map[strin
 //nolint:gocyclo
 func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externalId string, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string, rolesCreated map[string]interface{}, metaData map[string]map[string]struct{}) (string, error) {
 	accessProvider := toProcessAps[externalId]
-	logger.Debug(fmt.Sprintf("Handle access provider with key %q - %+v - %+v", externalId, accessProvider, toProcessAps))
 
 	ignoreWho := accessProvider.WhoLocked != nil && *accessProvider.WhoLocked
 	ignoreInheritance := accessProvider.InheritanceLocked != nil && *accessProvider.InheritanceLocked
@@ -573,6 +575,8 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 				if err2 != nil {
 					return actualName, err2
 				}
+			} else if what.DataObject.Type == Function {
+				s.createGrantsForFunction(permissions, what.DataObject.FullName, metaData, expectedGrants)
 			} else if what.DataObject.Type == "shared-schema" {
 				err2 := s.createGrantsForSchema(permissions, what.DataObject.FullName, metaData, true, expectedGrants)
 				if err2 != nil {
@@ -764,8 +768,13 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					logger.Debug(fmt.Sprintf("Ignoring USAGE permission on %s %q", grant.GrantedOn, grant.Name))
 				} else {
 					onType := convertSnowflakeGrantTypeToRaito(grant.GrantedOn)
+					name := grant.Name
 
-					foundGrants = append(foundGrants, Grant{grant.Privilege, onType, grant.Name})
+					if onType == Function { // For functions we need to do a special conversion
+						name = getFullNameFromGrant(name, onType)
+					}
+
+					foundGrants = append(foundGrants, Grant{grant.Privilege, onType, name})
 				}
 			}
 		}
@@ -1075,10 +1084,16 @@ func (s *AccessToTargetSyncer) generateAccessControls(ctx context.Context, toPro
 	metaData := s.buildMetaDataMap(md)
 
 	for externalId, accessProvider := range toProcessAps {
+		// Making sure we always set a type. If not set by Raito cloud, we take Account Role as default.
+		apType := access_provider.Role
+		if accessProvider.Type != nil && *accessProvider.Type != "" {
+			apType = *accessProvider.Type
+		}
+
 		fi := importer.AccessProviderSyncFeedback{
 			AccessProvider: accessProvider.Id,
 			ExternalId:     ptr.String(externalId),
-			Type:           accessProvider.Type,
+			Type:           &apType,
 		}
 
 		fi.ActualName, err = s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, metaData)
@@ -1220,6 +1235,25 @@ func (s *AccessToTargetSyncer) createGrantsForTableOrView(doType string, permiss
 	return nil
 }
 
+func (s *AccessToTargetSyncer) createGrantsForFunction(permissions []string, fullName string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) {
+	for _, p := range permissions {
+		if _, f := metaData[Function][strings.ToUpper(p)]; f {
+			grants.Add(Grant{p, Function, fullName}) // fullName should already be in the right format
+		} else {
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(Function)))
+		}
+	}
+
+	if len(grants) > 0 {
+		split := strings.Split(fullName, ".")
+
+		if len(split) >= 3 {
+			grants.Add(Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, split[0])},
+				Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, split[0], split[1])})
+		}
+	}
+}
+
 func (s *AccessToTargetSyncer) getTablesForSchema(database, schema string) ([]TableEntity, error) {
 	cacheKey := database + "." + schema
 
@@ -1227,7 +1261,7 @@ func (s *AccessToTargetSyncer) getTablesForSchema(database, schema string) ([]Ta
 		return tables, nil
 	}
 
-	tables := make([]TableEntity, 10)
+	tables := make([]TableEntity, 0, 10)
 
 	err := s.repo.GetTablesInDatabase(database, schema, func(entity interface{}) error {
 		table := entity.(*TableEntity)
@@ -1243,6 +1277,33 @@ func (s *AccessToTargetSyncer) getTablesForSchema(database, schema string) ([]Ta
 	s.tablesPerSchemaCache[cacheKey] = tables
 
 	return tables, nil
+}
+
+func (s *AccessToTargetSyncer) getFunctionsForSchema(database, schema string) ([]FunctionEntity, error) {
+	cacheKey := database + "." + schema
+
+	if functions, f := s.functionsPerSchemaCache[cacheKey]; f {
+		return functions, nil
+	}
+
+	functions := make([]FunctionEntity, 0, 10)
+
+	err := s.repo.GetFunctionsInDatabase(database, func(entity interface{}) error {
+		function := entity.(*FunctionEntity)
+		if function.Schema == schema {
+			functions = append(functions, *function)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	s.functionsPerSchemaCache[cacheKey] = functions
+
+	return functions, nil
 }
 
 func (s *AccessToTargetSyncer) getSchemasForDatabase(database string) ([]SchemaEntity, error) {
@@ -1344,6 +1405,18 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForSchema(database, schema,
 			tableMatchFound = s.createPermissionGrantsForTable(database, schema, table, p, metaData, isShared, grants)
 			matchFound = matchFound || tableMatchFound
 		}
+
+		functions, err := s.getFunctionsForSchema(database, schema)
+		if err != nil {
+			return false, err
+		}
+
+		// Run through all the tabular things (tables, views, ...) in the schema
+		for _, function := range functions {
+			functionMatchFound := false
+			functionMatchFound = s.createPermissionGrantsForFunction(database, schema, function, p, metaData, grants)
+			matchFound = matchFound || functionMatchFound
+		}
 	}
 
 	return matchFound, nil
@@ -1407,6 +1480,19 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForTable(database string, s
 	// Check if the permission is applicable on the data object type
 	if _, f2 := metaData[tableType][strings.ToUpper(p)]; f2 {
 		grants.Add(Grant{p, tableType, common.FormatQuery(`%s.%s.%s`, database, schema, table.Name)})
+		return true
+	}
+
+	return false
+}
+
+func (s *AccessToTargetSyncer) createPermissionGrantsForFunction(database string, schema string, function FunctionEntity, p string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) bool {
+	// Check if the permission is applicable on the data object type
+	if _, f2 := metaData[Function][strings.ToUpper(p)]; f2 {
+		argumentSignature := convertFunctionArgumentSignature(function.ArgumentSignature)
+
+		grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, database, schema) + `"` + function.Name + `"` + argumentSignature})
+
 		return true
 	}
 

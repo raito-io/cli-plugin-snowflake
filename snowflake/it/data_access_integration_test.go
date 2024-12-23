@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/data_source"
@@ -94,6 +95,33 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 					Permissions: []string{"OPERATE", "USAGE"},
 				},
 			})
+		} else if ap.Name == "DATA_ANALYST" {
+			s.Len(ap.What, 5)
+			s.ElementsMatch(ap.What, []sync_from_target.WhatItem{
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE", Type: ""},
+					Permissions: []string{"USAGE on DATABASE"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE.ORDERING", Type: ""},
+					Permissions: []string{"USAGE on SCHEMA"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE.ORDERING.SUPPLIER", Type: ""},
+					Permissions: []string{"REFERENCES", "SELECT"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_WAREHOUSE", Type: ""},
+					Permissions: []string{"OPERATE", "USAGE"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`, Type: ""},
+					Permissions: []string{"USAGE"},
+				},
+			})
+
+			s.Len(ap.Who.Users, 1)
+			s.ElementsMatch([]string{"BENJAMINSTEWART"}, ap.Who.Users)
 		}
 	}
 }
@@ -144,6 +172,13 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 							Type:     "schema",
 						},
 						Permissions: []string{"USAGE on SCHEMA"},
+					},
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`,
+							Type:     "function",
+						},
+						Permissions: []string{"USAGE"},
 					},
 				},
 			},
@@ -213,6 +248,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			AccessProvider: accountRoleId,
 			ActualName:     actualRoleName,
 			ExternalId:     &actualRoleName,
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1", testId),
@@ -240,20 +276,24 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 
 	grants, err := s.sfRepo.GetGrantsToAccountRole(actualRoleName)
 	s.NoError(err)
-	s.Len(grants, 4)
+	s.Len(grants, 5)
 	dbUsageFound := false
 	schemaUsageFound := false
+	functionUsageFound := false
 
 	for _, grant := range grants {
 		if strings.EqualFold(grant.GrantedOn, "DATABASE") && grant.Name == "RAITO_DATABASE" && grant.Privilege == "USAGE" {
 			dbUsageFound = true
 		} else if strings.EqualFold(grant.GrantedOn, "SCHEMA") && grant.Name == "RAITO_DATABASE.ORDERING" && grant.Privilege == "USAGE" {
 			schemaUsageFound = true
+		} else if strings.EqualFold(grant.GrantedOn, "FUNCTION") && grant.Name == "RAITO_DATABASE.ORDERING.\"decrypt(val VARCHAR):VARCHAR(16777216)\"" && grant.Privilege == "USAGE" {
+			functionUsageFound = true
 		}
 	}
 
 	s.True(dbUsageFound)
 	s.True(schemaUsageFound)
+	s.True(functionUsageFound)
 
 	databaseRoles, err := s.sfRepo.GetDatabaseRoles("RAITO_DATABASE")
 	s.NoError(err)
@@ -333,6 +373,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			AccessProvider: accountRoleId,
 			ActualName:     actualRoleName,
 			ExternalId:     &actualRoleName,
+			Type:           ptr.String(access_provider.Role),
 		},
 		{
 			AccessProvider: fmt.Sprintf("%s_TESTDATABASEROLE1", testId),
