@@ -354,7 +354,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 
 					repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantOfRole{
 						{GrantedTo: "ROLE", GranteeName: "GranteeDatabaseRole1Number2"},
-						{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.DatabaseRole2"},
+						{GrantedTo: GrantTypeDatabaseRole, GranteeName: "TEST_DB.DatabaseRole2"},
 					}, nil).Once()
 					repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "DatabaseRole1").Return([]GrantToRole{
 						{GrantedOn: "TABLE", Name: "TEST_DB.GranteeRole1Table", Privilege: "SELECT"},

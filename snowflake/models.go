@@ -69,7 +69,7 @@ func (t *TagEntity) GetFullName() string {
 		return *t.Database + "." + *t.Schema + "." + t.Name + "." + *t.Column
 	case "ROLE":
 		return t.Name
-	case "DATABASE_ROLE":
+	case GrantTypeDatabaseRole:
 		return *t.Database + "." + t.Name
 	case "WAREHOUSE":
 		return t.Name

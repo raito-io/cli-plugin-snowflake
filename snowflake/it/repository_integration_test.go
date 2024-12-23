@@ -695,7 +695,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantDatabaseRolesToDataba
 
 	for _, granteeName := range databaseRolesToGrant {
 		expectedGrants = append(expectedGrants, snowflake.GrantOfRole{
-			GrantedTo:   "DATABASE_ROLE",
+			GrantedTo:   snowflake.GrantTypeDatabaseRole,
 			GranteeName: fmt.Sprintf("%s.%s", database, granteeName),
 		})
 	}

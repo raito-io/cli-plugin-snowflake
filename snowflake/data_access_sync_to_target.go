@@ -667,7 +667,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					usersOfRole = append(usersOfRole, gor.GranteeName)
 				} else if strings.EqualFold(gor.GrantedTo, "ROLE") {
 					rolesOfRole = append(rolesOfRole, accountRoleExternalIdGenerator(gor.GranteeName))
-				} else if strings.EqualFold(gor.GrantedTo, "DATABASE_ROLE") {
+				} else if strings.EqualFold(gor.GrantedTo, GrantTypeDatabaseRole) {
 					database, parsedRoleName, err2 := parseDatabaseRoleRoleName(cleanDoubleQuotes(gor.GranteeName))
 					if err2 != nil {
 						return actualName, err2
@@ -765,7 +765,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					foundGrants = append(foundGrants, Grant{grant.Privilege, "account", ""})
 				} else if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
 					logger.Info(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, externalId))
-				} else if strings.EqualFold(grant.Privilege, "USAGE") && (strings.EqualFold(grant.GrantedOn, "ROLE") || strings.EqualFold(grant.GrantedOn, "DATABASE_ROLE")) {
+				} else if strings.EqualFold(grant.Privilege, "USAGE") && (strings.EqualFold(grant.GrantedOn, "ROLE") || strings.EqualFold(grant.GrantedOn, GrantTypeDatabaseRole)) {
 					logger.Debug(fmt.Sprintf("Ignoring USAGE permission on %s %q", grant.GrantedOn, grant.Name))
 				} else {
 					onType := convertSnowflakeGrantTypeToRaito(grant.GrantedOn)

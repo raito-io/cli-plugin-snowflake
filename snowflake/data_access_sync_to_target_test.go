@@ -988,8 +988,8 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 
 	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.AnythingOfType("string"), "TEST_DB", "existingDBRole1").Return(nil).Once()
 	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "existingDBRole1").Return([]GrantOfRole{
-		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role2"},
-		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role3"},
+		{GrantedTo: GrantTypeDatabaseRole, GranteeName: "TEST_DB.Role2"},
+		{GrantedTo: GrantTypeDatabaseRole, GranteeName: "TEST_DB.Role3"},
 	}, nil).Once()
 
 	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "existingDBRole1").Return([]GrantToRole{}, nil).Once()
@@ -1116,8 +1116,8 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.AnythingOfType("string"), "TEST_DB", "newDBRole").Return(nil).Once()
 	repoMock.EXPECT().RenameDatabaseRole("TEST_DB", "oldDBRole", "newDBRole").Return(nil).Once()
 	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "newDBRole").Return([]GrantOfRole{
-		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role1"},
-		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role2"},
+		{GrantedTo: GrantTypeDatabaseRole, GranteeName: "TEST_DB.Role1"},
+		{GrantedTo: GrantTypeDatabaseRole, GranteeName: "TEST_DB.Role2"},
 	}, nil).Once()
 	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "newDBRole").Return([]GrantToRole{}, nil).Once()
 

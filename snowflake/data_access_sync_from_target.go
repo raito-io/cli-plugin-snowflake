@@ -521,7 +521,7 @@ func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []Gra
 	first := true
 
 	for _, grant := range grantToEntities {
-		if grant.GrantedOn == "DATABASE_ROLE" { // It looks like database roles assigned to a SHARE are also included here, ignoring that
+		if grant.GrantedOn == GrantTypeDatabaseRole { // It looks like database roles assigned to a SHARE are also included here, ignoring that
 			continue
 		}
 
@@ -613,7 +613,7 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 				accessProviders = append(accessProviders, accountRoleExternalIdGenerator(cleanDoubleQuotes(grantee.GranteeName)))
 			} else if grantee.GrantedTo == "SHARE" {
 				accessProviders = append(accessProviders, shareExternalIdGenerator(cleanDoubleQuotes(grantee.GranteeName)))
-			} else if grantee.GrantedTo == "DATABASE_ROLE" {
+			} else if grantee.GrantedTo == GrantTypeDatabaseRole {
 				database, parsedRoleName, err2 := parseDatabaseRoleRoleName(cleanDoubleQuotes(grantee.GranteeName))
 				if err2 != nil {
 					return nil, nil, nil, err2
