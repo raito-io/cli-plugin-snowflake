@@ -10,6 +10,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/raito-io/cli/base/access_provider"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
+	"github.com/raito-io/cli/base/access_provider/types"
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
@@ -209,6 +210,11 @@ func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareEntity Shar
 	// Locking to make sure only one goroutine can read & write to the processedAps map at a time
 	s.lock.Lock()
 
+	recipients := strings.Split(shareEntity.To, ",")
+	for i, r := range recipients {
+		recipients[i] = strings.TrimSpace(r)
+	}
+
 	ap, f := processedAps[externalId]
 	if !f {
 		processedAps[externalId] = &exporter.AccessProvider{
@@ -217,13 +223,12 @@ func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareEntity Shar
 			ActualName:        shareName,
 			Name:              shareName,
 			NamingHint:        shareName,
-			Action:            exporter.Grant,
-			Who:               nil,
-			NotInternalizable: true, // TODO until we make it internalizable
-			WhoLocked:         ptr.Bool(true),
-			WhoLockedReason:   ptr.String("A share cannot be directly linked to a user, group or role"),
+			Action:            types.Share,
+			NotInternalizable: true,
 			What:              make([]exporter.WhatItem, 0),
-			Policy:            shareEntity.To,
+			Who: &exporter.WhoItem{
+				Recipients: recipients,
+			},
 		}
 
 		ap = processedAps[externalId]
@@ -266,7 +271,7 @@ func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity
 			ActualName: roleName,
 			Name:       roleName,
 			NamingHint: roleName,
-			Action:     exporter.Grant,
+			Action:     types.Grant,
 			Who: &exporter.WhoItem{
 				Users:           users,
 				AccessProviders: accessProviders,
@@ -431,7 +436,7 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 
 			Name:       fmt.Sprintf("%s.%s", database, roleName),
 			NamingHint: roleName,
-			Action:     exporter.Grant,
+			Action:     types.Grant,
 			Who: &exporter.WhoItem{
 				Users:           users,
 				AccessProviders: accessProviders,
@@ -622,7 +627,7 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 	return users, groups, accessProviders, nil
 }
 
-func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action exporter.Action) error {
+func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action types.Action) error {
 	policyEntities, err := s.repo.GetPolicies(policyType)
 	if err != nil {
 		// For Standard edition, row access policies are not supported. Failsafe in case `sf-standard-edition` is overlooked.
@@ -724,11 +729,11 @@ func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action 
 }
 
 func (s *AccessFromTargetSyncer) importMaskingPolicies() error {
-	return s.importPoliciesOfType("MASKING", exporter.Mask)
+	return s.importPoliciesOfType("MASKING", types.Mask)
 }
 
 func (s *AccessFromTargetSyncer) importRowAccessPolicies() error {
-	return s.importPoliciesOfType("ROW ACCESS", exporter.Filtered)
+	return s.importPoliciesOfType("ROW ACCESS", types.Filtered)
 }
 
 func (s *AccessFromTargetSyncer) getApplicableDatabases(dbExcludes set.Set[string]) (set.Set[string], error) {

@@ -15,6 +15,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
+	"github.com/raito-io/cli/base/access_provider/types"
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/util/match"
@@ -82,15 +83,15 @@ func (s *AccessToTargetSyncer) syncToTarget(ctx context.Context) error {
 		var err2 error
 
 		switch ap.Action {
-		case importer.Mask:
+		case types.Mask:
 			_, masksMap, masksToRemove, err2 = s.syncAccessProviderToTargetHandler(ap, masksMap, masksToRemove)
-		case importer.Filtered:
+		case types.Filtered:
 			_, filtersMap, filtersToRemove, err2 = s.syncAccessProviderToTargetHandler(ap, filtersMap, filtersToRemove)
-		case importer.Grant, importer.Purpose:
+		case types.Grant, types.Purpose:
 			var externalId string
 			externalId, rolesMap, rolesToRemove, err2 = s.syncAccessProviderToTargetHandler(ap, rolesMap, rolesToRemove)
 			apIdNameMap[ap.Id] = externalId
-		case importer.Deny, importer.Promise:
+		case types.Deny, types.Promise:
 		default:
 			err2 = s.accessProviderFeedbackHandler.AddAccessProviderFeedback(importer.AccessProviderSyncFeedback{
 				AccessProvider: ap.Id,

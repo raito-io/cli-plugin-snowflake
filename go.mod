@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/matoous/go-nanoid/v2 v2.1.0
 	github.com/raito-io/bexpression v0.1.2
-	github.com/raito-io/cli v0.68.6
+	github.com/raito-io/cli v0.69.0-dev0
 	github.com/raito-io/enumer v0.1.4
 	github.com/raito-io/golang-set v0.0.4
 	github.com/snowflakedb/gosnowflake v1.12.1
@@ -30,7 +30,6 @@ require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
-	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/apache/arrow/go/v16 v16.1.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.32.6 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.7 // indirect
@@ -83,7 +82,6 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/oklog/run v1.1.0 // indirect

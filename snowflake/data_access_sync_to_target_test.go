@@ -11,6 +11,7 @@ import (
 	"github.com/raito-io/bexpression/datacomparison"
 	"github.com/raito-io/cli/base/access_provider"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
+	"github.com/raito-io/cli/base/access_provider/types"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
@@ -231,7 +232,7 @@ func TestAccessSyncer_SyncAccessProviderMasksToTarget(t *testing.T) {
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1.Column1", Type: "column"}},
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2.Table1.Column1", Type: "column"}},
 			},
-			Action: importer.Mask,
+			Action: types.Mask,
 			Type:   ptr.String("SHA256"),
 		},
 		"Mask2": {
@@ -243,7 +244,7 @@ func TestAccessSyncer_SyncAccessProviderMasksToTarget(t *testing.T) {
 			What: []importer.WhatItem{
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table3.Column1", Type: "column"}},
 			},
-			Action: importer.Mask,
+			Action: types.Mask,
 		},
 	}
 
@@ -305,7 +306,7 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 	masksToRemove := map[string]*importer.AccessProvider{
 		"RAITO_FILTERTOREMOVE1": {
 			Id:         "FilterToRemove1",
-			Action:     importer.Filtered,
+			Action:     types.Filtered,
 			ActualName: ptr.String("RAITO_FILTERTOREMOVE1"),
 			ExternalId: ptr.String("DB1.Schema1.RAITO_FILTERTOREMOVE1"),
 			What: []importer.WhatItem{
@@ -319,7 +320,7 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 		},
 		"RAITO_FILTERTOREMOVE2": {
 			Id:         "FilterToRemove2",
-			Action:     importer.Filtered,
+			Action:     types.Filtered,
 			ActualName: ptr.String("RAITO_FILTERTOREMOVE2"),
 			ExternalId: ptr.String("DB1.Schema1.Table3.RAITO_FILTERTOREMOVE2"),
 			What: []importer.WhatItem{
@@ -337,7 +338,7 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 		"RAITO_FILTER1": {
 			Id:     "RAITO_FILTER1",
 			Name:   "RAITO_FILTER1",
-			Action: importer.Filtered,
+			Action: types.Filtered,
 			What: []importer.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
@@ -355,7 +356,7 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 		"RAITO_FILTER2": {
 			Id:     "RAITO_FILTER2",
 			Name:   "RAITO_FILTER2",
-			Action: importer.Filtered,
+			Action: types.Filtered,
 			What: []importer.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
@@ -386,7 +387,7 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 		"RAITO_FILTER3": {
 			Id:     "RAITO_FILTER3",
 			Name:   "RAITO_FILTER3",
-			Action: importer.Filtered,
+			Action: types.Filtered,
 			What: []importer.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
