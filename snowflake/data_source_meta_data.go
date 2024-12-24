@@ -14,7 +14,6 @@ const USAGE_ON_DATABASE = "USAGE on DATABASE"
 const USAGE_ON_SCHEMA = "USAGE on SCHEMA"
 
 const apTypeDatabaseRole = "databaseRole"
-const apTypeShare = "share"
 const apTypeSharePrefix = "share:"
 const ExternalTable = "external-" + ds.Table
 const IcebergTable = "iceberg-" + ds.Table
@@ -721,16 +720,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				CanBeCreated:                  false,
 				CanBeAssumed:                  false,
 				CanAssumeMultiple:             false,
-				AllowedWhoAccessProviderTypes: []string{access_provider.Role, apTypeDatabaseRole, apTypeShare},
-			},
-			{
-				Type:                          apTypeShare,
-				Label:                         "Share",
-				IsNamedEntity:                 true,
-				CanBeCreated:                  false,
-				CanBeAssumed:                  false,
-				CanAssumeMultiple:             false,
-				AllowedWhoAccessProviderTypes: []string{},
+				AllowedWhoAccessProviderTypes: []string{access_provider.Role, apTypeDatabaseRole},
 			},
 		},
 		MaskingMetadata: &ds.MaskingMetadata{

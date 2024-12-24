@@ -248,14 +248,13 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			wantAps: []sync_from_target.AccessProvider{
 				{
 					ExternalId:        apTypeSharePrefix + "Share1",
-					NotInternalizable: false,
+					NotInternalizable: true,
 					Name:              "Share1",
 					NamingHint:        "Share1",
-					Who:               nil,
-					ActualName:        "Share1",
-					Type:              ptr.String(apTypeShare),
-					WhoLocked:         ptr.Bool(true),
-					WhoLockedReason:   ptr.String("A share cannot be directly linked to a user, group or role"),
+					Who: &sync_from_target.WhoItem{
+						Recipients: []string{"acc1", "acc2"},
+					},
+					ActualName: "Share1",
 					What: []sync_from_target.WhatItem{
 						{
 							DataObject: &data_source.DataObjectReference{
@@ -272,8 +271,8 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 							Permissions: []string{"SELECT"},
 						},
 					},
-					Action: 1,
-					Policy: "acc1, acc2",
+					Action: 6,
+					Policy: "",
 				},
 				{
 					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",

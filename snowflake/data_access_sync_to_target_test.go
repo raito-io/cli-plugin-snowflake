@@ -998,6 +998,7 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, false, "TEST_DB", "existingDBRole1")
 	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1", "Role3").Return(nil).Once()
 	repoMock.EXPECT().RevokeAccountRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1").Return(nil).Once()
+	repoMock.EXPECT().RevokeSharesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1").Return(nil).Once()
 
 	access := map[string]*importer.AccessProvider{
 		"existingRole1": {
@@ -1452,6 +1453,7 @@ func TestGrantRolesToRole_DatabaseFiltering(t *testing.T) {
 
 	repoMock.EXPECT().GrantDatabaseRolesToDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherDBRole").Return(nil).Once()
 	repoMock.EXPECT().GrantAccountRolesToDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherRole").Return(nil).Once()
+	repoMock.EXPECT().GrantSharesToDatabaseRole(mock.Anything, "DB1", "TargetRole").Return(nil).Once()
 
 	dbRoleType := apTypeDatabaseRole
 	err := syncer.grantRolesToRole(context.Background(), databaseRoleExternalIdGenerator("DB1", "TargetRole"), &dbRoleType, "MyRole1", "AnotherRole", databaseRoleExternalIdGenerator("DB1", "MyDBRole"), databaseRoleExternalIdGenerator("DB1", "AnotherDBRole"))
@@ -1476,6 +1478,7 @@ func TestRevokeRolesFromRole_DatabaseFiltering(t *testing.T) {
 
 	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherDBRole").Return(nil).Once()
 	repoMock.EXPECT().RevokeAccountRolesFromDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherRole").Return(nil).Once()
+	repoMock.EXPECT().RevokeSharesFromDatabaseRole(mock.Anything, "DB1", "TargetRole").Return(nil).Once()
 
 	dbRoleType := apTypeDatabaseRole
 	err := syncer.revokeRolesFromRole(context.Background(), databaseRoleExternalIdGenerator("DB1", "TargetRole"), &dbRoleType, "MyRole1", "AnotherRole", databaseRoleExternalIdGenerator("DB1", "MyDBRole"), databaseRoleExternalIdGenerator("DB1", "AnotherDBRole"))
@@ -1555,6 +1558,7 @@ func expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock *mockDataAccessRep
 
 	if expectDatabaseRoles {
 		repoMock.EXPECT().GrantDatabaseRolesToDatabaseRole(mock.Anything, database, roleName, arguments...).Return(nil).Once()
+		repoMock.EXPECT().GrantSharesToDatabaseRole(mock.Anything, database, roleName, mock.Anything).Return(nil).Once()
 
 	} else {
 		repoMock.EXPECT().GrantAccountRolesToDatabaseRole(mock.Anything, database, roleName, arguments...).Return(nil).Once()
