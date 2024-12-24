@@ -247,10 +247,9 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 			},
 			wantAps: []sync_from_target.AccessProvider{
 				{
-					ExternalId:        apTypeSharePrefix + "Share1",
-					NotInternalizable: true,
-					Name:              "Share1",
-					NamingHint:        "Share1",
+					ExternalId: apTypeSharePrefix + "Share1",
+					Name:       "Share1",
+					NamingHint: "Share1",
 					Who: &sync_from_target.WhoItem{
 						Recipients: []string{"acc1", "acc2"},
 					},

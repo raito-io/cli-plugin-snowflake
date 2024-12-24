@@ -218,13 +218,12 @@ func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareEntity Shar
 	ap, f := processedAps[externalId]
 	if !f {
 		processedAps[externalId] = &exporter.AccessProvider{
-			ExternalId:        apTypeSharePrefix + shareName,
-			ActualName:        shareName,
-			Name:              shareName,
-			NamingHint:        shareName,
-			Action:            types.Share,
-			NotInternalizable: true,
-			What:              make([]exporter.WhatItem, 0),
+			ExternalId: apTypeSharePrefix + shareName,
+			ActualName: shareName,
+			Name:       shareName,
+			NamingHint: shareName,
+			Action:     types.Share,
+			What:       make([]exporter.WhatItem, 0),
 			Who: &exporter.WhoItem{
 				Recipients: recipients,
 			},
