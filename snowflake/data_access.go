@@ -220,6 +220,8 @@ func (s *AccessSyncer) getFullNameFromGrant(name, objectType string) string {
 	if strings.EqualFold(objectType, "ACCOUNT") {
 		accountName, err := s.repo.GetSnowFlakeAccountName()
 		if err != nil {
+			logger.Error(fmt.Sprintf("Failed to get account name from Snowflake: %s", err.Error()))
+
 			return "UNKNOWN"
 		}
 

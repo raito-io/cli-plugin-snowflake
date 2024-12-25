@@ -6,6 +6,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
+	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
@@ -133,8 +134,9 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 }
 
 func TestAccessSyncer_GetFullNameFromGrant(t *testing.T) {
-	assert.Equal(t, "DB1.Schema1.Entity1", getFullNameFromGrant("DB1.Schema1.Entity1", "table"))
-	assert.Equal(t, `MASTER_DATA.PUBLIC."DECRYPTIT"(VARCHAR, VARCHAR)`, getFullNameFromGrant(`MASTER_DATA.PUBLIC."DECRYPTIT(VAL VARCHAR, ENCRYPTIONTYPE VARCHAR):VARCHAR(16777216)"`, Function))
+	accessSyncer := NewDataAccessSyncer(naming_hint.NamingConstraints{})
+	assert.Equal(t, "DB1.Schema1.Entity1", accessSyncer.getFullNameFromGrant("DB1.Schema1.Entity1", "table"))
+	assert.Equal(t, `MASTER_DATA.PUBLIC."DECRYPTIT"(VARCHAR, VARCHAR)`, accessSyncer.getFullNameFromGrant(`MASTER_DATA.PUBLIC."DECRYPTIT(VAL VARCHAR, ENCRYPTIONTYPE VARCHAR):VARCHAR(16777216)"`, Function))
 }
 
 func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
