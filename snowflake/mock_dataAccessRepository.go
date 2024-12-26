@@ -1665,6 +1665,61 @@ func (_c *mockDataAccessRepository_GetShares_Call) RunAndReturn(run func() ([]Db
 	return _c
 }
 
+// GetSnowFlakeAccountName provides a mock function with no fields
+func (_m *mockDataAccessRepository) GetSnowFlakeAccountName() (string, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSnowFlakeAccountName")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (string, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataAccessRepository_GetSnowFlakeAccountName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSnowFlakeAccountName'
+type mockDataAccessRepository_GetSnowFlakeAccountName_Call struct {
+	*mock.Call
+}
+
+// GetSnowFlakeAccountName is a helper method to define mock.On call
+func (_e *mockDataAccessRepository_Expecter) GetSnowFlakeAccountName() *mockDataAccessRepository_GetSnowFlakeAccountName_Call {
+	return &mockDataAccessRepository_GetSnowFlakeAccountName_Call{Call: _e.mock.On("GetSnowFlakeAccountName")}
+}
+
+func (_c *mockDataAccessRepository_GetSnowFlakeAccountName_Call) Run(run func()) *mockDataAccessRepository_GetSnowFlakeAccountName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetSnowFlakeAccountName_Call) Return(_a0 string, _a1 error) *mockDataAccessRepository_GetSnowFlakeAccountName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetSnowFlakeAccountName_Call) RunAndReturn(run func() (string, error)) *mockDataAccessRepository_GetSnowFlakeAccountName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetTablesInDatabase provides a mock function with given fields: databaseName, schemaName, handleEntity
 func (_m *mockDataAccessRepository) GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {
 	ret := _m.Called(databaseName, schemaName, handleEntity)
