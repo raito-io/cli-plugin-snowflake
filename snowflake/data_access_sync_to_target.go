@@ -772,7 +772,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					name := grant.Name
 
 					if onType == Function { // For functions we need to do a special conversion
-						name = getFullNameFromGrant(name, onType)
+						name = s.accessSyncer.getFullNameFromGrant(name, onType)
 					}
 
 					foundGrants = append(foundGrants, Grant{grant.Privilege, onType, name})

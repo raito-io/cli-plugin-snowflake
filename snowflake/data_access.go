@@ -3,8 +3,11 @@ package snowflake
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
+	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	"github.com/raito-io/cli/base/tag"
@@ -31,6 +34,7 @@ const (
 //go:generate go run github.com/vektra/mockery/v2 --name=dataAccessRepository --with-expecter --inpackage
 type dataAccessRepository interface {
 	Close() error
+	GetSnowFlakeAccountName() (string, error)
 	CommentAccountRoleIfExists(comment, objectName string) error
 	CommentDatabaseRoleIfExists(comment, database, roleName string) error
 	CreateAccountRole(roleName string) error
@@ -213,4 +217,45 @@ func (s *AccessSyncer) retrieveGrantsOfRole(externalId string, apType *string) (
 	}
 
 	return grantOfEntities, err
+}
+
+// getFullNameFromGrant creates the full name for Raito WHAT item based on the name and type from the grant definition in Snowflake
+func (s *AccessSyncer) getFullNameFromGrant(name, objectType string) string {
+	if strings.EqualFold(objectType, "ACCOUNT") {
+		accountName, err := s.repo.GetSnowFlakeAccountName()
+		if err != nil {
+			logger.Error(fmt.Sprintf("Failed to get account name from Snowflake: %s", err.Error()))
+
+			return "UNKNOWN"
+		}
+
+		return accountName
+	}
+
+	sfObject := common.ParseFullName(name)
+
+	if strings.EqualFold(objectType, Function) && sfObject.Table != nil {
+		function := *sfObject.Table
+
+		if strings.Contains(function, "(") {
+			funcName := function[:strings.Index(function, "(")] //nolint:gocritic
+
+			paramString := function[strings.Index(function, "(")+1:]
+			if strings.Contains(paramString, "):") {
+				paramString = paramString[:strings.Index(paramString, "):")] //nolint:gocritic
+			}
+
+			paramString = strings.TrimSuffix(paramString, ")")
+
+			params := strings.Split(paramString, ",")
+			for i, param := range params {
+				p := strings.TrimSpace(param)
+				params[i] = p[strings.LastIndex(p, " ")+1:]
+			}
+
+			sfObject.Table = ptr.String(fmt.Sprintf(`%q(%s)`, funcName, strings.Join(params, ", ")))
+		}
+	}
+
+	return sfObject.GetFullName(false)
 }
