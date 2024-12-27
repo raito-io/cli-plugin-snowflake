@@ -23,7 +23,7 @@ const AccountAdmin = "ACCOUNTADMIN"
 type dataSourceRepository interface {
 	Close() error
 	TotalQueryTime() time.Duration
-	GetSnowFlakeAccountName() (string, error)
+	GetSnowFlakeAccountName(ops ...func(options *GetSnowFlakeAccountNameOptions)) (string, error)
 	GetWarehouses() ([]DbEntity, error)
 	GetInboundShares() ([]DbEntity, error)
 	GetDatabases() ([]DbEntity, error)
@@ -567,13 +567,15 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(entities []DbEntity, doType s
 				}
 
 				do := ds.DataObject{
-					ExternalId:       fullName,
-					Name:             extendedEntity.Entity.Name,
-					FullName:         fullName,
-					Type:             doType,
-					Description:      comment,
-					ParentExternalId: parent,
-					Tags:             doTags,
+					ExternalId:              fullName,
+					Name:                    extendedEntity.Entity.Name,
+					FullName:                fullName,
+					Type:                    doType,
+					Description:             comment,
+					ParentExternalId:        parent,
+					Tags:                    doTags,
+					ShareProviderIdentifier: extendedEntity.Entity.OwnerAccount,
+					ShareIdentifier:         extendedEntity.Entity.ShareName,
 				}
 
 				err := s.addDataObjects(&do)

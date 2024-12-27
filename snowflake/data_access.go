@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
 	"github.com/raito-io/golang-set/set"
+
+	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
 var RolesNotInternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
@@ -34,7 +35,7 @@ const (
 //go:generate go run github.com/vektra/mockery/v2 --name=dataAccessRepository --with-expecter --inpackage
 type dataAccessRepository interface {
 	Close() error
-	GetSnowFlakeAccountName() (string, error)
+	GetSnowFlakeAccountName(ops ...func(options *GetSnowFlakeAccountNameOptions)) (string, error)
 	CommentAccountRoleIfExists(comment, objectName string) error
 	CommentDatabaseRoleIfExists(comment, database, roleName string) error
 	CreateAccountRole(roleName string) error

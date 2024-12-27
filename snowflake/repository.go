@@ -914,8 +914,20 @@ func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName 
 	return policyReferenceEntities, nil
 }
 
-func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
-	rows, _, err := repo.query(`select CONCAT(CURRENT_ORGANIZATION_NAME(), '-', CURRENT_ACCOUNT_NAME())`)
+type GetSnowFlakeAccountNameOptions struct {
+	Delimiter rune
+}
+
+func (repo *SnowflakeRepository) GetSnowFlakeAccountName(ops ...func(options *GetSnowFlakeAccountNameOptions)) (string, error) {
+	options := GetSnowFlakeAccountNameOptions{
+		Delimiter: '-',
+	}
+
+	for _, op := range ops {
+		op(&options)
+	}
+
+	rows, _, err := repo.query(fmt.Sprintf(`select CONCAT(CURRENT_ORGANIZATION_NAME(), '%s', CURRENT_ACCOUNT_NAME())`, string(options.Delimiter)))
 	if err != nil {
 		return "", err
 	}
@@ -1026,7 +1038,7 @@ func (repo *SnowflakeRepository) GetInboundShares() ([]DbEntity, error) {
 		return nil, err
 	}
 
-	q = "select \"database_name\" as \"name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'"
+	q = "select \"database_name\" as \"name\", \"kind\", \"owner_account\", \"name\" as \"share_name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'"
 
 	return repo.getDbEntities(q)
 }

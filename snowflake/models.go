@@ -14,9 +14,11 @@ type NullString sql.NullString
 // Data Source
 
 type DbEntity struct {
-	Name    string  `db:"name"`
-	Comment *string `db:"comment"`
-	Kind    *string `db:"kind"`
+	Name         string  `db:"name"`
+	Comment      *string `db:"comment"`
+	Kind         *string `db:"kind"`
+	OwnerAccount *string `db:"owner_account"`
+	ShareName    *string `db:"share_name"`
 }
 
 type ExtendedDbEntity struct {

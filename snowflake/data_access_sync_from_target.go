@@ -218,7 +218,7 @@ func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareEntity Shar
 	ap, f := processedAps[externalId]
 	if !f {
 		processedAps[externalId] = &exporter.AccessProvider{
-			ExternalId: apTypeSharePrefix + shareName,
+			ExternalId: externalId,
 			ActualName: shareName,
 			Name:       shareName,
 			NamingHint: shareName,

@@ -500,10 +500,12 @@ func (s *AccessToTargetSyncer) findRoles(prefix string) (set.Set[string], error)
 	return existingRoles, nil
 }
 
-func (s *AccessToTargetSyncer) buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
+func (s *AccessToTargetSyncer) buildMetaDataMap() map[string]map[string]struct{} {
 	metaDataMap := make(map[string]map[string]struct{})
 
-	for _, dot := range metaData.DataObjectTypes {
+	dataObjects := DataObjectTypes()
+
+	for _, dot := range dataObjects {
 		dotMap := make(map[string]struct{})
 		metaDataMap[dot.Name] = dotMap
 
@@ -1075,14 +1077,7 @@ func (s *AccessToTargetSyncer) commentOnRoleIfExists(comment, roleName string) e
 func (s *AccessToTargetSyncer) generateAccessControls(ctx context.Context, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string) error {
 	// We always need the meta data
 	rolesCreated := make(map[string]interface{})
-	dsSyncer := DataSourceSyncer{}
-
-	md, err := dsSyncer.GetDataSourceMetaData(ctx, s.configMap)
-	if err != nil {
-		return err
-	}
-
-	metaData := s.buildMetaDataMap(md)
+	metaData := s.buildMetaDataMap()
 
 	for externalId, accessProvider := range toProcessAps {
 		// Making sure we always set a type. If not set by Raito cloud, we take Account Role as default.
@@ -1097,6 +1092,7 @@ func (s *AccessToTargetSyncer) generateAccessControls(ctx context.Context, toPro
 			Type:           &apType,
 		}
 
+		var err error
 		fi.ActualName, err = s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, metaData)
 
 		err3 := s.handleAccessProviderFeedback(&fi, err)
