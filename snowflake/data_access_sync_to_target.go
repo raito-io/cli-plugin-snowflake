@@ -15,6 +15,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
+	"github.com/raito-io/cli/base/access_provider/types"
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/util/match"
@@ -82,15 +83,15 @@ func (s *AccessToTargetSyncer) syncToTarget(ctx context.Context) error {
 		var err2 error
 
 		switch ap.Action {
-		case importer.Mask:
+		case types.Mask:
 			_, masksMap, masksToRemove, err2 = s.syncAccessProviderToTargetHandler(ap, masksMap, masksToRemove)
-		case importer.Filtered:
+		case types.Filtered:
 			_, filtersMap, filtersToRemove, err2 = s.syncAccessProviderToTargetHandler(ap, filtersMap, filtersToRemove)
-		case importer.Grant, importer.Purpose:
+		case types.Grant, types.Purpose:
 			var externalId string
 			externalId, rolesMap, rolesToRemove, err2 = s.syncAccessProviderToTargetHandler(ap, rolesMap, rolesToRemove)
 			apIdNameMap[ap.Id] = externalId
-		case importer.Deny, importer.Promise:
+		case types.Deny, types.Promise:
 		default:
 			err2 = s.accessProviderFeedbackHandler.AddAccessProviderFeedback(importer.AccessProviderSyncFeedback{
 				AccessProvider: ap.Id,
@@ -499,10 +500,12 @@ func (s *AccessToTargetSyncer) findRoles(prefix string) (set.Set[string], error)
 	return existingRoles, nil
 }
 
-func (s *AccessToTargetSyncer) buildMetaDataMap(metaData *ds.MetaData) map[string]map[string]struct{} {
+func (s *AccessToTargetSyncer) buildMetaDataMap() map[string]map[string]struct{} {
 	metaDataMap := make(map[string]map[string]struct{})
 
-	for _, dot := range metaData.DataObjectTypes {
+	dataObjects := DataObjectTypes()
+
+	for _, dot := range dataObjects {
 		dotMap := make(map[string]struct{})
 		metaDataMap[dot.Name] = dotMap
 
@@ -666,13 +669,15 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					usersOfRole = append(usersOfRole, gor.GranteeName)
 				} else if strings.EqualFold(gor.GrantedTo, "ROLE") {
 					rolesOfRole = append(rolesOfRole, accountRoleExternalIdGenerator(gor.GranteeName))
-				} else if strings.EqualFold(gor.GrantedTo, "DATABASE_ROLE") {
+				} else if strings.EqualFold(gor.GrantedTo, GrantTypeDatabaseRole) {
 					database, parsedRoleName, err2 := parseDatabaseRoleRoleName(cleanDoubleQuotes(gor.GranteeName))
 					if err2 != nil {
 						return actualName, err2
 					}
 
 					rolesOfRole = append(rolesOfRole, databaseRoleExternalIdGenerator(database, parsedRoleName))
+				} else if strings.EqualFold(gor.GrantedTo, "SHARE") {
+					rolesOfRole = append(rolesOfRole, shareExternalIdGenerator(gor.GranteeName))
 				}
 			}
 
@@ -762,7 +767,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					foundGrants = append(foundGrants, Grant{grant.Privilege, "account", ""})
 				} else if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
 					logger.Info(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, externalId))
-				} else if strings.EqualFold(grant.Privilege, "USAGE") && (strings.EqualFold(grant.GrantedOn, "ROLE") || strings.EqualFold(grant.GrantedOn, "DATABASE_ROLE")) {
+				} else if strings.EqualFold(grant.Privilege, "USAGE") && (strings.EqualFold(grant.GrantedOn, "ROLE") || strings.EqualFold(grant.GrantedOn, GrantTypeDatabaseRole)) {
 					logger.Debug(fmt.Sprintf("Ignoring USAGE permission on %s %q", grant.GrantedOn, grant.Name))
 				} else {
 					onType := convertSnowflakeGrantTypeToRaito(grant.GrantedOn)
@@ -829,22 +834,26 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 	return actualName, nil
 }
 
-func (s *AccessToTargetSyncer) splitRoles(inheritedRoles []string) ([]string, []string) {
-	toAddDatabaseRoles := []string{}
+func (s *AccessToTargetSyncer) splitRoles(inheritedRoles []string) ([]string, []string, []string) {
+	databaseRoles := []string{}
+	accountRoles := []string{}
+	shares := []string{}
 
 	for _, role := range inheritedRoles {
 		if isDatabaseRoleByExternalId(role) {
-			toAddDatabaseRoles = append(toAddDatabaseRoles, role)
+			databaseRoles = append(databaseRoles, role)
+		} else if isShareByExternalId(role) {
+			shares = append(shares, role)
+		} else {
+			accountRoles = append(accountRoles, role)
 		}
 	}
 
-	toAddAccountRoles := slice.SliceDifference(inheritedRoles, toAddDatabaseRoles)
-
-	return toAddDatabaseRoles, toAddAccountRoles
+	return databaseRoles, shares, accountRoles
 }
 
 func (s *AccessToTargetSyncer) grantRolesToRole(ctx context.Context, targetExternalId string, targetApType *string, roles ...string) error {
-	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
+	toAddDatabaseRoles, toAddShares, toAddAccountRoles := s.splitRoles(roles)
 
 	var filteredAccountRoles []string
 
@@ -866,6 +875,7 @@ func (s *AccessToTargetSyncer) grantRolesToRole(ctx context.Context, targetExter
 		}
 
 		var filteredDatabaseRoles []string
+		var filteredShares []string
 
 		for _, dbRole := range toAddDatabaseRoles {
 			toDatabase, toParsedRoleName, err2 := parseDatabaseRoleExternalId(dbRole)
@@ -887,7 +897,23 @@ func (s *AccessToTargetSyncer) grantRolesToRole(ctx context.Context, targetExter
 			}
 		}
 
+		for _, share := range toAddShares {
+			shouldIgnore, err2 := s.shouldIgnoreLinkedRole(share)
+			if err2 != nil {
+				return err2
+			}
+
+			if !shouldIgnore {
+				filteredShares = append(filteredShares, share)
+			}
+		}
+
 		err = s.repo.GrantDatabaseRolesToDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
+		if err != nil {
+			return err
+		}
+
+		err = s.repo.GrantSharesToDatabaseRole(ctx, database, parsedRoleName, filteredShares...)
 		if err != nil {
 			return err
 		}
@@ -912,11 +938,11 @@ func (s *AccessToTargetSyncer) shouldIgnoreLinkedRole(roleName string) (bool, er
 }
 
 func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetExternalId string, targetApType *string, roles ...string) error {
-	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
+	toRemoveDatabaseRoles, toRemoveShares, toRemoveAccountRoles := s.splitRoles(roles)
 
 	var filteredAccountRoles []string
 
-	for _, accountRole := range toAddAccountRoles {
+	for _, accountRole := range toRemoveAccountRoles {
 		shouldIgnore, err2 := s.shouldIgnoreLinkedRole(accountRole)
 		if err2 != nil {
 			return err2
@@ -934,8 +960,9 @@ func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetEx
 		}
 
 		var filteredDatabaseRoles []string
+		var filteredShares []string
 
-		for _, dbRole := range toAddDatabaseRoles {
+		for _, dbRole := range toRemoveDatabaseRoles {
 			_, toParsedRoleName, err2 := parseDatabaseRoleExternalId(dbRole)
 			if err2 != nil {
 				return err2
@@ -951,7 +978,23 @@ func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetEx
 			}
 		}
 
+		for _, share := range toRemoveShares {
+			shouldIgnore, err2 := s.shouldIgnoreLinkedRole(share)
+			if err2 != nil {
+				return err2
+			}
+
+			if !shouldIgnore {
+				filteredShares = append(filteredShares, share)
+			}
+		}
+
 		err = s.repo.RevokeDatabaseRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
+		if err != nil {
+			return err
+		}
+
+		err = s.repo.RevokeSharesFromDatabaseRole(ctx, database, parsedRoleName, filteredShares...)
 		if err != nil {
 			return err
 		}
@@ -959,8 +1002,8 @@ func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetEx
 		return s.repo.RevokeAccountRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
 	}
 
-	if len(toAddDatabaseRoles) > 0 {
-		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddDatabaseRoles)
+	if len(toRemoveDatabaseRoles) > 0 {
+		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toRemoveDatabaseRoles)
 	}
 
 	return s.repo.RevokeAccountRolesFromAccountRole(ctx, targetExternalId, filteredAccountRoles...)
@@ -1034,14 +1077,7 @@ func (s *AccessToTargetSyncer) commentOnRoleIfExists(comment, roleName string) e
 func (s *AccessToTargetSyncer) generateAccessControls(ctx context.Context, toProcessAps map[string]*importer.AccessProvider, existingRoles set.Set[string], toRenameAps map[string]string) error {
 	// We always need the meta data
 	rolesCreated := make(map[string]interface{})
-	dsSyncer := DataSourceSyncer{}
-
-	md, err := dsSyncer.GetDataSourceMetaData(ctx, s.configMap)
-	if err != nil {
-		return err
-	}
-
-	metaData := s.buildMetaDataMap(md)
+	metaData := s.buildMetaDataMap()
 
 	for externalId, accessProvider := range toProcessAps {
 		// Making sure we always set a type. If not set by Raito cloud, we take Account Role as default.
@@ -1056,6 +1092,7 @@ func (s *AccessToTargetSyncer) generateAccessControls(ctx context.Context, toPro
 			Type:           &apType,
 		}
 
+		var err error
 		fi.ActualName, err = s.handleAccessProvider(ctx, externalId, toProcessAps, existingRoles, toRenameAps, rolesCreated, metaData)
 
 		err3 := s.handleAccessProviderFeedback(&fi, err)
@@ -1518,7 +1555,7 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 				}
 			}
 
-			shareNames, err := s.accessSyncer.getShareNames()
+			inboundShareNames, err := s.accessSyncer.getInboundShareNames()
 			if err != nil {
 				return err
 			}
@@ -1528,12 +1565,12 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 				return err
 			}
 
-			databaseNames = append(databaseNames, shareNames...)
+			databaseNames = append(databaseNames, inboundShareNames...)
 
 			for _, database := range databaseNames {
 				databaseMatchFound := false
 
-				isShare := slices.Contains(shareNames, database)
+				isShare := slices.Contains(inboundShareNames, database)
 
 				databaseMatchFound, err = s.createPermissionGrantsForDatabase(database, p, metaData, isShare, grants)
 				if err != nil {

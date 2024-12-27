@@ -14,9 +14,11 @@ type NullString sql.NullString
 // Data Source
 
 type DbEntity struct {
-	Name    string  `db:"name"`
-	Comment *string `db:"comment"`
-	Kind    *string `db:"kind"`
+	Name         string  `db:"name"`
+	Comment      *string `db:"comment"`
+	Kind         *string `db:"kind"`
+	OwnerAccount *string `db:"owner_account"`
+	ShareName    *string `db:"share_name"`
 }
 
 type ExtendedDbEntity struct {
@@ -69,7 +71,7 @@ func (t *TagEntity) GetFullName() string {
 		return *t.Database + "." + *t.Schema + "." + t.Name + "." + *t.Column
 	case "ROLE":
 		return t.Name
-	case "DATABASE_ROLE":
+	case GrantTypeDatabaseRole:
 		return *t.Database + "." + t.Name
 	case "WAREHOUSE":
 		return t.Name
@@ -176,6 +178,12 @@ type RoleEntity struct {
 	GrantedToRoles  int    `db:"granted_to_roles"`
 	GrantedRoles    int    `db:"granted_roles"`
 	Owner           string `db:"owner"`
+}
+
+type ShareEntity struct {
+	Name  string `db:"name"`
+	Owner string `db:"owner"`
+	To    string `db:"to"`
 }
 
 type GrantOfRole struct {

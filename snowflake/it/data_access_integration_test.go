@@ -12,6 +12,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
+	"github.com/raito-io/cli/base/access_provider/types"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/wrappers/mocks"
 	"github.com/stretchr/testify/suite"
@@ -144,7 +145,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			{
 				Id:          accountRoleId,
 				Name:        fmt.Sprintf("%s_ap1", testId),
-				Action:      sync_to_target.Grant,
+				Action:      types.Grant,
 				NamingHint:  actualRoleName,
 				Delete:      false,
 				Description: fmt.Sprintf("Integration testing for test %s", testId),
@@ -185,7 +186,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			{
 				Id:          databaseRoleName1,
 				Name:        databaseRoleName1,
-				Action:      sync_to_target.Grant,
+				Action:      types.Grant,
 				NamingHint:  databaseRoleName1,
 				ActualName:  ptr.String(databaseRoleName1),
 				Delete:      false,
@@ -206,7 +207,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 				Id:          databaseRoleName2,
 				Name:        databaseRoleName2,
 				NamingHint:  databaseRoleName2,
-				Action:      sync_to_target.Grant,
+				Action:      types.Grant,
 				ActualName:  ptr.String(databaseRoleName2),
 				Delete:      false,
 				Description: fmt.Sprintf("Integration testing for test %s", testId),
@@ -319,7 +320,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		{
 			Id:          accountRoleId,
 			Name:        fmt.Sprintf("%s_ap1", testId),
-			Action:      sync_to_target.Grant,
+			Action:      types.Grant,
 			NamingHint:  actualRoleName,
 			ExternalId:  &actualRoleName,
 			Delete:      false,
@@ -340,7 +341,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		{
 			Id:          databaseRoleName1,
 			Name:        databaseRoleName1,
-			Action:      sync_to_target.Grant,
+			Action:      types.Grant,
 			ExternalId:  &databaseRoleExternalId1,
 			NamingHint:  databaseRoleName1,
 			ActualName:  ptr.String(databaseRoleName1),
@@ -417,7 +418,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		{
 			Id:          accountRoleId,
 			Name:        fmt.Sprintf("%s_ap1", testId),
-			Action:      sync_to_target.Grant,
+			Action:      types.Grant,
 			NamingHint:  actualRoleName,
 			ExternalId:  &actualRoleName,
 			Delete:      true,
@@ -482,7 +483,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 		AccessProviders: []*sync_to_target.AccessProvider{{
 			Id:          maskName,
 			Name:        maskName,
-			Action:      sync_to_target.Mask,
+			Action:      types.Mask,
 			Delete:      false,
 			Description: fmt.Sprintf("Mask integration testing for test %s", testId),
 			Who: sync_to_target.WhoItem{

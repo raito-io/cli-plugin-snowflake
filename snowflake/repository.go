@@ -276,6 +276,36 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 	return newMostRecentQueryStartTime, i, sec, repo.usageBatchSize != 0 && i >= repo.usageBatchSize
 }
 
+func (repo *SnowflakeRepository) GetOutboundShares() ([]ShareEntity, error) {
+	q := "SHOW SHARES"
+	_, err := repo.getDbEntities(q)
+
+	if err != nil {
+		return nil, err
+	}
+
+	q = `select "name", "owner", "to" from table(result_scan(LAST_QUERY_ID())) WHERE "kind" = 'OUTBOUND'`
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	var shareEntities []ShareEntity
+
+	err = scan.Rows(&shareEntities, rows)
+	if err != nil {
+		return nil, fmt.Errorf("fetching all outbound shares: %s", err.Error())
+	}
+
+	err = CheckSFLimitExceeded(q, len(shareEntities))
+	if err != nil {
+		return nil, fmt.Errorf("finding existing outbound shares: %s", err.Error())
+	}
+
+	return shareEntities, nil
+}
+
 func (repo *SnowflakeRepository) GetAccountRoles() ([]RoleEntity, error) {
 	return repo.GetAccountRolesWithPrefix("")
 }
@@ -367,6 +397,12 @@ func (repo *SnowflakeRepository) GetGrantsOfAccountRole(roleName string) ([]Gran
 
 func (repo *SnowflakeRepository) GetGrantsToAccountRole(roleName string) ([]GrantToRole, error) {
 	q := common.FormatQuery(`SHOW GRANTS TO ROLE %s`, roleName)
+
+	return repo.grantsToRoleMapper(q)
+}
+
+func (repo *SnowflakeRepository) GetGrantsToShare(shareName string) ([]GrantToRole, error) {
+	q := common.FormatQuery(`SHOW GRANTS TO SHARE %s`, shareName)
 
 	return repo.grantsToRoleMapper(q)
 }
@@ -601,6 +637,22 @@ func (repo *SnowflakeRepository) GrantDatabaseRolesToDatabaseRole(ctx context.Co
 	return <-done
 }
 
+func (repo *SnowflakeRepository) GrantSharesToDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error {
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, share := range shares {
+		q := common.FormatQuery(`CREATE SHARE IF NOT EXISTS %s`, share)
+		statementChan <- q
+
+		q = common.FormatQuery(`GRANT DATABASE ROLE %s.%s TO SHARE %s`, database, databaseRole, share)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
 func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error {
 	if repo.isProtectedRoleName(databaseRole) {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
@@ -611,6 +663,24 @@ func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.
 
 	for _, otherRole := range accountRoles {
 		q := common.FormatQuery(`REVOKE DATABASE ROLE %s.%s FROM ROLE %s`, database, databaseRole, otherRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) RevokeSharesFromDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error {
+	if repo.isProtectedRoleName(databaseRole) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
+		return nil
+	}
+
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, share := range shares {
+		q := common.FormatQuery(`REVOKE DATABASE ROLE %s.%s FROM SHARE %s`, database, databaseRole, share)
 		statementChan <- q
 	}
 
@@ -844,8 +914,20 @@ func (repo *SnowflakeRepository) GetPolicyReferences(dbName, schema, policyName 
 	return policyReferenceEntities, nil
 }
 
-func (repo *SnowflakeRepository) GetSnowFlakeAccountName() (string, error) {
-	rows, _, err := repo.query(`select CONCAT(CURRENT_ORGANIZATION_NAME(), '-', CURRENT_ACCOUNT_NAME())`)
+type GetSnowFlakeAccountNameOptions struct {
+	Delimiter rune
+}
+
+func (repo *SnowflakeRepository) GetSnowFlakeAccountName(ops ...func(options *GetSnowFlakeAccountNameOptions)) (string, error) {
+	options := GetSnowFlakeAccountNameOptions{
+		Delimiter: '-',
+	}
+
+	for _, op := range ops {
+		op(&options)
+	}
+
+	rows, _, err := repo.query(fmt.Sprintf(`select CONCAT(CURRENT_ORGANIZATION_NAME(), '%s', CURRENT_ACCOUNT_NAME())`, string(options.Delimiter)))
 	if err != nil {
 		return "", err
 	}
@@ -948,7 +1030,7 @@ func (repo *SnowflakeRepository) GetWarehouses() ([]DbEntity, error) {
 	return repo.getDbEntities(q)
 }
 
-func (repo *SnowflakeRepository) GetShares() ([]DbEntity, error) {
+func (repo *SnowflakeRepository) GetInboundShares() ([]DbEntity, error) {
 	q := "SHOW SHARES"
 	_, err := repo.getDbEntities(q)
 
@@ -956,7 +1038,7 @@ func (repo *SnowflakeRepository) GetShares() ([]DbEntity, error) {
 		return nil, err
 	}
 
-	q = "select \"database_name\" as \"name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'"
+	q = "select \"database_name\" as \"name\", \"kind\", \"owner_account\", \"name\" as \"share_name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'"
 
 	return repo.getDbEntities(q)
 }

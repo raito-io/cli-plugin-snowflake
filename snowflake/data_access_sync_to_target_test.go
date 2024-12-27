@@ -11,6 +11,7 @@ import (
 	"github.com/raito-io/bexpression/datacomparison"
 	"github.com/raito-io/cli/base/access_provider"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
+	"github.com/raito-io/cli/base/access_provider/types"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
@@ -44,7 +45,7 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 		{Name: "ExistingRole1", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 		{Name: "ExistingRole2", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
 	}, nil).Once()
-	repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Once()
+	repoMock.EXPECT().GetInboundShares().Return([]DbEntity{}, nil).Once()
 	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
 		{Name: "SNOWFLAKE"},
 		{Name: "TEST_DB"},
@@ -231,7 +232,7 @@ func TestAccessSyncer_SyncAccessProviderMasksToTarget(t *testing.T) {
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1.Column1", Type: "column"}},
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema2.Table1.Column1", Type: "column"}},
 			},
-			Action: importer.Mask,
+			Action: types.Mask,
 			Type:   ptr.String("SHA256"),
 		},
 		"Mask2": {
@@ -243,7 +244,7 @@ func TestAccessSyncer_SyncAccessProviderMasksToTarget(t *testing.T) {
 			What: []importer.WhatItem{
 				{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table3.Column1", Type: "column"}},
 			},
-			Action: importer.Mask,
+			Action: types.Mask,
 		},
 	}
 
@@ -305,7 +306,7 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 	masksToRemove := map[string]*importer.AccessProvider{
 		"RAITO_FILTERTOREMOVE1": {
 			Id:         "FilterToRemove1",
-			Action:     importer.Filtered,
+			Action:     types.Filtered,
 			ActualName: ptr.String("RAITO_FILTERTOREMOVE1"),
 			ExternalId: ptr.String("DB1.Schema1.RAITO_FILTERTOREMOVE1"),
 			What: []importer.WhatItem{
@@ -319,7 +320,7 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 		},
 		"RAITO_FILTERTOREMOVE2": {
 			Id:         "FilterToRemove2",
-			Action:     importer.Filtered,
+			Action:     types.Filtered,
 			ActualName: ptr.String("RAITO_FILTERTOREMOVE2"),
 			ExternalId: ptr.String("DB1.Schema1.Table3.RAITO_FILTERTOREMOVE2"),
 			What: []importer.WhatItem{
@@ -337,7 +338,7 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 		"RAITO_FILTER1": {
 			Id:     "RAITO_FILTER1",
 			Name:   "RAITO_FILTER1",
-			Action: importer.Filtered,
+			Action: types.Filtered,
 			What: []importer.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
@@ -355,7 +356,7 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 		"RAITO_FILTER2": {
 			Id:     "RAITO_FILTER2",
 			Name:   "RAITO_FILTER2",
-			Action: importer.Filtered,
+			Action: types.Filtered,
 			What: []importer.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
@@ -386,7 +387,7 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 		"RAITO_FILTER3": {
 			Id:     "RAITO_FILTER3",
 			Name:   "RAITO_FILTER3",
-			Action: importer.Filtered,
+			Action: types.Filtered,
 			What: []importer.WhatItem{
 				{
 					DataObject: &data_source.DataObjectReference{
@@ -924,7 +925,7 @@ func generateAccessControls_datasource(t *testing.T) {
 	repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 	repoMock.EXPECT().GrantAccountRolesToAccountRole(mock.Anything, "RoleName1").Return(nil).Once()
-	repoMock.EXPECT().GetShares().Return([]DbEntity{}, nil).Once()
+	repoMock.EXPECT().GetInboundShares().Return([]DbEntity{}, nil).Once()
 	repoMock.EXPECT().GetDatabases().Return([]DbEntity{}, nil).Once()
 
 	access := map[string]*importer.AccessProvider{
@@ -987,8 +988,8 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 
 	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.AnythingOfType("string"), "TEST_DB", "existingDBRole1").Return(nil).Once()
 	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "existingDBRole1").Return([]GrantOfRole{
-		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role2"},
-		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role3"},
+		{GrantedTo: GrantTypeDatabaseRole, GranteeName: "TEST_DB.Role2"},
+		{GrantedTo: GrantTypeDatabaseRole, GranteeName: "TEST_DB.Role3"},
 	}, nil).Once()
 
 	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "existingDBRole1").Return([]GrantToRole{}, nil).Once()
@@ -997,6 +998,7 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, false, "TEST_DB", "existingDBRole1")
 	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1", "Role3").Return(nil).Once()
 	repoMock.EXPECT().RevokeAccountRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1").Return(nil).Once()
+	repoMock.EXPECT().RevokeSharesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1").Return(nil).Once()
 
 	access := map[string]*importer.AccessProvider{
 		"existingRole1": {
@@ -1115,8 +1117,8 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 	repoMock.EXPECT().CommentDatabaseRoleIfExists(mock.AnythingOfType("string"), "TEST_DB", "newDBRole").Return(nil).Once()
 	repoMock.EXPECT().RenameDatabaseRole("TEST_DB", "oldDBRole", "newDBRole").Return(nil).Once()
 	repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "newDBRole").Return([]GrantOfRole{
-		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role1"},
-		{GrantedTo: "DATABASE_ROLE", GranteeName: "TEST_DB.Role2"},
+		{GrantedTo: GrantTypeDatabaseRole, GranteeName: "TEST_DB.Role1"},
+		{GrantedTo: GrantTypeDatabaseRole, GranteeName: "TEST_DB.Role2"},
 	}, nil).Once()
 	repoMock.EXPECT().GetGrantsToDatabaseRole("TEST_DB", "newDBRole").Return([]GrantToRole{}, nil).Once()
 
@@ -1451,6 +1453,7 @@ func TestGrantRolesToRole_DatabaseFiltering(t *testing.T) {
 
 	repoMock.EXPECT().GrantDatabaseRolesToDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherDBRole").Return(nil).Once()
 	repoMock.EXPECT().GrantAccountRolesToDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherRole").Return(nil).Once()
+	repoMock.EXPECT().GrantSharesToDatabaseRole(mock.Anything, "DB1", "TargetRole").Return(nil).Once()
 
 	dbRoleType := apTypeDatabaseRole
 	err := syncer.grantRolesToRole(context.Background(), databaseRoleExternalIdGenerator("DB1", "TargetRole"), &dbRoleType, "MyRole1", "AnotherRole", databaseRoleExternalIdGenerator("DB1", "MyDBRole"), databaseRoleExternalIdGenerator("DB1", "AnotherDBRole"))
@@ -1475,6 +1478,7 @@ func TestRevokeRolesFromRole_DatabaseFiltering(t *testing.T) {
 
 	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherDBRole").Return(nil).Once()
 	repoMock.EXPECT().RevokeAccountRolesFromDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherRole").Return(nil).Once()
+	repoMock.EXPECT().RevokeSharesFromDatabaseRole(mock.Anything, "DB1", "TargetRole").Return(nil).Once()
 
 	dbRoleType := apTypeDatabaseRole
 	err := syncer.revokeRolesFromRole(context.Background(), databaseRoleExternalIdGenerator("DB1", "TargetRole"), &dbRoleType, "MyRole1", "AnotherRole", databaseRoleExternalIdGenerator("DB1", "MyDBRole"), databaseRoleExternalIdGenerator("DB1", "AnotherDBRole"))
@@ -1554,6 +1558,7 @@ func expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock *mockDataAccessRep
 
 	if expectDatabaseRoles {
 		repoMock.EXPECT().GrantDatabaseRolesToDatabaseRole(mock.Anything, database, roleName, arguments...).Return(nil).Once()
+		repoMock.EXPECT().GrantSharesToDatabaseRole(mock.Anything, database, roleName, mock.Anything).Return(nil).Once()
 
 	} else {
 		repoMock.EXPECT().GrantAccountRolesToDatabaseRole(mock.Anything, database, roleName, arguments...).Return(nil).Once()

@@ -69,6 +69,10 @@ func accountRoleExternalIdGenerator(roleName string) string {
 	return roleName
 }
 
+func shareExternalIdGenerator(name string) string {
+	return fmt.Sprintf("%s%s", apTypeSharePrefix, name)
+}
+
 func isDatabaseRole(apType *string) bool {
 	return apType != nil && strings.EqualFold(*apType, apTypeDatabaseRole)
 }
@@ -91,6 +95,10 @@ func isDatabaseRoleByExternalId(externalId string) bool {
 	}
 
 	return false
+}
+
+func isShareByExternalId(externalId string) bool {
+	return strings.HasPrefix(externalId, apTypeSharePrefix)
 }
 
 func parseCommaSeparatedList(list string) set.Set[string] {

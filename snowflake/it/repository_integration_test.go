@@ -695,7 +695,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GrantDatabaseRolesToDataba
 
 	for _, granteeName := range databaseRolesToGrant {
 		expectedGrants = append(expectedGrants, snowflake.GrantOfRole{
-			GrantedTo:   "DATABASE_ROLE",
+			GrantedTo:   snowflake.GrantTypeDatabaseRole,
 			GranteeName: fmt.Sprintf("%s.%s", database, granteeName),
 		})
 	}
@@ -900,7 +900,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetWarehouses() {
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetShares() {
 	//When
-	shares, err := s.repo.GetShares()
+	shares, err := s.repo.GetInboundShares()
 
 	//Then
 	s.NoError(err)
