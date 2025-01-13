@@ -85,6 +85,11 @@ type dataAccessRepository interface {
 	RevokeUsersFromAccountRole(ctx context.Context, role string, users ...string) error
 	TotalQueryTime() time.Duration
 	UpdateFilter(databaseName string, schema string, tableName string, filterName string, argumentNames []string, expression string) error
+	CreateShare(shareName string) (err error)
+	SetShareAccounts(shareName string, accounts []string) (err error)
+	DropShare(shareName string) (err error)
+	ExecuteGrantOnShare(perm, on, shareName string) error
+	ExecuteRevokeOnShare(perm, on, shareName string) error
 }
 
 var _ wrappers.AccessProviderSyncer = (*AccessSyncer)(nil)

@@ -113,6 +113,7 @@ $> raito info raito-io/cli-plugin-snowflake
 |---------------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Row level filtering | ✅         | Only supported for enterprise editions                                                                                                                                                                                                                                 |
 | Column masking      | ✅         | Only supported for enterprise editions                                                                                                                                                                                                                                 |
+| Data Sharing        | ✅         |                                                                                                                                                                                                                                                                        |
 | Locking             | ✅         | Support for both who and what lock                                                                                                                                                                                                                                     |
 | Replay              | ✅         | Explicit deletes cannot be replayed                                                                                                                                                                                                                                    |
 | Usage               | ✅         | Only supported for enterprise editions. Usage will be processed based on [QUERY_HISTORY](https://docs.snowflake.com/en/sql-reference/account-usage/query_history) and [ACCESS_HISTORY](https://docs.snowflake.com/en/sql-reference/account-usage/access_history) view. |
@@ -157,14 +158,15 @@ Masking policies are imported as non-internalizable because most existing maskin
 Row access policies are imported as `filters`.
 The same mechanism is used as for masking policies. Therefor, row access policies are non-internalizable as the `who`-items can not be identified.
 
+#### Shares
+Shares are imported as `share`.
+Access granted by the share as imported as WHAT items. Accounts set on the share are imported as WHO items.
+
 ## To Target
 #### Grants
 Grants will be implemented as `Account role` (type `Role`) or `Database role` (type `databaseRole`).
 All associated who items will be granted access to the role.
 All what items will be granted permission for the specific role.
-
-#### Purposes
-Purposes will be implemented exactly the same as grants.
 
 #### Masks
 Each mask will be exported as masking policy to all schemas associated with the what-items of the mask.
@@ -194,6 +196,11 @@ CREATE MASKING POLICY MY_DATABASE.MY_SCHEMA.DECRYPTTEST_JH3EIhVr_TEXT AS (val TE
 
 #### Filters
 Each filter will be exported as row access policy to exactly one table.
+
+#### Shares
+Shares will be exported as [Share](https://docs.snowflake.com/en/user-guide/data-sharing-intro) in Snowflake.
+Privileges on data objects associated with the share will be granted to the share.
+The role that is defined with the sync should have the following permissions: `CREATE SHARE`, `MANAGE SHARE TARGET`.
 
 ## Usage
 The Raito Snowflake plugin retrieves usage data from the Snowflake system views:
