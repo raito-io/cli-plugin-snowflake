@@ -649,7 +649,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share
 
 	shares, err := s.sfRepo.GetOutboundShares()
 	s.NoError(err)
-	s.Equal(shares[0].Name, shareName)
+	s.Equal(actualShareName, shares[0].Name)
 }
 
 func generateRole(username string, prefix string) string {
