@@ -619,13 +619,6 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share
 						},
 						Permissions: []string{"USAGE on SCHEMA"},
 					},
-					{
-						DataObject: &data_source.DataObjectReference{
-							FullName: `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`,
-							Type:     "function",
-						},
-						Permissions: []string{"USAGE"},
-					},
 				},
 			},
 		},
