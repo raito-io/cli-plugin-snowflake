@@ -646,13 +646,11 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share
 
 	s.Len(accessProviderFeedback, 1)
 
-	actualName := "RAITO_" + shareName
-
 	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
 		{
 			AccessProvider: accountShareId,
-			ActualName:     shareName,
-			ExternalId:     &shareName,
+			ActualName:     actualShareName,
+			ExternalId:     &actualShareName,
 		},
 	}, accessProviderFeedback)
 
