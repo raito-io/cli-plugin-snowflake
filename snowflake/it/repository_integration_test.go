@@ -906,13 +906,15 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetShares() {
 	s.NoError(err)
 	s.True(len(shares) >= 2)
 
-	s.Contains(shares, snowflake.DbEntity{
-		Name: "SNOWFLAKE",
-	})
+	names := make([]string, 0, len(shares))
 
-	s.Contains(shares, snowflake.DbEntity{
-		Name: "SNOWFLAKE_SAMPLE_DATA",
-	})
+	for _, share := range shares {
+		names = append(names, share.Name)
+	}
+
+	s.Contains(names, "SNOWFLAKE")
+
+	s.Contains(names, "SNOWFLAKE_SAMPLE_DATA")
 }
 
 func (s *RepositoryTestSuite) TestSnowflakeRepository_GetDatabases() {

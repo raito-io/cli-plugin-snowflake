@@ -643,7 +643,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share
 
 	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
 
-	s.Len(accessProviderFeedback, 3)
+	s.Len(accessProviderFeedback, 1)
 	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
 		{
 			AccessProvider: accountShareId,
