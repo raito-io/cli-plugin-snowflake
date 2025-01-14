@@ -581,7 +581,8 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share
 	//Given
 	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
-	actualShareName := generateRole("TESTSHARE", testId)
+	shareName := generateRole("TESTSHARE", testId)
+	actualShareName := "RAITO_" + shareName
 	accountShareId := fmt.Sprintf("%s_SHARE_ID1", testId)
 
 	accessProviderImport := &sync_to_target.AccessProviderImport{
@@ -590,7 +591,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share
 				Id:          accountShareId,
 				Name:        fmt.Sprintf("%s_ap1", testId),
 				Action:      types.Share,
-				NamingHint:  actualShareName,
+				NamingHint:  shareName,
 				Delete:      false,
 				Description: fmt.Sprintf("Integration testing for test %s", testId),
 				Who: sync_to_target.WhoItem{
@@ -644,17 +645,20 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share
 	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
 
 	s.Len(accessProviderFeedback, 1)
+
+	actualName := "RAITO_" + shareName
+
 	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
 		{
 			AccessProvider: accountShareId,
-			ActualName:     actualShareName,
-			ExternalId:     &actualShareName,
+			ActualName:     shareName,
+			ExternalId:     &shareName,
 		},
 	}, accessProviderFeedback)
 
 	shares, err := s.sfRepo.GetOutboundShares()
 	s.NoError(err)
-	s.Equal(shares[0].Name, actualShareName)
+	s.Equal(shares[0].Name, shareName)
 }
 
 func generateRole(username string, prefix string) string {
