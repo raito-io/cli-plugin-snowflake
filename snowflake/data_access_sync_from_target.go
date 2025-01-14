@@ -441,7 +441,6 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 				Groups:          groups,
 			},
 			What: make([]exporter.WhatItem, 0),
-
 			// In a first implementation, we lock the who and what side for a database role
 			// Who side will always be locked as you can't directly grant access to a database role from a user
 			WhoLocked:        ptr.Bool(true),

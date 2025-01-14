@@ -17,9 +17,14 @@ import (
 
 func TestDataSourceSyncer_GetMetaData(t *testing.T) {
 	//Given
+	repo := newMockDataSourceRepository(t)
+	repo.EXPECT().GetSnowFlakeAccountName(mock.Anything).Return("SnowflakeAccountName", nil).Once()
+
 	syncer := DataSourceSyncer{repoProvider: func(params map[string]string, role string) (dataSourceRepository, error) {
-		return nil, nil
+		return repo, nil
 	}}
+
+	syncer.repo = repo
 
 	//When
 	result, err := syncer.GetDataSourceMetaData(context.Background(), &config.ConfigMap{})

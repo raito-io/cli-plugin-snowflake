@@ -3,9 +3,11 @@ package snowflake
 import (
 	"database/sql"
 	"fmt"
+	"iter"
 	"strings"
 
 	"github.com/raito-io/cli/base/tag"
+	"github.com/raito-io/golang-set/set"
 )
 
 // Implementation of Scanner interface for NullString
@@ -214,6 +216,10 @@ func (g *Grant) GetGrantOnType() string {
 	return strings.ToUpper(g.OnType)
 }
 
+func (g *Grant) OnWithType() string {
+	return fmt.Sprintf("%s %s", g.GetGrantOnType(), g.On)
+}
+
 type PolicyEntity struct {
 	Name         string `db:"name"`
 	DatabaseName string `db:"database_name"`
@@ -242,4 +248,70 @@ type PolicyReferenceEntity struct {
 	TAG_SCHEMA           NullString `db:"TAG_SCHEMA"`
 	TAG_NAME             NullString `db:"TAG_NAME"`
 	POLICY_STATUS        string     `db:"POLICY_STATUS"`
+}
+
+type GrantSet struct {
+	grants map[string]set.Set[Grant]
+}
+
+func NewGrantSet() GrantSet {
+	return GrantSet{
+		grants: make(map[string]set.Set[Grant]),
+	}
+}
+
+func (g *GrantSet) Add(grants ...Grant) {
+	for _, grant := range grants {
+		if _, ok := g.grants[grant.OnType]; !ok {
+			g.grants[grant.OnType] = set.NewSet[Grant]()
+		}
+
+		g.grants[grant.OnType].Add(grant)
+	}
+}
+
+func (g *GrantSet) Size() (size int) {
+	for _, s := range g.grants {
+		size += len(s)
+	}
+
+	return size
+}
+
+func (g *GrantSet) Iterator() iter.Seq[Grant] {
+	return func(yield func(Grant) bool) {
+		handledTypes := set.NewSet[string]()
+
+		for _, element := range DataObjectTypeOrder() {
+			if grants, ok := g.grants[element]; ok {
+				for grant := range grants {
+					if !yield(grant) {
+						return
+					}
+				}
+			}
+
+			handledTypes.Add(element)
+		}
+
+		for objectType, elements := range g.grants {
+			if !handledTypes.Contains(objectType) {
+				for element := range elements {
+					if !yield(element) {
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
+func (g *GrantSet) Slice() []Grant {
+	result := make([]Grant, 0, g.Size())
+
+	for element := range g.Iterator() {
+		result = append(result, element)
+	}
+
+	return result
 }

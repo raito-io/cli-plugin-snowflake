@@ -577,6 +577,81 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 	})
 }
 
+func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share() {
+	//Given
+	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+
+	shareName := generateRole("TESTSHARE", testId)
+	actualShareName := "RAITO_" + shareName
+	accountShareId := fmt.Sprintf("%s_SHARE_ID1", testId)
+
+	accessProviderImport := &sync_to_target.AccessProviderImport{
+		AccessProviders: []*sync_to_target.AccessProvider{
+			{
+				Id:          accountShareId,
+				Name:        fmt.Sprintf("%s_ap1", testId),
+				Action:      types.Share,
+				NamingHint:  shareName,
+				Delete:      false,
+				Description: fmt.Sprintf("Integration testing for test %s", testId),
+				Who: sync_to_target.WhoItem{
+					Recipients: []string{"TSMKRUM.OE70189"},
+				},
+				What: []sync_to_target.WhatItem{
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: "RAITO_DATABASE.ORDERING.ORDERS",
+							Type:     "table",
+						},
+						Permissions: []string{"SELECT"},
+					},
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: "RAITO_DATABASE",
+							Type:     "database",
+						},
+						Permissions: []string{"USAGE on DATABASE"},
+					},
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: "RAITO_DATABASE.ORDERING",
+							Type:     "schema",
+						},
+						Permissions: []string{"USAGE on SCHEMA"},
+					},
+				},
+			},
+		},
+	}
+
+	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
+
+	config := s.getConfig()
+
+	//When
+	err := dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+
+	//Then
+	s.NoError(err)
+	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 1)
+
+	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+	s.Len(accessProviderFeedback, 1)
+
+	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
+		{
+			AccessProvider: accountShareId,
+			ActualName:     actualShareName,
+			ExternalId:     &actualShareName,
+		},
+	}, accessProviderFeedback)
+
+	shares, err := s.sfRepo.GetOutboundShares()
+	s.NoError(err)
+	s.Equal(actualShareName, shares[0].Name)
+}
+
 func generateRole(username string, prefix string) string {
 	if prefix == "" {
 		prefix = fmt.Sprintf("%s_", testId)

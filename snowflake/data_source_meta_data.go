@@ -8,6 +8,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
+	"github.com/raito-io/golang-set/set"
 )
 
 const USAGE = "USAGE"
@@ -777,4 +778,48 @@ func DataObjectTypes() []*ds.DataObjectType {
 			Type: ds.Column,
 		},
 	}
+}
+
+var _dataObjectTypeOrder []string
+
+func DataObjectTypeOrder() []string {
+	if len(_dataObjectTypeOrder) > 0 {
+		return _dataObjectTypeOrder
+	}
+
+	dataObjectTypes := DataObjectTypes()
+
+	dataObjectTypeMap := make(map[string]set.Set[string])
+
+	for _, dot := range dataObjectTypes {
+		dataObjectTypeMap[dot.Name] = set.NewSet[string](dot.Children...)
+	}
+
+	_dataObjectTypeOrder = make([]string, 0, len(dataObjectTypes))
+
+	toHandle := []string{ds.Datasource}
+	handled := set.NewSet[string]()
+
+	for len(toHandle) > 0 {
+		element := toHandle[0]
+		toHandle = toHandle[1:]
+
+		if handled.Contains(element) {
+			continue
+		}
+
+		handled.Add(element)
+
+		_dataObjectTypeOrder = append(_dataObjectTypeOrder, element)
+
+		if children, found := dataObjectTypeMap[element]; found {
+			for child := range children {
+				if !handled.Contains(child) {
+					toHandle = append(toHandle, child)
+				}
+			}
+		}
+	}
+
+	return _dataObjectTypeOrder
 }

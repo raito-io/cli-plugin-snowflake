@@ -308,6 +308,52 @@ func (_c *mockDataAccessRepository_CreateMaskPolicy_Call) RunAndReturn(run func(
 	return _c
 }
 
+// CreateShare provides a mock function with given fields: shareName
+func (_m *mockDataAccessRepository) CreateShare(shareName string) error {
+	ret := _m.Called(shareName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateShare")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(shareName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_CreateShare_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateShare'
+type mockDataAccessRepository_CreateShare_Call struct {
+	*mock.Call
+}
+
+// CreateShare is a helper method to define mock.On call
+//   - shareName string
+func (_e *mockDataAccessRepository_Expecter) CreateShare(shareName interface{}) *mockDataAccessRepository_CreateShare_Call {
+	return &mockDataAccessRepository_CreateShare_Call{Call: _e.mock.On("CreateShare", shareName)}
+}
+
+func (_c *mockDataAccessRepository_CreateShare_Call) Run(run func(shareName string)) *mockDataAccessRepository_CreateShare_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_CreateShare_Call) Return(err error) *mockDataAccessRepository_CreateShare_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_CreateShare_Call) RunAndReturn(run func(string) error) *mockDataAccessRepository_CreateShare_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DescribePolicy provides a mock function with given fields: policyType, dbName, schema, policyName
 func (_m *mockDataAccessRepository) DescribePolicy(policyType string, dbName string, schema string, policyName string) ([]DescribePolicyEntity, error) {
 	ret := _m.Called(policyType, dbName, schema, policyName)
@@ -559,6 +605,52 @@ func (_c *mockDataAccessRepository_DropMaskingPolicy_Call) RunAndReturn(run func
 	return _c
 }
 
+// DropShare provides a mock function with given fields: shareName
+func (_m *mockDataAccessRepository) DropShare(shareName string) error {
+	ret := _m.Called(shareName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DropShare")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(shareName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_DropShare_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DropShare'
+type mockDataAccessRepository_DropShare_Call struct {
+	*mock.Call
+}
+
+// DropShare is a helper method to define mock.On call
+//   - shareName string
+func (_e *mockDataAccessRepository_Expecter) DropShare(shareName interface{}) *mockDataAccessRepository_DropShare_Call {
+	return &mockDataAccessRepository_DropShare_Call{Call: _e.mock.On("DropShare", shareName)}
+}
+
+func (_c *mockDataAccessRepository_DropShare_Call) Run(run func(shareName string)) *mockDataAccessRepository_DropShare_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_DropShare_Call) Return(err error) *mockDataAccessRepository_DropShare_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_DropShare_Call) RunAndReturn(run func(string) error) *mockDataAccessRepository_DropShare_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ExecuteGrantOnAccountRole provides a mock function with given fields: perm, on, role, isSystemGrant
 func (_m *mockDataAccessRepository) ExecuteGrantOnAccountRole(perm string, on string, role string, isSystemGrant bool) error {
 	ret := _m.Called(perm, on, role, isSystemGrant)
@@ -657,6 +749,54 @@ func (_c *mockDataAccessRepository_ExecuteGrantOnDatabaseRole_Call) RunAndReturn
 	return _c
 }
 
+// ExecuteGrantOnShare provides a mock function with given fields: perm, on, shareName
+func (_m *mockDataAccessRepository) ExecuteGrantOnShare(perm string, on string, shareName string) error {
+	ret := _m.Called(perm, on, shareName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExecuteGrantOnShare")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(perm, on, shareName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_ExecuteGrantOnShare_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteGrantOnShare'
+type mockDataAccessRepository_ExecuteGrantOnShare_Call struct {
+	*mock.Call
+}
+
+// ExecuteGrantOnShare is a helper method to define mock.On call
+//   - perm string
+//   - on string
+//   - shareName string
+func (_e *mockDataAccessRepository_Expecter) ExecuteGrantOnShare(perm interface{}, on interface{}, shareName interface{}) *mockDataAccessRepository_ExecuteGrantOnShare_Call {
+	return &mockDataAccessRepository_ExecuteGrantOnShare_Call{Call: _e.mock.On("ExecuteGrantOnShare", perm, on, shareName)}
+}
+
+func (_c *mockDataAccessRepository_ExecuteGrantOnShare_Call) Run(run func(perm string, on string, shareName string)) *mockDataAccessRepository_ExecuteGrantOnShare_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_ExecuteGrantOnShare_Call) Return(_a0 error) *mockDataAccessRepository_ExecuteGrantOnShare_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_ExecuteGrantOnShare_Call) RunAndReturn(run func(string, string, string) error) *mockDataAccessRepository_ExecuteGrantOnShare_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ExecuteRevokeOnAccountRole provides a mock function with given fields: perm, on, role, isSystemGrant
 func (_m *mockDataAccessRepository) ExecuteRevokeOnAccountRole(perm string, on string, role string, isSystemGrant bool) error {
 	ret := _m.Called(perm, on, role, isSystemGrant)
@@ -751,6 +891,54 @@ func (_c *mockDataAccessRepository_ExecuteRevokeOnDatabaseRole_Call) Return(_a0 
 }
 
 func (_c *mockDataAccessRepository_ExecuteRevokeOnDatabaseRole_Call) RunAndReturn(run func(string, string, string, string) error) *mockDataAccessRepository_ExecuteRevokeOnDatabaseRole_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ExecuteRevokeOnShare provides a mock function with given fields: perm, on, shareName
+func (_m *mockDataAccessRepository) ExecuteRevokeOnShare(perm string, on string, shareName string) error {
+	ret := _m.Called(perm, on, shareName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExecuteRevokeOnShare")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(perm, on, shareName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_ExecuteRevokeOnShare_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteRevokeOnShare'
+type mockDataAccessRepository_ExecuteRevokeOnShare_Call struct {
+	*mock.Call
+}
+
+// ExecuteRevokeOnShare is a helper method to define mock.On call
+//   - perm string
+//   - on string
+//   - shareName string
+func (_e *mockDataAccessRepository_Expecter) ExecuteRevokeOnShare(perm interface{}, on interface{}, shareName interface{}) *mockDataAccessRepository_ExecuteRevokeOnShare_Call {
+	return &mockDataAccessRepository_ExecuteRevokeOnShare_Call{Call: _e.mock.On("ExecuteRevokeOnShare", perm, on, shareName)}
+}
+
+func (_c *mockDataAccessRepository_ExecuteRevokeOnShare_Call) Run(run func(perm string, on string, shareName string)) *mockDataAccessRepository_ExecuteRevokeOnShare_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_ExecuteRevokeOnShare_Call) Return(_a0 error) *mockDataAccessRepository_ExecuteRevokeOnShare_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_ExecuteRevokeOnShare_Call) RunAndReturn(run func(string, string, string) error) *mockDataAccessRepository_ExecuteRevokeOnShare_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -866,53 +1054,6 @@ func (_c *mockDataAccessRepository_GetAccountRolesWithPrefix_Call) Return(_a0 []
 }
 
 func (_c *mockDataAccessRepository_GetAccountRolesWithPrefix_Call) RunAndReturn(run func(string) ([]RoleEntity, error)) *mockDataAccessRepository_GetAccountRolesWithPrefix_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetColumnsInDatabase provides a mock function with given fields: databaseName, handleEntity
-func (_m *mockDataAccessRepository) GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error {
-	ret := _m.Called(databaseName, handleEntity)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetColumnsInDatabase")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, EntityHandler) error); ok {
-		r0 = rf(databaseName, handleEntity)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockDataAccessRepository_GetColumnsInDatabase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetColumnsInDatabase'
-type mockDataAccessRepository_GetColumnsInDatabase_Call struct {
-	*mock.Call
-}
-
-// GetColumnsInDatabase is a helper method to define mock.On call
-//   - databaseName string
-//   - handleEntity EntityHandler
-func (_e *mockDataAccessRepository_Expecter) GetColumnsInDatabase(databaseName interface{}, handleEntity interface{}) *mockDataAccessRepository_GetColumnsInDatabase_Call {
-	return &mockDataAccessRepository_GetColumnsInDatabase_Call{Call: _e.mock.On("GetColumnsInDatabase", databaseName, handleEntity)}
-}
-
-func (_c *mockDataAccessRepository_GetColumnsInDatabase_Call) Run(run func(databaseName string, handleEntity EntityHandler)) *mockDataAccessRepository_GetColumnsInDatabase_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(EntityHandler))
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetColumnsInDatabase_Call) Return(_a0 error) *mockDataAccessRepository_GetColumnsInDatabase_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetColumnsInDatabase_Call) RunAndReturn(run func(string, EntityHandler) error) *mockDataAccessRepository_GetColumnsInDatabase_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2002,64 +2143,6 @@ func (_c *mockDataAccessRepository_GetTagsByDomain_Call) RunAndReturn(run func(s
 	return _c
 }
 
-// GetTagsLinkedToDatabaseName provides a mock function with given fields: databaseName
-func (_m *mockDataAccessRepository) GetTagsLinkedToDatabaseName(databaseName string) (map[string][]*tag.Tag, error) {
-	ret := _m.Called(databaseName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetTagsLinkedToDatabaseName")
-	}
-
-	var r0 map[string][]*tag.Tag
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (map[string][]*tag.Tag, error)); ok {
-		return rf(databaseName)
-	}
-	if rf, ok := ret.Get(0).(func(string) map[string][]*tag.Tag); ok {
-		r0 = rf(databaseName)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string][]*tag.Tag)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(databaseName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockDataAccessRepository_GetTagsLinkedToDatabaseName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTagsLinkedToDatabaseName'
-type mockDataAccessRepository_GetTagsLinkedToDatabaseName_Call struct {
-	*mock.Call
-}
-
-// GetTagsLinkedToDatabaseName is a helper method to define mock.On call
-//   - databaseName string
-func (_e *mockDataAccessRepository_Expecter) GetTagsLinkedToDatabaseName(databaseName interface{}) *mockDataAccessRepository_GetTagsLinkedToDatabaseName_Call {
-	return &mockDataAccessRepository_GetTagsLinkedToDatabaseName_Call{Call: _e.mock.On("GetTagsLinkedToDatabaseName", databaseName)}
-}
-
-func (_c *mockDataAccessRepository_GetTagsLinkedToDatabaseName_Call) Run(run func(databaseName string)) *mockDataAccessRepository_GetTagsLinkedToDatabaseName_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetTagsLinkedToDatabaseName_Call) Return(_a0 map[string][]*tag.Tag, _a1 error) *mockDataAccessRepository_GetTagsLinkedToDatabaseName_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetTagsLinkedToDatabaseName_Call) RunAndReturn(run func(string) (map[string][]*tag.Tag, error)) *mockDataAccessRepository_GetTagsLinkedToDatabaseName_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetWarehouses provides a mock function with no fields
 func (_m *mockDataAccessRepository) GetWarehouses() ([]DbEntity, error) {
 	ret := _m.Called()
@@ -2834,6 +2917,53 @@ func (_c *mockDataAccessRepository_RevokeUsersFromAccountRole_Call) Return(_a0 e
 }
 
 func (_c *mockDataAccessRepository_RevokeUsersFromAccountRole_Call) RunAndReturn(run func(context.Context, string, ...string) error) *mockDataAccessRepository_RevokeUsersFromAccountRole_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetShareAccounts provides a mock function with given fields: shareName, accounts
+func (_m *mockDataAccessRepository) SetShareAccounts(shareName string, accounts []string) error {
+	ret := _m.Called(shareName, accounts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetShareAccounts")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, []string) error); ok {
+		r0 = rf(shareName, accounts)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_SetShareAccounts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetShareAccounts'
+type mockDataAccessRepository_SetShareAccounts_Call struct {
+	*mock.Call
+}
+
+// SetShareAccounts is a helper method to define mock.On call
+//   - shareName string
+//   - accounts []string
+func (_e *mockDataAccessRepository_Expecter) SetShareAccounts(shareName interface{}, accounts interface{}) *mockDataAccessRepository_SetShareAccounts_Call {
+	return &mockDataAccessRepository_SetShareAccounts_Call{Call: _e.mock.On("SetShareAccounts", shareName, accounts)}
+}
+
+func (_c *mockDataAccessRepository_SetShareAccounts_Call) Run(run func(shareName string, accounts []string)) *mockDataAccessRepository_SetShareAccounts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].([]string))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_SetShareAccounts_Call) Return(err error) *mockDataAccessRepository_SetShareAccounts_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_SetShareAccounts_Call) RunAndReturn(run func(string, []string) error) *mockDataAccessRepository_SetShareAccounts_Call {
 	_c.Call.Return(run)
 	return _c
 }

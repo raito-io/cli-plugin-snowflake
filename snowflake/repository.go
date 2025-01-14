@@ -479,11 +479,7 @@ func (repo *SnowflakeRepository) ExecuteGrantOnAccountRole(perm, on, accountRole
 	}
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
-	q := fmt.Sprintf(`GRANT %s ON %s TO ROLE %s`, perm, on, common.FormatQuery("%s", accountRole))
-	logger.Debug("Executing grant query", "query", q)
-
-	_, _, err := repo.query(q)
-
+	err := repo.executeGrant(perm, on, accountRole, "ROLE")
 	if err != nil {
 		return fmt.Errorf("error while executing grant query on Snowflake for role %q: %s", accountRole, err.Error())
 	}
@@ -498,13 +494,51 @@ func (repo *SnowflakeRepository) ExecuteRevokeOnAccountRole(perm, on, accountRol
 	}
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
-	// q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
-	q := fmt.Sprintf(`REVOKE %s ON %s FROM ROLE %s`, perm, on, common.FormatQuery("%s", accountRole))
-	logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
+	err := repo.revokeGrant(perm, on, accountRole, "ROLE")
+	if err != nil {
+		return fmt.Errorf("error while executing revoke query on Snowflake for role %q: %s", accountRole, err.Error())
+	}
+
+	return nil
+}
+
+func (repo *SnowflakeRepository) ExecuteGrantOnShare(perm, on, shareName string) error {
+	err := repo.executeGrant(perm, on, shareName, "SHARE")
+	if err != nil {
+		return fmt.Errorf("error while executing grant query on Snowflake for share %q: %s", shareName, err.Error())
+	}
+
+	return nil
+}
+
+func (repo *SnowflakeRepository) ExecuteRevokeOnShare(perm, on, shareName string) error {
+	err := repo.revokeGrant(perm, on, shareName, "SHARE")
+	if err != nil {
+		return fmt.Errorf("error while executing revoke query on Snowflake for share %q: %s", shareName, err.Error())
+	}
+
+	return nil
+}
+
+func (repo *SnowflakeRepository) executeGrant(perm, on, objectId, objectType string) error {
+	q := fmt.Sprintf(`GRANT %s ON %s TO %s %s`, perm, on, objectType, common.FormatQuery("%s", objectId))
+	logger.Debug("Executing grant query", "query", q)
 
 	_, _, err := repo.query(q)
 	if err != nil {
-		return fmt.Errorf("error while executing revoke query on Snowflake for role %q: %s", accountRole, err.Error())
+		return fmt.Errorf("error while executing grant query on Snowflake: %s", err.Error())
+	}
+
+	return nil
+}
+
+func (repo *SnowflakeRepository) revokeGrant(perm, on, objectId, objectType string) error {
+	q := fmt.Sprintf(`REVOKE %s ON %s FROM %s %s`, perm, on, objectType, common.FormatQuery("%s", objectId))
+	logger.Debug("Executing revoke query", "query", q)
+
+	_, _, err := repo.query(q)
+	if err != nil {
+		return fmt.Errorf("error while executing revoke query on Snowflake: %s", err.Error())
 	}
 
 	return nil
@@ -1113,6 +1147,35 @@ func (repo *SnowflakeRepository) CommentDatabaseRoleIfExists(comment, database, 
 	}
 
 	return nil
+}
+
+func (repo *SnowflakeRepository) CreateShare(shareName string) (err error) {
+	q := common.FormatQuery("CREATE SHARE IF NOT EXISTS %s", shareName)
+
+	_, _, err = repo.query(q)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (repo *SnowflakeRepository) SetShareAccounts(shareName string, accounts []string) (err error) {
+	q := common.FormatQuery("ALTER SHARE %s SET ACCOUNTS=%s", shareName, strings.Join(accounts, ","))
+
+	_, _, err = repo.query(q)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (repo *SnowflakeRepository) DropShare(shareName string) (err error) {
+	q := common.FormatQuery("DROP SHARE %s", shareName)
+	_, _, err = repo.query(q)
+
+	return err
 }
 
 func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema string, maskName string, columnsFullName []string, maskType *string, beneficiaries *MaskingBeneficiaries) (err error) {
