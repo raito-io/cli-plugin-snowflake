@@ -330,75 +330,60 @@ func convertFunctionArgumentSignature(signature string) string {
 	return fmt.Sprintf("(%s)", strings.Join(args, ", "))
 }
 
-func (s *DataSourceSyncer) readFunctionsInDatabase(databaseName string, tagMap map[string][]*tag.Tag) error {
-	typeName := Function
+func (s *DataSourceSyncer) createDataObjectForFunction(doType, database, schema, name, argumentSignature string, comment *string, tagMap map[string][]*tag.Tag) *ds.DataObject {
+	parent := database + "." + schema
+	fullName := parent + `."` + name + `"`
 
+	argumentSignature = convertFunctionArgumentSignature(argumentSignature)
+
+	ff := s.schemaExcludes.Contains(database + "." + schema)
+
+	if ff || !s.shouldHandle(fullName) {
+		logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", Function, fullName))
+		return nil
+	}
+
+	description := ""
+	if comment != nil {
+		description = *comment
+	}
+
+	do := ds.DataObject{
+		ExternalId:       fullName + argumentSignature, // Adding the signature for full uniqueness
+		Name:             name + argumentSignature,
+		FullName:         fullName + argumentSignature, // Adding the signature because it is needed to reference it when setting grants
+		Type:             doType,
+		Description:      description,
+		ParentExternalId: parent,
+		Tags:             tagMap[fullName],
+	}
+
+	return &do
+}
+
+func (s *DataSourceSyncer) readFunctionsInDatabase(databaseName string, tagMap map[string][]*tag.Tag) error {
 	return s.repo.GetFunctionsInDatabase(databaseName, func(entity interface{}) error {
 		function := entity.(*FunctionEntity)
 
-		parent := function.Database + "." + function.Schema
-		fullName := parent + `."` + function.Name + `"`
-
-		argumentSignature := convertFunctionArgumentSignature(function.ArgumentSignature)
-
-		ff := s.schemaExcludes.Contains(function.Database + "." + function.Schema)
-
-		if ff || !s.shouldHandle(fullName) {
-			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
-			return nil
+		do := s.createDataObjectForFunction(Function, function.Database, function.Schema, function.Name, function.ArgumentSignature, function.Comment, tagMap)
+		if do != nil {
+			return s.addDataObjects(do)
 		}
 
-		comment := ""
-		if function.Comment != nil {
-			comment = *function.Comment
-		}
-		do := ds.DataObject{
-			ExternalId:       fullName + argumentSignature, // Adding the signature for full uniqueness
-			Name:             function.Name + argumentSignature,
-			FullName:         fullName + argumentSignature, // Adding the signature because it is needed to reference it when setting grants
-			Type:             typeName,
-			Description:      comment,
-			ParentExternalId: parent,
-			Tags:             tagMap[fullName],
-		}
-
-		return s.addDataObjects(&do)
+		return nil
 	})
 }
 
 func (s *DataSourceSyncer) readProceduresInDatabase(databaseName string, tagMap map[string][]*tag.Tag) error {
-	typeName := Procedure
-
 	return s.repo.GetProceduresInDatabase(databaseName, func(entity interface{}) error {
 		proc := entity.(*ProcedureEntity)
 
-		parent := proc.Database + "." + proc.Schema
-		fullName := parent + `."` + proc.Name + `"`
-
-		argumentSignature := convertFunctionArgumentSignature(proc.ArgumentSignature)
-
-		ff := s.schemaExcludes.Contains(proc.Database + "." + proc.Schema)
-
-		if ff || !s.shouldHandle(fullName) {
-			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
-			return nil
+		do := s.createDataObjectForFunction(Procedure, proc.Database, proc.Schema, proc.Name, proc.ArgumentSignature, proc.Comment, tagMap)
+		if do != nil {
+			return s.addDataObjects(do)
 		}
 
-		comment := ""
-		if proc.Comment != nil {
-			comment = *proc.Comment
-		}
-		do := ds.DataObject{
-			ExternalId:       fullName + argumentSignature, // Adding the signature for full uniqueness
-			Name:             proc.Name + argumentSignature,
-			FullName:         fullName + argumentSignature, // Adding the signature because it is needed to reference it when setting grants
-			Type:             typeName,
-			Description:      comment,
-			ParentExternalId: parent,
-			Tags:             tagMap[fullName],
-		}
-
-		return s.addDataObjects(&do)
+		return nil
 	})
 }
 
