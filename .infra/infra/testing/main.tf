@@ -1,4 +1,10 @@
-// SNOWFLAKE INTEGRATION
+// SNOWFLAKE SCIM INTEGRATION
+
+resource "snowflake_account_role" "scim_role" {
+  name    = "GENERIC_SCIM_PROVISIONER"
+  comment = "For scim provisioning"
+}
+
 resource "snowflake_scim_integration" "scim_integration" {
   name          = "SCIM Integration"
   enabled       = true
