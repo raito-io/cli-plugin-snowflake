@@ -491,7 +491,7 @@ func (s *DataSourceSyncer) readDatabases(excludes set.Set[string], shares map[st
 		return nil, err
 	}
 
-	enrichedDatabases, err := s.addDbEntitiesToImporter(databases, ds.Database, "", shouldRetrieveTags,
+	enrichedDatabases, err := s.addDbEntitiesToImporter(databases, ds.Database, shouldRetrieveTags,
 		s.repo.GetTagsLinkedToDatabaseName,
 		func(name string) string { return name },
 		func(name, fullName string) bool {
@@ -513,7 +513,7 @@ func (s *DataSourceSyncer) readShares(excludes set.Set[string], shouldRetrieveTa
 		return nil, nil, err
 	}
 
-	enrichedShares, err := s.addDbEntitiesToImporter(shares, "shared-database", "", shouldRetrieveTags,
+	enrichedShares, err := s.addDbEntitiesToImporter(shares, "shared-database", shouldRetrieveTags,
 		s.repo.GetTagsLinkedToDatabaseName,
 		func(name string) string { return name },
 		func(name, fullName string) bool {
@@ -549,7 +549,7 @@ func (s *DataSourceSyncer) readWarehouses(shouldRetrieveTags bool) error {
 		}
 	}
 
-	_, err = s.addDbEntitiesToImporter(dbWarehouses, "warehouse", "", shouldRetrieveTags,
+	_, err = s.addDbEntitiesToImporter(dbWarehouses, "warehouse", shouldRetrieveTags,
 		func(name string) (map[string][]*tag.Tag, error) {
 			return allWarehouseTags, nil
 		},
@@ -578,7 +578,7 @@ func (s *DataSourceSyncer) readIntegrations(shouldRetrieveTags bool) error {
 		}
 	}
 
-	_, err = s.addDbEntitiesToImporter(integrations, Integration, "", shouldRetrieveTags,
+	_, err = s.addDbEntitiesToImporter(integrations, Integration, shouldRetrieveTags,
 		func(name string) (map[string][]*tag.Tag, error) {
 			return integrationTags, nil
 		},
@@ -591,7 +591,7 @@ func (s *DataSourceSyncer) readIntegrations(shouldRetrieveTags bool) error {
 	return nil
 }
 
-func (s *DataSourceSyncer) addDbEntitiesToImporter(entities []DbEntity, doType string, parent string, shouldRetrieveTags bool, tagRetrieval func(name string) (map[string][]*tag.Tag, error), externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]ExtendedDbEntity, error) {
+func (s *DataSourceSyncer) addDbEntitiesToImporter(entities []DbEntity, doType string, shouldRetrieveTags bool, tagRetrieval func(name string) (map[string][]*tag.Tag, error), externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]ExtendedDbEntity, error) {
 	dbEntities := make([]ExtendedDbEntity, 0, 20)
 
 	for _, db := range entities {
@@ -634,7 +634,7 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(entities []DbEntity, doType s
 					FullName:         fullName,
 					Type:             doType,
 					Description:      comment,
-					ParentExternalId: parent,
+					ParentExternalId: "",
 					Tags:             doTags,
 				}
 
