@@ -4,7 +4,7 @@ resource "snowflake_scim_integration" "scim_integration" {
   enabled       = true
   scim_client   = "GENERIC"
   sync_password = false
-  run_as_role   = "RAITO"
+  run_as_role   = "GENERIC_SCIM_PROVISIONER"
 }
 
 // SNOWFLAKE DATABASE
