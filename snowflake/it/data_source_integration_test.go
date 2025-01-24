@@ -39,7 +39,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	sourceName := sfOrganization + "-" + sfAccount
 
 	s.NoError(err)
-	s.Len(dataSourceObjectHandler.DataObjects, 53)
+	s.Len(dataSourceObjectHandler.DataObjects, 54)
 
 	warehouses := getByType(dataSourceObjectHandler.DataObjects, "warehouse")
 	s.Len(warehouses, 2)
@@ -119,7 +119,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	s.Len(procedures, 1)
 	s.Contains(procedures, data_source.DataObject{
 		ExternalId:       `RAITO_DATABASE.ORDERING."myProcedure"(VARCHAR)`,
-		Name:             "muProcedure(VARCHAR)",
+		Name:             "myProcedure(VARCHAR)",
 		FullName:         `RAITO_DATABASE.ORDERING."myProcedure"(VARCHAR)`,
 		Type:             snowflake.Procedure,
 		Description:      "user-defined function",

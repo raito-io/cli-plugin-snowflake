@@ -32,7 +32,7 @@ resource "snowflake_function_sql" "decrypt_function" {
 resource "snowflake_procedure_sql" "my_procedure" {
   database = snowflake_database.db.name
   schema   = snowflake_schema.ordering.name
-  name     = "muProcedure"
+  name     = "myProcedure"
   arguments {
     arg_data_type = "VARCHAR(100)"
     arg_name      = "x"
