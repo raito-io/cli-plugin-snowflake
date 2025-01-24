@@ -118,9 +118,9 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	procedures := getByType(dataSourceObjectHandler.DataObjects, snowflake.Procedure)
 	s.Len(procedures, 1)
 	s.Contains(procedures, data_source.DataObject{
-		ExternalId:       `RAITO_DATABASE.ORDERING."muProcedure"(VARCHAR)`,
+		ExternalId:       `RAITO_DATABASE.ORDERING."myProcedure"(VARCHAR)`,
 		Name:             "muProcedure(VARCHAR)",
-		FullName:         `RAITO_DATABASE.ORDERING."muProcedure"(VARCHAR)`,
+		FullName:         `RAITO_DATABASE.ORDERING."myProcedure"(VARCHAR)`,
 		Type:             snowflake.Procedure,
 		Description:      "user-defined function",
 		ParentExternalId: "RAITO_DATABASE.ORDERING",

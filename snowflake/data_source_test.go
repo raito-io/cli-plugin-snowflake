@@ -87,6 +87,15 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 		return nil
 	}).Once()
 
+	repoMock.EXPECT().GetProceduresInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetProceduresInDatabase("Database2", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&ProcedureEntity{Database: s, Schema: "schema2", Name: "myProc", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
 	repoMock.EXPECT().GetTablesInDatabase("Database2", "", mock.Anything).RunAndReturn(func(s string, s2 string, handler EntityHandler) error {
 		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3", TableType: "BASE TABLE"})
 		return nil
@@ -119,7 +128,7 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 
 	//Then
 	assert.NoError(t, err)
-	assert.Len(t, dataSourceObjectHandlerMock.DataObjects, 15)
+	assert.Len(t, dataSourceObjectHandlerMock.DataObjects, 16)
 	assert.Equal(t, "SnowflakeAccountName", dataSourceObjectHandlerMock.DataSourceName)
 	assert.Equal(t, "SnowflakeAccountName", dataSourceObjectHandlerMock.DataSourceFullName)
 }
@@ -470,6 +479,10 @@ func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
 
 	repoMock.EXPECT().GetFunctionsInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&FunctionEntity{Database: s, Schema: "schema1", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetProceduresInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		return nil
 	}).Once()
 
