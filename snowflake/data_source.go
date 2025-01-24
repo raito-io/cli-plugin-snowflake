@@ -35,6 +35,7 @@ type dataSourceRepository interface {
 	GetTagsLinkedToDatabaseName(databaseName string) (map[string][]*tag.Tag, error)
 	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	ExecuteGrantOnAccountRole(perm, on, role string, isSystemGrant bool) error
+	GetIntegrations() ([]DbEntity, error)
 }
 
 type DataSourceSyncer struct {
@@ -141,21 +142,26 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	dataSourceHandler.SetDataSourceName(sfAccount)
 	dataSourceHandler.SetDataSourceFullname(sfAccount)
 
+	err = s.readIntegrations(shouldRetrieveTags)
+	if err != nil {
+		return fmt.Errorf("reading integrations: %w", err)
+	}
+
 	err = s.readWarehouses(shouldRetrieveTags)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading warehouses: %w", err)
 	}
 
 	shares, sharesMap, err := s.readShares(dbExcludes, shouldRetrieveTags)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading shares: %w", err)
 	}
 
 	s.sharesMap = sharesMap
 
 	databases, err := s.readDatabases(dbExcludes, sharesMap, shouldRetrieveTags)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading databases: %w", err)
 	}
 
 	// add shares to the list again to fetch their descendants
@@ -546,6 +552,35 @@ func (s *DataSourceSyncer) readWarehouses(shouldRetrieveTags bool) error {
 	_, err = s.addDbEntitiesToImporter(dbWarehouses, "warehouse", "", shouldRetrieveTags,
 		func(name string) (map[string][]*tag.Tag, error) {
 			return allWarehouseTags, nil
+		},
+		func(name string) string { return name },
+		func(name, fullName string) bool { return s.shouldGoInto(fullName) })
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *DataSourceSyncer) readIntegrations(shouldRetrieveTags bool) error {
+	integrations, err := s.repo.GetIntegrations()
+	if err != nil {
+		return err
+	}
+
+	integrationTags := make(map[string][]*tag.Tag, 0)
+
+	if shouldRetrieveTags {
+		integrationTags, err = s.repo.GetTagsByDomain("INTEGRATION")
+
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = s.addDbEntitiesToImporter(integrations, Integration, "", shouldRetrieveTags,
+		func(name string) (map[string][]*tag.Tag, error) {
+			return integrationTags, nil
 		},
 		func(name string) string { return name },
 		func(name, fullName string) bool { return s.shouldGoInto(fullName) })

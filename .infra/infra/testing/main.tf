@@ -1,3 +1,12 @@
+// SNOWFLAKE INTEGRATION
+resource "snowflake_scim_integration" "scim_integration" {
+  name          = "SCIM Integration"
+  enabled       = true
+  scim_client   = "GENERIC"
+  sync_password = false
+  run_as_role   = "RAITO"
+}
+
 // SNOWFLAKE DATABASE
 resource "snowflake_database" "db" {
   name    = "RAITO_DATABASE"
@@ -340,6 +349,15 @@ resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_d
   on_schema_object {
     object_name = snowflake_function_sql.decrypt_function.fully_qualified_name
     object_type = "FUNCTION"
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_myprocedure" {
+  privileges        = ["USAGE"]
+  account_role_name = "DATA_ANALYST"
+  on_schema_object {
+    object_name = snowflake_procedure_sql.my_procedure.fully_qualified_name
+    object_type = "PROCEDURE"
   }
 }
 

@@ -1113,6 +1113,28 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 	return nil
 }
 
+func (repo *SnowflakeRepository) GetIntegrations() ([]DbEntity, error) {
+	q := "SHOW INTEGRATIONS"
+
+	var integrationEntities []DbEntity
+
+	err := handleDbEntities(repo, q, func() interface{} {
+		return &DbEntity{}
+	}, func(entity interface{}) error {
+		pEntry := entity.(*DbEntity)
+		integrationEntities = append(integrationEntities, *pEntry)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Info(fmt.Sprintf("Found %d integrations", len(integrationEntities)))
+
+	return integrationEntities, nil
+}
+
 func (repo *SnowflakeRepository) GetPoliciesLike(policy string, like string) ([]PolicyEntity, error) {
 	q := fmt.Sprintf("SHOW %s POLICIES LIKE '%s';", common.FormatQuery("%s", policy), strings.ToUpper(like))
 

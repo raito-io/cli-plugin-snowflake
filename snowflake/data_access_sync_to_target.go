@@ -42,6 +42,7 @@ type AccessToTargetSyncer struct {
 	proceduresPerSchemaCache      map[string][]ProcedureEntity
 	schemasPerDataBaseCache       map[string][]SchemaEntity
 	warehousesCache               []DbEntity
+	integrationsCache             []DbEntity
 }
 
 func NewAccessToTargetSyncer(accessSyncer *AccessSyncer, namingConstraints naming_hint.NamingConstraints, repo dataAccessRepository, accessProviders *importer.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) *AccessToTargetSyncer {
@@ -596,6 +597,8 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 				}
 			} else if what.DataObject.Type == "warehouse" {
 				s.createGrantsForWarehouse(permissions, what.DataObject.FullName, metaData, expectedGrants)
+			} else if what.DataObject.Type == Integration {
+				s.createGrantsForIntegration(permissions, what.DataObject.FullName, metaData, expectedGrants)
 			} else if what.DataObject.Type == ds.Datasource {
 				err2 := s.createGrantsForAccount(permissions, metaData, expectedGrants)
 				if err2 != nil {
@@ -1334,6 +1337,22 @@ func (s *AccessToTargetSyncer) getWarehouses() ([]DbEntity, error) {
 	return s.warehousesCache, nil
 }
 
+func (s *AccessToTargetSyncer) getIntegrations() ([]DbEntity, error) {
+	if s.integrationsCache != nil {
+		return s.integrationsCache, nil
+	}
+
+	var err error
+	s.integrationsCache, err = s.repo.GetIntegrations()
+
+	if err != nil {
+		s.integrationsCache = nil
+		return nil, err
+	}
+
+	return s.integrationsCache, nil
+}
+
 func (s *AccessToTargetSyncer) createGrantsForSchema(permissions []string, fullName string, metaData map[string]map[string]struct{}, isShared bool, grants set.Set[Grant]) error {
 	// TODO: this does not work for Raito full names
 	sfObject := common.ParseFullName(fullName)
@@ -1538,6 +1557,17 @@ func (s *AccessToTargetSyncer) createGrantsForWarehouse(permissions []string, wa
 	}
 }
 
+func (s *AccessToTargetSyncer) createGrantsForIntegration(permissions []string, warehouse string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) {
+	for _, p := range permissions {
+		if _, f := metaData[Integration][strings.ToUpper(p)]; !f {
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type INTEGRATION. Skipping", p))
+			continue
+		}
+
+		grants.Add(Grant{p, Integration, common.FormatQuery(`%s`, warehouse)})
+	}
+}
+
 func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) error {
 	for _, p := range permissions {
 		matchFound := false
@@ -1556,6 +1586,19 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 
 				for _, warehouse := range warehouses {
 					grants.Add(Grant{p, "warehouse", common.FormatQuery(`%s`, warehouse.Name)})
+				}
+			}
+
+			if _, f2 := metaData[Integration][strings.ToUpper(p)]; f2 {
+				matchFound = true
+
+				integrations, err := s.getIntegrations()
+				if err != nil {
+					return err
+				}
+
+				for _, integration := range integrations {
+					grants.Add(Grant{p, Integration, common.FormatQuery(`%s`, integration.Name)})
 				}
 			}
 

@@ -122,7 +122,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 		Name:             "myProcedure(VARCHAR)",
 		FullName:         `RAITO_DATABASE.ORDERING."myProcedure"(VARCHAR)`,
 		Type:             snowflake.Procedure,
-		Description:      "user-defined function",
+		Description:      "user-defined procedure",
 		ParentExternalId: "RAITO_DATABASE.ORDERING",
 		Tags:             nil,
 	})

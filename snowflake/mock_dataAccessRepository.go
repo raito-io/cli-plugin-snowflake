@@ -1384,6 +1384,63 @@ func (_c *mockDataAccessRepository_GetGrantsToDatabaseRole_Call) RunAndReturn(ru
 	return _c
 }
 
+// GetIntegrations provides a mock function with no fields
+func (_m *mockDataAccessRepository) GetIntegrations() ([]DbEntity, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetIntegrations")
+	}
+
+	var r0 []DbEntity
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]DbEntity, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []DbEntity); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]DbEntity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockDataAccessRepository_GetIntegrations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIntegrations'
+type mockDataAccessRepository_GetIntegrations_Call struct {
+	*mock.Call
+}
+
+// GetIntegrations is a helper method to define mock.On call
+func (_e *mockDataAccessRepository_Expecter) GetIntegrations() *mockDataAccessRepository_GetIntegrations_Call {
+	return &mockDataAccessRepository_GetIntegrations_Call{Call: _e.mock.On("GetIntegrations")}
+}
+
+func (_c *mockDataAccessRepository_GetIntegrations_Call) Run(run func()) *mockDataAccessRepository_GetIntegrations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetIntegrations_Call) Return(_a0 []DbEntity, _a1 error) *mockDataAccessRepository_GetIntegrations_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetIntegrations_Call) RunAndReturn(run func() ([]DbEntity, error)) *mockDataAccessRepository_GetIntegrations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetPolicies provides a mock function with given fields: policy
 func (_m *mockDataAccessRepository) GetPolicies(policy string) ([]PolicyEntity, error) {
 	ret := _m.Called(policy)

@@ -69,6 +69,7 @@ type dataAccessRepository interface {
 	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	GetDatabaseRoleTags(databaseName string, roleName string) (map[string][]*tag.Tag, error)
 	GetWarehouses() ([]DbEntity, error)
+	GetIntegrations() ([]DbEntity, error)
 	GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error
 	GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
 	GrantDatabaseRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error

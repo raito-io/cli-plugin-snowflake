@@ -194,6 +194,21 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				Children: []string{},
 			},
 			{
+				Name:  Integration,
+				Label: "Integration",
+				Type:  Integration,
+				Permissions: []*ds.DataObjectTypePermission{
+					{
+						Permission:  "USAGE",
+						Description: "Enables using this integration",
+					},
+					{
+						Permission:  "USE_ANY_ROLE",
+						Description: "Allows an External OAuth client or user to switch roles within a session when interacting with Snowflake through an integration.",
+					},
+				},
+			},
+			{
 				Name: ds.Database,
 				Type: ds.Database,
 				Permissions: []*ds.DataObjectTypePermission{
