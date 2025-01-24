@@ -29,6 +29,22 @@ resource "snowflake_function_sql" "decrypt_function" {
   return_type         = "STRING"
 }
 
+resource "snowflake_procedure_sql" "my_procedure" {
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "muProcedure"
+  arguments {
+    arg_data_type = "VARCHAR(100)"
+    arg_name      = "x"
+  }
+  return_type          = "VARCHAR(100)"
+  procedure_definition = <<EOT
+BEGIN
+  RETURN message;
+END;
+EOT
+}
+
 resource "snowflake_schema" "special_schema" {
   database = snowflake_database.special_db.name
   name     = "SCHEMA NAME WITH S†RANGE çhars"

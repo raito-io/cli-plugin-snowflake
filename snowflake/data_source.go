@@ -29,6 +29,7 @@ type dataSourceRepository interface {
 	GetDatabases() ([]DbEntity, error)
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetStoredProceduresInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTagsLinkedToDatabaseName(databaseName string) (map[string][]*tag.Tag, error)
@@ -210,6 +211,11 @@ func (s *DataSourceSyncer) handleDatabase(database ExtendedDbEntity) error {
 		if err != nil {
 			return err
 		}
+
+		err = s.readStoredProceduresInDatabase(database.Entity.Name, database.LinkedTags)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = s.readTablesInDatabase(database.Entity.Name, doTypePrefix, s.repo.GetTablesInDatabase, database.LinkedTags)
@@ -349,6 +355,42 @@ func (s *DataSourceSyncer) readFunctionsInDatabase(databaseName string, tagMap m
 		do := ds.DataObject{
 			ExternalId:       fullName + argumentSignature, // Adding the signature for full uniqueness
 			Name:             function.Name + argumentSignature,
+			FullName:         fullName + argumentSignature, // Adding the signature because it is needed to reference it when setting grants
+			Type:             typeName,
+			Description:      comment,
+			ParentExternalId: parent,
+			Tags:             tagMap[fullName],
+		}
+
+		return s.addDataObjects(&do)
+	})
+}
+
+func (s *DataSourceSyncer) readStoredProceduresInDatabase(databaseName string, tagMap map[string][]*tag.Tag) error {
+	typeName := StoredProcedure
+
+	return s.repo.GetStoredProceduresInDatabase(databaseName, func(entity interface{}) error {
+		proc := entity.(*StoredProcedureEntity)
+
+		parent := proc.Database + "." + proc.Schema
+		fullName := parent + `."` + proc.Name + `"`
+
+		argumentSignature := convertFunctionArgumentSignature(proc.ArgumentSignature)
+
+		ff := s.schemaExcludes.Contains(proc.Database + "." + proc.Schema)
+
+		if ff || !s.shouldHandle(fullName) {
+			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
+			return nil
+		}
+
+		comment := ""
+		if proc.Comment != nil {
+			comment = *proc.Comment
+		}
+		do := ds.DataObject{
+			ExternalId:       fullName + argumentSignature, // Adding the signature for full uniqueness
+			Name:             proc.Name + argumentSignature,
 			FullName:         fullName + argumentSignature, // Adding the signature because it is needed to reference it when setting grants
 			Type:             typeName,
 			Description:      comment,

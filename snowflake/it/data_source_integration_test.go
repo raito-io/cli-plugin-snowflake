@@ -115,6 +115,18 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 		Tags:             nil,
 	})
 
+	procedures := getByType(dataSourceObjectHandler.DataObjects, snowflake.StoredProcedure)
+	s.Len(procedures, 1)
+	s.Contains(procedures, data_source.DataObject{
+		ExternalId:       `RAITO_DATABASE.ORDERING."muProcedure"(VARCHAR)`,
+		Name:             "muProcedure(VARCHAR)",
+		FullName:         `RAITO_DATABASE.ORDERING."muProcedure"(VARCHAR)`,
+		Type:             snowflake.StoredProcedure,
+		Description:      "user-defined function",
+		ParentExternalId: "RAITO_DATABASE.ORDERING",
+		Tags:             nil,
+	})
+
 	column := getByType(dataSourceObjectHandler.DataObjects, "column")
 	s.Len(column, 38)
 	s.Contains(column, data_source.DataObject{

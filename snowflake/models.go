@@ -37,6 +37,14 @@ type FunctionEntity struct {
 	ArgumentSignature string  `db:"ARGUMENT_SIGNATURE"`
 }
 
+type StoredProcedureEntity struct {
+	Database          string  `db:"PROCEDURE_CATALOG"`
+	Schema            string  `db:"PROCEDURE_SCHEMA"`
+	Name              string  `db:"PROCEDURE_NAME"`
+	Comment           *string `db:"COMMENT"`
+	ArgumentSignature string  `db:"ARGUMENT_SIGNATURE"`
+}
+
 type TagEntity struct {
 	Database *string `db:"OBJECT_DATABASE"`
 	Schema   *string `db:"OBJECT_SCHEMA"`

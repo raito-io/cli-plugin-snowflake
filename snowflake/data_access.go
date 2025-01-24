@@ -230,7 +230,7 @@ func (s *AccessSyncer) getFullNameFromGrant(name, objectType string) string {
 
 	sfObject := common.ParseFullName(name)
 
-	if strings.EqualFold(objectType, Function) && sfObject.Table != nil {
+	if (strings.EqualFold(objectType, Function) || strings.EqualFold(objectType, StoredProcedure)) && sfObject.Table != nil {
 		function := *sfObject.Table
 
 		if strings.Contains(function, "(") {

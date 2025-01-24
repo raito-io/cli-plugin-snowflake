@@ -575,8 +575,8 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 				if err2 != nil {
 					return actualName, err2
 				}
-			} else if what.DataObject.Type == Function {
-				s.createGrantsForFunction(permissions, what.DataObject.FullName, metaData, expectedGrants)
+			} else if what.DataObject.Type == Function || what.DataObject.Type == StoredProcedure {
+				s.createGrantsForFunctionOrProcedure(permissions, what.DataObject.FullName, metaData, expectedGrants, what.DataObject.Type)
 			} else if what.DataObject.Type == "shared-schema" {
 				err2 := s.createGrantsForSchema(permissions, what.DataObject.FullName, metaData, true, expectedGrants)
 				if err2 != nil {
@@ -768,7 +768,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					onType := convertSnowflakeGrantTypeToRaito(grant.GrantedOn)
 					name := grant.Name
 
-					if onType == Function { // For functions we need to do a special conversion
+					if onType == Function || onType == StoredProcedure { // For functions and stored procedures we need to do a special conversion
 						name = s.accessSyncer.getFullNameFromGrant(name, onType)
 					}
 
@@ -1195,12 +1195,12 @@ func (s *AccessToTargetSyncer) createGrantsForTableOrView(doType string, permiss
 	return nil
 }
 
-func (s *AccessToTargetSyncer) createGrantsForFunction(permissions []string, fullName string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) {
+func (s *AccessToTargetSyncer) createGrantsForFunctionOrProcedure(permissions []string, fullName string, metaData map[string]map[string]struct{}, grants set.Set[Grant], objType string) {
 	for _, p := range permissions {
-		if _, f := metaData[Function][strings.ToUpper(p)]; f {
-			grants.Add(Grant{p, Function, fullName}) // fullName should already be in the right format
+		if _, f := metaData[objType][strings.ToUpper(p)]; f {
+			grants.Add(Grant{p, objType, fullName}) // fullName should already be in the right format
 		} else {
-			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(Function)))
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(objType)))
 		}
 	}
 
@@ -1446,12 +1446,12 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForTable(database string, s
 	return false
 }
 
-func (s *AccessToTargetSyncer) createPermissionGrantsForFunction(database string, schema string, function FunctionEntity, p string, metaData map[string]map[string]struct{}, grants set.Set[Grant]) bool {
+func (s *AccessToTargetSyncer) createPermissionGrantsForFunctionOrProcedure(database string, schema string, function FunctionEntity, p string, metaData map[string]map[string]struct{}, grants set.Set[Grant], objType string) bool {
 	// Check if the permission is applicable on the data object type
-	if _, f2 := metaData[Function][strings.ToUpper(p)]; f2 {
+	if _, f2 := metaData[objType][strings.ToUpper(p)]; f2 {
 		argumentSignature := convertFunctionArgumentSignature(function.ArgumentSignature)
 
-		grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, database, schema) + `"` + function.Name + `"` + argumentSignature})
+		grants.Add(Grant{p, objType, common.FormatQuery(`%s.%s.`, database, schema) + `"` + function.Name + `"` + argumentSignature})
 
 		return true
 	}
