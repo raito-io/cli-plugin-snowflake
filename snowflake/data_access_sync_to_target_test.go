@@ -604,6 +604,10 @@ func generateAccessControls_schema(t *testing.T) {
 		return nil
 	}).Once()
 
+	repoMock.EXPECT().GetStoredProceduresInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		return nil
+	}).Once()
+
 	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
 			Id:   "AccessProviderId1",
@@ -688,7 +692,10 @@ func generateAccessControls_existing_schema(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
-		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetStoredProceduresInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		return nil
 	}).Once()
 
@@ -773,9 +780,16 @@ func generateAccessControls_database(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema2", "RoleName1", false).Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema2.Table3", "RoleName1", false).Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "VIEW DB1.Schema2.View3", "RoleName1", false).Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "STOREDPROCEDURE DB1.Schema2.\"procMe\"(VARCHAR)", "RoleName1", false).Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "FUNCTION DB1.Schema2.\"Decrypt\"(VARCHAR)", "RoleName1", false).Return(nil).Once()
 
 	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetStoredProceduresInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&StoredProcedureEntity{Database: s, Schema: "Schema2", Name: "procMe", ArgumentSignature: "(VAL VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -787,7 +801,7 @@ func generateAccessControls_database(t *testing.T) {
 				Users: []string{"User1", "User2"},
 			},
 			What: []importer.WhatItem{
-				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"SELECT"}},
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"SELECT", "USAGE"}},
 			},
 		},
 	}
@@ -827,6 +841,10 @@ func generateAccessControls_existing_database(t *testing.T) {
 
 	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetStoredProceduresInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		return nil
 	}).Once()
 

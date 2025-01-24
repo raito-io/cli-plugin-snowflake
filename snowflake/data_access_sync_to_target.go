@@ -36,25 +36,27 @@ type AccessToTargetSyncer struct {
 	ignoreLinksToRole          []string
 	databaseRoleSupportEnabled bool
 
-	uniqueRoleNameGeneratorsCache map[*string]naming_hint.UniqueGenerator
-	tablesPerSchemaCache          map[string][]TableEntity
-	functionsPerSchemaCache       map[string][]FunctionEntity
-	schemasPerDataBaseCache       map[string][]SchemaEntity
-	warehousesCache               []DbEntity
+	uniqueRoleNameGeneratorsCache  map[*string]naming_hint.UniqueGenerator
+	tablesPerSchemaCache           map[string][]TableEntity
+	functionsPerSchemaCache        map[string][]FunctionEntity
+	storedProceduresPerSchemaCache map[string][]StoredProcedureEntity
+	schemasPerDataBaseCache        map[string][]SchemaEntity
+	warehousesCache                []DbEntity
 }
 
 func NewAccessToTargetSyncer(accessSyncer *AccessSyncer, namingConstraints naming_hint.NamingConstraints, repo dataAccessRepository, accessProviders *importer.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) *AccessToTargetSyncer {
 	return &AccessToTargetSyncer{
-		accessSyncer:                  accessSyncer,
-		accessProviders:               accessProviders,
-		accessProviderFeedbackHandler: accessProviderFeedbackHandler,
-		configMap:                     configMap,
-		repo:                          repo,
-		tablesPerSchemaCache:          make(map[string][]TableEntity),
-		functionsPerSchemaCache:       make(map[string][]FunctionEntity),
-		schemasPerDataBaseCache:       make(map[string][]SchemaEntity),
-		uniqueRoleNameGeneratorsCache: make(map[*string]naming_hint.UniqueGenerator),
-		namingConstraints:             namingConstraints,
+		accessSyncer:                   accessSyncer,
+		accessProviders:                accessProviders,
+		accessProviderFeedbackHandler:  accessProviderFeedbackHandler,
+		configMap:                      configMap,
+		repo:                           repo,
+		tablesPerSchemaCache:           make(map[string][]TableEntity),
+		functionsPerSchemaCache:        make(map[string][]FunctionEntity),
+		storedProceduresPerSchemaCache: make(map[string][]StoredProcedureEntity),
+		schemasPerDataBaseCache:        make(map[string][]SchemaEntity),
+		uniqueRoleNameGeneratorsCache:  make(map[*string]naming_hint.UniqueGenerator),
+		namingConstraints:              namingConstraints,
 	}
 }
 
@@ -1266,6 +1268,33 @@ func (s *AccessToTargetSyncer) getFunctionsForSchema(database, schema string) ([
 	return functions, nil
 }
 
+func (s *AccessToTargetSyncer) getStoredProceduresForSchema(database, schema string) ([]StoredProcedureEntity, error) {
+	cacheKey := database + "." + schema
+
+	if procs, f := s.storedProceduresPerSchemaCache[cacheKey]; f {
+		return procs, nil
+	}
+
+	procs := make([]StoredProcedureEntity, 0, 10)
+
+	err := s.repo.GetStoredProceduresInDatabase(database, func(entity interface{}) error {
+		proc := entity.(*StoredProcedureEntity)
+		if proc.Schema == schema {
+			procs = append(procs, *proc)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	s.storedProceduresPerSchemaCache[cacheKey] = procs
+
+	return procs, nil
+}
+
 func (s *AccessToTargetSyncer) getSchemasForDatabase(database string) ([]SchemaEntity, error) {
 	if schemas, f := s.schemasPerDataBaseCache[database]; f {
 		return schemas, nil
@@ -1374,8 +1403,20 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForSchema(database, schema,
 		// Run through all the tabular things (tables, views, ...) in the schema
 		for _, function := range functions {
 			functionMatchFound := false
-			functionMatchFound = s.createPermissionGrantsForFunction(database, schema, function, p, metaData, grants)
+			functionMatchFound = s.createPermissionGrantsForFunctionOrProcedure(database, schema, function.Name, function.ArgumentSignature, p, metaData, grants, Function)
 			matchFound = matchFound || functionMatchFound
+		}
+
+		procedures, err := s.getStoredProceduresForSchema(database, schema)
+		if err != nil {
+			return false, err
+		}
+
+		// Run through all the tabular things (tables, views, ...) in the schema
+		for _, proc := range procedures {
+			procedureMatchFound := false
+			procedureMatchFound = s.createPermissionGrantsForFunctionOrProcedure(database, schema, proc.Name, proc.ArgumentSignature, p, metaData, grants, StoredProcedure)
+			matchFound = matchFound || procedureMatchFound
 		}
 	}
 
@@ -1446,12 +1487,12 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForTable(database string, s
 	return false
 }
 
-func (s *AccessToTargetSyncer) createPermissionGrantsForFunctionOrProcedure(database string, schema string, function FunctionEntity, p string, metaData map[string]map[string]struct{}, grants set.Set[Grant], objType string) bool {
+func (s *AccessToTargetSyncer) createPermissionGrantsForFunctionOrProcedure(database string, schema string, name, signature, p string, metaData map[string]map[string]struct{}, grants set.Set[Grant], objType string) bool {
 	// Check if the permission is applicable on the data object type
 	if _, f2 := metaData[objType][strings.ToUpper(p)]; f2 {
-		argumentSignature := convertFunctionArgumentSignature(function.ArgumentSignature)
+		argumentSignature := convertFunctionArgumentSignature(signature)
 
-		grants.Add(Grant{p, objType, common.FormatQuery(`%s.%s.`, database, schema) + `"` + function.Name + `"` + argumentSignature})
+		grants.Add(Grant{p, objType, common.FormatQuery(`%s.%s.`, database, schema) + `"` + name + `"` + argumentSignature})
 
 		return true
 	}

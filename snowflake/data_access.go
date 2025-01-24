@@ -65,6 +65,7 @@ type dataAccessRepository interface {
 	GetShares() ([]DbEntity, error)
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetStoredProceduresInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	GetDatabaseRoleTags(databaseName string, roleName string) (map[string][]*tag.Tag, error)
 	GetWarehouses() ([]DbEntity, error)
