@@ -1561,6 +1561,53 @@ func (_c *mockDataAccessRepository_GetPolicyReferences_Call) RunAndReturn(run fu
 	return _c
 }
 
+// GetProceduresInDatabase provides a mock function with given fields: databaseName, handleEntity
+func (_m *mockDataAccessRepository) GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error {
+	ret := _m.Called(databaseName, handleEntity)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProceduresInDatabase")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, EntityHandler) error); ok {
+		r0 = rf(databaseName, handleEntity)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockDataAccessRepository_GetProceduresInDatabase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetProceduresInDatabase'
+type mockDataAccessRepository_GetProceduresInDatabase_Call struct {
+	*mock.Call
+}
+
+// GetProceduresInDatabase is a helper method to define mock.On call
+//   - databaseName string
+//   - handleEntity EntityHandler
+func (_e *mockDataAccessRepository_Expecter) GetProceduresInDatabase(databaseName interface{}, handleEntity interface{}) *mockDataAccessRepository_GetProceduresInDatabase_Call {
+	return &mockDataAccessRepository_GetProceduresInDatabase_Call{Call: _e.mock.On("GetProceduresInDatabase", databaseName, handleEntity)}
+}
+
+func (_c *mockDataAccessRepository_GetProceduresInDatabase_Call) Run(run func(databaseName string, handleEntity EntityHandler)) *mockDataAccessRepository_GetProceduresInDatabase_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(EntityHandler))
+	})
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetProceduresInDatabase_Call) Return(_a0 error) *mockDataAccessRepository_GetProceduresInDatabase_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockDataAccessRepository_GetProceduresInDatabase_Call) RunAndReturn(run func(string, EntityHandler) error) *mockDataAccessRepository_GetProceduresInDatabase_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSchemasInDatabase provides a mock function with given fields: databaseName, handleEntity
 func (_m *mockDataAccessRepository) GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error {
 	ret := _m.Called(databaseName, handleEntity)
@@ -1716,53 +1763,6 @@ func (_c *mockDataAccessRepository_GetSnowFlakeAccountName_Call) Return(_a0 stri
 }
 
 func (_c *mockDataAccessRepository_GetSnowFlakeAccountName_Call) RunAndReturn(run func() (string, error)) *mockDataAccessRepository_GetSnowFlakeAccountName_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetStoredProceduresInDatabase provides a mock function with given fields: databaseName, handleEntity
-func (_m *mockDataAccessRepository) GetStoredProceduresInDatabase(databaseName string, handleEntity EntityHandler) error {
-	ret := _m.Called(databaseName, handleEntity)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetStoredProceduresInDatabase")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, EntityHandler) error); ok {
-		r0 = rf(databaseName, handleEntity)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockDataAccessRepository_GetStoredProceduresInDatabase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetStoredProceduresInDatabase'
-type mockDataAccessRepository_GetStoredProceduresInDatabase_Call struct {
-	*mock.Call
-}
-
-// GetStoredProceduresInDatabase is a helper method to define mock.On call
-//   - databaseName string
-//   - handleEntity EntityHandler
-func (_e *mockDataAccessRepository_Expecter) GetStoredProceduresInDatabase(databaseName interface{}, handleEntity interface{}) *mockDataAccessRepository_GetStoredProceduresInDatabase_Call {
-	return &mockDataAccessRepository_GetStoredProceduresInDatabase_Call{Call: _e.mock.On("GetStoredProceduresInDatabase", databaseName, handleEntity)}
-}
-
-func (_c *mockDataAccessRepository_GetStoredProceduresInDatabase_Call) Run(run func(databaseName string, handleEntity EntityHandler)) *mockDataAccessRepository_GetStoredProceduresInDatabase_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(EntityHandler))
-	})
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetStoredProceduresInDatabase_Call) Return(_a0 error) *mockDataAccessRepository_GetStoredProceduresInDatabase_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockDataAccessRepository_GetStoredProceduresInDatabase_Call) RunAndReturn(run func(string, EntityHandler) error) *mockDataAccessRepository_GetStoredProceduresInDatabase_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -17,7 +17,7 @@ const apTypeDatabaseRole = "databaseRole"
 const ExternalTable = "external-" + ds.Table
 const IcebergTable = "iceberg-" + ds.Table
 const Function = "function"
-const StoredProcedure = "storedProcedure"
+const Procedure = "procedure"
 const Integration = "integration"
 const MaterializedView = "materialized-" + ds.View
 
@@ -361,7 +361,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 						CannotBeGranted:        true,
 					},
 				},
-				Children: []string{ds.Table, ds.View, ExternalTable, MaterializedView, IcebergTable, Function, StoredProcedure},
+				Children: []string{ds.Table, ds.View, ExternalTable, MaterializedView, IcebergTable, Function, Procedure},
 			},
 			{
 				Name: ds.Table,
@@ -448,9 +448,9 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				},
 			},
 			{
-				Name:  StoredProcedure,
+				Name:  Procedure,
 				Label: "Stored Procedures",
-				Type:  StoredProcedure,
+				Type:  Procedure,
 				Permissions: []*ds.DataObjectTypePermission{
 					{
 						Permission:             "USAGE",

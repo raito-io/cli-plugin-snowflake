@@ -996,11 +996,11 @@ func (repo *SnowflakeRepository) GetFunctionsInDatabase(databaseName string, han
 	}, handleEntity)
 }
 
-func (repo *SnowflakeRepository) GetStoredProceduresInDatabase(databaseName string, handleEntity EntityHandler) error {
-	q := getStoredProceduresInDatabaseQuery(databaseName)
+func (repo *SnowflakeRepository) GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error {
+	q := getProceduresInDatabaseQuery(databaseName)
 
 	return handleDbEntities(repo, q, func() interface{} {
-		return &StoredProcedureEntity{}
+		return &ProcedureEntity{}
 	}, handleEntity)
 }
 
@@ -1491,7 +1491,7 @@ func getFunctionsInDatabaseQuery(dbName string) string {
 	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.FUNCTIONS`, common.FormatQuery("%s", dbName))
 }
 
-func getStoredProceduresInDatabaseQuery(dbName string) string {
+func getProceduresInDatabaseQuery(dbName string) string {
 	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.PROCEDURES`, common.FormatQuery("%s", dbName))
 }
 

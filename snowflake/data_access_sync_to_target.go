@@ -36,27 +36,27 @@ type AccessToTargetSyncer struct {
 	ignoreLinksToRole          []string
 	databaseRoleSupportEnabled bool
 
-	uniqueRoleNameGeneratorsCache  map[*string]naming_hint.UniqueGenerator
-	tablesPerSchemaCache           map[string][]TableEntity
-	functionsPerSchemaCache        map[string][]FunctionEntity
-	storedProceduresPerSchemaCache map[string][]StoredProcedureEntity
-	schemasPerDataBaseCache        map[string][]SchemaEntity
-	warehousesCache                []DbEntity
+	uniqueRoleNameGeneratorsCache map[*string]naming_hint.UniqueGenerator
+	tablesPerSchemaCache          map[string][]TableEntity
+	functionsPerSchemaCache       map[string][]FunctionEntity
+	proceduresPerSchemaCache      map[string][]ProcedureEntity
+	schemasPerDataBaseCache       map[string][]SchemaEntity
+	warehousesCache               []DbEntity
 }
 
 func NewAccessToTargetSyncer(accessSyncer *AccessSyncer, namingConstraints naming_hint.NamingConstraints, repo dataAccessRepository, accessProviders *importer.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) *AccessToTargetSyncer {
 	return &AccessToTargetSyncer{
-		accessSyncer:                   accessSyncer,
-		accessProviders:                accessProviders,
-		accessProviderFeedbackHandler:  accessProviderFeedbackHandler,
-		configMap:                      configMap,
-		repo:                           repo,
-		tablesPerSchemaCache:           make(map[string][]TableEntity),
-		functionsPerSchemaCache:        make(map[string][]FunctionEntity),
-		storedProceduresPerSchemaCache: make(map[string][]StoredProcedureEntity),
-		schemasPerDataBaseCache:        make(map[string][]SchemaEntity),
-		uniqueRoleNameGeneratorsCache:  make(map[*string]naming_hint.UniqueGenerator),
-		namingConstraints:              namingConstraints,
+		accessSyncer:                  accessSyncer,
+		accessProviders:               accessProviders,
+		accessProviderFeedbackHandler: accessProviderFeedbackHandler,
+		configMap:                     configMap,
+		repo:                          repo,
+		tablesPerSchemaCache:          make(map[string][]TableEntity),
+		functionsPerSchemaCache:       make(map[string][]FunctionEntity),
+		proceduresPerSchemaCache:      make(map[string][]ProcedureEntity),
+		schemasPerDataBaseCache:       make(map[string][]SchemaEntity),
+		uniqueRoleNameGeneratorsCache: make(map[*string]naming_hint.UniqueGenerator),
+		namingConstraints:             namingConstraints,
 	}
 }
 
@@ -577,7 +577,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 				if err2 != nil {
 					return actualName, err2
 				}
-			} else if what.DataObject.Type == Function || what.DataObject.Type == StoredProcedure {
+			} else if what.DataObject.Type == Function || what.DataObject.Type == Procedure {
 				s.createGrantsForFunctionOrProcedure(permissions, what.DataObject.FullName, metaData, expectedGrants, what.DataObject.Type)
 			} else if what.DataObject.Type == "shared-schema" {
 				err2 := s.createGrantsForSchema(permissions, what.DataObject.FullName, metaData, true, expectedGrants)
@@ -770,7 +770,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					onType := convertSnowflakeGrantTypeToRaito(grant.GrantedOn)
 					name := grant.Name
 
-					if onType == Function || onType == StoredProcedure { // For functions and stored procedures we need to do a special conversion
+					if onType == Function || onType == Procedure { // For functions and stored procedures we need to do a special conversion
 						name = s.accessSyncer.getFullNameFromGrant(name, onType)
 					}
 
@@ -1268,17 +1268,17 @@ func (s *AccessToTargetSyncer) getFunctionsForSchema(database, schema string) ([
 	return functions, nil
 }
 
-func (s *AccessToTargetSyncer) getStoredProceduresForSchema(database, schema string) ([]StoredProcedureEntity, error) {
+func (s *AccessToTargetSyncer) getProceduresForSchema(database, schema string) ([]ProcedureEntity, error) {
 	cacheKey := database + "." + schema
 
-	if procs, f := s.storedProceduresPerSchemaCache[cacheKey]; f {
+	if procs, f := s.proceduresPerSchemaCache[cacheKey]; f {
 		return procs, nil
 	}
 
-	procs := make([]StoredProcedureEntity, 0, 10)
+	procs := make([]ProcedureEntity, 0, 10)
 
-	err := s.repo.GetStoredProceduresInDatabase(database, func(entity interface{}) error {
-		proc := entity.(*StoredProcedureEntity)
+	err := s.repo.GetProceduresInDatabase(database, func(entity interface{}) error {
+		proc := entity.(*ProcedureEntity)
 		if proc.Schema == schema {
 			procs = append(procs, *proc)
 		}
@@ -1290,7 +1290,7 @@ func (s *AccessToTargetSyncer) getStoredProceduresForSchema(database, schema str
 		return nil, err
 	}
 
-	s.storedProceduresPerSchemaCache[cacheKey] = procs
+	s.proceduresPerSchemaCache[cacheKey] = procs
 
 	return procs, nil
 }
@@ -1407,7 +1407,7 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForSchema(database, schema,
 			matchFound = matchFound || functionMatchFound
 		}
 
-		procedures, err := s.getStoredProceduresForSchema(database, schema)
+		procedures, err := s.getProceduresForSchema(database, schema)
 		if err != nil {
 			return false, err
 		}
@@ -1415,7 +1415,7 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForSchema(database, schema,
 		// Run through all the tabular things (tables, views, ...) in the schema
 		for _, proc := range procedures {
 			procedureMatchFound := false
-			procedureMatchFound = s.createPermissionGrantsForFunctionOrProcedure(database, schema, proc.Name, proc.ArgumentSignature, p, metaData, grants, StoredProcedure)
+			procedureMatchFound = s.createPermissionGrantsForFunctionOrProcedure(database, schema, proc.Name, proc.ArgumentSignature, p, metaData, grants, Procedure)
 			matchFound = matchFound || procedureMatchFound
 		}
 	}

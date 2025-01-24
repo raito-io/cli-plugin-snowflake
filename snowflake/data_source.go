@@ -29,7 +29,7 @@ type dataSourceRepository interface {
 	GetDatabases() ([]DbEntity, error)
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error
-	GetStoredProceduresInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTagsLinkedToDatabaseName(databaseName string) (map[string][]*tag.Tag, error)
@@ -212,7 +212,7 @@ func (s *DataSourceSyncer) handleDatabase(database ExtendedDbEntity) error {
 			return err
 		}
 
-		err = s.readStoredProceduresInDatabase(database.Entity.Name, database.LinkedTags)
+		err = s.readProceduresInDatabase(database.Entity.Name, database.LinkedTags)
 		if err != nil {
 			return err
 		}
@@ -366,11 +366,11 @@ func (s *DataSourceSyncer) readFunctionsInDatabase(databaseName string, tagMap m
 	})
 }
 
-func (s *DataSourceSyncer) readStoredProceduresInDatabase(databaseName string, tagMap map[string][]*tag.Tag) error {
-	typeName := StoredProcedure
+func (s *DataSourceSyncer) readProceduresInDatabase(databaseName string, tagMap map[string][]*tag.Tag) error {
+	typeName := Procedure
 
-	return s.repo.GetStoredProceduresInDatabase(databaseName, func(entity interface{}) error {
-		proc := entity.(*StoredProcedureEntity)
+	return s.repo.GetProceduresInDatabase(databaseName, func(entity interface{}) error {
+		proc := entity.(*ProcedureEntity)
 
 		parent := proc.Database + "." + proc.Schema
 		fullName := parent + `."` + proc.Name + `"`
