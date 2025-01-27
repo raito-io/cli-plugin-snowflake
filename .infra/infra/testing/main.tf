@@ -8,6 +8,7 @@ resource "snowflake_account_role" "scim_role" {
 resource "snowflake_grant_privileges_to_account_role" "scim_role_assigments" {
   privileges        = ["CREATE USER", "CREATE ROLE"]
   account_role_name = snowflake_account_role.scim_role.name
+  on_account = true
 }
 
 resource "snowflake_grant_account_role" "scim_role_to_accountadmin" {
