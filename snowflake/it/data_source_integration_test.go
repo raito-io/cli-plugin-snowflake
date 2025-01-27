@@ -39,7 +39,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	sourceName := sfOrganization + "-" + sfAccount
 
 	s.NoError(err)
-	s.Len(dataSourceObjectHandler.DataObjects, 54)
+	s.Len(dataSourceObjectHandler.DataObjects, 55)
 
 	warehouses := getByType(dataSourceObjectHandler.DataObjects, "warehouse")
 	s.Len(warehouses, 2)
@@ -138,6 +138,17 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 		ParentExternalId: "RAITO_DATABASE.ORDERING.ORDERS",
 		Tags:             nil,
 		DataType:         ptr.String("NUMBER"),
+	})
+
+	scim := getByType(dataSourceObjectHandler.DataObjects, snowflake.Integration)
+	s.Len(scim, 1)
+	s.Contains(scim, data_source.DataObject{
+		ExternalId:  "SCIM Integration",
+		Name:        "SCIM Integration",
+		FullName:    "SCIM Integration",
+		Type:        snowflake.Integration,
+		Description: "",
+		Tags:        nil,
 	})
 
 	s.True(len(dataSourceObjectHandler.DataObjects) > 0)
