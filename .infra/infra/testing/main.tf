@@ -8,17 +8,13 @@ resource "snowflake_account_role" "scim_role" {
 resource "snowflake_grant_privileges_to_account_role" "scim_role_assigments" {
   privileges        = ["CREATE USER", "CREATE ROLE"]
   account_role_name = snowflake_account_role.scim_role.name
-  on_account = true
+  on_account        = true
 }
 
 resource "snowflake_grant_account_role" "scim_role_to_accountadmin" {
   role_name        = snowflake_account_role.scim_role.name
   parent_role_name = "ACCOUNTADMIN"
 }
-
-// grant create user on account to role generic_scim_provisioner;
-// grant create role on account to role generic_scim_provisioner;
-// grant role generic_scim_provisioner to role accountadmin;
 
 resource "snowflake_scim_integration" "scim_integration" {
   name          = "SCIM Integration"
