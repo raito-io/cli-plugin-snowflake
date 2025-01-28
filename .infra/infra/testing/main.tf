@@ -378,6 +378,15 @@ resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_m
   }
 }
 
+resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_scimintegration" {
+  privileges        = ["USAGE"]
+  account_role_name = "DATA_ANALYST"
+  on_account_object {
+    object_name = snowflake_scim_integration.scim_integration.fully_qualified_name
+    object_type = "INTEGRATION"
+  }
+}
+
 resource "snowflake_grant_privileges_to_account_role" "sales_privileges_orders" {
   privileges        = ["SELECT", "INSERT"]
   account_role_name = "SALES"
