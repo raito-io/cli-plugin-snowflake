@@ -118,6 +118,14 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 					DataObject:  &data_source.DataObjectReference{FullName: `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`, Type: ""},
 					Permissions: []string{"USAGE"},
 				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: `RAITO_DATABASE.ORDERING."myProcedure"(VARCHAR)`, Type: ""},
+					Permissions: []string{"USAGE"},
+				},
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: `SCIM Integration`, Type: ""},
+					Permissions: []string{"USAGE"},
+				},
 			})
 
 			s.Len(ap.Who.Users, 1)
