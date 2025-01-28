@@ -96,7 +96,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 				},
 			})
 		} else if ap.Name == "DATA_ANALYST" {
-			s.Len(ap.What, 5)
+			s.Len(ap.What, 7)
 			s.ElementsMatch(ap.What, []sync_from_target.WhatItem{
 				{
 					DataObject:  &data_source.DataObjectReference{FullName: "RAITO_DATABASE", Type: ""},
