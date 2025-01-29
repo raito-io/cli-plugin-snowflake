@@ -580,18 +580,19 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 				users = append(users, cleanDoubleQuotes(grantee.GranteeName))
 			} else if grantee.GrantedTo == "ROLE" {
 				if _, exclude := s.excludedRoles[grantee.GranteeName]; exclude {
-					logger.Warn(fmt.Sprintf("Skipping Snowflake ROLE %q may break the hierarcy for role %q", grantee.GranteeName, roleName))
+					logger.Warn(fmt.Sprintf("Skipping Snowflake ROLE %q may break the hierarchy for role %q", grantee.GranteeName, roleName))
 
 					incomplete = true
 
 					continue
 				}
+
 				accessProviders = append(accessProviders, accountRoleExternalIdGenerator(cleanDoubleQuotes(grantee.GranteeName)))
 			} else if grantee.GrantedTo == "SHARE" {
 				accessProviders = append(accessProviders, shareExternalIdGenerator(cleanDoubleQuotes(grantee.GranteeName)))
 			} else if grantee.GrantedTo == GrantTypeDatabaseRole {
 				if _, exclude := s.excludedRoles[grantee.GranteeName]; exclude {
-					logger.Warn(fmt.Sprintf("Skipping Snowflake DATABASE ROLE %q may break the hierarcy for role %q", grantee.GranteeName, roleName))
+					logger.Warn(fmt.Sprintf("Skipping Snowflake DATABASE ROLE %q may break the hierarchy for role %q", grantee.GranteeName, roleName))
 
 					incomplete = true
 
