@@ -7,6 +7,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
+	"github.com/raito-io/cli/base/access_provider/types"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
@@ -207,7 +208,7 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 	syncer := createBasicFromTargetSyncer(repoMock, fileCreator, nil)
 
 	//When
-	err := syncer.importPoliciesOfType(policyType, sync_from_target.Grant)
+	err := syncer.importPoliciesOfType(policyType, types.Grant)
 
 	//Then
 	assert.NoError(t, err)
@@ -228,7 +229,7 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 					Permissions: []string{},
 				},
 			},
-			Action: sync_from_target.Grant,
+			Action: types.Grant,
 			Policy: "PolicyBody1",
 		},
 		{
@@ -247,7 +248,7 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 					Permissions: []string{},
 				},
 			},
-			Action: sync_from_target.Grant,
+			Action: types.Grant,
 			Policy: "PolicyBody2",
 		},
 	}, fileCreator.AccessProviders)

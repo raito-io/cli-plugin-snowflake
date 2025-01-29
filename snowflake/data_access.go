@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers"
 	"github.com/raito-io/golang-set/set"
+
+	"github.com/raito-io/cli-plugin-snowflake/common"
 )
 
 var RolesNotInternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
@@ -34,7 +35,7 @@ const (
 //go:generate go run github.com/vektra/mockery/v2 --name=dataAccessRepository --with-expecter --inpackage
 type dataAccessRepository interface {
 	Close() error
-	GetSnowFlakeAccountName() (string, error)
+	GetSnowFlakeAccountName(ops ...func(options *GetSnowFlakeAccountNameOptions)) (string, error)
 	CommentAccountRoleIfExists(comment, objectName string) error
 	CommentDatabaseRoleIfExists(comment, database, roleName string) error
 	CreateAccountRole(roleName string) error
@@ -50,6 +51,7 @@ type dataAccessRepository interface {
 	ExecuteRevokeOnAccountRole(perm, on, role string, isSystemGrant bool) error
 	ExecuteRevokeOnDatabaseRole(perm, on, database, databaseRole string) error
 	GetAccountRoles() ([]RoleEntity, error)
+	GetOutboundShares() ([]ShareEntity, error)
 	GetAccountRolesWithPrefix(prefix string) ([]RoleEntity, error)
 	GetDatabaseRoles(database string) ([]RoleEntity, error)
 	GetDatabaseRolesWithPrefix(database string, prefix string) ([]RoleEntity, error)
@@ -57,12 +59,13 @@ type dataAccessRepository interface {
 	GetGrantsOfAccountRole(roleName string) ([]GrantOfRole, error)
 	GetGrantsOfDatabaseRole(database, roleName string) ([]GrantOfRole, error)
 	GetGrantsToAccountRole(roleName string) ([]GrantToRole, error)
+	GetGrantsToShare(shareName string) ([]GrantToRole, error)
 	GetGrantsToDatabaseRole(database, roleName string) ([]GrantToRole, error)
 	GetPolicies(policy string) ([]PolicyEntity, error)
 	GetPoliciesLike(policy string, like string) ([]PolicyEntity, error)
 	GetPolicyReferences(dbName, schema, policyName string) ([]PolicyReferenceEntity, error)
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
-	GetShares() ([]DbEntity, error)
+	GetInboundShares() ([]DbEntity, error)
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
@@ -71,15 +74,22 @@ type dataAccessRepository interface {
 	GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error
 	GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
 	GrantDatabaseRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
+	GrantSharesToDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error
 	GrantUsersToAccountRole(ctx context.Context, role string, users ...string) error
 	RenameAccountRole(oldName, newName string) error
 	RenameDatabaseRole(database, oldName, newName string) error
 	RevokeAccountRolesFromAccountRole(ctx context.Context, role string, roles ...string) error
 	RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
 	RevokeDatabaseRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
+	RevokeSharesFromDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error
 	RevokeUsersFromAccountRole(ctx context.Context, role string, users ...string) error
 	TotalQueryTime() time.Duration
 	UpdateFilter(databaseName string, schema string, tableName string, filterName string, argumentNames []string, expression string) error
+	CreateShare(shareName string) (err error)
+	SetShareAccounts(shareName string, accounts []string) (err error)
+	DropShare(shareName string) (err error)
+	ExecuteGrantOnShare(perm, on, shareName string) error
+	ExecuteRevokeOnShare(perm, on, shareName string) error
 }
 
 var _ wrappers.AccessProviderSyncer = (*AccessSyncer)(nil)
@@ -141,8 +151,8 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 // Functions used in both the from target and the to target syncers
 //
 
-func (s *AccessSyncer) getShareNames() ([]string, error) {
-	dbShares, err := s.repo.GetShares()
+func (s *AccessSyncer) getInboundShareNames() ([]string, error) {
+	dbShares, err := s.repo.GetInboundShares()
 	if err != nil {
 		return nil, err
 	}
@@ -175,14 +185,14 @@ func (s *AccessSyncer) getAllDatabaseAndShareNames() (set.Set[string], error) {
 		return nil, err
 	}
 
-	shares, err := s.getShareNames()
+	inboundShares, err := s.getInboundShareNames()
 	if err != nil {
 		return nil, err
 	}
 
 	combinedList := set.NewSet[string]()
 	combinedList.Add(databases...)
-	combinedList.Add(shares...)
+	combinedList.Add(inboundShares...)
 
 	return combinedList, nil
 }

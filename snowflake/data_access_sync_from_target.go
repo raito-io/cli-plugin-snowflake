@@ -10,6 +10,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/raito-io/cli/base/access_provider"
 	exporter "github.com/raito-io/cli/base/access_provider/sync_from_target"
+	"github.com/raito-io/cli/base/access_provider/types"
 	ds "github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
@@ -25,7 +26,7 @@ type AccessFromTargetSyncer struct {
 	accessSyncer          *AccessSyncer
 	accessProviderHandler wrappers.AccessProviderHandler
 
-	shares                            []string
+	inboundShares                     []string
 	linkToExternalIdentityStoreGroups bool
 	externalGroupOwners               string
 	excludedRoles                     map[string]struct{}
@@ -48,12 +49,12 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 
 	logger.Info("Reading account and database roles from Snowflake")
 
-	shares, err := s.accessSyncer.getShareNames()
+	inboundShares, err := s.accessSyncer.getInboundShareNames()
 	if err != nil {
 		return err
 	}
 
-	s.shares = shares
+	s.inboundShares = inboundShares
 	s.externalGroupOwners = s.configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
 	s.extractExcludeRoleList()
 	s.linkToExternalIdentityStoreGroups = s.configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
@@ -62,7 +63,12 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 
 	err = s.importAllRolesOnAccountLevel(s.accessProviderHandler)
 	if err != nil {
-		return err
+		return fmt.Errorf("importing account roles: %w", err)
+	}
+
+	err = s.importOutboundShares(s.accessProviderHandler)
+	if err != nil {
+		return fmt.Errorf("importing shares: %w", err)
 	}
 
 	databaseRoleSupportEnabled := s.configMap.GetBoolWithDefault(SfDatabaseRoles, false)
@@ -99,6 +105,42 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 		}
 	} else {
 		logger.Info("Skipping masking policies and row access policies due to Snowflake Standard Edition.")
+	}
+
+	return nil
+}
+
+func (s *AccessFromTargetSyncer) importOutboundShares(accessProviderHandler wrappers.AccessProviderHandler) error {
+	// Get all output shares and import them
+	shareEntities, err := s.repo.GetOutboundShares()
+	if err != nil {
+		return err
+	}
+
+	wp := workerpool.New(getWorkerPoolSize(s.configMap))
+
+	processedAps := make(map[string]*exporter.AccessProvider)
+
+	for _, shareEntity := range shareEntities {
+		if _, exclude := s.excludedRoles[shareEntity.Name]; exclude {
+			logger.Info("Skipping SnowFlake SHARE " + shareEntity.Name)
+			continue
+		}
+
+		wp.Submit(func() {
+			err2 := s.transformShareToAccessProvider(shareEntity, processedAps)
+			if err2 != nil {
+				logger.Warn(fmt.Sprintf("Error importing SnowFlake share %q: %s", shareEntity.Name, err2.Error()))
+				return
+			}
+		})
+	}
+
+	wp.StopWait()
+
+	err = accessProviderHandler.AddAccessProviders(values(processedAps)...)
+	if err != nil {
+		return fmt.Errorf("error adding shares to import file: %s", err.Error())
 	}
 
 	return nil
@@ -144,7 +186,7 @@ func (s *AccessFromTargetSyncer) importAllRolesOnAccountLevel(accessProviderHand
 
 	err = accessProviderHandler.AddAccessProviders(values(processedAps)...)
 	if err != nil {
-		return fmt.Errorf("error adding access provider to import file: %s", err.Error())
+		return fmt.Errorf("error adding account roles to import file: %s", err.Error())
 	}
 
 	return nil
@@ -157,6 +199,50 @@ func (s *AccessFromTargetSyncer) shouldRetrieveTags() bool {
 	tagSupportEnabled := !standard && !skipTags
 
 	return tagSupportEnabled
+}
+
+func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareEntity ShareEntity, processedAps map[string]*exporter.AccessProvider) error {
+	logger.Info(fmt.Sprintf("Reading SnowFlake SHARE %s", shareEntity.Name))
+
+	shareName := shareEntity.Name
+	externalId := apTypeSharePrefix + shareName
+
+	// Locking to make sure only one goroutine can read & write to the processedAps map at a time
+	s.lock.Lock()
+
+	recipients := strings.Split(shareEntity.To, ",")
+	for i, r := range recipients {
+		recipients[i] = strings.TrimSpace(r)
+	}
+
+	ap, f := processedAps[externalId]
+	if !f {
+		processedAps[externalId] = &exporter.AccessProvider{
+			ExternalId: externalId,
+			ActualName: shareName,
+			Name:       shareName,
+			NamingHint: shareName,
+			Action:     types.Share,
+			What:       make([]exporter.WhatItem, 0),
+			Who: &exporter.WhoItem{
+				Recipients: recipients,
+			},
+		}
+
+		ap = processedAps[externalId]
+	}
+
+	s.lock.Unlock()
+
+	// get objects granted TO share
+	grantToEntities, err := s.repo.GetGrantsToShare(shareName)
+	if err != nil {
+		return fmt.Errorf("retrieving grants for share: %s", err.Error())
+	}
+
+	ap.What = append(ap.What, s.mapGrantToRoleToWhatItems(grantToEntities)...)
+
+	return nil
 }
 
 func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntity, processedAps map[string]*exporter.AccessProvider, availableTags map[string][]*tag.Tag) error {
@@ -183,7 +269,7 @@ func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity
 			ActualName: roleName,
 			Name:       roleName,
 			NamingHint: roleName,
-			Action:     exporter.Grant,
+			Action:     types.Grant,
 			Who: &exporter.WhoItem{
 				Users:           users,
 				AccessProviders: accessProviders,
@@ -348,14 +434,13 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 
 			Name:       fmt.Sprintf("%s.%s", database, roleName),
 			NamingHint: roleName,
-			Action:     exporter.Grant,
+			Action:     types.Grant,
 			Who: &exporter.WhoItem{
 				Users:           users,
 				AccessProviders: accessProviders,
 				Groups:          groups,
 			},
 			What: make([]exporter.WhatItem, 0),
-
 			// In a first implementation, we lock the who and what side for a database role
 			// Who side will always be locked as you can't directly grant access to a database role from a user
 			WhoLocked:        ptr.Bool(true),
@@ -400,11 +485,18 @@ func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []Gra
 	permissions := make([]string, 0)
 	sharesApplied := make([]string, 0)
 
-	for k, grant := range grantToEntities {
-		if k == 0 {
+	first := true
+
+	for _, grant := range grantToEntities {
+		if grant.GrantedOn == GrantTypeDatabaseRole { // It looks like database roles assigned to a SHARE are also included here, ignoring that
+			continue
+		}
+
+		if first {
 			// We set type to empty string because that's not needed by the importer to match the data object
 			// + we cannot make the mapping to the correct Raito data object types here.
 			do = &ds.DataObjectReference{FullName: s.accessSyncer.getFullNameFromGrant(grant.Name, grant.GrantedOn), Type: ""}
+			first = false
 		} else if do.FullName != grant.Name {
 			if len(permissions) > 0 {
 				whatItems = append(whatItems, exporter.WhatItem{
@@ -428,7 +520,7 @@ func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []Gra
 		}
 
 		databaseName := strings.Split(grant.Name, ".")[0]
-		if slices.Contains(s.shares, databaseName) {
+		if slices.Contains(s.inboundShares, databaseName) {
 			// TODO do we need to do this for all tabular types?
 			if strings.EqualFold(grant.GrantedOn, "TABLE") && !slices.Contains(sharesApplied, databaseName) {
 				whatItems = append(whatItems, exporter.WhatItem{
@@ -439,13 +531,13 @@ func (s *AccessFromTargetSyncer) mapGrantToRoleToWhatItems(grantToEntities []Gra
 				sharesApplied = append(sharesApplied, databaseName)
 			}
 		}
+	}
 
-		if k == len(grantToEntities)-1 && len(permissions) > 0 {
-			whatItems = append(whatItems, exporter.WhatItem{
-				DataObject:  do,
-				Permissions: permissions,
-			})
-		}
+	if len(permissions) > 0 {
+		whatItems = append(whatItems, exporter.WhatItem{
+			DataObject:  do,
+			Permissions: permissions,
+		})
 	}
 
 	return whatItems
@@ -486,7 +578,9 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 				users = append(users, cleanDoubleQuotes(grantee.GranteeName))
 			} else if grantee.GrantedTo == "ROLE" {
 				accessProviders = append(accessProviders, accountRoleExternalIdGenerator(cleanDoubleQuotes(grantee.GranteeName)))
-			} else if grantee.GrantedTo == "DATABASE_ROLE" {
+			} else if grantee.GrantedTo == "SHARE" {
+				accessProviders = append(accessProviders, shareExternalIdGenerator(cleanDoubleQuotes(grantee.GranteeName)))
+			} else if grantee.GrantedTo == GrantTypeDatabaseRole {
 				database, parsedRoleName, err2 := parseDatabaseRoleRoleName(cleanDoubleQuotes(grantee.GranteeName))
 				if err2 != nil {
 					return nil, nil, nil, err2
@@ -500,7 +594,7 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 	return users, groups, accessProviders, nil
 }
 
-func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action exporter.Action) error {
+func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action types.Action) error {
 	policyEntities, err := s.repo.GetPolicies(policyType)
 	if err != nil {
 		// For Standard edition, row access policies are not supported. Failsafe in case `sf-standard-edition` is overlooked.
@@ -602,11 +696,11 @@ func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action 
 }
 
 func (s *AccessFromTargetSyncer) importMaskingPolicies() error {
-	return s.importPoliciesOfType("MASKING", exporter.Mask)
+	return s.importPoliciesOfType("MASKING", types.Mask)
 }
 
 func (s *AccessFromTargetSyncer) importRowAccessPolicies() error {
-	return s.importPoliciesOfType("ROW ACCESS", exporter.Filtered)
+	return s.importPoliciesOfType("ROW ACCESS", types.Filtered)
 }
 
 func (s *AccessFromTargetSyncer) getApplicableDatabases(dbExcludes set.Set[string]) (set.Set[string], error) {

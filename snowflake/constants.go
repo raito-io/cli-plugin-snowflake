@@ -33,4 +33,6 @@ const (
 	SharedPrefix = "shared-"
 
 	AccountAdminRole = "ACCOUNTADMIN"
+
+	GrantTypeDatabaseRole = "DATABASE_ROLE"
 )
