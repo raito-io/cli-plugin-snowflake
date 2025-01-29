@@ -18,7 +18,7 @@ import (
 )
 
 var RolesNotInternalizable = []string{"ORGADMIN", "ACCOUNTADMIN", "SECURITYADMIN", "USERADMIN", "SYSADMIN", "PUBLIC"}
-var AcceptedTypes = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "VIEW": {}, "COLUMN": {}, "SHARED-DATABASE": {}, "EXTERNAL_TABLE": {}, "MATERIALIZED_VIEW": {}, "FUNCTION": {}}
+var AcceptedTypes = map[string]struct{}{"ACCOUNT": {}, "WAREHOUSE": {}, "DATABASE": {}, "SCHEMA": {}, "TABLE": {}, "VIEW": {}, "COLUMN": {}, "SHARED-DATABASE": {}, "EXTERNAL_TABLE": {}, "MATERIALIZED_VIEW": {}, "FUNCTION": {}, "PROCEDURE": {}, "INTEGRATION": {}}
 
 const (
 	whoLockedReason         = "The 'who' for this Snowflake role cannot be changed because it was imported from an external identity store"
@@ -68,9 +68,11 @@ type dataAccessRepository interface {
 	GetInboundShares() ([]DbEntity, error)
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	GetDatabaseRoleTags(databaseName string, roleName string) (map[string][]*tag.Tag, error)
 	GetWarehouses() ([]DbEntity, error)
+	GetIntegrations() ([]DbEntity, error)
 	GrantAccountRolesToAccountRole(ctx context.Context, role string, roles ...string) error
 	GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
 	GrantDatabaseRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
@@ -240,7 +242,7 @@ func (s *AccessSyncer) getFullNameFromGrant(name, objectType string) string {
 
 	sfObject := common.ParseFullName(name)
 
-	if strings.EqualFold(objectType, Function) && sfObject.Table != nil {
+	if (strings.EqualFold(objectType, Function) || strings.EqualFold(objectType, Procedure)) && sfObject.Table != nil {
 		function := *sfObject.Table
 
 		if strings.Contains(function, "(") {

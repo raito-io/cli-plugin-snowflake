@@ -605,6 +605,10 @@ func generateAccessControls_schema(t *testing.T) {
 		return nil
 	}).Once()
 
+	repoMock.EXPECT().GetProceduresInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		return nil
+	}).Once()
+
 	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
 			Id:   "AccessProviderId1",
@@ -689,7 +693,10 @@ func generateAccessControls_existing_schema(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
-		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetProceduresInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		return nil
 	}).Once()
 
@@ -774,9 +781,16 @@ func generateAccessControls_database(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema2", "RoleName1", false).Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema2.Table3", "RoleName1", false).Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "VIEW DB1.Schema2.View3", "RoleName1", false).Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "PROCEDURE DB1.Schema2.\"procMe\"(VARCHAR)", "RoleName1", false).Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "FUNCTION DB1.Schema2.\"Decrypt\"(VARCHAR)", "RoleName1", false).Return(nil).Once()
 
 	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetProceduresInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&ProcedureEntity{Database: s, Schema: "Schema2", Name: "procMe", ArgumentSignature: "(VAL VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -788,7 +802,7 @@ func generateAccessControls_database(t *testing.T) {
 				Users: []string{"User1", "User2"},
 			},
 			What: []importer.WhatItem{
-				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"SELECT"}},
+				{DataObject: &data_source.DataObjectReference{FullName: "DB1", Type: "database"}, Permissions: []string{"SELECT", "USAGE"}},
 			},
 		},
 	}
@@ -828,6 +842,10 @@ func generateAccessControls_existing_database(t *testing.T) {
 
 	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetProceduresInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		return nil
 	}).Once()
 
@@ -917,6 +935,39 @@ func generateAccessControls_warehouse(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func generateAccessControls_integration(t *testing.T) {
+	//Given
+	repoMock := newMockDataAccessRepository(t)
+
+	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "RoleName1").Return(nil).Once()
+	expectGrantUsersToRole(repoMock, "RoleName1", "User1")
+	repoMock.EXPECT().GrantAccountRolesToAccountRole(mock.Anything, "RoleName1").Return(nil).Once()
+
+	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "INTEGRATION I1", "RoleName1", false).Return(nil).Once()
+
+	access := map[string]*importer.AccessProvider{
+		"RoleName1": {
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users: []string{"User1"},
+			},
+			What: []importer.WhatItem{
+				{DataObject: &data_source.DataObjectReference{FullName: "I1", Type: "integration"}, Permissions: []string{"USAGE"}},
+			},
+		},
+	}
+
+	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
+
+	//When
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
+
+	//Then
+	assert.NoError(t, err)
+}
+
 func generateAccessControls_datasource(t *testing.T) {
 	//Given
 	repoMock := newMockDataAccessRepository(t)
@@ -960,6 +1011,7 @@ func TestAccessSyncer_generateAccessControls(t *testing.T) {
 	t.Run("Database", generateAccessControls_database)
 	t.Run("Existing Database", generateAccessControls_existing_database)
 	t.Run("Warehouse", generateAccessControls_warehouse)
+	t.Run("Integration", generateAccessControls_integration)
 	t.Run("Datasource", generateAccessControls_datasource)
 }
 

@@ -29,11 +29,13 @@ type dataSourceRepository interface {
 	GetDatabases() ([]DbEntity, error)
 	GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetColumnsInDatabase(databaseName string, handleEntity EntityHandler) error
 	GetTagsLinkedToDatabaseName(databaseName string) (map[string][]*tag.Tag, error)
 	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	ExecuteGrantOnAccountRole(perm, on, role string, isSystemGrant bool) error
+	GetIntegrations() ([]DbEntity, error)
 }
 
 type DataSourceSyncer struct {
@@ -140,21 +142,26 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	dataSourceHandler.SetDataSourceName(sfAccount)
 	dataSourceHandler.SetDataSourceFullname(sfAccount)
 
+	err = s.readIntegrations(shouldRetrieveTags)
+	if err != nil {
+		return fmt.Errorf("reading integrations: %w", err)
+	}
+
 	err = s.readWarehouses(shouldRetrieveTags)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading warehouses: %w", err)
 	}
 
 	inboundShares, inboundSharesMap, err := s.readShares(dbExcludes, shouldRetrieveTags)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading shares: %w", err)
 	}
 
 	s.inboundSharesMap = inboundSharesMap
 
 	databases, err := s.readDatabases(dbExcludes, inboundSharesMap, shouldRetrieveTags)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading databases: %w", err)
 	}
 
 	// add inboundShares to the list again to fetch their descendants
@@ -207,6 +214,11 @@ func (s *DataSourceSyncer) handleDatabase(database ExtendedDbEntity) error {
 
 	if doTypePrefix == "" {
 		err = s.readFunctionsInDatabase(database.Entity.Name, database.LinkedTags)
+		if err != nil {
+			return err
+		}
+
+		err = s.readProceduresInDatabase(database.Entity.Name, database.LinkedTags)
 		if err != nil {
 			return err
 		}
@@ -324,39 +336,60 @@ func convertFunctionArgumentSignature(signature string) string {
 	return fmt.Sprintf("(%s)", strings.Join(args, ", "))
 }
 
-func (s *DataSourceSyncer) readFunctionsInDatabase(databaseName string, tagMap map[string][]*tag.Tag) error {
-	typeName := Function
+func (s *DataSourceSyncer) createDataObjectForFunction(doType, database, schema, name, argumentSignature string, comment *string, tagMap map[string][]*tag.Tag) *ds.DataObject {
+	parent := database + "." + schema
+	fullName := parent + `."` + name + `"`
 
+	argumentSignature = convertFunctionArgumentSignature(argumentSignature)
+
+	ff := s.schemaExcludes.Contains(database + "." + schema)
+
+	if ff || !s.shouldHandle(fullName) {
+		logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", Function, fullName))
+		return nil
+	}
+
+	description := ""
+	if comment != nil {
+		description = *comment
+	}
+
+	do := ds.DataObject{
+		ExternalId:       fullName + argumentSignature, // Adding the signature for full uniqueness
+		Name:             name + argumentSignature,
+		FullName:         fullName + argumentSignature, // Adding the signature because it is needed to reference it when setting grants
+		Type:             doType,
+		Description:      description,
+		ParentExternalId: parent,
+		Tags:             tagMap[fullName],
+	}
+
+	return &do
+}
+
+func (s *DataSourceSyncer) readFunctionsInDatabase(databaseName string, tagMap map[string][]*tag.Tag) error {
 	return s.repo.GetFunctionsInDatabase(databaseName, func(entity interface{}) error {
 		function := entity.(*FunctionEntity)
 
-		parent := function.Database + "." + function.Schema
-		fullName := parent + `."` + function.Name + `"`
-
-		argumentSignature := convertFunctionArgumentSignature(function.ArgumentSignature)
-
-		ff := s.schemaExcludes.Contains(function.Database + "." + function.Schema)
-
-		if ff || !s.shouldHandle(fullName) {
-			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
-			return nil
+		do := s.createDataObjectForFunction(Function, function.Database, function.Schema, function.Name, function.ArgumentSignature, function.Comment, tagMap)
+		if do != nil {
+			return s.addDataObjects(do)
 		}
 
-		comment := ""
-		if function.Comment != nil {
-			comment = *function.Comment
-		}
-		do := ds.DataObject{
-			ExternalId:       fullName + argumentSignature, // Adding the signature for full uniqueness
-			Name:             function.Name + argumentSignature,
-			FullName:         fullName + argumentSignature, // Adding the signature because it is needed to reference it when setting grants
-			Type:             typeName,
-			Description:      comment,
-			ParentExternalId: parent,
-			Tags:             tagMap[fullName],
+		return nil
+	})
+}
+
+func (s *DataSourceSyncer) readProceduresInDatabase(databaseName string, tagMap map[string][]*tag.Tag) error {
+	return s.repo.GetProceduresInDatabase(databaseName, func(entity interface{}) error {
+		proc := entity.(*ProcedureEntity)
+
+		do := s.createDataObjectForFunction(Procedure, proc.Database, proc.Schema, proc.Name, proc.ArgumentSignature, proc.Comment, tagMap)
+		if do != nil {
+			return s.addDataObjects(do)
 		}
 
-		return s.addDataObjects(&do)
+		return nil
 	})
 }
 
@@ -458,7 +491,7 @@ func (s *DataSourceSyncer) readDatabases(excludes set.Set[string], shares map[st
 		return nil, err
 	}
 
-	enrichedDatabases, err := s.addDbEntitiesToImporter(databases, ds.Database, "", shouldRetrieveTags,
+	enrichedDatabases, err := s.addTopLevelEntitiesToImporter(databases, ds.Database, shouldRetrieveTags,
 		s.repo.GetTagsLinkedToDatabaseName,
 		func(name string) string { return name },
 		func(name, fullName string) bool {
@@ -480,7 +513,7 @@ func (s *DataSourceSyncer) readShares(excludes set.Set[string], shouldRetrieveTa
 		return nil, nil, err
 	}
 
-	enrichedInboundShares, err := s.addDbEntitiesToImporter(inboundShares, "shared-database", "", shouldRetrieveTags,
+	enrichedInboundShares, err := s.addTopLevelEntitiesToImporter(inboundShares, "shared-database", shouldRetrieveTags,
 		s.repo.GetTagsLinkedToDatabaseName,
 		func(name string) string { return name },
 		func(name, fullName string) bool {
@@ -516,7 +549,7 @@ func (s *DataSourceSyncer) readWarehouses(shouldRetrieveTags bool) error {
 		}
 	}
 
-	_, err = s.addDbEntitiesToImporter(dbWarehouses, "warehouse", "", shouldRetrieveTags,
+	_, err = s.addTopLevelEntitiesToImporter(dbWarehouses, "warehouse", shouldRetrieveTags,
 		func(name string) (map[string][]*tag.Tag, error) {
 			return allWarehouseTags, nil
 		},
@@ -529,7 +562,36 @@ func (s *DataSourceSyncer) readWarehouses(shouldRetrieveTags bool) error {
 	return nil
 }
 
-func (s *DataSourceSyncer) addDbEntitiesToImporter(entities []DbEntity, doType string, parent string, shouldRetrieveTags bool, tagRetrieval func(name string) (map[string][]*tag.Tag, error), externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]ExtendedDbEntity, error) {
+func (s *DataSourceSyncer) readIntegrations(shouldRetrieveTags bool) error {
+	integrations, err := s.repo.GetIntegrations()
+	if err != nil {
+		return err
+	}
+
+	integrationTags := make(map[string][]*tag.Tag, 0)
+
+	if shouldRetrieveTags {
+		integrationTags, err = s.repo.GetTagsByDomain("INTEGRATION")
+
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = s.addTopLevelEntitiesToImporter(integrations, Integration, shouldRetrieveTags,
+		func(name string) (map[string][]*tag.Tag, error) {
+			return integrationTags, nil
+		},
+		func(name string) string { return name },
+		func(name, fullName string) bool { return s.shouldGoInto(fullName) })
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *DataSourceSyncer) addTopLevelEntitiesToImporter(entities []DbEntity, doType string, shouldRetrieveTags bool, tagRetrieval func(name string) (map[string][]*tag.Tag, error), externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]ExtendedDbEntity, error) {
 	dbEntities := make([]ExtendedDbEntity, 0, 20)
 
 	for _, db := range entities {
@@ -572,7 +634,6 @@ func (s *DataSourceSyncer) addDbEntitiesToImporter(entities []DbEntity, doType s
 					FullName:                fullName,
 					Type:                    doType,
 					Description:             comment,
-					ParentExternalId:        parent,
 					Tags:                    doTags,
 					ShareProviderIdentifier: extendedEntity.Entity.OwnerAccount,
 					ShareIdentifier:         extendedEntity.Entity.ShareName,

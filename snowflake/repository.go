@@ -1112,6 +1112,14 @@ func (repo *SnowflakeRepository) GetFunctionsInDatabase(databaseName string, han
 	}, handleEntity)
 }
 
+func (repo *SnowflakeRepository) GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error {
+	q := getProceduresInDatabaseQuery(databaseName)
+
+	return handleDbEntities(repo, q, func() interface{} {
+		return &ProcedureEntity{}
+	}, handleEntity)
+}
+
 func (repo *SnowflakeRepository) GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {
 	q := getTablesInDatabaseQuery(databaseName, schemaName)
 
@@ -1248,6 +1256,28 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 	}
 
 	return nil
+}
+
+func (repo *SnowflakeRepository) GetIntegrations() ([]DbEntity, error) {
+	q := "SHOW INTEGRATIONS"
+
+	var integrationEntities []DbEntity
+
+	err := handleDbEntities(repo, q, func() interface{} {
+		return &DbEntity{}
+	}, func(entity interface{}) error {
+		pEntry := entity.(*DbEntity)
+		integrationEntities = append(integrationEntities, *pEntry)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Info(fmt.Sprintf("Found %d integrations", len(integrationEntities)))
+
+	return integrationEntities, nil
 }
 
 func (repo *SnowflakeRepository) GetPoliciesLike(policy string, like string) ([]PolicyEntity, error) {
@@ -1626,6 +1656,10 @@ func getSchemasInDatabaseQuery(dbName string) string {
 
 func getFunctionsInDatabaseQuery(dbName string) string {
 	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.FUNCTIONS`, common.FormatQuery("%s", dbName))
+}
+
+func getProceduresInDatabaseQuery(dbName string) string {
+	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.PROCEDURES`, common.FormatQuery("%s", dbName))
 }
 
 func getTablesInDatabaseQuery(dbName string, schemaName string) string {

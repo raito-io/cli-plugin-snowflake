@@ -1,3 +1,29 @@
+// SNOWFLAKE SCIM INTEGRATION
+
+resource "snowflake_account_role" "scim_role" {
+  name    = "GENERIC_SCIM_PROVISIONER"
+  comment = "For scim provisioning"
+}
+
+resource "snowflake_grant_privileges_to_account_role" "scim_role_assigments" {
+  privileges        = ["CREATE USER", "CREATE ROLE"]
+  account_role_name = snowflake_account_role.scim_role.name
+  on_account        = true
+}
+
+resource "snowflake_grant_account_role" "scim_role_to_accountadmin" {
+  role_name        = snowflake_account_role.scim_role.name
+  parent_role_name = "ACCOUNTADMIN"
+}
+
+resource "snowflake_scim_integration" "scim_integration" {
+  name          = "SCIM Integration"
+  enabled       = true
+  scim_client   = "GENERIC"
+  sync_password = false
+  run_as_role   = "GENERIC_SCIM_PROVISIONER"
+}
+
 // SNOWFLAKE DATABASE
 resource "snowflake_database" "db" {
   name    = "RAITO_DATABASE"
@@ -27,6 +53,22 @@ resource "snowflake_function_sql" "decrypt_function" {
     'Decrypted: ' || val
   EOF
   return_type         = "STRING"
+}
+
+resource "snowflake_procedure_sql" "my_procedure" {
+  database = snowflake_database.db.name
+  schema   = snowflake_schema.ordering.name
+  name     = "myProcedure"
+  arguments {
+    arg_data_type = "VARCHAR(100)"
+    arg_name      = "x"
+  }
+  return_type          = "VARCHAR(100)"
+  procedure_definition = <<EOT
+BEGIN
+  RETURN message;
+END;
+EOT
 }
 
 resource "snowflake_schema" "special_schema" {
@@ -324,6 +366,24 @@ resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_d
   on_schema_object {
     object_name = snowflake_function_sql.decrypt_function.fully_qualified_name
     object_type = "FUNCTION"
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_myprocedure" {
+  privileges        = ["USAGE"]
+  account_role_name = "DATA_ANALYST"
+  on_schema_object {
+    object_name = snowflake_procedure_sql.my_procedure.fully_qualified_name
+    object_type = "PROCEDURE"
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "data_analyst_privileges_scimintegration" {
+  privileges        = ["USAGE"]
+  account_role_name = "DATA_ANALYST"
+  on_account_object {
+    object_name = snowflake_scim_integration.scim_integration.fully_qualified_name
+    object_type = "INTEGRATION"
   }
 }
 
