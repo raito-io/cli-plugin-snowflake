@@ -55,7 +55,6 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 
 	s.shares = shares
 	s.externalGroupOwners = s.configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
-	s.extractExcludeRoleList()
 	s.linkToExternalIdentityStoreGroups = s.configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
 
 	logger.Info("Reading account roles from Snowflake")
@@ -485,8 +484,20 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 			if grantee.GrantedTo == "USER" {
 				users = append(users, cleanDoubleQuotes(grantee.GranteeName))
 			} else if grantee.GrantedTo == "ROLE" {
+				if _, exclude := s.excludedRoles[grantee.GranteeName]; exclude {
+					logger.Info("Skipping SnowFlake ROLE " + grantee.GranteeName + " in who of " + roleName)
+
+					continue
+				}
+
 				accessProviders = append(accessProviders, accountRoleExternalIdGenerator(cleanDoubleQuotes(grantee.GranteeName)))
 			} else if grantee.GrantedTo == "DATABASE_ROLE" {
+				if _, exclude := s.excludedRoles[grantee.GranteeName]; exclude {
+					logger.Info("Skipping SnowFlake ROLE " + grantee.GranteeName + " in who of " + roleName)
+
+					continue
+				}
+
 				database, parsedRoleName, err2 := parseDatabaseRoleRoleName(cleanDoubleQuotes(grantee.GranteeName))
 				if err2 != nil {
 					return nil, nil, nil, err2

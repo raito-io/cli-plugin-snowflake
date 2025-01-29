@@ -854,7 +854,12 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{Name: "Role1", AssignedToUsers: 2, GrantedRoles: 3, GrantedToRoles: 1, Owner: "Owner1"},
 						{Name: "Role2", AssignedToUsers: 3, GrantedRoles: 2, GrantedToRoles: 1, Owner: "Owner2"},
 					}, nil).Once()
-					repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{}, nil).Once()
+					repoMock.EXPECT().GetGrantsOfAccountRole("Role2").Return([]GrantOfRole{
+						{
+							GrantedTo:   "ROLE",
+							GranteeName: "Role1",
+						},
+					}, nil).Once()
 					repoMock.EXPECT().GetGrantsToAccountRole("Role2").Return([]GrantToRole{}, nil).Once()
 
 					repoMock.EXPECT().GetGrantsOfDatabaseRole("TEST_DB", "DatabaseRole2").Return([]GrantOfRole{}, nil).Once()
