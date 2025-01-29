@@ -139,8 +139,9 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 							Permissions: []string{"SELECT"},
 						},
 					},
-					Action: 1,
-					Policy: "",
+					Incomplete: ptr.Bool(false),
+					Action:     1,
+					Policy:     "",
 				}, {
 					ExternalId:        "Role2",
 					NotInternalizable: false,
@@ -156,6 +157,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					What:       []sync_from_target.WhatItem{},
 					Action:     1,
 					Policy:     "",
+					Incomplete: ptr.Bool(false),
 				}, {
 					ExternalId:        "Role3",
 					NotInternalizable: true,
@@ -171,6 +173,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					What:       []sync_from_target.WhatItem{},
 					Action:     1,
 					Policy:     "",
+					Incomplete: ptr.Bool(false),
 				},
 				{
 					ExternalId:        "DB-schema1-MaskingPolicy1",
@@ -329,8 +332,9 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 							Permissions: []string{"SELECT"},
 						},
 					},
-					Action: 1,
-					Policy: "",
+					Action:     1,
+					Policy:     "",
+					Incomplete: ptr.Bool(false),
 				}, {
 					ExternalId:        "Role2",
 					NotInternalizable: false,
@@ -346,6 +350,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					What:       []sync_from_target.WhatItem{},
 					Action:     1,
 					Policy:     "",
+					Incomplete: ptr.Bool(false),
 				}, {
 					ExternalId:        "Role3",
 					NotInternalizable: true,
@@ -361,6 +366,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					What:       []sync_from_target.WhatItem{},
 					Action:     1,
 					Policy:     "",
+					Incomplete: ptr.Bool(false),
 				},
 				{
 					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",
@@ -396,6 +402,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
 					WhatLocked:       ptr.Bool(true),
 					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					Incomplete:       ptr.Bool(false),
 				}, {
 					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2",
 					NotInternalizable: false,
@@ -415,6 +422,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
 					WhatLocked:       ptr.Bool(true),
 					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					Incomplete:       ptr.Bool(false),
 				}, {
 					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole3",
 					NotInternalizable: false,
@@ -443,6 +451,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
 					WhatLocked:       ptr.Bool(true),
 					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					Incomplete:       ptr.Bool(false),
 				},
 				{
 					ExternalId:        "DB-schema1-MaskingPolicy1",
@@ -552,8 +561,9 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 							Permissions: []string{"SELECT"},
 						},
 					},
-					Action: 1,
-					Policy: "",
+					Action:     1,
+					Policy:     "",
+					Incomplete: ptr.Bool(false),
 				}, {
 					ExternalId:              "Role3",
 					Type:                    ptr.String(access_provider.Role),
@@ -577,6 +587,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					What:       []sync_from_target.WhatItem{},
 					Action:     1,
 					Policy:     "",
+					Incomplete: ptr.Bool(false),
 				},
 				{
 					ExternalId:        "DB-schema1-MaskingPolicy1",
@@ -687,8 +698,9 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 							Permissions: []string{"SELECT"},
 						},
 					},
-					Action: 1,
-					Policy: "",
+					Action:     1,
+					Policy:     "",
+					Incomplete: ptr.Bool(false),
 				}, {
 					ExternalId:        "Role2",
 					Type:              ptr.String(access_provider.Role),
@@ -704,6 +716,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					What:       []sync_from_target.WhatItem{},
 					Action:     1,
 					Policy:     "",
+					Incomplete: ptr.Bool(false),
 				}, {
 					ExternalId:        "Role3",
 					Type:              ptr.String(access_provider.Role),
@@ -719,6 +732,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					What:       []sync_from_target.WhatItem{},
 					Action:     1,
 					Policy:     "",
+					Incomplete: ptr.Bool(false),
 				},
 			},
 			wantErr: require.NoError,
@@ -800,6 +814,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{Key: "a_key", Value: "override_name"},
 						{Key: "an_other_key", Value: "...."},
 					},
+					Incomplete: ptr.Bool(false),
 				},
 				{
 					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",
@@ -827,6 +842,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{Key: "a_key", Value: "override_name_2"},
 						{Key: "an_other_key", Value: "...."},
 					},
+					Incomplete: ptr.Bool(false),
 				},
 			},
 			wantErr: require.NoError,
@@ -896,6 +912,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					What:       []sync_from_target.WhatItem{},
 					Action:     1,
 					Policy:     "",
+					Incomplete: ptr.Bool(true),
 				}, {
 					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole2",
 					Type:              ptr.String("databaseRole"),
@@ -915,6 +932,7 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					WhoLockedReason:  ptr.String("The 'who' for this Snowflake role cannot be changed because we currently do not support database role changes"),
 					WhatLocked:       ptr.Bool(true),
 					WhatLockedReason: ptr.String("The 'what' for this Snowflake role cannot be changed because we currently do not support database role changes"),
+					Incomplete:       ptr.Bool(false),
 				},
 			},
 			wantErr: require.NoError,
