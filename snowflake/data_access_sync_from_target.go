@@ -56,7 +56,6 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 
 	s.inboundShares = inboundShares
 	s.externalGroupOwners = s.configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
-	s.extractExcludeRoleList()
 	s.linkToExternalIdentityStoreGroups = s.configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
 
 	logger.Info("Reading account roles from Snowflake")
@@ -253,7 +252,7 @@ func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity
 	currentApType := ptr.String(access_provider.Role)
 	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, s.externalGroupOwners)
 
-	users, groups, accessProviders, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS)
+	users, groups, accessProviders, incomplete, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS)
 	if err != nil {
 		return err
 	}
@@ -270,6 +269,7 @@ func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity
 			Name:       roleName,
 			NamingHint: roleName,
 			Action:     types.Grant,
+			Incomplete: &incomplete,
 			Who: &exporter.WhoItem{
 				Users:           users,
 				AccessProviders: accessProviders,
@@ -417,7 +417,7 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 	currentApType := ptr.String(apTypeDatabaseRole)
 	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, s.externalGroupOwners)
 
-	users, groups, accessProviders, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS)
+	users, groups, accessProviders, incomplete, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS)
 	if err != nil {
 		return err
 	}
@@ -447,6 +447,8 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 			WhoLockedReason:  ptr.String(databaseRoleWhoLockedReason),
 			WhatLocked:       ptr.Bool(true),
 			WhatLockedReason: ptr.String(databaseRoleWhatLockedReason),
+
+			Incomplete: &incomplete,
 		}
 		ap = processedAps[externalId]
 	} else {
@@ -558,7 +560,7 @@ func mapPrivilege(privilege string, grantedOn string) string {
 	return privilege
 }
 
-func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntity, externalId string, apType *string, fromExternalIS bool) (users []string, groups []string, accessProviders []string, err error) {
+func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntity, externalId string, apType *string, fromExternalIS bool) (users []string, groups []string, accessProviders []string, incomplete bool, err error) {
 	roleName := roleEntity.Name
 
 	users = make([]string, 0)
@@ -570,20 +572,36 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 	} else {
 		grantOfEntities, err := s.accessSyncer.retrieveGrantsOfRole(externalId, apType)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, false, err
 		}
 
 		for _, grantee := range grantOfEntities {
 			if grantee.GrantedTo == "USER" {
 				users = append(users, cleanDoubleQuotes(grantee.GranteeName))
 			} else if grantee.GrantedTo == "ROLE" {
+				if _, exclude := s.excludedRoles[grantee.GranteeName]; exclude {
+					logger.Warn(fmt.Sprintf("Skipping Snowflake ROLE %q may break the hierarchy for role %q", grantee.GranteeName, roleName))
+
+					incomplete = true
+
+					continue
+				}
+
 				accessProviders = append(accessProviders, accountRoleExternalIdGenerator(cleanDoubleQuotes(grantee.GranteeName)))
 			} else if grantee.GrantedTo == "SHARE" {
 				accessProviders = append(accessProviders, shareExternalIdGenerator(cleanDoubleQuotes(grantee.GranteeName)))
 			} else if grantee.GrantedTo == GrantTypeDatabaseRole {
+				if _, exclude := s.excludedRoles[grantee.GranteeName]; exclude {
+					logger.Warn(fmt.Sprintf("Skipping Snowflake DATABASE ROLE %q may break the hierarchy for role %q", grantee.GranteeName, roleName))
+
+					incomplete = true
+
+					continue
+				}
+
 				database, parsedRoleName, err2 := parseDatabaseRoleRoleName(cleanDoubleQuotes(grantee.GranteeName))
 				if err2 != nil {
-					return nil, nil, nil, err2
+					return nil, nil, nil, false, err2
 				}
 
 				accessProviders = append(accessProviders, databaseRoleExternalIdGenerator(database, parsedRoleName))
@@ -591,7 +609,7 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 		}
 	}
 
-	return users, groups, accessProviders, nil
+	return users, groups, accessProviders, incomplete, nil
 }
 
 func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action types.Action) error {

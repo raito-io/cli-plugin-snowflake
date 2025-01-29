@@ -35,6 +35,28 @@ jobs:
     needs:
       - setup-infra
 
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - name: Mod Tidy
+        run: go mod tidy
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.63.4
+
   build:
     environment: integration_testing
     runs-on: ubuntu-latest
@@ -42,6 +64,7 @@ jobs:
     needs:
       - setup-infra
       - generate-usage
+      - lint
 
     steps:
       - name: Check out repository code
@@ -65,11 +88,6 @@ jobs:
 
       - name: Build
         run: make build
-
-      - name: Lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.60.3
 
       - name: Test
         run: make test
