@@ -12,6 +12,7 @@ import (
 	"github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/access_provider/sync_from_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
+	"github.com/raito-io/cli/base/access_provider/types"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/wrappers/mocks"
 	"github.com/stretchr/testify/suite"
@@ -152,7 +153,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			{
 				Id:          accountRoleId,
 				Name:        fmt.Sprintf("%s_ap1", testId),
-				Action:      sync_to_target.Grant,
+				Action:      types.Grant,
 				NamingHint:  actualRoleName,
 				Delete:      false,
 				Description: fmt.Sprintf("Integration testing for test %s", testId),
@@ -207,7 +208,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			{
 				Id:          databaseRoleName1,
 				Name:        databaseRoleName1,
-				Action:      sync_to_target.Grant,
+				Action:      types.Grant,
 				NamingHint:  databaseRoleName1,
 				ActualName:  ptr.String(databaseRoleName1),
 				Delete:      false,
@@ -228,7 +229,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 				Id:          databaseRoleName2,
 				Name:        databaseRoleName2,
 				NamingHint:  databaseRoleName2,
-				Action:      sync_to_target.Grant,
+				Action:      types.Grant,
 				ActualName:  ptr.String(databaseRoleName2),
 				Delete:      false,
 				Description: fmt.Sprintf("Integration testing for test %s", testId),
@@ -349,7 +350,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		{
 			Id:          accountRoleId,
 			Name:        fmt.Sprintf("%s_ap1", testId),
-			Action:      sync_to_target.Grant,
+			Action:      types.Grant,
 			NamingHint:  actualRoleName,
 			ExternalId:  &actualRoleName,
 			Delete:      false,
@@ -370,7 +371,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		{
 			Id:          databaseRoleName1,
 			Name:        databaseRoleName1,
-			Action:      sync_to_target.Grant,
+			Action:      types.Grant,
 			ExternalId:  &databaseRoleExternalId1,
 			NamingHint:  databaseRoleName1,
 			ActualName:  ptr.String(databaseRoleName1),
@@ -447,7 +448,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		{
 			Id:          accountRoleId,
 			Name:        fmt.Sprintf("%s_ap1", testId),
-			Action:      sync_to_target.Grant,
+			Action:      types.Grant,
 			NamingHint:  actualRoleName,
 			ExternalId:  &actualRoleName,
 			Delete:      true,
@@ -512,7 +513,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 		AccessProviders: []*sync_to_target.AccessProvider{{
 			Id:          maskName,
 			Name:        maskName,
-			Action:      sync_to_target.Mask,
+			Action:      types.Mask,
 			Delete:      false,
 			Description: fmt.Sprintf("Mask integration testing for test %s", testId),
 			Who: sync_to_target.WhoItem{
@@ -604,6 +605,88 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 		DatabaseName: database,
 		Owner:        "ACCOUNTADMIN",
 	})
+}
+
+func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share() {
+	//Given
+	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+
+	shareName := generateRole("TESTSHARE", testId)
+	actualShareName := "RAITO_" + shareName
+	accountShareId := fmt.Sprintf("%s_SHARE_ID1", testId)
+
+	accessProviderImport := &sync_to_target.AccessProviderImport{
+		AccessProviders: []*sync_to_target.AccessProvider{
+			{
+				Id:          accountShareId,
+				Name:        fmt.Sprintf("%s_ap1", testId),
+				Action:      types.Share,
+				NamingHint:  shareName,
+				Delete:      false,
+				Description: fmt.Sprintf("Integration testing for test %s", testId),
+				Who: sync_to_target.WhoItem{
+					Recipients: []string{"TSMKRUM.OE70189"},
+				},
+				What: []sync_to_target.WhatItem{
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: "RAITO_DATABASE.ORDERING.ORDERS",
+							Type:     "table",
+						},
+						Permissions: []string{"SELECT"},
+					},
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: "RAITO_DATABASE",
+							Type:     "database",
+						},
+						Permissions: []string{"USAGE on DATABASE"},
+					},
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: "RAITO_DATABASE.ORDERING",
+							Type:     "schema",
+						},
+						Permissions: []string{"USAGE on SCHEMA"},
+					},
+				},
+			},
+		},
+	}
+
+	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
+
+	config := s.getConfig()
+
+	//When
+	err := dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+
+	//Then
+	s.NoError(err)
+	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 1)
+
+	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+	s.Len(accessProviderFeedback, 1)
+
+	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
+		{
+			AccessProvider: accountShareId,
+			ActualName:     actualShareName,
+			ExternalId:     &actualShareName,
+		},
+	}, accessProviderFeedback)
+
+	shares, err := s.sfRepo.GetOutboundShares()
+	s.NoError(err)
+
+	shareNames := make([]string, 0, len(shares))
+
+	for _, share := range shares {
+		shareNames = append(shareNames, share.Name)
+	}
+
+	s.Contains(shareNames, actualShareName)
 }
 
 func generateRole(username string, prefix string) string {

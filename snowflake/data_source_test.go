@@ -17,9 +17,14 @@ import (
 
 func TestDataSourceSyncer_GetMetaData(t *testing.T) {
 	//Given
+	repo := newMockDataSourceRepository(t)
+	repo.EXPECT().GetSnowFlakeAccountName(mock.Anything).Return("SnowflakeAccountName", nil).Once()
+
 	syncer := DataSourceSyncer{repoProvider: func(params map[string]string, role string) (dataSourceRepository, error) {
-		return nil, nil
+		return repo, nil
 	}}
+
+	syncer.repo = repo
 
 	//When
 	result, err := syncer.GetDataSourceMetaData(context.Background(), &config.ConfigMap{})
@@ -46,7 +51,7 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 		{Name: "Warehouse1"},
 		{Name: "Warehouse2"},
 	}, nil).Once()
-	repoMock.EXPECT().GetShares().Return([]DbEntity{
+	repoMock.EXPECT().GetInboundShares().Return([]DbEntity{
 		{Name: "Share1"},
 	}, nil).Once()
 	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
@@ -331,7 +336,7 @@ func TestDataSourceSyncer_SyncDataSource_readShares(t *testing.T) {
 
 	excludedDatabases := set.NewSet[string]("ExcludeShare1", "ExcludeShare2")
 
-	repoMock.EXPECT().GetShares().Return([]DbEntity{
+	repoMock.EXPECT().GetInboundShares().Return([]DbEntity{
 		{Name: "Share1"}, {Name: "ExcludeShare1"}, {Name: "Share2"}, {Name: "ExcludeShare2"},
 	}, nil).Once()
 
@@ -490,7 +495,7 @@ func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
 		{Name: "Warehouse2"},
 	}, nil).Once()
 	repoMock.EXPECT().GetIntegrations().Return([]DbEntity{}, nil).Once()
-	repoMock.EXPECT().GetShares().Return([]DbEntity{
+	repoMock.EXPECT().GetInboundShares().Return([]DbEntity{
 		{Name: "Share1"},
 	}, nil).Once()
 	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
