@@ -39,7 +39,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	sourceName := sfOrganization + "-" + sfAccount
 
 	s.NoError(err)
-	s.Len(dataSourceObjectHandler.DataObjects, 53)
+	s.Len(dataSourceObjectHandler.DataObjects, 55)
 
 	warehouses := getByType(dataSourceObjectHandler.DataObjects, "warehouse")
 	s.Len(warehouses, 2)
@@ -115,6 +115,18 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 		Tags:             nil,
 	})
 
+	procedures := getByType(dataSourceObjectHandler.DataObjects, snowflake.Procedure)
+	s.Len(procedures, 1)
+	s.Contains(procedures, data_source.DataObject{
+		ExternalId:       `RAITO_DATABASE.ORDERING."myProcedure"(VARCHAR)`,
+		Name:             "myProcedure(VARCHAR)",
+		FullName:         `RAITO_DATABASE.ORDERING."myProcedure"(VARCHAR)`,
+		Type:             snowflake.Procedure,
+		Description:      "user-defined procedure",
+		ParentExternalId: "RAITO_DATABASE.ORDERING",
+		Tags:             nil,
+	})
+
 	column := getByType(dataSourceObjectHandler.DataObjects, "column")
 	s.Len(column, 38)
 	s.Contains(column, data_source.DataObject{
@@ -126,6 +138,17 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 		ParentExternalId: "RAITO_DATABASE.ORDERING.ORDERS",
 		Tags:             nil,
 		DataType:         ptr.String("NUMBER"),
+	})
+
+	scim := getByType(dataSourceObjectHandler.DataObjects, snowflake.Integration)
+	s.Len(scim, 1)
+	s.Contains(scim, data_source.DataObject{
+		ExternalId:  "SCIM Integration",
+		Name:        "SCIM Integration",
+		FullName:    "SCIM Integration",
+		Type:        snowflake.Integration,
+		Description: "",
+		Tags:        nil,
 	})
 
 	s.True(len(dataSourceObjectHandler.DataObjects) > 0)

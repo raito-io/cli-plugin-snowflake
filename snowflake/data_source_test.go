@@ -59,7 +59,10 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	}, nil).Once()
 
 	repoMock.EXPECT().GetTagsByDomain("WAREHOUSE").Return(map[string][]*tag.Tag{}, nil).Once()
+	repoMock.EXPECT().GetTagsByDomain("INTEGRATION").Return(map[string][]*tag.Tag{}, nil).Once()
 	repoMock.EXPECT().GetTagsLinkedToDatabaseName(mock.Anything).Return(map[string][]*tag.Tag{}, nil).Times(3)
+
+	repoMock.EXPECT().GetIntegrations().Return([]DbEntity{}, nil).Once()
 
 	repoMock.EXPECT().GetSchemasInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&SchemaEntity{Database: s, Name: "schema1"})
@@ -89,6 +92,15 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetFunctionsInDatabase("Database2", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetProceduresInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetProceduresInDatabase("Database2", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
+		handler(&ProcedureEntity{Database: s, Schema: "schema2", Name: "myProc", ArgumentSignature: "(VAL VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -124,7 +136,7 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 
 	//Then
 	assert.NoError(t, err)
-	assert.Len(t, dataSourceObjectHandlerMock.DataObjects, 15)
+	assert.Len(t, dataSourceObjectHandlerMock.DataObjects, 16)
 	assert.Equal(t, "SnowflakeAccountName", dataSourceObjectHandlerMock.DataSourceName)
 	assert.Equal(t, "SnowflakeAccountName", dataSourceObjectHandlerMock.DataSourceFullName)
 }
@@ -165,7 +177,6 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter(t *testing.T) {
 
 	entities := []DbEntity{{Name: "Object1", Comment: &comment}, {Name: "Object2"}, {Name: "ObjectToFilter"}, {Name: "FilterByFullName"}}
 	doType := "doType"
-	parent := "DB1.Schema1"
 	filter := func(name string, fullName string) bool {
 		if name == "ObjectToFilter" || fullName == "external-FilterByFullName" {
 			return false
@@ -185,26 +196,24 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter(t *testing.T) {
 	syncer.dataSourceHandler = dataSourceObjectHandlerMock
 
 	//When
-	returnedEntities, err := syncer.addDbEntitiesToImporter(entities, doType, parent, true, repoMock.GetTagsLinkedToDatabaseName, externalIdGenerator, filter)
+	returnedEntities, err := syncer.addTopLevelEntitiesToImporter(entities, doType, true, repoMock.GetTagsLinkedToDatabaseName, externalIdGenerator, filter)
 
 	//Then
 	assert.NoError(t, err)
 	assert.Len(t, returnedEntities, 2)
 
 	assert.Contains(t, dataSourceObjectHandlerMock.DataObjects, data_source.DataObject{
-		Name:             "Object1",
-		Type:             "doType",
-		FullName:         "external-Object1",
-		ParentExternalId: parent,
-		ExternalId:       "external-Object1",
-		Description:      comment,
+		Name:        "Object1",
+		Type:        "doType",
+		FullName:    "external-Object1",
+		ExternalId:  "external-Object1",
+		Description: comment,
 	})
 	assert.Contains(t, dataSourceObjectHandlerMock.DataObjects, data_source.DataObject{
-		Name:             "Object2",
-		Type:             "doType",
-		FullName:         "external-Object2",
-		ParentExternalId: parent,
-		ExternalId:       "external-Object2",
+		Name:       "Object2",
+		Type:       "doType",
+		FullName:   "external-Object2",
+		ExternalId: "external-Object2",
 	})
 
 	assert.Equal(t, []ExtendedDbEntity{{Entity: DbEntity{Name: "Object1", Comment: &comment}}, {Entity: DbEntity{Name: "Object2"}}}, returnedEntities)
@@ -218,7 +227,6 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter_ErrorOnAddDataO
 
 	entities := []DbEntity{{Name: "Object1"}, {Name: "Object2"}, {Name: "ObjectToFilter"}, {Name: "FilterByFullName"}}
 	doType := "doType"
-	parent := "DB1.Schema1"
 	filter := func(name string, fullName string) bool {
 		if name == "ObjectToFilter" || fullName == "external-FilterByFullName" {
 			return false
@@ -235,7 +243,7 @@ func TestDataSourceSyncer_SyncDataSource_addDbEntitiesToImporter_ErrorOnAddDataO
 	syncer.dataSourceHandler = dataSourceObjectHandlerMock
 
 	//When
-	returnedEntities, err := syncer.addDbEntitiesToImporter(entities, doType, parent, false, repoMock.GetTagsLinkedToDatabaseName, externalIdGenerator, filter)
+	returnedEntities, err := syncer.addTopLevelEntitiesToImporter(entities, doType, false, repoMock.GetTagsLinkedToDatabaseName, externalIdGenerator, filter)
 
 	//Then
 	assert.Error(t, err)
@@ -282,6 +290,42 @@ func TestDataSourceSyncer_SyncDataSource_readWarehouses(t *testing.T) {
 		Type:       "warehouse",
 		FullName:   "Warehouse2",
 		ExternalId: "Warehouse2",
+	})
+}
+
+func TestDataSourceSyncer_SyncDataSource_readIntegrations(t *testing.T) {
+	//Given
+	repoMock := newMockDataSourceRepository(t)
+	dataSourceObjectHandlerMock := mocks.NewSimpleDataSourceObjectHandler(t, 1)
+
+	repoMock.EXPECT().GetIntegrations().Return([]DbEntity{
+		{Name: "Integration1"},
+	}, nil).Once()
+
+	repoMock.EXPECT().GetTagsByDomain("INTEGRATION").Return(map[string][]*tag.Tag{
+		"Integration1": {
+			{Key: "tag1", Value: "value1"},
+		},
+	}, nil).Once()
+
+	syncer := createSyncer(nil)
+	syncer.repo = repoMock
+	syncer.dataSourceHandler = dataSourceObjectHandlerMock
+
+	//When
+	err := syncer.readIntegrations(true)
+
+	//Then
+	assert.NoError(t, err)
+	assert.Len(t, dataSourceObjectHandlerMock.DataObjects, 1)
+	assert.Contains(t, dataSourceObjectHandlerMock.DataObjects, data_source.DataObject{
+		Name:       "Integration1",
+		Type:       "integration",
+		FullName:   "Integration1",
+		ExternalId: "Integration1",
+		Tags: []*tag.Tag{
+			{Key: "tag1", Value: "value1"},
+		},
 	})
 }
 
@@ -450,6 +494,7 @@ func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
 		{Name: "Warehouse1"},
 		{Name: "Warehouse2"},
 	}, nil).Once()
+	repoMock.EXPECT().GetIntegrations().Return([]DbEntity{}, nil).Once()
 	repoMock.EXPECT().GetInboundShares().Return([]DbEntity{
 		{Name: "Share1"},
 	}, nil).Once()
@@ -458,6 +503,7 @@ func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
 	}, nil).Once()
 
 	repoMock.EXPECT().GetTagsByDomain("WAREHOUSE").Return(nil, nil).Once()
+	repoMock.EXPECT().GetTagsByDomain("INTEGRATION").Return(nil, nil).Once()
 	repoMock.EXPECT().GetTagsLinkedToDatabaseName(mock.Anything).Return(map[string][]*tag.Tag{}, nil).Once()
 
 	repoMock.EXPECT().GetSchemasInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
@@ -475,6 +521,10 @@ func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
 
 	repoMock.EXPECT().GetFunctionsInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		handler(&FunctionEntity{Database: s, Schema: "schema1", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		return nil
+	}).Once()
+
+	repoMock.EXPECT().GetProceduresInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
 		return nil
 	}).Once()
 

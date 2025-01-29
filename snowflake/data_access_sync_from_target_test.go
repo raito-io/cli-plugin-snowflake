@@ -138,6 +138,7 @@ func TestAccessSyncer_GetFullNameFromGrant(t *testing.T) {
 	accessSyncer := NewDataAccessSyncer(naming_hint.NamingConstraints{})
 	assert.Equal(t, "DB1.Schema1.Entity1", accessSyncer.getFullNameFromGrant("DB1.Schema1.Entity1", "table"))
 	assert.Equal(t, `MASTER_DATA.PUBLIC."DECRYPTIT"(VARCHAR, VARCHAR)`, accessSyncer.getFullNameFromGrant(`MASTER_DATA.PUBLIC."DECRYPTIT(VAL VARCHAR, ENCRYPTIONTYPE VARCHAR):VARCHAR(16777216)"`, Function))
+	assert.Equal(t, `MASTER_DATA.PUBLIC."DECRYPTIT"(VARCHAR, VARCHAR)`, accessSyncer.getFullNameFromGrant(`MASTER_DATA.PUBLIC."DECRYPTIT(VAL VARCHAR, ENCRYPTIONTYPE VARCHAR):VARCHAR(16777216)"`, Procedure))
 }
 
 func TestAccessSyncer_importPoliciesOfType(t *testing.T) {

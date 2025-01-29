@@ -20,6 +20,8 @@ const apTypeSharePrefix = "share:"
 const ExternalTable = "external-" + ds.Table
 const IcebergTable = "iceberg-" + ds.Table
 const Function = "function"
+const Procedure = "procedure"
+const Integration = "integration"
 const MaterializedView = "materialized-" + ds.View
 
 // RoleNameConstraints is based on https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
@@ -240,7 +242,7 @@ func DataObjectTypes() []*ds.DataObjectType {
 					Description: "Grants ability to set value for the SHARE_RESTRICTIONS parameter which enables a Business Critical provider account to add a consumer account (with Non-Business Critical edition) to a share.",
 				},
 			},
-			Children: []string{ds.Database, SharedPrefix + ds.Database, "warehouse"},
+			Children: []string{ds.Database, SharedPrefix + ds.Database, "warehouse", Integration},
 		},
 		{
 			Name: "warehouse",
@@ -271,6 +273,21 @@ func DataObjectTypes() []*ds.DataObjectType {
 				},
 			},
 			Children: []string{},
+		},
+		{
+			Name:  Integration,
+			Label: "Integration",
+			Type:  Integration,
+			Permissions: []*ds.DataObjectTypePermission{
+				{
+					Permission:  "USAGE",
+					Description: "Enables using this integration",
+				},
+				{
+					Permission:  "USE_ANY_ROLE",
+					Description: "Allows an External OAuth client or user to switch roles within a session when interacting with Snowflake through an integration.",
+				},
+			},
 		},
 		{
 			Name: ds.Database,
@@ -440,7 +457,7 @@ func DataObjectTypes() []*ds.DataObjectType {
 					CannotBeGranted:        true,
 				},
 			},
-			Children: []string{ds.Table, ds.View, ExternalTable, MaterializedView, IcebergTable, Function},
+			Children: []string{ds.Table, ds.View, ExternalTable, MaterializedView, IcebergTable, Function, Procedure},
 		},
 		{
 			Name: ds.Table,
@@ -521,6 +538,19 @@ func DataObjectTypes() []*ds.DataObjectType {
 				{
 					Permission:             "USAGE",
 					Description:            "Enables using this function",
+					UsageGlobalPermissions: []string{ds.Read},
+					GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
+				},
+			},
+		},
+		{
+			Name:  Procedure,
+			Label: "Stored Procedures",
+			Type:  Procedure,
+			Permissions: []*ds.DataObjectTypePermission{
+				{
+					Permission:             "USAGE",
+					Description:            "Enables using this stored procedure",
 					UsageGlobalPermissions: []string{ds.Read},
 					GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
 				},

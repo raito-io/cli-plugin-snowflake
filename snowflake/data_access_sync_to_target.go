@@ -40,8 +40,10 @@ type AccessToTargetSyncer struct {
 	uniqueRoleNameGeneratorsCache map[*string]naming_hint.UniqueGenerator
 	tablesPerSchemaCache          map[string][]TableEntity
 	functionsPerSchemaCache       map[string][]FunctionEntity
+	proceduresPerSchemaCache      map[string][]ProcedureEntity
 	schemasPerDataBaseCache       map[string][]SchemaEntity
 	warehousesCache               []DbEntity
+	integrationsCache             []DbEntity
 }
 
 func NewAccessToTargetSyncer(accessSyncer *AccessSyncer, namingConstraints naming_hint.NamingConstraints, repo dataAccessRepository, accessProviders *importer.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) *AccessToTargetSyncer {
@@ -53,6 +55,7 @@ func NewAccessToTargetSyncer(accessSyncer *AccessSyncer, namingConstraints namin
 		repo:                          repo,
 		tablesPerSchemaCache:          make(map[string][]TableEntity),
 		functionsPerSchemaCache:       make(map[string][]FunctionEntity),
+		proceduresPerSchemaCache:      make(map[string][]ProcedureEntity),
 		schemasPerDataBaseCache:       make(map[string][]SchemaEntity),
 		uniqueRoleNameGeneratorsCache: make(map[*string]naming_hint.UniqueGenerator),
 		namingConstraints:             namingConstraints,
@@ -785,7 +788,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					onType := convertSnowflakeGrantTypeToRaito(grant.GrantedOn)
 					name := grant.Name
 
-					if onType == Function { // For functions we need to do a special conversion
+					if onType == Function || onType == Procedure { // For functions and stored procedures we need to do a special conversion
 						name = s.accessSyncer.getFullNameFromGrant(name, onType)
 					}
 
@@ -866,8 +869,8 @@ func (s *AccessToTargetSyncer) createGrantsForWhatObjects(accessProvider *import
 			if err2 != nil {
 				return expectedGrants, err2
 			}
-		} else if what.DataObject.Type == Function {
-			s.createGrantsForFunction(permissions, what.DataObject.FullName, metaData, &expectedGrants)
+		} else if what.DataObject.Type == Function || what.DataObject.Type == Procedure {
+			s.createGrantsForFunctionOrProcedure(permissions, what.DataObject.FullName, metaData, &expectedGrants, what.DataObject.Type)
 		} else if what.DataObject.Type == "shared-schema" {
 			err2 := s.createGrantsForSchema(permissions, what.DataObject.FullName, metaData, true, &expectedGrants)
 			if err2 != nil {
@@ -885,6 +888,8 @@ func (s *AccessToTargetSyncer) createGrantsForWhatObjects(accessProvider *import
 			}
 		} else if what.DataObject.Type == "warehouse" {
 			s.createGrantsForWarehouse(permissions, what.DataObject.FullName, metaData, &expectedGrants)
+		} else if what.DataObject.Type == Integration {
+			s.createGrantsForIntegration(permissions, what.DataObject.FullName, metaData, &expectedGrants)
 		} else if what.DataObject.Type == ds.Datasource {
 			err2 := s.createGrantsForAccount(permissions, metaData, &expectedGrants)
 			if err2 != nil {
@@ -1367,12 +1372,12 @@ func (s *AccessToTargetSyncer) createGrantsForTableOrView(doType string, permiss
 	return nil
 }
 
-func (s *AccessToTargetSyncer) createGrantsForFunction(permissions []string, fullName string, metaData map[string]map[string]struct{}, grants *GrantSet) {
+func (s *AccessToTargetSyncer) createGrantsForFunctionOrProcedure(permissions []string, fullName string, metaData map[string]map[string]struct{}, grants *GrantSet, objType string) {
 	for _, p := range permissions {
-		if _, f := metaData[Function][strings.ToUpper(p)]; f {
-			grants.Add(Grant{p, Function, fullName}) // fullName should already be in the right format
+		if _, f := metaData[objType][strings.ToUpper(p)]; f {
+			grants.Add(Grant{p, objType, fullName}) // fullName should already be in the right format
 		} else {
-			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(Function)))
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(objType)))
 		}
 	}
 
@@ -1438,6 +1443,33 @@ func (s *AccessToTargetSyncer) getFunctionsForSchema(database, schema string) ([
 	return functions, nil
 }
 
+func (s *AccessToTargetSyncer) getProceduresForSchema(database, schema string) ([]ProcedureEntity, error) {
+	cacheKey := database + "." + schema
+
+	if procs, f := s.proceduresPerSchemaCache[cacheKey]; f {
+		return procs, nil
+	}
+
+	procs := make([]ProcedureEntity, 0, 10)
+
+	err := s.repo.GetProceduresInDatabase(database, func(entity interface{}) error {
+		proc := entity.(*ProcedureEntity)
+		if proc.Schema == schema {
+			procs = append(procs, *proc)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	s.proceduresPerSchemaCache[cacheKey] = procs
+
+	return procs, nil
+}
+
 func (s *AccessToTargetSyncer) getSchemasForDatabase(database string) ([]SchemaEntity, error) {
 	if schemas, f := s.schemasPerDataBaseCache[database]; f {
 		return schemas, nil
@@ -1475,6 +1507,22 @@ func (s *AccessToTargetSyncer) getWarehouses() ([]DbEntity, error) {
 	}
 
 	return s.warehousesCache, nil
+}
+
+func (s *AccessToTargetSyncer) getIntegrations() ([]DbEntity, error) {
+	if s.integrationsCache != nil {
+		return s.integrationsCache, nil
+	}
+
+	var err error
+	s.integrationsCache, err = s.repo.GetIntegrations()
+
+	if err != nil {
+		s.integrationsCache = nil
+		return nil, err
+	}
+
+	return s.integrationsCache, nil
 }
 
 func (s *AccessToTargetSyncer) createGrantsForSchema(permissions []string, fullName string, metaData map[string]map[string]struct{}, isShared bool, grants *GrantSet) error {
@@ -1546,8 +1594,20 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForSchema(database, schema,
 		// Run through all the tabular things (tables, views, ...) in the schema
 		for _, function := range functions {
 			functionMatchFound := false
-			functionMatchFound = s.createPermissionGrantsForFunction(database, schema, function, p, metaData, grants)
+			functionMatchFound = s.createPermissionGrantsForFunctionOrProcedure(database, schema, function.Name, function.ArgumentSignature, p, metaData, grants, Function)
 			matchFound = matchFound || functionMatchFound
+		}
+
+		procedures, err := s.getProceduresForSchema(database, schema)
+		if err != nil {
+			return false, err
+		}
+
+		// Run through all the tabular things (tables, views, ...) in the schema
+		for _, proc := range procedures {
+			procedureMatchFound := false
+			procedureMatchFound = s.createPermissionGrantsForFunctionOrProcedure(database, schema, proc.Name, proc.ArgumentSignature, p, metaData, grants, Procedure)
+			matchFound = matchFound || procedureMatchFound
 		}
 	}
 
@@ -1618,12 +1678,12 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForTable(database string, s
 	return false
 }
 
-func (s *AccessToTargetSyncer) createPermissionGrantsForFunction(database string, schema string, function FunctionEntity, p string, metaData map[string]map[string]struct{}, grants *GrantSet) bool {
+func (s *AccessToTargetSyncer) createPermissionGrantsForFunctionOrProcedure(database string, schema string, name, signature, p string, metaData map[string]map[string]struct{}, grants *GrantSet, objType string) bool {
 	// Check if the permission is applicable on the data object type
-	if _, f2 := metaData[Function][strings.ToUpper(p)]; f2 {
-		argumentSignature := convertFunctionArgumentSignature(function.ArgumentSignature)
+	if _, f2 := metaData[objType][strings.ToUpper(p)]; f2 {
+		argumentSignature := convertFunctionArgumentSignature(signature)
 
-		grants.Add(Grant{p, Function, common.FormatQuery(`%s.%s.`, database, schema) + `"` + function.Name + `"` + argumentSignature})
+		grants.Add(Grant{p, objType, common.FormatQuery(`%s.%s.`, database, schema) + `"` + name + `"` + argumentSignature})
 
 		return true
 	}
@@ -1669,6 +1729,17 @@ func (s *AccessToTargetSyncer) createGrantsForWarehouse(permissions []string, wa
 	}
 }
 
+func (s *AccessToTargetSyncer) createGrantsForIntegration(permissions []string, warehouse string, metaData map[string]map[string]struct{}, grants *GrantSet) {
+	for _, p := range permissions {
+		if _, f := metaData[Integration][strings.ToUpper(p)]; !f {
+			logger.Warn(fmt.Sprintf("Permission %q does not apply to type INTEGRATION. Skipping", p))
+			continue
+		}
+
+		grants.Add(Grant{p, Integration, common.FormatQuery(`%s`, warehouse)})
+	}
+}
+
 func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, metaData map[string]map[string]struct{}, grants *GrantSet) error {
 	for _, p := range permissions {
 		matchFound := false
@@ -1687,6 +1758,19 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 
 				for _, warehouse := range warehouses {
 					grants.Add(Grant{p, "warehouse", common.FormatQuery(`%s`, warehouse.Name)})
+				}
+			}
+
+			if _, f2 := metaData[Integration][strings.ToUpper(p)]; f2 {
+				matchFound = true
+
+				integrations, err := s.getIntegrations()
+				if err != nil {
+					return err
+				}
+
+				for _, integration := range integrations {
+					grants.Add(Grant{p, Integration, common.FormatQuery(`%s`, integration.Name)})
 				}
 			}
 
