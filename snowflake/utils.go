@@ -69,6 +69,10 @@ func accountRoleExternalIdGenerator(roleName string) string {
 	return roleName
 }
 
+func shareExternalIdGenerator(name string) string {
+	return fmt.Sprintf("%s%s", apTypeSharePrefix, name)
+}
+
 func isDatabaseRole(apType *string) bool {
 	return apType != nil && strings.EqualFold(*apType, apTypeDatabaseRole)
 }
