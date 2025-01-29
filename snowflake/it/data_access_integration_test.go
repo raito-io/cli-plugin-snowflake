@@ -188,6 +188,20 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 						},
 						Permissions: []string{"USAGE"},
 					},
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: `RAITO_DATABASE.ORDERING."myProcedure"(VARCHAR)`,
+							Type:     "procedure",
+						},
+						Permissions: []string{"USAGE"},
+					},
+					{
+						DataObject: &data_source.DataObjectReference{
+							FullName: `SCIM Integration`,
+							Type:     "integration",
+						},
+						Permissions: []string{"USAGE"},
+					},
 				},
 			},
 			{
@@ -284,10 +298,12 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 
 	grants, err := s.sfRepo.GetGrantsToAccountRole(actualRoleName)
 	s.NoError(err)
-	s.Len(grants, 5)
+	s.Len(grants, 7)
 	dbUsageFound := false
 	schemaUsageFound := false
 	functionUsageFound := false
+	procedureUsageFound := false
+	integrationUsageFound := false
 
 	for _, grant := range grants {
 		if strings.EqualFold(grant.GrantedOn, "DATABASE") && grant.Name == "RAITO_DATABASE" && grant.Privilege == "USAGE" {
@@ -296,12 +312,18 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 			schemaUsageFound = true
 		} else if strings.EqualFold(grant.GrantedOn, "FUNCTION") && grant.Name == "RAITO_DATABASE.ORDERING.\"decrypt(val VARCHAR):VARCHAR(16777216)\"" && grant.Privilege == "USAGE" {
 			functionUsageFound = true
+		} else if strings.EqualFold(grant.GrantedOn, "PROCEDURE") && strings.Contains(grant.Name, "RAITO_DATABASE.ORDERING.\"myProcedure(x VARCHAR)") && grant.Privilege == "USAGE" {
+			procedureUsageFound = true
+		} else if strings.EqualFold(grant.GrantedOn, "INTEGRATION") && grant.Name == "\"SCIM Integration\"" && grant.Privilege == "USAGE" {
+			integrationUsageFound = true
 		}
 	}
 
 	s.True(dbUsageFound)
 	s.True(schemaUsageFound)
 	s.True(functionUsageFound)
+	s.True(procedureUsageFound)
+	s.True(integrationUsageFound)
 
 	databaseRoles, err := s.sfRepo.GetDatabaseRoles("RAITO_DATABASE")
 	s.NoError(err)
