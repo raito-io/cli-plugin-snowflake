@@ -280,8 +280,9 @@ func DataObjectTypes() []*ds.DataObjectType {
 			Type:  Integration,
 			Permissions: []*ds.DataObjectTypePermission{
 				{
-					Permission:  "USAGE",
-					Description: "Enables using this integration",
+					Permission:        USAGE,
+					Description:       "Enables using this integration",
+					GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 				},
 				{
 					Permission:  "USE_ANY_ROLE",
