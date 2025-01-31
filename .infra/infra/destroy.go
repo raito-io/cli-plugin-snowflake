@@ -25,11 +25,13 @@ func dropAllRoles() error {
 
 	fmt.Printf("Using account: %s\n", account)
 
+	role := "ACCOUNTADMIN"
+
 	dsn, err := sf.DSN(&sf.Config{
 		Account:  account,
 		User:     sfUser,
 		Password: sfPassword,
-		Role:     "ACCOUNTADMIN",
+		Role:     role,
 	})
 
 	if err != nil {
@@ -49,6 +51,11 @@ func dropAllRoles() error {
 	}
 
 	err = dropDatabaseRoles(db)
+	if err != nil {
+		return err
+	}
+
+	err = dropOutboundShares(db, role)
 	if err != nil {
 		return err
 	}
@@ -100,6 +107,33 @@ func dropDatabaseRoles(db *sql.DB) error {
 			err = dropRole(db, databaseRole, &database.Name)
 			if err != nil {
 				return fmt.Errorf("drop role %s in database %s: %w", databaseRole.Name, database.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func dropOutboundShares(db *sql.DB, currentRole string) error {
+	rows, err := db.Query("SHOW SHARES")
+	if err != nil {
+		return fmt.Errorf("query snowflake shares: %w", err)
+	}
+
+	defer rows.Close()
+
+	var shareEntities []snowflake.ShareEntity
+
+	err = scan.Rows(&shareEntities, rows)
+	if err != nil {
+		return fmt.Errorf("scan snowflake shares: %w", err)
+	}
+
+	for _, share := range shareEntities {
+		if share.Owner == currentRole {
+			_, err = db.Exec(fmt.Sprintf("DROP SHARE %s", share.Name))
+			if err != nil {
+				return fmt.Errorf("drop share %s: %w", share.Name, err)
 			}
 		}
 	}
