@@ -42,7 +42,7 @@ func TestDataAccessTestSuite(t *testing.T) {
 
 func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	//Given
-	dataAccessProviderHandler := mocks.NewSimpleAccessProviderHandler(s.T(), 15)
+	dataAccessProviderHandler := mocks.NewSimpleAccessProviderHandler(s.T(), 17)
 	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
 
 	config := s.getConfig()
