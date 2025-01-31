@@ -227,7 +227,12 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 						{
 							Name:  "Share1",
 							Owner: "owner1",
-							To:    "acc1, acc2",
+							To:    "acc1",
+						},
+						{
+							Name:  "Share1",
+							Owner: "owner1",
+							To:    "acc2",
 						},
 					}, nil).Once()
 					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{}, nil).Once()

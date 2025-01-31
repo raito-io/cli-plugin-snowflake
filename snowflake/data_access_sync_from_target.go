@@ -116,20 +116,26 @@ func (s *AccessFromTargetSyncer) importOutboundShares(accessProviderHandler wrap
 		return err
 	}
 
+	shareMap := make(map[string][]ShareEntity)
+
+	for _, shareEntity := range shareEntities {
+		shareMap[shareEntity.Name] = append(shareMap[shareEntity.Name], shareEntity)
+	}
+
 	wp := workerpool.New(getWorkerPoolSize(s.configMap))
 
 	processedAps := make(map[string]*exporter.AccessProvider)
 
-	for _, shareEntity := range shareEntities {
-		if _, exclude := s.excludedRoles[shareEntity.Name]; exclude {
-			logger.Info("Skipping SnowFlake SHARE " + shareEntity.Name)
+	for shareName, shareEntityItems := range shareMap {
+		if _, exclude := s.excludedRoles[shareName]; exclude {
+			logger.Info("Skipping SnowFlake SHARE " + shareName)
 			continue
 		}
 
 		wp.Submit(func() {
-			err2 := s.transformShareToAccessProvider(shareEntity, processedAps)
+			err2 := s.transformShareToAccessProvider(shareName, shareEntityItems, processedAps)
 			if err2 != nil {
-				logger.Warn(fmt.Sprintf("Error importing SnowFlake share %q: %s", shareEntity.Name, err2.Error()))
+				logger.Warn(fmt.Sprintf("Error importing SnowFlake share %q: %s", shareName, err2.Error()))
 				return
 			}
 		})
@@ -200,18 +206,24 @@ func (s *AccessFromTargetSyncer) shouldRetrieveTags() bool {
 	return tagSupportEnabled
 }
 
-func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareEntity ShareEntity, processedAps map[string]*exporter.AccessProvider) error {
-	logger.Info(fmt.Sprintf("Reading SnowFlake SHARE %s", shareEntity.Name))
+func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareName string, shareEntity []ShareEntity, processedAps map[string]*exporter.AccessProvider) error {
+	logger.Info(fmt.Sprintf("Reading SnowFlake SHARE %s (%d items)", shareName, len(shareEntity)))
 
-	shareName := shareEntity.Name
 	externalId := apTypeSharePrefix + shareName
 
 	// Locking to make sure only one goroutine can read & write to the processedAps map at a time
 	s.lock.Lock()
 
-	recipients := strings.Split(shareEntity.To, ",")
-	for i, r := range recipients {
-		recipients[i] = strings.TrimSpace(r)
+	recipients := make([]string, 0, len(shareEntity))
+
+	for _, share := range shareEntity {
+		trimmedRecipient := strings.TrimSpace(share.To)
+
+		if trimmedRecipient == "" {
+			continue
+		}
+
+		recipients = append(recipients, trimmedRecipient)
 	}
 
 	ap, f := processedAps[externalId]
