@@ -136,7 +136,8 @@ func dropOutboundShares(db *sql.DB, currentRole string) error {
 
 	for _, share := range shareEntities {
 		if share.Owner == currentRole {
-			_, err = db.Exec(fmt.Sprintf("DROP SHARE %s", share.Name))
+			fmt.Printf("drop share %q\n", share.Name)
+			err = dropShare(db, share.Name)
 			if err != nil {
 				return fmt.Errorf("drop share %s: %w", share.Name, err)
 			}
@@ -229,6 +230,19 @@ func dropRole(db *sql.DB, role snowflake.RoleEntity, database *string) error {
 	return nil
 }
 
+func dropShare(db *sql.DB, share string) error {
+	if !nonDryRun {
+		return nil
+	}
+
+	_, err := db.Exec(fmt.Sprintf("DROP SHARE IF EXISTS %s", share))
+	if err != nil {
+		return fmt.Errorf("drop share %s: %w", share, err)
+	}
+
+	return nil
+}
+
 func main() {
 	flag.StringVar(&sfAccount, "sfAccount", "", "Snowflake account")
 	flag.StringVar(&sfOrganization, "sfOrganization", "", "Snowflake organization")
@@ -237,9 +251,8 @@ func main() {
 	flag.BoolVar(&nonDryRun, "drop", false, "Execute drop roles. If not set or false a dry run will be executed.")
 	flag.Parse()
 
-	if sfAccount == "" || sfOrganization == "" || sfUser == "" || sfPassword == "" {
-		fmt.Println("Missing required arguments")
-		return
+	if sfAccount == "" || sfUser == "" || sfPassword == "" {
+		panic("Missing required arguments")
 	}
 
 	if nonDryRun {
