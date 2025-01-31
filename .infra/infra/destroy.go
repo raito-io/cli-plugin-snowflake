@@ -122,7 +122,7 @@ func dropOutboundShares(db *sql.DB, currentRole string) error {
 
 	rows.Close()
 
-	rows, err := db.Query("select \"name\", \"owner\", \"to\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'OUTBOUND'")
+	rows, err = db.Query("select \"name\", \"owner\", \"to\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'OUTBOUND'")
 	if err != nil {
 		return fmt.Errorf("query snowflake shares with filter: %w", err)
 	}
