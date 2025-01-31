@@ -115,10 +115,12 @@ func dropDatabaseRoles(db *sql.DB) error {
 }
 
 func dropOutboundShares(db *sql.DB, currentRole string) error {
-	_, err := db.Query("SHOW SHARES")
+	rows, err := db.Query("SHOW SHARES")
 	if err != nil {
 		return fmt.Errorf("query snowflake shares: %w", err)
 	}
+
+	rows.Close()
 
 	rows, err := db.Query("select \"name\", \"owner\", \"to\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'OUTBOUND'")
 	if err != nil {
