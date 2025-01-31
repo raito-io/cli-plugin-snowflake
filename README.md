@@ -133,6 +133,9 @@ $> raito info raito-io/cli-plugin-snowflake
 - Shared View
 - Column
 - Shared Column
+- Function
+- Procedure
+- Integration
 
 
 ## Access controls
@@ -172,11 +175,11 @@ All what items will be granted permission for the specific role.
 Each mask will be exported as masking policy to all schemas associated with the what-items of the mask.
 Within each schema a masking policy function is created for each required data type.
 
-It is possible to define a custom decrypt masking policy. This is done using the parameters 'sf-mask-decrypt-function'.
-When this parameter is set, a new masking type is made available to Raito Cloud users, called 'Decrypt'.
+It is possible to define a custom decrypt masking policy. This is done using the parameters `sf-mask-decrypt-function`.
+When this parameter is set, a new masking type is made available to Raito Cloud users, called `Decrypt`.
 This will generate a mask that will decrypt the value of the column using the specified function when the current user or role is part of the beneficiaries of the mask in Raito Cloud.
 
-When you need to pass an additional parameter to the decrypt function, you can use the parameter 'sf-mask-decrypt-column-tag'. 
+When you need to pass an additional parameter to the decrypt function, you can use the parameter `sf-mask-decrypt-column-tag`. 
 This will fetch the value of the given tag on the column to (un)mask and pass that value to your decrypt function as well. This is typically used to pass the encryption type to the decrypt function.
 
 As an example, if you specified the following parameters in your target configuration:
@@ -193,6 +196,8 @@ CREATE MASKING POLICY MY_DATABASE.MY_SCHEMA.DECRYPTTEST_JH3EIhVr_TEXT AS (val TE
 	ELSE val
   END;
 ```
+
+Note: Make sure the role used to connect to Snowflake (as specified in `sf-role`) has USAGE permissions on the decryption method.
 
 #### Filters
 Each filter will be exported as row access policy to exactly one table.
