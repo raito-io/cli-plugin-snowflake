@@ -48,9 +48,10 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 		return nil, fmt.Errorf("get Snowflake account name: %w", err)
 	}
 
-	var supportedFeatures []string
+	supportedFeatures := []string{ds.DataSharing}
+
 	if !configParam.GetBoolWithDefault(SfStandardEdition, false) {
-		supportedFeatures = append(supportedFeatures, ds.RowFiltering, ds.ColumnMasking, ds.DataSharing)
+		supportedFeatures = append(supportedFeatures, ds.RowFiltering, ds.ColumnMasking)
 	}
 
 	metaData := &ds.MetaData{
@@ -87,7 +88,10 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				AllowedWhoAccessProviderTypes: []string{access_provider.Role, apTypeDatabaseRole},
 			},
 		},
-		MaskingMetadata: &ds.MaskingMetadata{
+	}
+
+	if !configParam.GetBoolWithDefault(SfStandardEdition, false) {
+		metaData.MaskingMetadata = &ds.MaskingMetadata{
 			MaskTypes: []*ds.MaskingType{
 				{
 					DisplayName: "NULL",
@@ -102,21 +106,22 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				},
 			},
 			DefaultMaskExternalName: NullMaskId,
-		},
-		ShareMetadata: &ds.ShareMetadata{
+		}
+
+		if _, f := configParam.GetParameters()[SfMaskDecryptFunction]; f {
+			metaData.MaskingMetadata.MaskTypes = append(metaData.MaskingMetadata.MaskTypes, &ds.MaskingType{
+				DisplayName: "ENCRYPT",
+				ExternalId:  EncryptMaskId,
+				Description: "Returns the encrypted value (as stored in the database) instead of the decrypted version.",
+				DataTypes:   []string{"varchar", "char", "string", "text"},
+			})
+		}
+
+		metaData.ShareMetadata = &ds.ShareMetadata{
 			ApplicableTypes:           []string{ds.Database, ds.Schema, ds.Table, ds.View, ExternalTable, MaterializedView, IcebergTable, Function},
 			CommonParentType:          ds.Database,
 			DataSourceShareIdentifier: accountIdentifier,
-		},
-	}
-
-	if _, f := configParam.GetParameters()[SfMaskDecryptFunction]; f {
-		metaData.MaskingMetadata.MaskTypes = append(metaData.MaskingMetadata.MaskTypes, &ds.MaskingType{
-			DisplayName: "ENCRYPT",
-			ExternalId:  EncryptMaskId,
-			Description: "Returns the encrypted value (as stored in the database) instead of the decrypted version.",
-			DataTypes:   []string{"varchar", "char", "string", "text"},
-		})
+		}
 	}
 
 	return metaData, nil
