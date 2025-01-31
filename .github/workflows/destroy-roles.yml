@@ -49,3 +49,4 @@ jobs:
           SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SF_USER: ${{ secrets.SNOWFLAKE_USER }}
           SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SF_ORGANIZATION: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
