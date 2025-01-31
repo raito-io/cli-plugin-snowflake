@@ -25,11 +25,13 @@ func dropAllRoles() error {
 
 	fmt.Printf("Using account: %s\n", account)
 
+	role := "ACCOUNTADMIN"
+
 	dsn, err := sf.DSN(&sf.Config{
 		Account:  account,
 		User:     sfUser,
 		Password: sfPassword,
-		Role:     "ACCOUNTADMIN",
+		Role:     role,
 	})
 
 	if err != nil {
@@ -49,6 +51,11 @@ func dropAllRoles() error {
 	}
 
 	err = dropDatabaseRoles(db)
+	if err != nil {
+		return err
+	}
+
+	err = dropOutboundShares(db, role)
 	if err != nil {
 		return err
 	}
@@ -100,6 +107,41 @@ func dropDatabaseRoles(db *sql.DB) error {
 			err = dropRole(db, databaseRole, &database.Name)
 			if err != nil {
 				return fmt.Errorf("drop role %s in database %s: %w", databaseRole.Name, database.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func dropOutboundShares(db *sql.DB, currentRole string) error {
+	rows, err := db.Query("SHOW SHARES")
+	if err != nil {
+		return fmt.Errorf("query snowflake shares: %w", err)
+	}
+
+	rows.Close()
+
+	rows, err = db.Query("select \"name\", \"owner\", \"to\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'OUTBOUND'")
+	if err != nil {
+		return fmt.Errorf("query snowflake shares with filter: %w", err)
+	}
+
+	defer rows.Close()
+
+	var shareEntities []snowflake.ShareEntity
+
+	err = scan.Rows(&shareEntities, rows)
+	if err != nil {
+		return fmt.Errorf("scan snowflake shares: %w", err)
+	}
+
+	for _, share := range shareEntities {
+		if share.Owner == currentRole {
+			fmt.Printf("drop share %q\n", share.Name)
+			err = dropShare(db, share.Name)
+			if err != nil {
+				return fmt.Errorf("drop share %s: %w", share.Name, err)
 			}
 		}
 	}
@@ -190,6 +232,19 @@ func dropRole(db *sql.DB, role snowflake.RoleEntity, database *string) error {
 	return nil
 }
 
+func dropShare(db *sql.DB, share string) error {
+	if !nonDryRun {
+		return nil
+	}
+
+	_, err := db.Exec(fmt.Sprintf("DROP SHARE IF EXISTS %s", share))
+	if err != nil {
+		return fmt.Errorf("drop share %s: %w", share, err)
+	}
+
+	return nil
+}
+
 func main() {
 	flag.StringVar(&sfAccount, "sfAccount", "", "Snowflake account")
 	flag.StringVar(&sfOrganization, "sfOrganization", "", "Snowflake organization")
@@ -198,9 +253,8 @@ func main() {
 	flag.BoolVar(&nonDryRun, "drop", false, "Execute drop roles. If not set or false a dry run will be executed.")
 	flag.Parse()
 
-	if sfAccount == "" || sfOrganization == "" || sfUser == "" || sfPassword == "" {
-		fmt.Println("Missing required arguments")
-		return
+	if sfAccount == "" || sfUser == "" || sfPassword == "" {
+		panic("Missing required arguments")
 	}
 
 	if nonDryRun {
