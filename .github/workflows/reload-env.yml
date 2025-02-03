@@ -1,13 +1,15 @@
 name: Raito CLI - Snowflake Plugin - Reload
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       targetEnvironment:
-        required: true
         type: string
+        required: true
+        description: ""
       secretArn:
         required: true
         type: string
+        description: "The ARN of the secret to load"
 
 permissions:
   id-token: write
