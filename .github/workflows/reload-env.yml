@@ -18,6 +18,7 @@ permissions:
 jobs:
     load-secrets:
       name: Reload
+      environment: ${{ inputs.targetEnvironment }}
       runs-on: ubuntu-latest
       steps:
       - name: Assume role using OIDC
@@ -64,8 +65,8 @@ jobs:
         demo-infra: true
         testing-infra: false
       secrets:
-        AWS_OIDC_DEPLOY_ROLE: ${{ secrets.AWS_OIDC_SHARED_SERVICES_ROLE }}
-        AWS_REGION: ${{ vars.AWS_REGION }}
+        AWS_OIDC_DEPLOY_ROLE: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
         AWS_S3_TERRAFORM_BUCKET: ${{ needs.load-secrets.outputs.AWS_S3_TERRAFORM_BUCKET }}
         AWS_S3_TERRAFORM_KEY: ${{ needs.load-secrets.outputs.AWS_S3_TERRAFORM_KEY }}
         SNOWFLAKE_ACCOUNT: ${{ needs.load-secrets.outputs.SNOWFLAKE_ACCOUNT }}
