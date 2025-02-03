@@ -61,8 +61,8 @@ jobs:
       uses: ./.github/workflows/generate-infra.yml
       with:
         targetEnvironment: ${{ inputs.targetEnvironment }}
-        demo-infra: 'true'
-        testing-infra: 'false'
+        demo-infra: true
+        testing-infra: false
       secrets:
         AWS_OIDC_DEPLOY_ROLE: ${{ secrets.AWS_OIDC_SHARED_SERVICES_ROLE }}
         AWS_REGION: ${{ vars.AWS_REGION }}
