@@ -50,6 +50,18 @@ jobs:
           echo "AWS_S3_TERRAFORM_BUCKET=${AWS_S3_TERRAFORM_BUCKET}" >> $GITHUB_OUTPUT
           echo "AWS_S3_TERRAFORM_KEY=${AWS_S3_TERRAFORM_KEY}" >> $GITHUB_OUTPUT
 
+    debug:
+      name: Debug
+      runs-on: ubuntu-latest
+      needs:
+        - load-secrets
+      steps:
+        - name: Print some values
+          run: |
+            echo "SNOWFLAKE_USER=${{ needs.load-secrets.outputs.SNOWFLAKE_USER }}"
+            echo "SNOWFLAKE_ROLE=${{ needs.load-secrets.outputs.SNOWFLAKE_ROLE }}"
+            echo "SNOWFLAKE_ORGANIZATION=${{ needs.load-secrets.outputs.SNOWFLAKE_ORGANIZATION }}"
+
     destroy-old-infra:
       name: Destroy old infrastructure
       needs:
