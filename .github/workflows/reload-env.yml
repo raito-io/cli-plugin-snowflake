@@ -38,6 +38,7 @@ jobs:
         uses: aws-actions/aws-secretsmanager-get-secrets@v2
         with:
           secret-ids: ",${{ inputs.secretArn }}"
+          parse-json-secrets: true
 
       - name: Generate output
         id: output
