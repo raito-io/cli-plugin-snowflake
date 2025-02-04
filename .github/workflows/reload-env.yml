@@ -20,6 +20,13 @@ jobs:
       name: Reload
       environment: ${{ inputs.targetEnvironment }}
       runs-on: ubuntu-latest
+      outputs:
+        AWS_S3_TERRAFORM_BUCKET: ${{ steps.output.outputs.AWS_S3_TERRAFORM_BUCKET }}
+        AWS_S3_TERRAFORM_KEY: ${{ steps.output.outputs.AWS_S3_TERRAFORM_KEY }}
+        SNOWFLAKE_ACCOUNT: ${{ steps.output.outputs.SNOWFLAKE_ACCOUNT }}
+        SNOWFLAKE_ORGANIZATION: ${{ steps.output.outputs.SNOWFLAKE_ORGANIZATION }}
+        SNOWFLAKE_USER: ${{ steps.output.outputs.SNOWFLAKE_USER }}
+        SNOWFLAKE_PASSWORD: ${{ steps.output.outputs.SNOWFLAKE_PASSWORD }}
       steps:
       - name: Assume role using OIDC
         uses: aws-actions/configure-aws-credentials@v4
@@ -33,6 +40,7 @@ jobs:
           secret-ids: ",${{ inputs.secretArn }}"
 
       - name: Generate output
+        id: output
         run: |
           echo "SNOWFLAKE_ACCOUNT=${SF_ACCOUNT}" >> $GITHUB_OUTPUT
           echo "SNOWFLAKE_USER=${SF_USER}" >> $GITHUB_OUTPUT
@@ -53,6 +61,7 @@ jobs:
         SNOWFLAKE_ACCOUNT: ${{ needs.load-secrets.outputs.SNOWFLAKE_ACCOUNT }}
         SNOWFLAKE_USER: ${{ needs.load-secrets.outputs.SNOWFLAKE_USER }}
         SNOWFLAKE_PASSWORD: ${{ needs.load-secrets.outputs.SNOWFLAKE_PASSWORD }}
+        SNOWFLAKE_ORGANIZATION: ${{ needs.load-secrets.outputs.SNOWFLAKE_ORGANIZATION }}
 
     generate-new-infra:
       name: Generate new infrastructure

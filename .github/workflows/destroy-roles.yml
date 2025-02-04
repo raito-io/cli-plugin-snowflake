@@ -12,6 +12,8 @@ on:
         required: true
       SNOWFLAKE_PASSWORD:
         required: true
+      SNOWFLAKE_ORGANIZATION:
+        required: true
   workflow_dispatch:
     inputs:
       targetEnvironment:
