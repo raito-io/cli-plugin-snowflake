@@ -27,6 +27,7 @@ jobs:
         SNOWFLAKE_ORGANIZATION: ${{ steps.output.outputs.SNOWFLAKE_ORGANIZATION }}
         SNOWFLAKE_USER: ${{ steps.output.outputs.SNOWFLAKE_USER }}
         SNOWFLAKE_PASSWORD: ${{ steps.output.outputs.SNOWFLAKE_PASSWORD }}
+        SNOWFLAKE_ROKE: ${{ steps.output.outputs.SNOWFLAKE_ROLE }}
       steps:
       - name: Assume role using OIDC
         uses: aws-actions/configure-aws-credentials@v4
@@ -43,6 +44,7 @@ jobs:
       - name: Generate output
         id: output
         run: |
+          echo "account ${SF_ACCOUNT} user ${SF_USER}" 
           echo "SNOWFLAKE_ACCOUNT=${SF_ACCOUNT}" >> $GITHUB_OUTPUT
           echo "SNOWFLAKE_USER=${SF_USER}" >> $GITHUB_OUTPUT
           echo "SNOWFLAKE_PASSWORD=${SF_PASSWORD}" >> $GITHUB_OUTPUT
