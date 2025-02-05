@@ -21,7 +21,7 @@ resource "snowflake_scim_integration" "scim_integration" {
   enabled       = true
   scim_client   = "GENERIC"
   sync_password = false
-  run_as_role   = "GENERIC_SCIM_PROVISIONER"
+  run_as_role   = snowflake_account_role.scim_role.name
 }
 
 // SNOWFLAKE DATABASE
