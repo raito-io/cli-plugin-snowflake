@@ -45,18 +45,18 @@ jobs:
         - name: Remove old infrastructure
           uses: ./.github/actions/destroy-roles
           with:
-            snowflakeUser: ${SF_USER}
-            snowflakePassword: ${SF_PASSWORD}
-            snowflakeAccount: ${SF_ACCOUNT}
-            snowflakeOrganization: ${SF_ORGANIZATION}
+            snowflakeUser: ${{ env.SF_USER }}
+            snowflakePassword: ${{ env.SF_PASSWORD }}
+            snowflakeAccount: ${{ env.SF_ACCOUNT }}
+            snowflakeOrganization: ${{ env.SF_ORGANIZATION }}
 
         - name: Setup infrastructure
           uses: ./.github/actions/generate-infra
           with:
-            snowflakeUser: ${SF_USER}
-            snowflakePassword: ${SF_PASSWORD}
-            snowflakeAccount: ${SF_ACCOUNT}
-            snowflakeOrganization: ${SF_ORGANIZATION}
+            snowflakeUser: ${{ env.SF_USER }}
+            snowflakePassword: ${{ env.SF_PASSWORD }}
+            snowflakeAccount: ${{ env.SF_ACCOUNT }}
+            snowflakeOrganization: ${{ env.SF_ORGANIZATION }}
             testingDataset: 'false'
             demoDataset: 'true'
 
