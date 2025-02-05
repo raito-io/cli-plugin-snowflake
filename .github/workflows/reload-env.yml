@@ -36,33 +36,32 @@ jobs:
             secret-ids: ",${{ inputs.secretArn }}"
             parse-json-secrets: true
 
-        - name: Destroy old infra
-          uses: ./.github/destroy-roles
+        - name: Initiate Terraform
+          uses: ./.github/actions/terraform-init
           with:
-            snowflakeAccount: ${SF_ACCOUNT}
+            S3TerraformBucket: ${AWS_S3_TERRAFORM_BUCKET}
+            S3TerraformKey: ${AWS_S3_TERRAFORM_KEY}
+
+        - name: Remove old infrastructure
+          uses: ./.github/actions/destroy-roles
+          with:
             snowflakeUser: ${SF_USER}
             snowflakePassword: ${SF_PASSWORD}
+            snowflakeAccount: ${SF_ACCOUNT}
             snowflakeOrganization: ${SF_ORGANIZATION}
 
-#    generate-new-infra:
-#      name: Generate new infrastructure
-#      needs:
-#        - destroy-old-infra
-#        - load-secrets
-#      uses: ./.github/workflows/generate-infra.yml
-#      with:
-#        targetEnvironment: ${{ inputs.targetEnvironment }}
-#        demo-infra: true
-#        testing-infra: false
-#      secrets:
-#        AWS_OIDC_DEPLOY_ROLE: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
-#        AWS_REGION: ${{ secrets.AWS_REGION }}
-#        AWS_S3_TERRAFORM_BUCKET: ${{ needs.load-secrets.outputs.AWS_S3_TERRAFORM_BUCKET }}
-#        AWS_S3_TERRAFORM_KEY: ${{ needs.load-secrets.outputs.AWS_S3_TERRAFORM_KEY }}
-#        SNOWFLAKE_ACCOUNT: ${{ needs.load-secrets.outputs.SNOWFLAKE_ACCOUNT }}
-#        SNOWFLAKE_ORGANIZATION: ${{ needs.load-secrets.outputs.SNOWFLAKE_ORGANIZATION }}
-#        SNOWFLAKE_USER: ${{ needs.load-secrets.outputs.SNOWFLAKE_USER }}
-#        SNOWFLAKE_PASSWORD: ${{ needs.load-secrets.outputs.SNOWFLAKE_PASSWORD }}
+        - name: Setup infrastructure
+          uses: ./.github/actions/generate-infra
+          with:
+            snowflakeUser: ${SF_USER}
+            snowflakePassword: ${SF_PASSWORD}
+            snowflakeAccount: ${SF_ACCOUNT}
+            snowflakeOrganization: ${SF_ORGANIZATION}
+            testingDataset: 'false'
+            demoDataset: 'true'
+
+        - name: Generate usage
+          uses: ./.github/actions/generate-usage
 
 
 
