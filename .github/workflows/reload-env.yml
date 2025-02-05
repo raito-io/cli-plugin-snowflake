@@ -67,8 +67,8 @@ jobs:
             snowflakePassword: ${{ env.SF_PASSWORD }}
             snowflakeAccount: ${{ env.SF_ACCOUNT }}
             snowflakeOrganization: ${{ env.SF_ORGANIZATION }}
-            testingDataset: 'false'
-            demoDataset: 'true'
+            testingDataset: ${{ env.SF_TESTING_DATA }}
+            demoDataset: ${{ env.SF_DEMO_DATA }}
 
         - name: Generate usage
           uses: ./.github/actions/generate-usage
