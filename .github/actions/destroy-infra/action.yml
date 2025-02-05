@@ -1,0 +1,33 @@
+name: "Destroy infra"
+description: "Destroy infrastructure"
+inputs:
+  snowflakeAccount:
+    description: "Snowflake account name"
+    required: true
+  snowflakeUser:
+    description: "Snowflake user name"
+    required: true
+  snowflakePassword:
+    description: "Snowflake user password"
+    required: true
+  snowflakeOrganization:
+    description: "Snowflake organization name"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Destroy infrastructure
+      shell: bash
+      run: make destroy-test-infra
+      env:
+        TF_VAR_snowflake_account: ${{ inputs.snowflakeAccount }}
+        TF_VAR_snowflake_organization: ${{ inputs.snowflakeOrganization }}
+        TF_VAR_snowflake_user: ${{ inputs.snowflakeUser }}
+        TF_VAR_snowflake_password: ${{ inputs.snowflakePassword }}
+        SF_ACCOUNT: ${{ inputs.snowflakeAccount }}
+        SF_ORGANIZATION: ${{ inputs.snowflakeOrganization }}
+        SF_USER: ${{ inputs.snowflakeUser }}
+        SF_PASSWORD: ${{ inputs.snowflakePassword }}
+        TF_VAR_testing_dataset: true
+        TF_VAR_demo_dataset: true

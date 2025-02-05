@@ -9,12 +9,14 @@ permissions:
   contents: read
 jobs:
   remove-old-infra:
+    name: "Remove old infrastructure"
     uses: ./.github/workflows/destroy-roles.yml
     with:
       targetEnvironment: integration_testing
     secrets: inherit
 
   setup-infra:
+    name: "Setup infrastructure"
     uses: ./.github/workflows/generate-infra.yml
     with:
       targetEnvironment: integration_testing
@@ -27,6 +29,7 @@ jobs:
     if: always()
 
   generate-usage:
+    name: "Generate usage"
     uses: ./.github/workflows/generate-usage.yml
     with:
       targetEnvironment: integration_testing
@@ -36,6 +39,7 @@ jobs:
       - setup-infra
 
   lint:
+    name: "Linting"
     runs-on: ubuntu-latest
 
     steps:
@@ -58,6 +62,7 @@ jobs:
           version: v1.63.4
 
   build:
+    name: "Build"
     environment: integration_testing
     runs-on: ubuntu-latest
 

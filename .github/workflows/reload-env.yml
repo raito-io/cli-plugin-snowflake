@@ -20,34 +20,29 @@ jobs:
       name: Reload
       environment: ${{ inputs.targetEnvironment }}
       runs-on: ubuntu-latest
-      outputs:
-        AWS_S3_TERRAFORM_BUCKET: ${{ steps.output.outputs.AWS_S3_TERRAFORM_BUCKET }}
-        AWS_S3_TERRAFORM_KEY: ${{ steps.output.outputs.AWS_S3_TERRAFORM_KEY }}
-        SNOWFLAKE_ACCOUNT: ${{ steps.output.outputs.SNOWFLAKE_ACCOUNT }}
-        SNOWFLAKE_ORGANIZATION: ${{ steps.output.outputs.SNOWFLAKE_ORGANIZATION }}
-        SNOWFLAKE_USER: ${{ steps.output.outputs.SNOWFLAKE_USER }}
-        SNOWFLAKE_PASSWORD: ${{ steps.output.outputs.SNOWFLAKE_PASSWORD }}
-        SNOWFLAKE_ROKE: ${{ steps.output.outputs.SNOWFLAKE_ROLE }}
       steps:
-      - name: Assume role using OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
-          aws-region: ${{ secrets.AWS_REGION }}
+        - name: Check out repository code
+          uses: actions/checkout@v4
 
-      - name: Load secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@v2
-        with:
-          secret-ids: ",${{ inputs.secretArn }}"
-          parse-json-secrets: true
+        - name: Assume role using OIDC
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            role-to-assume: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
+            aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Destroy old infra
-        uses: ./.github/destroy-roles
-        with:
-          snowflakeAccount: ${SF_ACCOUNT}
-          snowflakeUser: ${SF_USER}
-          snowflakePassword: ${SF_PASSWORD}
-          snowflakeOrganization: ${SF_ORGANIZATION}
+        - name: Load secrets
+          uses: aws-actions/aws-secretsmanager-get-secrets@v2
+          with:
+            secret-ids: ",${{ inputs.secretArn }}"
+            parse-json-secrets: true
+
+        - name: Destroy old infra
+          uses: ./.github/destroy-roles
+          with:
+            snowflakeAccount: ${SF_ACCOUNT}
+            snowflakeUser: ${SF_USER}
+            snowflakePassword: ${SF_PASSWORD}
+            snowflakeOrganization: ${SF_ORGANIZATION}
 
 #    generate-new-infra:
 #      name: Generate new infrastructure

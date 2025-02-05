@@ -17,18 +17,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-        check-latest: true
-        cache: true
-
-    - name: Mod Tidy
-      shell: bash
-      run: go mod tidy
-
-    - name: Destroy infrastructure
+    - name: Destroy roles and shares
       shell: bash
       run: make destroy-roles
       env:

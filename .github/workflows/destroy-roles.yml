@@ -33,9 +33,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4 
+        uses: actions/checkout@v4
 
-      - uses: ./.github/destroy-roles
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - name: Mod Tidy
+        shell: bash
+        run: go mod tidy
+
+      - uses: ./.github/actions/destroy-roles
         with:
           snowflakeAccount: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           snowflakeUser: ${{ secrets.SNOWFLAKE_USER }}

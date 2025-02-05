@@ -1,0 +1,39 @@
+name: "Initiate Terraform"
+description: "Initiate Terraform"
+inputs:
+  S3TerraformBucket:
+    description: "Bucket name of S3 bucket to use"
+    required: true
+  S3TerraformKey:
+    description: "S3 key of terraform tfstate file"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform backend
+      shell: bash
+      run: |
+        cat <<EOF > .infra/infra/backend_override.tf
+        terraform {
+          backend "s3" {
+          }
+        }
+        EOF
+
+    - name: Terraform init
+      shell: bash
+      run: |
+        terraform init \
+          -backend-config=bucket=${{ inputs.S3TerraformBucket }} \
+          -backend-config=key=${{ inputs.S3TerraformKey }} \
+          -backend-config=region=${AWS_REGION} \
+          -backend-config=access_key=${AWS_ACCESS_KEY_ID} \
+          -backend-config=secret_key=${AWS_SECRET_ACCESS_KEY} \
+          -backend-config=token=${AWS_SESSION_TOKEN} \
+      working-directory: .infra/infra
+
+
