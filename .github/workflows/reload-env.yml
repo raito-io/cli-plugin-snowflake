@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 jobs:
-    load-secrets:
+    reload:
       name: Reload
       environment: ${{ inputs.targetEnvironment }}
       runs-on: ubuntu-latest
@@ -41,62 +41,33 @@ jobs:
           secret-ids: ",${{ inputs.secretArn }}"
           parse-json-secrets: true
 
-      - name: Generate output
-        id: output
-        run: |
-          echo "account ${SF_ACCOUNT} user ${SF_USER}" 
-          echo "SNOWFLAKE_ACCOUNT=${SF_ACCOUNT}" >> $GITHUB_OUTPUT
-          echo "SNOWFLAKE_USER=${SF_USER}" >> $GITHUB_OUTPUT
-          echo "SNOWFLAKE_PASSWORD=${SF_PASSWORD}" >> $GITHUB_OUTPUT
-          echo "SNOWFLAKE_ROLE=${SF_ROLE}" >> $GITHUB_OUTPUT
-          echo "SNOWFLAKE_ORGANIZATION=${SNOWFLAKE_ORGANIZATION}" >> $GITHUB_OUTPUT
-          echo "AWS_S3_TERRAFORM_BUCKET=${AWS_S3_TERRAFORM_BUCKET}" >> $GITHUB_OUTPUT
-          echo "AWS_S3_TERRAFORM_KEY=${AWS_S3_TERRAFORM_KEY}" >> $GITHUB_OUTPUT
+      - name: Destroy old infra
+        uses: ./.github/destroy-roles
+        with:
+          snowflakeAccount: ${SF_ACCOUNT}
+          snowflakeUser: ${SF_USER}
+          snowflakePassword: ${SF_PASSWORD}
+          snowflakeOrganization: ${SF_ORGANIZATION}
 
-    debug:
-      name: Debug
-      runs-on: ubuntu-latest
-      needs:
-        - load-secrets
-      steps:
-        - name: Print some values
-          run: |
-            echo "SNOWFLAKE_USER=${{ needs.load-secrets.outputs.SNOWFLAKE_USER }}"
-            echo "SNOWFLAKE_ROLE=${{ needs.load-secrets.outputs.SNOWFLAKE_ROLE }}"
-            echo "SNOWFLAKE_ORGANIZATION=${{ needs.load-secrets.outputs.SNOWFLAKE_ORGANIZATION }}"
-
-    destroy-old-infra:
-      name: Destroy old infrastructure
-      needs:
-        - load-secrets
-      uses: ./.github/workflows/destroy-roles.yml
-      with:
-        targetEnvironment: ${{ inputs.targetEnvironment }}
-      secrets:
-        SNOWFLAKE_ACCOUNT: ${{ needs.load-secrets.outputs.SNOWFLAKE_ACCOUNT }}
-        SNOWFLAKE_USER: ${{ needs.load-secrets.outputs.SNOWFLAKE_USER }}
-        SNOWFLAKE_PASSWORD: ${{ needs.load-secrets.outputs.SNOWFLAKE_PASSWORD }}
-        SNOWFLAKE_ORGANIZATION: ${{ needs.load-secrets.outputs.SNOWFLAKE_ORGANIZATION }}
-
-    generate-new-infra:
-      name: Generate new infrastructure
-      needs:
-        - destroy-old-infra
-        - load-secrets
-      uses: ./.github/workflows/generate-infra.yml
-      with:
-        targetEnvironment: ${{ inputs.targetEnvironment }}
-        demo-infra: true
-        testing-infra: false
-      secrets:
-        AWS_OIDC_DEPLOY_ROLE: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        AWS_S3_TERRAFORM_BUCKET: ${{ needs.load-secrets.outputs.AWS_S3_TERRAFORM_BUCKET }}
-        AWS_S3_TERRAFORM_KEY: ${{ needs.load-secrets.outputs.AWS_S3_TERRAFORM_KEY }}
-        SNOWFLAKE_ACCOUNT: ${{ needs.load-secrets.outputs.SNOWFLAKE_ACCOUNT }}
-        SNOWFLAKE_ORGANIZATION: ${{ needs.load-secrets.outputs.SNOWFLAKE_ORGANIZATION }}
-        SNOWFLAKE_USER: ${{ needs.load-secrets.outputs.SNOWFLAKE_USER }}
-        SNOWFLAKE_PASSWORD: ${{ needs.load-secrets.outputs.SNOWFLAKE_PASSWORD }}
+#    generate-new-infra:
+#      name: Generate new infrastructure
+#      needs:
+#        - destroy-old-infra
+#        - load-secrets
+#      uses: ./.github/workflows/generate-infra.yml
+#      with:
+#        targetEnvironment: ${{ inputs.targetEnvironment }}
+#        demo-infra: true
+#        testing-infra: false
+#      secrets:
+#        AWS_OIDC_DEPLOY_ROLE: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
+#        AWS_REGION: ${{ secrets.AWS_REGION }}
+#        AWS_S3_TERRAFORM_BUCKET: ${{ needs.load-secrets.outputs.AWS_S3_TERRAFORM_BUCKET }}
+#        AWS_S3_TERRAFORM_KEY: ${{ needs.load-secrets.outputs.AWS_S3_TERRAFORM_KEY }}
+#        SNOWFLAKE_ACCOUNT: ${{ needs.load-secrets.outputs.SNOWFLAKE_ACCOUNT }}
+#        SNOWFLAKE_ORGANIZATION: ${{ needs.load-secrets.outputs.SNOWFLAKE_ORGANIZATION }}
+#        SNOWFLAKE_USER: ${{ needs.load-secrets.outputs.SNOWFLAKE_USER }}
+#        SNOWFLAKE_PASSWORD: ${{ needs.load-secrets.outputs.SNOWFLAKE_PASSWORD }}
 
 
 

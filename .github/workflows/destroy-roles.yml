@@ -32,23 +32,9 @@ jobs:
     environment: ${{ inputs.targetEnvironment }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-
-      - name: Install Go
-        uses: actions/setup-go@v5
+      - uses: ./.github/destroy-roles
         with:
-          go-version-file: go.mod
-          check-latest: true
-          cache: true
-
-      - name: Mod Tidy
-        run: go mod tidy
-
-      - name: Destroy infrastructure
-        run: make destroy-roles
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SF_ORGANIZATION: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
+          snowflakeAccount: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          snowflakeUser: ${{ secrets.SNOWFLAKE_USER }}
+          snowflakePassword: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          snowflakeOrganization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
