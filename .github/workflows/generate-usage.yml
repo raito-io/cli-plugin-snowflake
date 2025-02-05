@@ -48,31 +48,12 @@ jobs:
           check-latest: true
           cache: true
 
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Initate Terraform
+        uses: ./.github/actions/terraform-init
+        with:
+          S3TerraformBucket: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
+          S3TerraformKey: ${{ secrets.AWS_S3_TERRAFORM_KEY }}
 
-      - name: Terraform backend
-        run: |
-          cat <<EOF > .infra/infra/backend_override.tf
-          terraform {
-            backend "s3" {
-            }
-          }
-          EOF
-
-      - name: Terraform init
-        run: |
-          terraform init \
-            -backend-config=bucket=${AWS_S3_TERRAFORM_BUCKET} \
-            -backend-config=key=${AWS_S3_TERRAFORM_KEY} \
-            -backend-config=region=${AWS_REGION} \
-            -backend-config=access_key=${AWS_ACCESS_KEY_ID} \
-            -backend-config=secret_key=${AWS_SECRET_ACCESS_KEY} \
-            -backend-config=token=${AWS_SESSION_TOKEN} \
-        working-directory: .infra/infra
-        env:
-          AWS_S3_TERRAFORM_BUCKET: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
-          AWS_S3_TERRAFORM_KEY: ${{ secrets.AWS_S3_TERRAFORM_KEY }}
 
       - name: Generate usage
-        run: make gen-test-usage
+        uses: ./.github/actions/generate-usage

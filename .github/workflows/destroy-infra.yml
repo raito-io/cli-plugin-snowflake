@@ -59,42 +59,16 @@ jobs:
       - name: Mod Tidy
         run: go mod tidy
 
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform backend
-        run: |
-          cat <<EOF > .infra/infra/backend_override.tf
-          terraform {
-            backend "s3" {
-            }
-          }
-          EOF
-
-      - name: Terraform init
-        run: |
-          terraform init \
-            -backend-config=bucket=${AWS_S3_TERRAFORM_BUCKET} \
-            -backend-config=key=${AWS_S3_TERRAFORM_KEY} \
-            -backend-config=region=${AWS_REGION} \
-            -backend-config=access_key=${AWS_ACCESS_KEY_ID} \
-            -backend-config=secret_key=${AWS_SECRET_ACCESS_KEY} \
-            -backend-config=token=${AWS_SESSION_TOKEN} \
-        working-directory: .infra/infra
-        env:
-          AWS_S3_TERRAFORM_BUCKET: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
-          AWS_S3_TERRAFORM_KEY: ${{ secrets.AWS_S3_TERRAFORM_KEY }}
+      - name: Initiate Terraform
+        uses: ./.github/actions/terraform-init
+        with:
+          S3TerraformBucket: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
+          S3TerraformKey: ${{ secrets.AWS_S3_TERRAFORM_KEY }}
 
       - name: Destroy infrastructure
-        run: make destroy-test-infra
-        env:
-          TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          TF_VAR_snowflake_organization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
-          TF_VAR_snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
-          TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SF_ORGANIZATION: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
-          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          TF_VAR_testing_dataset: true
-          TF_VAR_demo_dataset: true
+        uses: ./.github/actions/destroy-infra
+        with:
+          snowflakeAccount: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          snowflakeUser: ${{ secrets.SNOWFLAKE_USER }}
+          snowflakePassword: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          snowflakeOrganization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}

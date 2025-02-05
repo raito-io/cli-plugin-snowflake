@@ -65,42 +65,18 @@ jobs:
           role-to-assume: ${{ secrets.AWS_OIDC_DEPLOY_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Format terraform
-        run: terraform fmt -check -recursive
-        working-directory: .infra/infra
-
-      - name: Terraform backend
-        run: |
-          cat <<EOF > .infra/infra/backend_override.tf
-          terraform {
-            backend "s3" {
-            }
-          }
-          EOF
-
-      - name: Terraform init
-        run: |
-          terraform init \
-            -backend-config=bucket=${AWS_S3_TERRAFORM_BUCKET} \
-            -backend-config=key=${AWS_S3_TERRAFORM_KEY} \
-            -backend-config=region=${AWS_REGION} \
-            -backend-config=access_key=${AWS_ACCESS_KEY_ID} \
-            -backend-config=secret_key=${AWS_SECRET_ACCESS_KEY} \
-            -backend-config=token=${AWS_SESSION_TOKEN} \
-        working-directory: .infra/infra
-        env:
-          AWS_S3_TERRAFORM_BUCKET: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
-          AWS_S3_TERRAFORM_KEY: ${{ secrets.AWS_S3_TERRAFORM_KEY }}
+      - name: Initiate Terraform
+        uses: ./.github/actions/terraform-init
+        with:
+          S3TerraformBucket: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
+          S3TerraformKey: ${{ secrets.AWS_S3_TERRAFORM_KEY }}
 
       - name: Generate infra
-        run: make gen-test-infra
-        env:
-          TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          TF_VAR_snowflake_organization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
-          TF_VAR_snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
-          TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          TF_VAR_testing_dataset: ${{ inputs.testing-infra }}
-          TF_VAR_demo_dataset: ${{ inputs.demo-infra }}
+        uses: ./.github/actions/generate-infra
+        with:
+          snowflakeAccount: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          snowflakeOrganization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
+          snowflakeUser: ${{ secrets.SNOWFLAKE_USER }}
+          snowflakePassword: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          demoDataset: ${{ inputs.demo-infra }}
+          testingDataset: ${{ inputs.testing-infra }}

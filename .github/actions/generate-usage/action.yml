@@ -1,0 +1,8 @@
+name: "Generate usage"
+description: "Generate usage"
+runs:
+  using: composite
+  steps:
+    - name: Generate usage
+      shell: bash
+      run: make gen-test-usage

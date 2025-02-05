@@ -1,0 +1,27 @@
+name: "Destroy roles"
+description: "Destroy custom Snowflake roles"
+inputs:
+  snowflakeAccount:
+    description: "Snowflake account name"
+    required: true
+  snowflakeUser:
+    description: "Snowflake user name"
+    required: true
+  snowflakePassword:
+    description: "Snowflake user password"
+    required: true
+  snowflakeOrganization:
+    description: "Snowflake organization name"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Destroy roles and shares
+      shell: bash
+      run: make destroy-roles
+      env:
+        SF_ACCOUNT: ${{ inputs.snowflakeAccount }}
+        SF_USER: ${{ inputs.snowflakeUser }}
+        SF_PASSWORD: ${{ inputs.snowflakePassword }}
+        SF_ORGANIZATION: ${{ inputs.snowflakeOrganization }}
