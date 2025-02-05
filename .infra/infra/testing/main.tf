@@ -22,6 +22,11 @@ resource "snowflake_scim_integration" "scim_integration" {
   scim_client   = "GENERIC"
   sync_password = false
   run_as_role   = snowflake_account_role.scim_role.name
+
+  depends_on = [
+    snowflake_grant_privileges_to_account_role.scim_role_assigments,
+    snowflake_grant_account_role.scim_role_to_accountadmin
+  ]
 }
 
 // SNOWFLAKE DATABASE
