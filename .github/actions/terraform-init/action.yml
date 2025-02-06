@@ -7,6 +7,9 @@ inputs:
   S3TerraformKey:
     description: "S3 key of terraform tfstate file"
     required: true
+  DynamoDBTerraformTable:
+    description: "DynamoDB table name to use for locking"
+    required: true
 
 runs:
   using: composite
@@ -34,6 +37,7 @@ runs:
           -backend-config=access_key=${AWS_ACCESS_KEY_ID} \
           -backend-config=secret_key=${AWS_SECRET_ACCESS_KEY} \
           -backend-config=token=${AWS_SESSION_TOKEN} \
+          -backend-config=dynamodb_table=${{ inputs.DynamoDBTerraformTable }}
       working-directory: .infra/infra
 
 

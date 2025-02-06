@@ -53,6 +53,7 @@ jobs:
         with:
           S3TerraformBucket: ${{ secrets.AWS_S3_TERRAFORM_BUCKET }}
           S3TerraformKey: ${{ secrets.AWS_S3_TERRAFORM_KEY }}
+          DynamoDBTerraformTable: ${{ secrets.AWS_DYNAMODB_TERRAFORM_TABLE }}
 
 
       - name: Generate usage
