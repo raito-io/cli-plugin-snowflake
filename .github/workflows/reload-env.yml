@@ -51,6 +51,7 @@ jobs:
           with:
             S3TerraformBucket: ${AWS_S3_TERRAFORM_BUCKET}
             S3TerraformKey: ${AWS_S3_TERRAFORM_KEY}
+            DynamoDBTerraformTable: ${AWS_DYNAMODB_TERRAFORM_TABLE}
 
         - name: Remove old infrastructure
           uses: ./.github/actions/destroy-roles
