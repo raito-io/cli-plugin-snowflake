@@ -224,7 +224,7 @@ func dropRole(db *sql.DB, role snowflake.RoleEntity, database *string) error {
 	roleName := common.FormatQuery("%s", role.Name)
 
 	if role.Owner != sfRole {
-		_, err := db.Exec("GRANT OWNERSHIP ON ROLE " + roleName + " TO " + sfRole)
+		_, err := db.Exec("GRANT OWNERSHIP ON ROLE " + roleName + " TO " + sfRole + " REVOKE CURRENT GRANTS")
 		if err != nil {
 			return fmt.Errorf("grant ownership on role %s: %w", role.Name, err)
 		}
