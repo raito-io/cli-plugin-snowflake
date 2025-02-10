@@ -49,17 +49,17 @@ func dropAllRoles() error {
 
 	defer db.Close()
 
+	err = dropOutboundShares(db, role)
+	if err != nil {
+		return err
+	}
+
 	err = dropAccountRoles(db)
 	if err != nil {
 		return err
 	}
 
 	err = dropDatabaseRoles(db)
-	if err != nil {
-		return err
-	}
-
-	err = dropOutboundShares(db, role)
 	if err != nil {
 		return err
 	}
