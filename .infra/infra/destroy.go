@@ -13,7 +13,7 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
 )
 
-var systemRoles = set.Set[string]{"ORGADMIN": {}, "ACCOUNTADMIN": {}, "SECURITYADMIN": {}, "USERADMIN": {}, "SYSADMIN": {}, "PUBLIC": {}}
+var systemRoles = set.Set[string]{"ORGADMIN": {}, "ACCOUNTADMIN": {}, "SECURITYADMIN": {}, "USERADMIN": {}, "SYSADMIN": {}, "PUBLIC": {}, "RAITO_SYNC": {}}
 
 const (
 	sfRole = "ACCOUNTADMIN"
