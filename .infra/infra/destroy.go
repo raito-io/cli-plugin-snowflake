@@ -13,7 +13,11 @@ import (
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
 )
 
-var systemRoles = set.Set[string]{"ORGADMIN": {}, "ACCOUNTADMIN": {}, "SECURITYADMIN": {}, "USERADMIN": {}, "SYSADMIN": {}, "PUBLIC": {}}
+var systemRoles = set.Set[string]{"ORGADMIN": {}, "ACCOUNTADMIN": {}, "SECURITYADMIN": {}, "USERADMIN": {}, "SYSADMIN": {}, "PUBLIC": {}, "RAITO_SYNC": {}}
+
+const (
+	sfRole = "ACCOUNTADMIN"
+)
 
 var (
 	sfAccount, sfOrganization, sfUser, sfPassword string
@@ -25,7 +29,7 @@ func dropAllRoles() error {
 
 	fmt.Printf("Using account: %s\n", account)
 
-	role := "ACCOUNTADMIN"
+	role := sfRole
 
 	dsn, err := sf.DSN(&sf.Config{
 		Account:  account,
@@ -45,17 +49,17 @@ func dropAllRoles() error {
 
 	defer db.Close()
 
+	err = dropOutboundShares(db, role)
+	if err != nil {
+		return err
+	}
+
 	err = dropAccountRoles(db)
 	if err != nil {
 		return err
 	}
 
 	err = dropDatabaseRoles(db)
-	if err != nil {
-		return err
-	}
-
-	err = dropOutboundShares(db, role)
 	if err != nil {
 		return err
 	}
@@ -218,6 +222,13 @@ func dropRole(db *sql.DB, role snowflake.RoleEntity, database *string) error {
 
 	databaseRole := ""
 	roleName := common.FormatQuery("%s", role.Name)
+
+	if role.Owner != sfRole {
+		_, err := db.Exec("GRANT OWNERSHIP ON ROLE " + roleName + " TO " + sfRole + " REVOKE CURRENT GRANTS")
+		if err != nil {
+			return fmt.Errorf("grant ownership on role %s: %w", role.Name, err)
+		}
+	}
 
 	if database != nil {
 		databaseRole = "DATABASE"
