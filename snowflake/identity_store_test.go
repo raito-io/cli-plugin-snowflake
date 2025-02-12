@@ -119,10 +119,12 @@ func TestNewIdentityStoreSyncer_AddUserError(t *testing.T) {
 		{
 			Name:        "UserName1",
 			DisplayName: "user1",
+			Email:       ptr.String("user1@raito.io"),
 		},
 		{
 			Name:        "UserName2",
 			DisplayName: "user2",
+			Email:       ptr.String("user2@raito.io"),
 		},
 	}, nil)
 
