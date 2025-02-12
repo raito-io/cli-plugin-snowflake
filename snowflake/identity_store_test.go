@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
 	"github.com/raito-io/cli/base/wrappers/mocks"
@@ -28,10 +29,16 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 		{
 			Name:        "UserName1",
 			DisplayName: "user1",
+			Email:       ptr.String("user1@raito.io"),
 		},
 		{
 			Name:        "UserName2",
 			DisplayName: "user2",
+			Email:       ptr.String("user2@raito.io"),
+		},
+		{
+			Name:  "SNOWFLAKE",
+			Email: nil,
 		},
 	}, nil)
 	repoMock.EXPECT().GetTagsByDomain("USER").Return(map[string][]*tag.Tag{
