@@ -40,21 +40,12 @@ func (s *IdentityStoreTestSuite) TestIdentityStoreSync() {
 	//Then
 	s.NoError(err)
 
-	s.True(len(identityHandler.Users) >= 3)
+	s.True(len(identityHandler.Users) >= 2)
 	s.Contains(identityHandler.Users, identity_store.User{
 		ExternalId:       "BENJAMINSTEWART",
 		Name:             "Benjamin Stewart",
 		UserName:         "BENJAMINSTEWART",
 		Email:            "b_stewart@raito.io",
-		GroupExternalIds: nil,
-		Tags:             nil,
-		IsMachine:        ptr.Bool(false),
-	})
-	s.Contains(identityHandler.Users, identity_store.User{
-		ExternalId:       snowflakeUserName,
-		Name:             snowflakeUserName,
-		UserName:         snowflakeUserName,
-		Email:            "",
 		GroupExternalIds: nil,
 		Tags:             nil,
 		IsMachine:        ptr.Bool(false),

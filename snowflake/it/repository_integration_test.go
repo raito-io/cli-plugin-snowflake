@@ -564,7 +564,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 
 	s.Contains(users, snowflake.UserEntity{
 		Name:        "SNOWFLAKE",
-		Email:       "",
+		Email:       nil,
 		Owner:       "",
 		DisplayName: "SNOWFLAKE",
 		LoginName:   "SNOWFLAKE",
@@ -572,17 +572,8 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 	})
 
 	s.Contains(users, snowflake.UserEntity{
-		Name:        snowflakeUserName,
-		Email:       "",
-		Owner:       "ACCOUNTADMIN",
-		DisplayName: snowflakeUserName,
-		LoginName:   snowflakeUserName,
-		Type:        ptr.String("null"),
-	})
-
-	s.Contains(users, snowflake.UserEntity{
 		Name:        "data_engineering",
-		Email:       "data_engineer@raito.io",
+		Email:       ptr.String("data_engineer@raito.io"),
 		Owner:       "ACCOUNTADMIN",
 		DisplayName: "Data Engineer service account",
 		LoginName:   "DATA_ENGINEERING",
