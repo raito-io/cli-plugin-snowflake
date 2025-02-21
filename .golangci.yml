@@ -129,9 +129,11 @@ run:
   issues-exit-code: 1
   tests: false
 
+issues:
+  uniq-by-line: false
+
 output:
   path-prefix: ""
   sort-results: true
   print-issued-lines: false
   print-linter-name: true
-  uniq-by-line: false
