@@ -1244,7 +1244,7 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 		for _, column := range columns {
 			fullnameSplit := strings.Split(column, ".")
 
-			q := fmt.Sprintf("ALTER TABLE %s.%s.%s ALTER COLUMN %s SET MASKING POLICY %s FORCE", fullnameSplit[0], fullnameSplit[1], fullnameSplit[2], fullnameSplit[3], maskingName)
+			q := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %q SET MASKING POLICY %s FORCE", common.FormatQuery("%s.%s.%s", fullnameSplit[0], fullnameSplit[1], fullnameSplit[2]), fullnameSplit[3], maskingName)
 
 			logger.Debug(fmt.Sprintf("Execute query to assign mask %s to column %s: '%s'", maskingName, column, q))
 
