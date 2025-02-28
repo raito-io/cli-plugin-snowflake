@@ -216,6 +216,8 @@ func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareName string
 
 	recipients := make([]string, 0, len(shareEntity))
 
+	var commonDatabase *string
+
 	for _, share := range shareEntity {
 		trimmedRecipient := strings.TrimSpace(share.To)
 
@@ -224,6 +226,12 @@ func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareName string
 		}
 
 		recipients = append(recipients, trimmedRecipient)
+
+		if commonDatabase == nil {
+			commonDatabase = &share.DatabaseName
+		} else if *commonDatabase != share.DatabaseName {
+			return fmt.Errorf("share %s has multiple databases: %s and %s", shareName, *commonDatabase, share.DatabaseName)
+		}
 	}
 
 	ap, f := processedAps[externalId]
@@ -238,6 +246,7 @@ func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareName string
 			Who: &exporter.WhoItem{
 				Recipients: recipients,
 			},
+			CommonWhatDataObject: commonDatabase,
 		}
 
 		ap = processedAps[externalId]

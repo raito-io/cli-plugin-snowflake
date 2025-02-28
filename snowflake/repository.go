@@ -284,7 +284,7 @@ func (repo *SnowflakeRepository) GetOutboundShares() ([]ShareEntity, error) {
 		return nil, err
 	}
 
-	q = `select "name", "owner", "to" from table(result_scan(LAST_QUERY_ID())) WHERE "kind" = 'OUTBOUND'`
+	q = `select "name", "owner", "to", "database_name" from table(result_scan(LAST_QUERY_ID())) WHERE "kind" = 'OUTBOUND'`
 
 	rows, _, err := repo.query(q)
 	if err != nil {
