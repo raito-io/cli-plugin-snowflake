@@ -65,7 +65,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Lint
-        run: terraform fmt -check=true -recursive
+        run: terraform fmt -check=true -recursive --out-format=github-actions --timeout=5m
         working-directory: .infra/infra
 
   build:
