@@ -1072,7 +1072,7 @@ func (repo *SnowflakeRepository) GetInboundShares() ([]DbEntity, error) {
 		return nil, err
 	}
 
-	q = "select \"database_name\" as \"name\", \"kind\", \"owner_account\", \"name\" as \"share_name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND'"
+	q = "select \"database_name\" as \"name\", \"kind\", \"owner_account\", \"name\" as \"share_name\" from table(result_scan(LAST_QUERY_ID())) WHERE \"kind\" = 'INBOUND' AND \"database_name\" != ''"
 
 	return repo.getDbEntities(q)
 }
