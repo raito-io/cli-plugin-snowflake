@@ -191,9 +191,10 @@ type RoleEntity struct {
 }
 
 type ShareEntity struct {
-	Name  string `db:"name"`
-	Owner string `db:"owner"`
-	To    string `db:"to"`
+	Name         string `db:"name"`
+	Owner        string `db:"owner"`
+	To           string `db:"to"`
+	DatabaseName string `db:"database_name"`
 }
 
 type GrantOfRole struct {

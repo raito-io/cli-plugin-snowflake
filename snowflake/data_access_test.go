@@ -225,14 +225,16 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 					repoMock.EXPECT().GetInboundShares().Return([]DbEntity{}, nil)
 					repoMock.EXPECT().GetOutboundShares().Return([]ShareEntity{
 						{
-							Name:  "Share1",
-							Owner: "owner1",
-							To:    "acc1",
+							Name:         "Share1",
+							Owner:        "owner1",
+							To:           "acc1",
+							DatabaseName: "TEST_DB",
 						},
 						{
-							Name:  "Share1",
-							Owner: "owner1",
-							To:    "acc2",
+							Name:         "Share1",
+							Owner:        "owner1",
+							To:           "acc2",
+							DatabaseName: "TEST_DB",
 						},
 					}, nil).Once()
 					repoMock.EXPECT().GetAccountRoles().Return([]RoleEntity{}, nil).Once()
@@ -278,8 +280,9 @@ func TestAccessSyncer_SyncAccessProvidersFromTarget(t *testing.T) {
 							Permissions: []string{"SELECT"},
 						},
 					},
-					Action: 6,
-					Policy: "",
+					Action:               6,
+					Policy:               "",
+					CommonWhatDataObject: ptr.String("TEST_DB"),
 				},
 				{
 					ExternalId:        "DATABASEROLE###DATABASE:TEST_DB###ROLE:DatabaseRole1",
