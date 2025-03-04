@@ -345,7 +345,7 @@ func (s *DataSourceSyncer) createDataObjectForFunction(doType, database, schema,
 	ff := s.schemaExcludes.Contains(database + "." + schema)
 
 	if ff || !s.shouldHandle(fullName) {
-		logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", Function, fullName))
+		logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", doType, fullName))
 		return nil
 	}
 

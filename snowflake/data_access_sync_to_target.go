@@ -1717,8 +1717,6 @@ func (s *AccessToTargetSyncer) createGrantsForDatabase(permissions []string, dat
 }
 
 func (s *AccessToTargetSyncer) createGrantsForWarehouse(permissions []string, warehouse string, metaData map[string]map[string]struct{}, grants *GrantSet) {
-	grants.Add(Grant{USAGE, "warehouse", common.FormatQuery(`%s`, warehouse)})
-
 	for _, p := range permissions {
 		if _, f := metaData["warehouse"][strings.ToUpper(p)]; !f {
 			logger.Warn(fmt.Sprintf("Permission %q does not apply to type WAREHOUSE. Skipping", p))
