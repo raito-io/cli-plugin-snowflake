@@ -911,8 +911,7 @@ func generateAccessControls_warehouse(t *testing.T) {
 	repoMock.EXPECT().GrantAccountRolesToAccountRole(mock.Anything, "RoleName1").Return(nil).Once()
 
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("MONITOR", "WAREHOUSE WH1", "RoleName1", false).Return(nil).Once()
-	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "WAREHOUSE WH1", "RoleName1", false).Return(nil).Once()
-
+	
 	access := map[string]*importer.AccessProvider{
 		"RoleName1": {
 			Id:   "AccessProviderId1",
