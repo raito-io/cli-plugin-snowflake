@@ -142,11 +142,11 @@ func usageQueryResultToStatement(input *UsageQueryResult) (statement du.Statemen
 	var objects []du.UsageDataObjectItem
 
 	statement.ExternalId = input.ExternalId
-	statement.User = input.User
+	statement.User = input.User.String
 	statement.Role = stringWithDefault(input.Role)
-	statement.Success = input.Status == "SUCCESS"
-	statement.Status = input.Status
-	statement.Query = input.Query
+	statement.Success = input.Status.String == "SUCCESS"
+	statement.Status = input.Status.String
+	statement.Query = input.Query.String
 	statement.Bytes = int(input.BytesWrittenToResult)
 	statement.Credits = float32(input.CloudCreditsUsed)
 
