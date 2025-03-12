@@ -153,14 +153,14 @@ func (entity QueryDbEntities) String() string {
 
 type UsageQueryResult struct {
 	ExternalId            string        `db:"QUERY_ID" useColumnName:"true"`
-	Query                 string        `db:"QUERY_TEXT" useColumnName:"true"`
+	Query                 NullString    `db:"QUERY_TEXT" useColumnName:"true"`
 	DatabaseName          NullString    `db:"DATABASE_NAME" useColumnName:"true"`
 	SchemaName            NullString    `db:"SCHEMA_NAME" useColumnName:"true"`
-	QueryType             string        `db:"QUERY_TYPE" useColumnName:"true"`
+	QueryType             NullString    `db:"QUERY_TYPE" useColumnName:"true"`
 	SessionID             NullString    `db:"SESSION_ID" useColumnName:"true"`
-	User                  string        `db:"USER_NAME" useColumnName:"true"`
+	User                  NullString    `db:"USER_NAME" useColumnName:"true"`
 	Role                  NullString    `db:"ROLE_NAME" useColumnName:"true"`
-	Status                string        `db:"EXECUTION_STATUS" useColumnName:"true"`
+	Status                NullString    `db:"EXECUTION_STATUS" useColumnName:"true"`
 	StartTime             sql.NullTime  `db:"START_TIME" useColumnName:"true"`
 	EndTime               sql.NullTime  `db:"END_TIME" useColumnName:"true"`
 	TotalElapsedTime      int64         `db:"TOTAL_ELAPSED_TIME" useColumnName:"true"`

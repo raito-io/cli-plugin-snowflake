@@ -259,6 +259,12 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 			return newMostRecentQueryStartTime, i, sec, false
 		}
 
+		if !result.Query.Valid || !result.User.Valid || !result.QueryType.Valid {
+			logger.Info(fmt.Sprintf("Skipping usage row with missing values: %v", result))
+
+			continue
+		}
+
 		ok := sendObject(result)
 		if !ok {
 			return newMostRecentQueryStartTime, i, sec, false
