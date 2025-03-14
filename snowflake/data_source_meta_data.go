@@ -469,7 +469,7 @@ func DataObjectTypes() []*ds.DataObjectType {
 			},
 			Children: []string{ds.Table, ds.View, ExternalTable, MaterializedView, IcebergTable, Function, Procedure},
 			ShareProperties: &ds.DataObjectShareProperties{
-				ShareablePermissions:     []string{USAGE_ON_SCHEMA, "MONITOR"},
+				ShareablePermissions:     []string{USAGE_ON_SCHEMA},
 				CorrespondingSharedTypes: []string{SharedPrefix + ds.Schema},
 			},
 		},
