@@ -331,6 +331,10 @@ func DataObjectTypes() []*ds.DataObjectType {
 				},
 			},
 			Children: []string{ds.Schema},
+			ShareProperties: &ds.DataObjectShareProperties{
+				ShareablePermissions:     []string{USAGE_ON_DATABASE},
+				CorrespondingSharedTypes: []string{SharedPrefix + ds.Database},
+			},
 		},
 		{
 			Name: ds.Schema,
@@ -464,6 +468,10 @@ func DataObjectTypes() []*ds.DataObjectType {
 				},
 			},
 			Children: []string{ds.Table, ds.View, ExternalTable, MaterializedView, IcebergTable, Function, Procedure},
+			ShareProperties: &ds.DataObjectShareProperties{
+				ShareablePermissions:     []string{USAGE_ON_SCHEMA},
+				CorrespondingSharedTypes: []string{SharedPrefix + ds.Schema},
+			},
 		},
 		{
 			Name: ds.Table,
@@ -535,6 +543,10 @@ func DataObjectTypes() []*ds.DataObjectType {
 				},
 			},
 			Children: []string{ds.Column},
+			ShareProperties: &ds.DataObjectShareProperties{
+				ShareablePermissions:     []string{"SELECT", "REFERENCES"},
+				CorrespondingSharedTypes: []string{SharedPrefix + ds.Table},
+			},
 		},
 		{
 			Name:  Function,
@@ -637,6 +649,10 @@ func DataObjectTypes() []*ds.DataObjectType {
 				},
 			},
 			Children: []string{ds.Column},
+			ShareProperties: &ds.DataObjectShareProperties{
+				ShareablePermissions:     []string{"SELECT", "REFERENCES"},
+				CorrespondingSharedTypes: []string{SharedPrefix + ds.Table},
+			},
 		},
 		{
 			Name:  ExternalTable,
@@ -667,6 +683,10 @@ func DataObjectTypes() []*ds.DataObjectType {
 					Action:        "SELECT",
 					GlobalActions: []string{ds.Read},
 				},
+			},
+			ShareProperties: &ds.DataObjectShareProperties{
+				ShareablePermissions:     []string{"SELECT", "REFERENCES"},
+				CorrespondingSharedTypes: []string{SharedPrefix + ds.Table},
 			},
 		},
 		{
@@ -699,6 +719,10 @@ func DataObjectTypes() []*ds.DataObjectType {
 				},
 			},
 			Children: []string{ds.Column},
+			ShareProperties: &ds.DataObjectShareProperties{
+				ShareablePermissions:     []string{"SELECT", "REFERENCES"},
+				CorrespondingSharedTypes: []string{SharedPrefix + ds.View},
+			},
 		},
 		{
 			Name:  MaterializedView,
@@ -731,6 +755,10 @@ func DataObjectTypes() []*ds.DataObjectType {
 				},
 			},
 			Children: []string{ds.Column},
+			ShareProperties: &ds.DataObjectShareProperties{
+				ShareablePermissions:     []string{"SELECT", "REFERENCES"},
+				CorrespondingSharedTypes: []string{SharedPrefix + ds.View},
+			},
 		},
 		{
 			Name: ds.Column,

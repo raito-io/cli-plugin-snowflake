@@ -207,8 +207,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/raito-io/bexpression v0.1.2 h1:DHBTG2kNGSfwM3BwH97WP1vFjB2N8Ub41RRNUDWztVA=
 github.com/raito-io/bexpression v0.1.2/go.mod h1:z0in8o1zo5cPNeCUa3Mh5ZP7h6v/LX0JH5/NbV3VtzI=
-github.com/raito-io/cli v0.70.0 h1:DOCNhnOl/d3MKyAKJZhPTIzVn0LUO+MMSwnRqNlvxFg=
-github.com/raito-io/cli v0.70.0/go.mod h1:TkNB3RNhIxZb0cTU2+/P56m5A7IaQh8rlDGkQnosFaQ=
+github.com/raito-io/cli v0.71.0-dev1 h1:oqRQ7uB/aQfhYg1dUL3VDmUYH1wvQ/srj6pjQVenf9E=
+github.com/raito-io/cli v0.71.0-dev1/go.mod h1:/POgNK3WYl8ysHHvsrbEe9FArjZwjtE/5TtibnAsbxQ=
 github.com/raito-io/enumer v0.1.6 h1:iXX63/mgapmsAYENKWnt8mGOTvQ3DN2NCXIAI3XhPaM=
 github.com/raito-io/enumer v0.1.6/go.mod h1:XyBW7tZ1xL9x4yclF+GOBY5W/2m3CiRtqZqveGIkEHo=
 github.com/raito-io/golang-set v0.0.4 h1:7zk8r1TCE/F9JOOgseIXYx7oZJdC9/j5uivkCYjnCg0=
