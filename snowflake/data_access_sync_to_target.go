@@ -846,7 +846,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 		}
 	}
 
-	err = s.handleOwnerTags(actualName, accessProvider.Owners)
+	err = s.handleOwnerTags(actualName, accessProvider.Owners, isDatabaseRole(accessProvider.Type))
 	if err != nil {
 		return actualName, fmt.Errorf("error while setting owner tags on role %q: %s", actualName, err.Error())
 	}
@@ -854,7 +854,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 	return actualName, nil
 }
 
-func (s *AccessToTargetSyncer) handleOwnerTags(actualName string, owners []importer.Owner) error {
+func (s *AccessToTargetSyncer) handleOwnerTags(actualName string, owners []importer.Owner, isDatabaseRole bool) error {
 	if len(owners) == 0 {
 		return nil
 	}
@@ -868,7 +868,7 @@ func (s *AccessToTargetSyncer) handleOwnerTags(actualName string, owners []impor
 			}
 		}
 
-		err := s.repo.SetTagOnRole(actualName, emailTag, strings.Join(tagValues, ","))
+		err := s.repo.SetTagOnRole(actualName, emailTag, strings.Join(tagValues, ","), isDatabaseRole)
 		if err != nil {
 			return fmt.Errorf("setting owner email tag on role %q: %s", actualName, err.Error())
 		}
@@ -883,7 +883,7 @@ func (s *AccessToTargetSyncer) handleOwnerTags(actualName string, owners []impor
 			}
 		}
 
-		err := s.repo.SetTagOnRole(actualName, nameTag, strings.Join(tagValues, ","))
+		err := s.repo.SetTagOnRole(actualName, nameTag, strings.Join(tagValues, ","), isDatabaseRole)
 		if err != nil {
 			return fmt.Errorf("setting owner account name tag on role %q: %s", actualName, err.Error())
 		}
@@ -898,7 +898,7 @@ func (s *AccessToTargetSyncer) handleOwnerTags(actualName string, owners []impor
 			}
 		}
 
-		err := s.repo.SetTagOnRole(actualName, groupTag, strings.Join(tagValues, ","))
+		err := s.repo.SetTagOnRole(actualName, groupTag, strings.Join(tagValues, ","), isDatabaseRole)
 		if err != nil {
 			return fmt.Errorf("setting owner group name tag on role %q: %s", actualName, err.Error())
 		}
