@@ -846,7 +846,65 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 		}
 	}
 
+	err = s.handleOwnerTags(actualName, accessProvider.Owners)
+	if err != nil {
+		return actualName, fmt.Errorf("error while setting owner tags on role %q: %s", actualName, err.Error())
+	}
+
 	return actualName, nil
+}
+
+func (s *AccessToTargetSyncer) handleOwnerTags(actualName string, owners []importer.Owner) error {
+	if len(owners) == 0 {
+		return nil
+	}
+
+	if emailTag, found := s.configMap.Parameters[SfRoleOwnerEmailTag]; found && emailTag != "" {
+		tagValues := make([]string, 0, len(owners))
+
+		for _, owner := range owners {
+			if owner.Email != nil && *owner.Email != "" {
+				tagValues = append(tagValues, fmt.Sprintf("email:%s", *owner.Email))
+			}
+		}
+
+		err := s.repo.SetTagOnRole(actualName, emailTag, strings.Join(tagValues, ","))
+		if err != nil {
+			return fmt.Errorf("setting owner email tag on role %q: %s", actualName, err.Error())
+		}
+	}
+
+	if nameTag, found := s.configMap.Parameters[SfRoleOwnerNameTag]; found && nameTag != "" {
+		tagValues := make([]string, 0, len(owners))
+
+		for _, owner := range owners {
+			if owner.AccountName != nil && *owner.AccountName != "" {
+				tagValues = append(tagValues, *owner.AccountName)
+			}
+		}
+
+		err := s.repo.SetTagOnRole(actualName, nameTag, strings.Join(tagValues, ","))
+		if err != nil {
+			return fmt.Errorf("setting owner account name tag on role %q: %s", actualName, err.Error())
+		}
+	}
+
+	if groupTag, found := s.configMap.Parameters[SfRoleOwnerGroupTag]; found && groupTag != "" {
+		tagValues := make([]string, 0, len(owners))
+
+		for _, owner := range owners {
+			if owner.GroupName != nil && *owner.GroupName != "" {
+				tagValues = append(tagValues, *owner.GroupName)
+			}
+		}
+
+		err := s.repo.SetTagOnRole(actualName, groupTag, strings.Join(tagValues, ","))
+		if err != nil {
+			return fmt.Errorf("setting owner group name tag on role %q: %s", actualName, err.Error())
+		}
+	}
+
+	return nil
 }
 
 func (s *AccessToTargetSyncer) createGrantsForWhatObjects(accessProvider *importer.AccessProvider, metaData map[string]map[string]struct{}) (GrantSet, error) {

@@ -25,6 +25,10 @@ const (
 	SfUsageUserExcludes                 = "sf-usage-user-excludes"
 	SfWorkerPoolSize                    = "sf-worker-pool-size"
 
+	SfRoleOwnerEmailTag = "sf-role-owner-email-tag"
+	SfRoleOwnerNameTag  = "sf-role-owner-name-tag"
+	SfRoleOwnerGroupTag = "sf-role-owner-group-tag"
+
 	SfMaskDecryptFunction  = "sf-mask-decrypt-function"
 	SfMaskDecryptColumnTag = "sf-mask-decrypt-column-tag"
 

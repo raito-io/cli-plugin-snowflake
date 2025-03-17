@@ -110,6 +110,26 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateAccountRole() {
 	})
 }
 
+func (s *RepositoryTestSuite) TestSnowflakeRepository_CreateAccountRole_Owner() {
+	//Given
+	roleName := strings.ToUpper(fmt.Sprintf("%s_%s", testId, "CreateAccountRole_Owner"))
+
+	//When
+	err := s.repo.CreateAccountRole(roleName)
+
+	//Then
+	s.Require().NoError(err)
+
+	err = s.repo.SetTagOnRole(roleName, "RAITO_DATABASE.PUBLIC.\"raito.io:owner\"", "email:test@raito.io")
+	s.Require().NoError(err)
+
+	tags, err := s.repo.GetDirectObjectTagValues("RAITO_DATABASE.PUBLIC.\"raito.io:owner\"", roleName, "role")
+	s.Require().NoError(err)
+
+	s.Len(tags, 1)
+	s.Equal("email:test@raito.io", tags[0])
+}
+
 func (s *RepositoryTestSuite) TestSnowflakeRepository_DropAccountRole() {
 	test := func(roleName string) {
 		//Given
