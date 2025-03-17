@@ -586,10 +586,11 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 	inheritedRoles := make([]string, 0)
 
 	actualName := externalId
+	dbName := ""
 	var err error
 
 	if isDatabaseRole(accessProvider.Type) {
-		_, actualName, err = parseDatabaseRoleExternalId(externalId)
+		dbName, actualName, err = parseDatabaseRoleExternalId(externalId)
 		if err != nil {
 			return actualName, err
 		}
@@ -846,7 +847,12 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 		}
 	}
 
-	err = s.handleOwnerTags(actualName, accessProvider.Owners, isDatabaseRole(accessProvider.Type))
+	fullName := actualName
+	if dbName != "" {
+		fullName = fmt.Sprintf("%s.%s", dbName, actualName)
+	}
+
+	err = s.handleOwnerTags(fullName, accessProvider.Owners, isDatabaseRole(accessProvider.Type))
 	if err != nil {
 		return actualName, fmt.Errorf("error while setting owner tags on role %q: %s", actualName, err.Error())
 	}
