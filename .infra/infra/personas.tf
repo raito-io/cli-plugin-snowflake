@@ -11,7 +11,7 @@ resource "snowflake_user" "benjamin" {
   first_name        = "Benjamin"
   last_name         = "Stewart"
   comment           = "Raito - Access Manager"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_openssh
+  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
   default_role      = "PUBLIC"
   disabled          = "false"
@@ -25,7 +25,7 @@ resource "snowflake_user" "nick" {
   first_name        = "Nick"
   last_name         = "Nguyen"
   comment           = "Raito - Admin"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_openssh
+  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
   default_role      = "PUBLIC"
   disabled          = "false"
@@ -39,7 +39,7 @@ resource "snowflake_user" "carla" {
   first_name        = "Carla"
   last_name         = "Harris"
   comment           = "Raito - Observer"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_openssh
+  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
   default_role      = "PUBLIC"
   disabled          = "false"
@@ -53,7 +53,7 @@ resource "snowflake_user" "dustin" {
   first_name        = "Dustin"
   last_name         = "Hayden"
   comment           = "Raito - Owner"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_openssh
+  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
   default_role      = "PUBLIC"
   disabled          = "false"
@@ -67,7 +67,7 @@ resource "snowflake_user" "mary" {
   first_name        = "Mary"
   last_name         = "Carissa"
   comment           = "Raito - User"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_openssh
+  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
   default_role      = "PUBLIC"
   disabled          = "false"
@@ -80,7 +80,7 @@ resource "snowflake_user" "luis_garcia_stork" {
   display_name      = "Luis Garcia Stork"
   first_name        = "Luis"
   last_name         = "Garcia Stork"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_openssh
+  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
 }
 
@@ -89,7 +89,7 @@ resource "snowflake_user" "jobs_de" {
   login_name        = "JOBS_DE"
   email             = "jobs_de@raito.io"
   display_name      = "Intern Data Engineer"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_openssh
+  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
 }
 
@@ -98,7 +98,7 @@ resource "snowflake_user" "data_engineering" {
   login_name        = "DATA_ENGINEERING"
   email             = "data_engineer@raito.io"
   display_name      = "Data Engineer service account"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_openssh
+  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
 }
 
