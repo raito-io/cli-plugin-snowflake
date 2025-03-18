@@ -3,75 +3,75 @@ resource "tls_private_key" "rsa-key" {
 }
 
 // RAITO PERSONAS
-resource "snowflake_user" "benjamin" {
+resource "snowflake_service_user" "benjamin" {
   name              = "BENJAMINSTEWART"
   login_name        = "BENJAMINSTEWART"
   email             = "b_stewart@raito.io"
   display_name      = "Benjamin Stewart"
-  first_name        = "Benjamin"
-  last_name         = "Stewart"
+  #first_name        = "Benjamin"
+  #last_name         = "Stewart"
   comment           = "Raito - Access Manager"
-  password          = random_password.persona_password.result
+  #password          = random_password.persona_password.result
   rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
   default_role      = "PUBLIC"
   disabled          = "false"
 }
 
-resource "snowflake_user" "nick" {
+resource "snowflake_service_user" "nick" {
   name              = "NICKNGUYEN"
   login_name        = "NICKNGUYEN"
   email             = "n_nguyen@raito.io"
   display_name      = "Nick Nguyen"
-  first_name        = "Nick"
-  last_name         = "Nguyen"
+  #first_name        = "Nick"
+  #last_name         = "Nguyen"
   comment           = "Raito - Admin"
-  password          = random_password.persona_password.result
+  #password          = random_password.persona_password.result
   rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
   default_role      = "PUBLIC"
   disabled          = "false"
 }
 
-resource "snowflake_user" "carla" {
+resource "snowflake_service_user" "carla" {
   name              = "CARLAHARRIS"
   login_name        = "CARLAHARRIS"
   email             = "c_harris@raito.io"
   display_name      = "Carla Harris"
-  first_name        = "Carla"
-  last_name         = "Harris"
+  #first_name        = "Carla"
+  #last_name         = "Harris"
   comment           = "Raito - Observer"
-  password          = random_password.persona_password.result
+  #password          = random_password.persona_password.result
   rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
   default_role      = "PUBLIC"
   disabled          = "false"
 }
 
-resource "snowflake_user" "dustin" {
+resource "snowflake_service_user" "dustin" {
   name              = "DUSTINHAYDEN"
   login_name        = "DUSTINHAYDEN"
   email             = "d_hayden@raito.io"
   display_name      = "Dustin Hayden"
-  first_name        = "Dustin"
-  last_name         = "Hayden"
+  #first_name        = "Dustin"
+  #last_name         = "Hayden"
   comment           = "Raito - Owner"
-  password          = random_password.persona_password.result
+  #password          = random_password.persona_password.result
   rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
   default_role      = "PUBLIC"
   disabled          = "false"
 }
 
-resource "snowflake_user" "mary" {
+resource "snowflake_service_user" "mary" {
   name              = "MARYCARISSA"
   login_name        = "MARYCARISSA"
   email             = "m_carissa@raito.io"
   display_name      = "Mary Carissa"
-  first_name        = "Mary"
-  last_name         = "Carissa"
+  #first_name        = "Mary"
+  #last_name         = "Carissa"
   comment           = "Raito - User"
-  password          = random_password.persona_password.result
+  #password          = random_password.persona_password.result
   rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
   default_role      = "PUBLIC"
@@ -86,26 +86,25 @@ resource "snowflake_user" "luis_garcia_stork" {
   first_name        = "Luis"
   last_name         = "Garcia Stork"
   password          = random_password.persona_password.result
-  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
 }
 
-resource "snowflake_user" "jobs_de" {
+resource "snowflake_service_user" "jobs_de" {
   name              = "jobs_de"
   login_name        = "JOBS_DE"
   email             = "jobs_de@raito.io"
   display_name      = "Intern Data Engineer"
-  password          = random_password.persona_password.result
+  #password          = random_password.persona_password.result
   rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
 }
 
-resource "snowflake_user" "data_engineering" {
+resource "snowflake_service_user" "data_engineering" {
   name              = "data_engineering"
   login_name        = "DATA_ENGINEERING"
   email             = "data_engineer@raito.io"
   display_name      = "Data Engineer service account"
-  password          = random_password.persona_password.result
+  #password          = random_password.persona_password.result
   rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
 }
