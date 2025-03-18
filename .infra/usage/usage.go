@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"encoding/pem"
+	"errors"
 	"os"
 
 	"github.com/hashicorp/go-hclog"
@@ -51,6 +52,9 @@ func CreateUsage(config *UsageConfig) error {
 	logger.Info(fmt.Sprintf("rsa private key length: %d", len(config.PersonaRsaPrivateKey.Value)))
 
 	block, _ := pem.Decode([]byte(config.PersonaRsaPrivateKey.Value))
+	if block == nil {
+		return errors.New("pem decode failed")
+	}
 
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
@@ -79,22 +83,35 @@ func executeQueryUsage(account string, email string, role string, password strin
 
 	defer conn.Close()
 
+	executed := 0
+	failed := 0
+	success := 0
+
 	for _, table := range tables {
 		r := rand.Intn(10)
 		for range r {
 			query := fmt.Sprintf("SELECT * FROM %s LIMIT 1000", table)
+
+			executed++
+
 			rows, err := conn.Query(query)
 			if err != nil {
 				logger.Info(fmt.Sprintf("Query %q execution failed: %s", query, err.Error()))
+
+				failed++
 			} else {
 				logger.Info(fmt.Sprintf("Query %q executed successfully", query))
 				for rows.Next() {
 					// Do nothng
 				}
+
+				success++
 				rows.Close()
 			}
 		}
 	}
+
+	logger.Info(fmt.Sprintf("Executed %d queries, %d failed, %d success", executed, failed, success))
 
 	return nil
 }
