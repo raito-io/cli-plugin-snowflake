@@ -115,7 +115,7 @@ func openConnection(account string, username string, role string, password strin
 	if err != nil {
 		return nil, fmt.Errorf("snowflake DSN: %w", err)
 	}
-	
+
 	conn, err := sql.Open("snowflake", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open snowflake: %w", err)
