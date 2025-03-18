@@ -3,8 +3,6 @@ package main
 import (
 	"crypto/rsa"
 	"database/sql"
-	"encoding/pem"
-	"errors"
 	"os"
 
 	"github.com/hashicorp/go-hclog"
