@@ -45,6 +45,8 @@ type UsageConfig struct {
 }
 
 func CreateUsage(config *UsageConfig) error {
+	logger.Info(fmt.Sprintf("rsa private key length: %q", len(config.PersonaRsaPrivateKey.Value)))
+
 	block, _ := pem.Decode([]byte(config.PersonaRsaPrivateKey.Value))
 
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
@@ -56,7 +58,7 @@ func CreateUsage(config *UsageConfig) error {
 		logger.Info(fmt.Sprintf("Executing queries for %q", persona.User))
 
 		for _, role := range persona.Roles {
-			err := executeQueryUsage(config.SnowflakeAccount.Value, persona.User, role, key, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
+			err = executeQueryUsage(config.SnowflakeAccount.Value, persona.User, role, key, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
 			if err != nil {
 				return fmt.Errorf("execute usage: %w", err)
 			}
@@ -113,6 +115,11 @@ func openConnection(account string, username string, role string, rsaPrivateKey 
 	conn, err := sql.Open("snowflake", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open snowflake: %w", err)
+	}
+
+	err = conn.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("ping snowflake: %w", err)
 	}
 
 	return conn, nil
