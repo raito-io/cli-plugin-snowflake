@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
 	"os"
 
 	"github.com/hashicorp/go-hclog"
@@ -17,9 +19,9 @@ import (
 var logger hclog.Logger
 
 type UsageConfig struct {
-	PersonaPassword struct {
+	PersonaRsaPrivateKey struct {
 		Value string `json:"value"`
-	} `json:"persona_password"`
+	} `json:"persona_rsa_private_key"`
 	Personas struct {
 		Value []struct {
 			Roles []string `json:"roles"`
@@ -46,7 +48,7 @@ func CreateUsage(config *UsageConfig) error {
 		logger.Info(fmt.Sprintf("Executing queries for %q", persona.User))
 
 		for _, role := range persona.Roles {
-			err := executeQueryUsage(config.SnowflakeAccount.Value, persona.User, role, config.PersonaPassword.Value, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
+			err := executeQueryUsage(config.SnowflakeAccount.Value, persona.User, role, config.PersonaRsaPrivateKey.Value, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
 			if err != nil {
 				return fmt.Errorf("execute usage: %w", err)
 			}
@@ -56,8 +58,8 @@ func CreateUsage(config *UsageConfig) error {
 	return nil
 }
 
-func executeQueryUsage(account string, email string, role string, password string, database string, warehouse string, tables []string) error {
-	conn, err := openConnection(account, email, role, password, database, warehouse)
+func executeQueryUsage(account string, email string, role string, rsaPrivateKey string, database string, warehouse string, tables []string) error {
+	conn, err := openConnection(account, email, role, rsaPrivateKey, database, warehouse)
 	if err != nil {
 		return fmt.Errorf("open connection: %w", err)
 	}
@@ -84,12 +86,19 @@ func executeQueryUsage(account string, email string, role string, password strin
 	return nil
 }
 
-func openConnection(account string, username string, role string, password string, database string, warehouse string) (*sql.DB, error) {
+func openConnection(account string, username string, role string, rsaPrivateKey string, database string, warehouse string) (*sql.DB, error) {
+	block, _ := pem.Decode([]byte(rsaPrivateKey))
+
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse rsa private key: %w", err)
+	}
+
 	dsn, err := sf.DSN(&sf.Config{
 		Account:     account,
 		User:        username,
 		Database:    database,
-		Password:    password,
+		PrivateKey:  key,
 		Role:        role,
 		Warehouse:   warehouse,
 		Application: snowflake.ConnectionStringIdentifier,
