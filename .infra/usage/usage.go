@@ -45,7 +45,7 @@ type UsageConfig struct {
 }
 
 func CreateUsage(config *UsageConfig) error {
-	logger.Info(fmt.Sprintf("rsa private key length: %q", len(config.PersonaRsaPrivateKey.Value)))
+	logger.Info(fmt.Sprintf("rsa private key length: %d", len(config.PersonaRsaPrivateKey.Value)))
 
 	block, _ := pem.Decode([]byte(config.PersonaRsaPrivateKey.Value))
 
@@ -111,6 +111,8 @@ func openConnection(account string, username string, role string, rsaPrivateKey 
 	if err != nil {
 		return nil, fmt.Errorf("snowflake DSN: %w", err)
 	}
+
+	logger.Info(fmt.Sprintf("Opening connection to DSN: %s", dsn))
 
 	conn, err := sql.Open("snowflake", dsn)
 	if err != nil {
