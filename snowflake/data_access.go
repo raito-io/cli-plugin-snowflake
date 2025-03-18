@@ -92,6 +92,7 @@ type dataAccessRepository interface {
 	DropShare(shareName string) (err error)
 	ExecuteGrantOnShare(perm, on, shareName string) error
 	ExecuteRevokeOnShare(perm, on, shareName string) error
+	SetTagOnRole(roleName, tagName, tagValue string, isDatabaseRole bool) error
 }
 
 var _ wrappers.AccessProviderSyncer = (*AccessSyncer)(nil)

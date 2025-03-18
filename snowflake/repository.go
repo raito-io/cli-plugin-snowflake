@@ -994,6 +994,44 @@ func (repo *SnowflakeRepository) GetTagsLinkedToDatabaseName(databaseName string
 	return repo.getTags(nil, ptr.String(databaseName))
 }
 
+func (repo *SnowflakeRepository) GetDirectObjectTagValues(tagName, objectName, objectDomain string) ([]string, error) {
+	tagObject := common.ParseFullName(tagName)
+	if tagObject.Database == nil || tagObject.Schema == nil || tagObject.Table == nil {
+		return nil, fmt.Errorf("expected tagname %q to have 3 parts (database.schema.tagname)", tagName)
+	}
+
+	tagName = common.FormatQuery(`%s.%s.%s`, *tagObject.Database, *tagObject.Schema, *tagObject.Table)
+
+	obj := common.ParseFullName(objectName)
+	objectName = common.FormatQuery("%s", *obj.Database)
+
+	if obj.Schema != nil {
+		objectName = common.FormatQuery("%s.%s", *obj.Database, *obj.Schema)
+	}
+
+	query := fmt.Sprintf("SELECT SYSTEM$GET_TAG('%s', '%s', '%s') as value;", tagName, objectName, objectDomain)
+
+	rows, _, err := repo.query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	tagValues := make([]string, 0)
+
+	for rows.Next() {
+		var value string
+
+		err = rows.Scan(&value)
+		if err != nil {
+			return nil, err
+		}
+
+		tagValues = append(tagValues, value)
+	}
+
+	return tagValues, nil
+}
+
 func (repo *SnowflakeRepository) getTags(domain *string, databaseName *string) (map[string][]*tag.Tag, error) {
 	tagMap := make(map[string][]*tag.Tag)
 
@@ -1063,6 +1101,37 @@ func (repo *SnowflakeRepository) GetDatabaseRoleTags(databaseName string, roleNa
 	}
 
 	return tagMap, nil
+}
+
+func (repo *SnowflakeRepository) SetTagOnRole(roleName, tagName, tagValue string, isDatabaseRole bool) error {
+	sfObject := common.ParseFullName(tagName)
+	if sfObject.Database == nil || sfObject.Schema == nil || sfObject.Table == nil {
+		return fmt.Errorf("expected tagname %q to have 3 parts (database.schema.tagname)", tagName)
+	}
+
+	entityName := "ROLE"
+	if isDatabaseRole {
+		entityName = "DATABASE ROLE"
+
+		roleObject := common.ParseFullName(roleName)
+		if roleObject.Database == nil || roleObject.Schema == nil {
+			return fmt.Errorf("expected roleName %q to have 2 parts (database.role)", roleName)
+		}
+
+		roleName = common.FormatQuery("%s.%s", *roleObject.Database, *roleObject.Schema)
+	} else {
+		roleName = common.FormatQuery("%s", roleName)
+	}
+
+	q := fmt.Sprintf(`ALTER %s %s SET TAG %s = '%s'`, entityName, roleName, common.FormatQuery(`%s.%s.%s`, *sfObject.Database, *sfObject.Schema, *sfObject.Table), strings.ReplaceAll(tagValue, "'", ""))
+
+	_, _, err := repo.query(q)
+
+	if err != nil {
+		return fmt.Errorf("setting tag %q on role %q: %s", tagName, roleName, err.Error())
+	}
+
+	return nil
 }
 
 func (repo *SnowflakeRepository) GetWarehouses() ([]DbEntity, error) {

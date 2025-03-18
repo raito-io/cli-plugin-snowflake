@@ -599,7 +599,7 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 		for _, grantee := range grantOfEntities {
 			if grantee.GrantedTo == "USER" {
 				users = append(users, cleanDoubleQuotes(grantee.GranteeName))
-			} else if grantee.GrantedTo == "ROLE" {
+			} else if grantee.GrantedTo == "ROLE" { //nolint:goconst
 				if _, exclude := s.excludedRoles[grantee.GranteeName]; exclude {
 					logger.Warn(fmt.Sprintf("Skipping Snowflake ROLE %q may break the hierarchy for role %q", grantee.GranteeName, roleName))
 

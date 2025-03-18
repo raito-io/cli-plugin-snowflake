@@ -204,6 +204,11 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 						Permissions: []string{"USAGE"},
 					},
 				},
+				Owners: []sync_to_target.Owner{
+					{
+						Email: ptr.String("owner1@raito.io"),
+					},
+				},
 			},
 			{
 				Id:          databaseRoleName1,
@@ -222,6 +227,11 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 							Type:     "table",
 						},
 						Permissions: []string{"SELECT"},
+					},
+				},
+				Owners: []sync_to_target.Owner{
+					{
+						Email: ptr.String("owner2@raito.io"),
 					},
 				},
 			},
