@@ -187,28 +187,28 @@ resource "snowflake_user" "henriksson_v" {
 locals {
   who_role = [
     {
-      user : snowflake_user.benjamin.name
-      email : snowflake_user.benjamin.email
+      user : snowflake_service_user.benjamin.name
+      email : snowflake_service_user.benjamin.email
       roles : [snowflake_account_role.human_resources.name, snowflake_account_role.data_analyst.name]
     },
     {
-      user : snowflake_user.nick.name
-      email : snowflake_user.nick.email
+      user : snowflake_service_user.nick.name
+      email : snowflake_service_user.nick.email
       roles : []
     },
     {
-      user : snowflake_user.carla.name
-      email : snowflake_user.carla.email
+      user : snowflake_service_user.carla.name
+      email : snowflake_service_user.carla.email
       roles : []
     },
     {
-      user : snowflake_user.dustin.name
-      email : snowflake_user.dustin.email
+      user : snowflake_service_user.dustin.name
+      email : snowflake_service_user.dustin.email
       roles : [snowflake_account_role.sales.name, snowflake_account_role.sales_ext.name]
     },
     {
-      user : snowflake_user.mary.name
-      email : snowflake_user.mary.email
+      user : snowflake_service_user.mary.name
+      email : snowflake_service_user.mary.email
       roles : [snowflake_account_role.human_resources.name, snowflake_account_role.sales.name, snowflake_account_role.sales_analysis.name]
     },
     {
@@ -217,13 +217,13 @@ locals {
       roles : []
     },
     {
-      user : snowflake_user.jobs_de.name
-      email : snowflake_user.jobs_de.email
+      user : snowflake_service_user.jobs_de.name
+      email : snowflake_service_user.jobs_de.email
       roles : []
     },
     {
-      user : snowflake_user.data_engineering.name
-      email : snowflake_user.data_engineering.email
+      user : snowflake_service_user.data_engineering.name
+      email : snowflake_service_user.data_engineering.email
       roles : []
     },
     {
@@ -316,7 +316,7 @@ resource "snowflake_account_role" "sales_ext" {
 
 resource "snowflake_grant_account_role" "sales_dustin" {
   role_name = snowflake_account_role.sales.name
-  user_name = snowflake_user.dustin.name
+  user_name = snowflake_service_user.dustin.name
 }
 
 resource "snowflake_grant_privileges_to_account_role" "warehouse_grant" {
