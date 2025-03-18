@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
 	"database/sql"
 	"encoding/pem"
 	"errors"
@@ -21,9 +20,6 @@ import (
 var logger hclog.Logger
 
 type UsageConfig struct {
-	Password struct {
-		Value string `json:"value"`
-	} `json:"persona_password"`
 	PersonaRsaPrivateKey struct {
 		Value string `json:"value"`
 	} `json:"persona_rsa_private_key"`
@@ -51,7 +47,7 @@ type UsageConfig struct {
 func CreateUsage(config *UsageConfig) error {
 	logger.Info(fmt.Sprintf("rsa private key length: %d", len(config.PersonaRsaPrivateKey.Value)))
 
-	key, err := snowflake.LoadPrivateKey([]byte(config.PersonaRsaPrivateKey.Value), nil)
+	key, err := snowflake.LoadPrivateKey([]byte(config.PersonaRsaPrivateKey.Value), "")
 
 	block, _ := pem.Decode([]byte(config.PersonaRsaPrivateKey.Value))
 	if block == nil {
@@ -62,7 +58,7 @@ func CreateUsage(config *UsageConfig) error {
 		logger.Info(fmt.Sprintf("Executing queries for %q", persona.User))
 
 		for _, role := range persona.Roles {
-			err = executeQueryUsage(config.SnowflakeAccount.Value, persona.User, role, config.Password.Value, key, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
+			err = executeQueryUsage(config.SnowflakeAccount.Value, persona.User, role, key, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
 			if err != nil {
 				return fmt.Errorf("execute usage: %w", err)
 			}
@@ -72,8 +68,8 @@ func CreateUsage(config *UsageConfig) error {
 	return nil
 }
 
-func executeQueryUsage(account string, email string, role string, password string, rsaPrivateKey *rsa.PrivateKey, database string, warehouse string, tables []string) error {
-	conn, err := openConnection(account, email, role, password, rsaPrivateKey, database, warehouse)
+func executeQueryUsage(account string, email string, role string, rsaPrivateKey *rsa.PrivateKey, database string, warehouse string, tables []string) error {
+	conn, err := openConnection(account, email, role, rsaPrivateKey, database, warehouse)
 	if err != nil {
 		return fmt.Errorf("open connection: %w", err)
 	}
@@ -113,7 +109,7 @@ func executeQueryUsage(account string, email string, role string, password strin
 	return nil
 }
 
-func openConnection(account string, username string, role string, password string, rsaPrivateKey *rsa.PrivateKey, database string, warehouse string) (*sql.DB, error) {
+func openConnection(account string, username string, role string, rsaPrivateKey *rsa.PrivateKey, database string, warehouse string) (*sql.DB, error) {
 	dsn, err := sf.DSN(&sf.Config{
 		Account:       account,
 		User:          username,
