@@ -36,6 +36,6 @@ output "personas" {
 }
 
 output "persona_rsa_private_key" {
-    value     = tls_private_key.rsa-key.private_key_pem_pkcs8
-    sensitive = true
+  value     = tls_private_key.rsa-key.private_key_pem_pkcs8
+  sensitive = true
 }

@@ -82,78 +82,78 @@ resource "snowflake_service_user" "jobs_de" {
 }
 
 resource "snowflake_service_user" "data_engineering" {
-  name              = "data_engineering"
-  login_name        = "DATA_ENGINEERING"
-  email             = "data_engineer@raito.io"
-  display_name      = "Data Engineer service account"
+  name         = "data_engineering"
+  login_name   = "DATA_ENGINEERING"
+  email        = "data_engineer@raito.io"
+  display_name = "Data Engineer service account"
   #password          = random_password.persona_password.result
   rsa_public_key    = tls_private_key.rsa-key.public_key_pem
   default_warehouse = snowflake_warehouse.warehouse.id
 }
 
 resource "snowflake_service_user" "scranton_j" {
-  name         = "scranton_j"
-  login_name   = "SCRANTON_J"
-  email        = "jscranton123@raito.io"
-  display_name = "James Robert Scranton"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
+  name           = "scranton_j"
+  login_name     = "SCRANTON_J"
+  email          = "jscranton123@raito.io"
+  display_name   = "James Robert Scranton"
+  rsa_public_key = tls_private_key.rsa-key.public_key_pem
 }
 
 resource "snowflake_service_user" "atkison_a" {
-  name         = "atkison_a"
-  login_name   = "ATKISON_A"
-  email        = "a_abbotatkinson7576@raito.io"
-  display_name = "Angelica Abbot Atkinson"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
+  name           = "atkison_a"
+  login_name     = "ATKISON_A"
+  email          = "a_abbotatkinson7576@raito.io"
+  display_name   = "Angelica Abbot Atkinson"
+  rsa_public_key = tls_private_key.rsa-key.public_key_pem
 
 }
 
 resource "snowflake_service_user" "macwilliam_j" {
-  name         = "macwilliam_j"
-  login_name   = "MACWILLIAM_J"
-  email        = "jb_macwilliam@raito.io"
-  display_name = "Juliette Berkant MacWilliam"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
+  name           = "macwilliam_j"
+  login_name     = "MACWILLIAM_J"
+  email          = "jb_macwilliam@raito.io"
+  display_name   = "Juliette Berkant MacWilliam"
+  rsa_public_key = tls_private_key.rsa-key.public_key_pem
 }
 
 resource "snowflake_service_user" "keith_c" {
-  name         = "keith_c"
-  login_name   = "KEITH_C"
-  email        = "c_keith@raito.io"
-  display_name = "Claudia Seyyed Keith"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
+  name           = "keith_c"
+  login_name     = "KEITH_C"
+  email          = "c_keith@raito.io"
+  display_name   = "Claudia Seyyed Keith"
+  rsa_public_key = tls_private_key.rsa-key.public_key_pem
 }
 
 resource "snowflake_service_user" "sakamoto_w" {
-  name         = "sakamoto_w"
-  login_name   = "SAKAMOTO_W"
-  email        = "w-sakamoto515@raito.io"
-  display_name = "Wil Arya Sakamoto"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
+  name           = "sakamoto_w"
+  login_name     = "SAKAMOTO_W"
+  email          = "w-sakamoto515@raito.io"
+  display_name   = "Wil Arya Sakamoto"
+  rsa_public_key = tls_private_key.rsa-key.public_key_pem
 }
 
 resource "snowflake_service_user" "stein_v" {
-  name         = "stein_v"
-  login_name   = "STEIN_V"
-  email        = "v.scarletstein8246@raito.us"
-  display_name = "Vladimir Scarlet Stein (US Sales)"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
+  name           = "stein_v"
+  login_name     = "STEIN_V"
+  email          = "v.scarletstein8246@raito.us"
+  display_name   = "Vladimir Scarlet Stein (US Sales)"
+  rsa_public_key = tls_private_key.rsa-key.public_key_pem
 }
 
 resource "snowflake_service_user" "kiss_k" {
-  name         = "kiss_k"
-  login_name   = "KISS_K"
-  email        = "k.a.kiss54856@raito.io"
-  display_name = "Katsuo América Kiss"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
+  name           = "kiss_k"
+  login_name     = "KISS_K"
+  email          = "k.a.kiss54856@raito.io"
+  display_name   = "Katsuo América Kiss"
+  rsa_public_key = tls_private_key.rsa-key.public_key_pem
 }
 
 resource "snowflake_service_user" "henriksson_v" {
-  name         = "henriksson_v"
-  login_name   = "HENRIKSSON_V"
-  email        = "vk-henriksson@raito.io"
-  display_name = "Valentin Kasey Henriksson"
-  rsa_public_key    = tls_private_key.rsa-key.public_key_pem
+  name           = "henriksson_v"
+  login_name     = "HENRIKSSON_V"
+  email          = "vk-henriksson@raito.io"
+  display_name   = "Valentin Kasey Henriksson"
+  rsa_public_key = tls_private_key.rsa-key.public_key_pem
 
 }
 
