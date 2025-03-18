@@ -48,10 +48,8 @@ func CreateUsage(config *UsageConfig) error {
 	logger.Info(fmt.Sprintf("rsa private key length: %d", len(config.PersonaRsaPrivateKey.Value)))
 
 	key, err := snowflake.LoadPrivateKey([]byte(config.PersonaRsaPrivateKey.Value), "")
-
-	block, _ := pem.Decode([]byte(config.PersonaRsaPrivateKey.Value))
-	if block == nil {
-		return errors.New("pem decode failed")
+	if err != nil {
+		return fmt.Errorf("load private key: %w", err)
 	}
 
 	for _, persona := range config.Personas.Value {
