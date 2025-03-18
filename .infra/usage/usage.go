@@ -51,14 +51,11 @@ type UsageConfig struct {
 func CreateUsage(config *UsageConfig) error {
 	logger.Info(fmt.Sprintf("rsa private key length: %d", len(config.PersonaRsaPrivateKey.Value)))
 
+	key, err := snowflake.LoadPrivateKey([]byte(config.PersonaRsaPrivateKey.Value), nil)
+
 	block, _ := pem.Decode([]byte(config.PersonaRsaPrivateKey.Value))
 	if block == nil {
 		return errors.New("pem decode failed")
-	}
-
-	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		return fmt.Errorf("parse rsa private key: %w", err)
 	}
 
 	for _, persona := range config.Personas.Value {
@@ -131,7 +128,7 @@ func openConnection(account string, username string, role string, password strin
 	if err != nil {
 		return nil, fmt.Errorf("snowflake DSN: %w", err)
 	}
-	
+
 	conn, err := sql.Open("snowflake", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open snowflake: %w", err)
