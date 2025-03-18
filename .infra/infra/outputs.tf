@@ -29,3 +29,8 @@ output "personas" {
   value     = local.who_role
   sensitive = true
 }
+
+output "persona_rsa_private_key" {
+    value     = tls_private_key.rsa-key.private_key_pem
+    sensitive = true
+}
