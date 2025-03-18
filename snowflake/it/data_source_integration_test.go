@@ -39,7 +39,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	sourceName := sfOrganization + "-" + sfAccount
 
 	s.NoError(err)
-	s.Len(dataSourceObjectHandler.DataObjects, 55)
+	s.Len(dataSourceObjectHandler.DataObjects, 56)
 
 	warehouses := getByType(dataSourceObjectHandler.DataObjects, "warehouse")
 	s.Len(warehouses, 2)
@@ -141,7 +141,7 @@ func (s *DataSourceTestSuite) TestDataSourceSync_SyncDataSource() {
 	})
 
 	scim := getByType(dataSourceObjectHandler.DataObjects, snowflake.Integration)
-	s.Len(scim, 1)
+	s.Len(scim, 2)
 	s.Contains(scim, data_source.DataObject{
 		ExternalId:  "SCIM Integration",
 		Name:        "SCIM Integration",
