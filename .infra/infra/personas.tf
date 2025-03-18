@@ -317,7 +317,7 @@ resource "snowflake_account_role" "sales_ext" {
 
 resource "snowflake_grant_account_role" "sales_dustin" {
   role_name = snowflake_account_role.sales.name
-  user_name = snowflake_service_user.dustin.name
+  user_name = snowflake_user.dustin.name
 }
 
 resource "snowflake_grant_privileges_to_account_role" "warehouse_grant" {
