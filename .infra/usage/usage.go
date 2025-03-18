@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rsa"
 	"crypto/x509"
 	"database/sql"
 	"encoding/pem"
@@ -44,11 +45,18 @@ type UsageConfig struct {
 }
 
 func CreateUsage(config *UsageConfig) error {
+	block, _ := pem.Decode([]byte(config.PersonaRsaPrivateKey.Value))
+
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("parse rsa private key: %w", err)
+	}
+
 	for _, persona := range config.Personas.Value {
 		logger.Info(fmt.Sprintf("Executing queries for %q", persona.User))
 
 		for _, role := range persona.Roles {
-			err := executeQueryUsage(config.SnowflakeAccount.Value, persona.User, role, config.PersonaRsaPrivateKey.Value, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
+			err := executeQueryUsage(config.SnowflakeAccount.Value, persona.User, role, key, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
 			if err != nil {
 				return fmt.Errorf("execute usage: %w", err)
 			}
@@ -58,7 +66,7 @@ func CreateUsage(config *UsageConfig) error {
 	return nil
 }
 
-func executeQueryUsage(account string, email string, role string, rsaPrivateKey string, database string, warehouse string, tables []string) error {
+func executeQueryUsage(account string, email string, role string, rsaPrivateKey *rsa.PrivateKey, database string, warehouse string, tables []string) error {
 	conn, err := openConnection(account, email, role, rsaPrivateKey, database, warehouse)
 	if err != nil {
 		return fmt.Errorf("open connection: %w", err)
@@ -86,22 +94,16 @@ func executeQueryUsage(account string, email string, role string, rsaPrivateKey 
 	return nil
 }
 
-func openConnection(account string, username string, role string, rsaPrivateKey string, database string, warehouse string) (*sql.DB, error) {
-	block, _ := pem.Decode([]byte(rsaPrivateKey))
-
-	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("parse rsa private key: %w", err)
-	}
-
+func openConnection(account string, username string, role string, rsaPrivateKey *rsa.PrivateKey, database string, warehouse string) (*sql.DB, error) {
 	dsn, err := sf.DSN(&sf.Config{
-		Account:     account,
-		User:        username,
-		Database:    database,
-		PrivateKey:  key,
-		Role:        role,
-		Warehouse:   warehouse,
-		Application: snowflake.ConnectionStringIdentifier,
+		Account:       account,
+		User:          username,
+		Database:      database,
+		PrivateKey:    rsaPrivateKey,
+		Role:          role,
+		Warehouse:     warehouse,
+		Application:   snowflake.ConnectionStringIdentifier,
+		Authenticator: sf.AuthTypeJwt,
 	})
 
 	if err != nil {
