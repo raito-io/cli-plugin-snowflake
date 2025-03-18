@@ -2,7 +2,6 @@ package snowflake
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -140,8 +139,6 @@ func LoadPrivateKey(pemData []byte, passphrase string) (*rsa.PrivateKey, error) 
 		key, err = pkcs8.ParsePKCS8PrivateKey(block.Bytes, []byte(passphrase))
 	} else if block.Type == "PRIVATE KEY" {
 		key, err = pkcs8.ParsePKCS8PrivateKey(block.Bytes)
-	} else if block.Type == "RSA PRIVATE KEY" {
-		key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 	} else {
 		return nil, fmt.Errorf("unsupported private key block type %q", block.Type)
 	}

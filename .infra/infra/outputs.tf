@@ -15,6 +15,11 @@ output "snowflake_account" {
   sensitive = true
 }
 
+output "snowflake_organization" {
+  value     = var.snowflake_organization
+  sensitive = true
+}
+
 output "snowflake_tables" {
   value = concat(var.testing_dataset ? module.testing[0].snowflake_tables : [], var.demo_dataset ? module.demo[0].tables : [])
 }

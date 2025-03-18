@@ -34,6 +34,9 @@ type UsageConfig struct {
 	SnowflakeTables struct {
 		Value []string `json:"value"`
 	} `json:"snowflake_tables"`
+	SnowflakeOrganization struct {
+		Value string `json:"value"`
+	} `json:"snowflake_organization"`
 	SnowflakeAccount struct {
 		Value string `json:"value"`
 	} `json:"snowflake_account"`
@@ -54,7 +57,7 @@ func CreateUsage(config *UsageConfig) error {
 		logger.Info(fmt.Sprintf("Executing queries for %q", persona.User))
 
 		for _, role := range persona.Roles {
-			err = executeQueryUsage(config.SnowflakeAccount.Value, persona.User, role, key, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
+			err = executeQueryUsage(fmt.Sprintf("%s-%s", config.SnowflakeOrganization.Value, config.SnowflakeAccount.Value), persona.User, role, key, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
 			if err != nil {
 				return fmt.Errorf("execute usage: %w", err)
 			}
