@@ -113,18 +113,23 @@ func parseCommaSeparatedList(list string) set.Set[string] {
 	return ret
 }
 
-func loadPrivateKey(file string, passphrase string) (*rsa.PrivateKey, error) {
+func loadPrivateKeyFromFile(file string, passphrase string) (*rsa.PrivateKey, error) {
 	pemData, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("opening file %q: %w", file, err)
 	}
 
+	return LoadPrivateKey(pemData, passphrase)
+}
+
+func LoadPrivateKey(pemData []byte, passphrase string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(pemData)
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block containing the private key; block is nil")
 	}
 
 	var key interface{}
+	var err error
 
 	if block.Type == "ENCRYPTED PRIVATE KEY" {
 		if passphrase == "" {
@@ -133,7 +138,7 @@ func loadPrivateKey(file string, passphrase string) (*rsa.PrivateKey, error) {
 
 		key, err = pkcs8.ParsePKCS8PrivateKey(block.Bytes, []byte(passphrase))
 	} else if block.Type == "PRIVATE KEY" {
-		key, err = pkcs8.ParsePKCS8PrivateKey(block.Bytes, nil)
+		key, err = pkcs8.ParsePKCS8PrivateKey(block.Bytes)
 	} else {
 		return nil, fmt.Errorf("unsupported private key block type %q", block.Type)
 	}

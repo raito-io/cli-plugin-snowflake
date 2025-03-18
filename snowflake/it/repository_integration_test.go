@@ -603,12 +603,12 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 	s.True(len(users) >= 3)
 
 	s.Contains(users, snowflake.UserEntity{
-		Name:        "SNOWFLAKE",
-		Email:       nil,
-		Owner:       "",
-		DisplayName: "SNOWFLAKE",
-		LoginName:   "SNOWFLAKE",
-		Type:        nil,
+		Name:        "BENJAMINSTEWART",
+		Email:       ptr.String("b_stewart@raito.io"),
+		Owner:       "ACCOUNTADMIN",
+		DisplayName: "Benjamin Stewart",
+		LoginName:   "BENJAMINSTEWART",
+		Type:        ptr.String("SERVICE"),
 	})
 
 	s.Contains(users, snowflake.UserEntity{
@@ -617,7 +617,7 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 		Owner:       "ACCOUNTADMIN",
 		DisplayName: "Data Engineer service account",
 		LoginName:   "DATA_ENGINEERING",
-		Type:        ptr.String("null"),
+		Type:        ptr.String("SERVICE"),
 	})
 }
 

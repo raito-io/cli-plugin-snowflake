@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rsa"
 	"database/sql"
 	"os"
 
@@ -17,9 +18,9 @@ import (
 var logger hclog.Logger
 
 type UsageConfig struct {
-	PersonaPassword struct {
+	PersonaRsaPrivateKey struct {
 		Value string `json:"value"`
-	} `json:"persona_password"`
+	} `json:"persona_rsa_private_key"`
 	Personas struct {
 		Value []struct {
 			Roles []string `json:"roles"`
@@ -33,6 +34,9 @@ type UsageConfig struct {
 	SnowflakeTables struct {
 		Value []string `json:"value"`
 	} `json:"snowflake_tables"`
+	SnowflakeOrganization struct {
+		Value string `json:"value"`
+	} `json:"snowflake_organization"`
 	SnowflakeAccount struct {
 		Value string `json:"value"`
 	} `json:"snowflake_account"`
@@ -42,11 +46,18 @@ type UsageConfig struct {
 }
 
 func CreateUsage(config *UsageConfig) error {
+	logger.Info(fmt.Sprintf("rsa private key length: %d", len(config.PersonaRsaPrivateKey.Value)))
+
+	key, err := snowflake.LoadPrivateKey([]byte(config.PersonaRsaPrivateKey.Value), "")
+	if err != nil {
+		return fmt.Errorf("load private key: %w", err)
+	}
+
 	for _, persona := range config.Personas.Value {
 		logger.Info(fmt.Sprintf("Executing queries for %q", persona.User))
 
 		for _, role := range persona.Roles {
-			err := executeQueryUsage(config.SnowflakeAccount.Value, persona.User, role, config.PersonaPassword.Value, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
+			err = executeQueryUsage(fmt.Sprintf("%s-%s", config.SnowflakeOrganization.Value, config.SnowflakeAccount.Value), persona.User, role, key, config.SnowflakeDataBaseName.Value, config.SnowflakeWarehouse.Value, config.SnowflakeTables.Value)
 			if err != nil {
 				return fmt.Errorf("execute usage: %w", err)
 			}
@@ -56,43 +67,57 @@ func CreateUsage(config *UsageConfig) error {
 	return nil
 }
 
-func executeQueryUsage(account string, email string, role string, password string, database string, warehouse string, tables []string) error {
-	conn, err := openConnection(account, email, role, password, database, warehouse)
+func executeQueryUsage(account string, email string, role string, rsaPrivateKey *rsa.PrivateKey, database string, warehouse string, tables []string) error {
+	conn, err := openConnection(account, email, role, rsaPrivateKey, database, warehouse)
 	if err != nil {
 		return fmt.Errorf("open connection: %w", err)
 	}
 
 	defer conn.Close()
 
+	executed := 0
+	failed := 0
+	success := 0
+
 	for _, table := range tables {
 		r := rand.Intn(10)
 		for range r {
 			query := fmt.Sprintf("SELECT * FROM %s LIMIT 1000", table)
+
+			executed++
+
 			rows, err := conn.Query(query)
 			if err != nil {
 				logger.Info(fmt.Sprintf("Query %q execution failed: %s", query, err.Error()))
+
+				failed++
 			} else {
 				logger.Info(fmt.Sprintf("Query %q executed successfully", query))
 				for rows.Next() {
 					// Do nothng
 				}
+
+				success++
 				rows.Close()
 			}
 		}
 	}
 
+	logger.Info(fmt.Sprintf("Executed %d queries, %d failed, %d success", executed, failed, success))
+
 	return nil
 }
 
-func openConnection(account string, username string, role string, password string, database string, warehouse string) (*sql.DB, error) {
+func openConnection(account string, username string, role string, rsaPrivateKey *rsa.PrivateKey, database string, warehouse string) (*sql.DB, error) {
 	dsn, err := sf.DSN(&sf.Config{
-		Account:     account,
-		User:        username,
-		Database:    database,
-		Password:    password,
-		Role:        role,
-		Warehouse:   warehouse,
-		Application: snowflake.ConnectionStringIdentifier,
+		Account:       account,
+		User:          username,
+		Database:      database,
+		PrivateKey:    rsaPrivateKey,
+		Role:          role,
+		Warehouse:     warehouse,
+		Application:   snowflake.ConnectionStringIdentifier,
+		Authenticator: sf.AuthTypeJwt,
 	})
 
 	if err != nil {
@@ -102,6 +127,11 @@ func openConnection(account string, username string, role string, password strin
 	conn, err := sql.Open("snowflake", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open snowflake: %w", err)
+	}
+
+	err = conn.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("ping snowflake: %w", err)
 	}
 
 	return conn, nil

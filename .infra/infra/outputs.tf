@@ -15,6 +15,11 @@ output "snowflake_account" {
   sensitive = true
 }
 
+output "snowflake_organization" {
+  value     = var.snowflake_organization
+  sensitive = true
+}
+
 output "snowflake_tables" {
   value = concat(var.testing_dataset ? module.testing[0].snowflake_tables : [], var.demo_dataset ? module.demo[0].tables : [])
 }
@@ -27,5 +32,10 @@ output "persona_password" {
 
 output "personas" {
   value     = local.who_role
+  sensitive = true
+}
+
+output "persona_rsa_private_key" {
+  value     = tls_private_key.rsa-key.private_key_pem_pkcs8
   sensitive = true
 }
