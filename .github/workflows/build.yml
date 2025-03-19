@@ -102,13 +102,17 @@ jobs:
       - name: Build
         run: make build
 
+      - name: Store private key to file
+        shell: bash
+        run: echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > /tmp/snowflake_private_key.pem
+
       - name: Test
         run: make test
         env:
           SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SF_ORGANIZATION: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
           SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SF_PRIVATE_KEY: /tmp/snowflake_private_key.pem
           SF_ROLE: ${{ secrets.sf_role }}
           SF_STANDARD_EDITION: false
 

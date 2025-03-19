@@ -113,7 +113,7 @@ func parseCommaSeparatedList(list string) set.Set[string] {
 	return ret
 }
 
-func loadPrivateKeyFromFile(file string, passphrase string) (*rsa.PrivateKey, error) {
+func LoadPrivateKeyFromFile(file string, passphrase string) (*rsa.PrivateKey, error) {
 	pemData, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("opening file %q: %w", file, err)

@@ -23,10 +23,10 @@ gen-test-infra:
 	cd .infra/infra; terraform apply -auto-approve
 
 destroy-test-infra:
-	cd .infra/infra; terraform apply -destroy -auto-approve; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfOrganization "${SF_ORGANIZATION}" --sfUser ${SF_USER} --sfPassword ${SF_PASSWORD} --drop=true
+	cd .infra/infra; terraform apply -destroy -auto-approve; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfOrganization "${SF_ORGANIZATION}" --sfUser ${SF_USER} --sfPassword "${SF_PASSWORD}" --sfPrivateKey "${SF_PRIVATE_KEY_FILE}" --drop=true
 
 destroy-roles:
-	cd .infra/infra; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfUser ${SF_USER} --sfOrganization "${SF_ORGANIZATION}" --sfPassword ${SF_PASSWORD} --drop=true
+	cd .infra/infra; go run destroy.go --sfAccount ${SF_ACCOUNT} --sfUser ${SF_USER} --sfOrganization "${SF_ORGANIZATION}" --sfPassword "${SF_PASSWORD}" --sfPrivateKey "${SF_PRIVATE_KEY_FILE}" --drop=true
 
 gen-test-usage:
 	cd .infra/infra; terraform output -json | go run ../usage/usage.go

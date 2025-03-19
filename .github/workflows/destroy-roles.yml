@@ -10,7 +10,7 @@ on:
         required: true
       SNOWFLAKE_USER:
         required: true
-      SNOWFLAKE_PASSWORD:
+      SNOWFLAKE_PRIVATE_KEY:
         required: true
       SNOWFLAKE_ORGANIZATION:
         required: true
@@ -46,9 +46,13 @@ jobs:
         shell: bash
         run: go mod tidy
 
+      - name: Store private key to file
+        shell: bash
+        run: echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > /tmp/snowflake_private_key.pem
+
       - uses: ./.github/actions/destroy-roles
         with:
           snowflakeAccount: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           snowflakeUser: ${{ secrets.SNOWFLAKE_USER }}
-          snowflakePassword: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          snowflakePrivateKey: /tmp/snowflake_private_key.pem
           snowflakeOrganization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}

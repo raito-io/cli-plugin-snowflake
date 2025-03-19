@@ -21,10 +21,10 @@ variable "snowflake_user" {
   nullable    = false
 }
 
-variable "snowflake_password" {
+variable "snowflake_private_key_file" {
   type        = string
   sensitive   = true
-  description = "Snowflake password"
+  description = "Path to the private key file"
   nullable    = false
 }
 

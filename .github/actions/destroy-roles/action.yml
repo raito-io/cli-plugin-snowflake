@@ -9,7 +9,12 @@ inputs:
     required: true
   snowflakePassword:
     description: "Snowflake user password"
-    required: true
+    required: false
+    default: ""
+  snowflakePrivateKey:
+    description: "Snowflake private key file"
+    required: false
+    default: ""
   snowflakeOrganization:
     description: "Snowflake organization name"
     required: true
@@ -24,4 +29,5 @@ runs:
         SF_ACCOUNT: ${{ inputs.snowflakeAccount }}
         SF_USER: ${{ inputs.snowflakeUser }}
         SF_PASSWORD: ${{ inputs.snowflakePassword }}
+        SF_PRIVATE_KEY_FILE: ${{ inputs.snowflakePrivateKey }}
         SF_ORGANIZATION: ${{ inputs.snowflakeOrganization }}

@@ -10,6 +10,11 @@ on:
         required: true
         type: string
         description: "The ARN of the secret to load"
+      secretFiles:
+        required: false
+        type: string
+        description: "The ARN of the secret files to load"
+        default: "[]"
 
 permissions:
   id-token: write
@@ -46,6 +51,38 @@ jobs:
             secret-ids: ",${{ inputs.secretArn }}"
             parse-json-secrets: true
 
+        - name: Pre load secret files
+          id: pre-load-secret-files
+          if: ${{ inputs.secretFiles != '[]' }}
+          run: |
+            secretList=$(echo '${{ inputs.secretFiles }}' | jq -r '.[] | "\(.name | ascii_upcase),\(.secret_arn)"')
+            echo 'secretfilelist<<EOF' >> "$GITHUB_OUTPUT"
+            echo "$secretList" >> "$GITHUB_OUTPUT"
+            echo 'EOF' >> "$GITHUB_OUTPUT"
+
+            echo "Secret file list ${secretList}"
+
+        - name: Load file secrets
+          if: ${{ inputs.secretFiles != '[]' }}
+          uses: aws-actions/aws-secretsmanager-get-secrets@v2
+          with:
+            secret-ids: ${{ steps.pre-load-secret-files.outputs.secretfilelist }}
+            parse-json-secrets: false
+
+        - name: Store file secrets
+          if: ${{ inputs.secretFiles != '[]' }}
+          run: |
+            echo '${{ inputs.secretFiles }}' | jq -r '.[] | .name | ascii_upcase' | while read -r secretName; do
+              FILE_PATH="/tmp/${secretName}"
+              ENV_VAR_PATH="FILE_${secretName}"
+
+              echo "${!secretName}" > ${FILE_PATH}
+              echo "${ENV_VAR_PATH}=${FILE_PATH}" >> "$GITHUB_ENV"
+
+              echo "Write secret file to ${FILE_PATH}"
+
+            done 
+
         - name: Initiate Terraform
           uses: ./.github/actions/terraform-init
           with:
@@ -57,7 +94,7 @@ jobs:
           uses: ./.github/actions/destroy-roles
           with:
             snowflakeUser: ${{ env.SF_USER }}
-            snowflakePassword: ${{ env.SF_PASSWORD }}
+            snowflakePrivateKey: ${{ env.FILE_SNOWFLAKE_RSA_KEY_P8 }}
             snowflakeAccount: ${{ env.SF_ACCOUNT }}
             snowflakeOrganization: ${{ env.SF_ORGANIZATION }}
 
