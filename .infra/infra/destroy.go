@@ -20,8 +20,8 @@ const (
 )
 
 var (
-	sfAccount, sfOrganization, sfUser, sfPassword string
-	nonDryRun                                     bool
+	sfAccount, sfOrganization, sfUser, sfPassword, sfPrivateKeyFile string
+	nonDryRun                                                       bool
 )
 
 func dropAllRoles() error {
@@ -31,12 +31,25 @@ func dropAllRoles() error {
 
 	role := sfRole
 
-	dsn, err := sf.DSN(&sf.Config{
-		Account:  account,
-		User:     sfUser,
-		Password: sfPassword,
-		Role:     role,
-	})
+	config := sf.Config{
+		Account: account,
+		User:    sfUser,
+		Role:    role,
+	}
+
+	if sfPrivateKeyFile != "" {
+		key, err := snowflake.LoadPrivateKeyFromFile(sfPrivateKeyFile, "")
+		if err != nil {
+			return fmt.Errorf("load private key: %w", err)
+		}
+
+		config.PrivateKey = key
+		config.Authenticator = sf.AuthTypeJwt
+	} else {
+		config.Password = sfPassword
+	}
+
+	dsn, err := sf.DSN(&config)
 
 	if err != nil {
 		return fmt.Errorf("snowflake dsn: %w", err)
@@ -261,10 +274,11 @@ func main() {
 	flag.StringVar(&sfOrganization, "sfOrganization", "", "Snowflake organization")
 	flag.StringVar(&sfUser, "sfUser", "", "Snowflake user")
 	flag.StringVar(&sfPassword, "sfPassword", "", "Snowflake password")
+	flag.StringVar(&sfPrivateKeyFile, "sfPrivateKey", "", "Snowflake private key file path")
 	flag.BoolVar(&nonDryRun, "drop", false, "Execute drop roles. If not set or false a dry run will be executed.")
 	flag.Parse()
 
-	if sfAccount == "" || sfUser == "" || sfPassword == "" {
+	if sfAccount == "" || sfUser == "" || (sfPassword == "" && sfPrivateKeyFile == "") {
 		panic("Missing required arguments")
 	}
 

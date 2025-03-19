@@ -56,7 +56,7 @@ func ConnectToSnowflake(params map[string]string, role string) (*sql.DB, string,
 	}
 
 	if foundPrivateKey && sfPrivateKey != "" {
-		privateKey, err := loadPrivateKeyFromFile(sfPrivateKey, sfPrivateKeyPassphrase)
+		privateKey, err := LoadPrivateKeyFromFile(sfPrivateKey, sfPrivateKeyPassphrase)
 		if err != nil {
 			return nil, "", e.CreateBadInputParameterError(SfPrivateKey, sfPrivateKey, fmt.Sprintf("Failed to parse private key: %s", err.Error()))
 		}

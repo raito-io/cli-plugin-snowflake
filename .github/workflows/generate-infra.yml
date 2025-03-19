@@ -26,7 +26,7 @@ on:
           required: true
       SNOWFLAKE_USER:
         required: true
-      SNOWFLAKE_PASSWORD:
+      SNOWFLAKE_PRIVATE_KEY:
         required: true
   workflow_dispatch:
     inputs:
@@ -72,12 +72,16 @@ jobs:
           S3TerraformKey: ${{ secrets.AWS_S3_TERRAFORM_KEY }}
           DynamoDBTerraformTable: ${{ secrets.AWS_DYNAMODB_TERRAFORM_TABLE }}
 
+      - name: Store private key to file
+        shell: bash
+        run: echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > /tmp/snowflake_private_key.pem
+
       - name: Generate infra
         uses: ./.github/actions/generate-infra
         with:
           snowflakeAccount: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           snowflakeOrganization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
           snowflakeUser: ${{ secrets.SNOWFLAKE_USER }}
-          snowflakePassword: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          snowflakePrivateKey: /tmp/snowflake_private_key.pem
           demoDataset: ${{ inputs.demo-infra }}
           testingDataset: ${{ inputs.testing-infra }}
