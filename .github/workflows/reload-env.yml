@@ -102,7 +102,7 @@ jobs:
           uses: ./.github/actions/generate-infra
           with:
             snowflakeUser: ${{ env.SF_USER }}
-            snowflakePassword: ${{ env.SF_PASSWORD }}
+            snowflakePrivateKey: ${{ env.FILE_SNOWFLAKE_RSA_KEY_P8 }}
             snowflakeAccount: ${{ env.SF_ACCOUNT }}
             snowflakeOrganization: ${{ env.SF_ORGANIZATION }}
             testingDataset: ${{ env.SF_TESTING_DATA }}
