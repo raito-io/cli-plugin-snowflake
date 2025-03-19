@@ -5,6 +5,5 @@ provider "snowflake" {
   user                     = var.snowflake_user
   authenticator            = "SNOWFLAKE_JWT"
   private_key              = file(var.snowflake_private_key_file)
-  password                 = var.snowflake_password
   preview_features_enabled = ["snowflake_function_sql_resource", "snowflake_procedure_sql_resource", "snowflake_table_resource", "snowflake_materialized_view_resource"]
 }
