@@ -329,10 +329,16 @@ func DataObjectTypes() []*ds.DataObjectType {
 					UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
 					CannotBeGranted:        true,
 				},
+				{
+					Permission:             "REFERENCE_USAGE",
+					Description:            "Enables using an object (e.g. secure view in a share) when the object references another object in a different database.",
+					UsageGlobalPermissions: []string{ds.Read},
+					GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
+				},
 			},
 			Children: []string{ds.Schema},
 			ShareProperties: &ds.DataObjectShareProperties{
-				ShareablePermissions:     []string{USAGE_ON_DATABASE},
+				ShareablePermissions:     []string{USAGE_ON_DATABASE, "REFERENCE_USAGE"},
 				CorrespondingSharedTypes: []string{SharedPrefix + ds.Database},
 			},
 		},
@@ -519,6 +525,10 @@ func DataObjectTypes() []*ds.DataObjectType {
 					UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
 					CannotBeGranted:        true,
 				},
+				{
+					Permission:  "EVOLVE SCHEMA",
+					Description: "Enables schema evolution to occur on a table when loading data.",
+				},
 			},
 			Actions: []*ds.DataObjectTypeAction{
 				{
@@ -544,7 +554,7 @@ func DataObjectTypes() []*ds.DataObjectType {
 			},
 			Children: []string{ds.Column},
 			ShareProperties: &ds.DataObjectShareProperties{
-				ShareablePermissions:     []string{"SELECT", "REFERENCES"},
+				ShareablePermissions:     []string{"SELECT", "EVOLVE SCHEMA"},
 				CorrespondingSharedTypes: []string{SharedPrefix + ds.Table},
 			},
 		},
@@ -559,6 +569,9 @@ func DataObjectTypes() []*ds.DataObjectType {
 					UsageGlobalPermissions: []string{ds.Read},
 					GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
 				},
+			},
+			ShareProperties: &ds.DataObjectShareProperties{
+				ShareablePermissions: []string{"USAGE"},
 			},
 		},
 		{
@@ -650,7 +663,7 @@ func DataObjectTypes() []*ds.DataObjectType {
 			},
 			Children: []string{ds.Column},
 			ShareProperties: &ds.DataObjectShareProperties{
-				ShareablePermissions:     []string{"SELECT", "REFERENCES"},
+				ShareablePermissions:     []string{"SELECT"},
 				CorrespondingSharedTypes: []string{SharedPrefix + ds.Table},
 			},
 		},
@@ -685,7 +698,7 @@ func DataObjectTypes() []*ds.DataObjectType {
 				},
 			},
 			ShareProperties: &ds.DataObjectShareProperties{
-				ShareablePermissions:     []string{"SELECT", "REFERENCES"},
+				ShareablePermissions:     []string{"SELECT"},
 				CorrespondingSharedTypes: []string{SharedPrefix + ds.Table},
 			},
 		},
@@ -720,8 +733,8 @@ func DataObjectTypes() []*ds.DataObjectType {
 			},
 			Children: []string{ds.Column},
 			ShareProperties: &ds.DataObjectShareProperties{
-				ShareablePermissions:     []string{"SELECT", "REFERENCES"},
-				CorrespondingSharedTypes: []string{SharedPrefix + ds.View},
+				ShareablePermissions:     []string{"SELECT"},
+				CorrespondingSharedTypes: []string{SharedPrefix + ds.Table},
 			},
 		},
 		{
@@ -756,8 +769,8 @@ func DataObjectTypes() []*ds.DataObjectType {
 			},
 			Children: []string{ds.Column},
 			ShareProperties: &ds.DataObjectShareProperties{
-				ShareablePermissions:     []string{"SELECT", "REFERENCES"},
-				CorrespondingSharedTypes: []string{SharedPrefix + ds.View},
+				ShareablePermissions:     []string{"SELECT"},
+				CorrespondingSharedTypes: []string{SharedPrefix + ds.Table},
 			},
 		},
 		{
