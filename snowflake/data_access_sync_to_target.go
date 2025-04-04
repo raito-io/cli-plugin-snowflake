@@ -181,49 +181,9 @@ func (s *AccessToTargetSyncer) syncAccessProviderToTargetHandler(ap *importer.Ac
 
 func (s *AccessToTargetSyncer) generateUniqueExternalId(ap *importer.AccessProvider, prefix string) (string, error) {
 	if isDatabaseRole(ap.Type) {
-		sfRoleName := ap.Name
-		if ap.NamingHint != "" {
-			sfRoleName = ap.NamingHint
-		}
-
-		// Finding the database this db role is linked to
-		var database string
-		var err error
-
-		if len(ap.What) > 0 {
-			// If there is a WHAT, we look for the database of the first element
-			parts := strings.Split(ap.What[0].DataObject.FullName, ".")
-			database = parts[0]
-		} else if ap.ExternalId != nil {
-			// Otherwise, we try to parse the externalId
-			database, _, err = parseDatabaseRoleExternalId(*ap.ExternalId)
-
-			if err != nil {
-				return "", err
-			}
-		} else {
-			return "", errors.New("unable to determine database for database role")
-		}
-
-		uniqueRoleNameGenerator, err := s.getUniqueRoleNameGenerator(prefix, &database)
-		if err != nil {
-			return "", err
-		}
-
-		// Temp updating namingHint to "resource only without database" as this is the way Generate will create a unique resource name
-		oldNamingHint := ap.NamingHint
-		ap.NamingHint = sfRoleName
-
-		roleName, err := uniqueRoleNameGenerator.Generate(ap)
-		if err != nil {
-			return "", err
-		}
-
-		ap.NamingHint = oldNamingHint
-
-		logger.Info(fmt.Sprintf("Generated database role name %q", roleName))
-
-		return databaseRoleExternalIdGenerator(database, roleName), nil
+		return s.generateNamespacedExternalId(ap, prefix, parseDatabaseRoleExternalId, databaseRoleExternalIdGenerator)
+	} else if isApplicationRole(ap.Type) {
+		return s.generateNamespacedExternalId(ap, prefix, parseApplicationRoleExternalId, applicationRoleExternalIdGenerator)
 	} else {
 		uniqueRoleNameGenerator, err := s.getUniqueRoleNameGenerator(prefix, nil)
 		if err != nil {
@@ -239,6 +199,54 @@ func (s *AccessToTargetSyncer) generateUniqueExternalId(ap *importer.AccessProvi
 
 		return accountRoleExternalIdGenerator(roleName), nil
 	}
+}
+
+func (s *AccessToTargetSyncer) generateNamespacedExternalId(ap *importer.AccessProvider, prefix string,
+	parseNamespaceRoleExternalId func(string) (string, string, error),
+	externalIdGenerator func(string, string) string) (string, error) {
+	sfRoleName := ap.Name
+	if ap.NamingHint != "" {
+		sfRoleName = ap.NamingHint
+	}
+
+	// Finding the database this db role is linked to
+	var database string
+	var err error
+
+	if len(ap.What) > 0 {
+		// If there is a WHAT, we look for the database of the first element
+		parts := strings.Split(ap.What[0].DataObject.FullName, ".")
+		database = parts[0]
+	} else if ap.ExternalId != nil {
+		// Otherwise, we try to parse the externalId
+		database, _, err = parseNamespaceRoleExternalId(*ap.ExternalId)
+
+		if err != nil {
+			return "", err
+		}
+	} else {
+		return "", errors.New("unable to determine database for database role")
+	}
+
+	uniqueRoleNameGenerator, err := s.getUniqueRoleNameGenerator(prefix, &database)
+	if err != nil {
+		return "", err
+	}
+
+	// Temp updating namingHint to "resource only without database" as this is the way Generate will create a unique resource name
+	oldNamingHint := ap.NamingHint
+	ap.NamingHint = sfRoleName
+
+	roleName, err := uniqueRoleNameGenerator.Generate(ap)
+	if err != nil {
+		return "", err
+	}
+
+	ap.NamingHint = oldNamingHint
+
+	logger.Info(fmt.Sprintf("Generated database role name %q", roleName))
+
+	return externalIdGenerator(database, roleName), nil
 }
 
 func (s *AccessToTargetSyncer) getUniqueRoleNameGenerator(prefix string, database *string) (naming_hint.UniqueGenerator, error) {
@@ -382,7 +390,7 @@ func (s *AccessToTargetSyncer) SyncAccessProviderFiltersToTarget(ctx context.Con
 
 	logger.Info(fmt.Sprintf("Configuring access provider as filters in Snowflake. Update %d masks remove %d masks", len(apMap), len(apToRemoveMap)))
 
-	//Groups filters by table
+	// Groups filters by table
 	updateGroupedFilters, err := groupFiltersByTable(apMap, s.accessProviderFeedbackHandler)
 	if err != nil {
 		return err
@@ -430,7 +438,7 @@ func (s *AccessToTargetSyncer) SyncAccessProviderFiltersToTarget(ctx context.Con
 		return feedbackErr
 	}
 
-	//Create or update filters per table
+	// Create or update filters per table
 	updatedTables := set.NewSet[string]()
 
 	for table, filters := range updateGroupedFilters {
@@ -533,7 +541,7 @@ func (s *AccessToTargetSyncer) findRoles(prefix string) (set.Set[string], error)
 		return existingRoles, nil
 	}
 
-	//Get all database roles for each database and add database roles to existing roles
+	// Get all database roles for each database and add database roles to existing roles
 	databases, err := s.accessSyncer.getAllDatabaseAndShareNames()
 	if err != nil {
 		return nil, err
@@ -548,6 +556,26 @@ func (s *AccessToTargetSyncer) findRoles(prefix string) (set.Set[string], error)
 
 		for _, roleEntity := range roleEntities {
 			existingRoles.Add(databaseRoleExternalIdGenerator(database, roleEntity.Name))
+		}
+	}
+
+	// Get all application roles for each database and add application roles to existing roles
+	applications, err := s.repo.GetApplications()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get applications: %w", err)
+	}
+
+	for _, application := range applications {
+		// Get all application roles for application
+		roleEntities, err := s.repo.GetApplicationRoles(application.Name)
+		if err != nil {
+			return nil, fmt.Errorf("get application roles: %w", err)
+		}
+
+		for _, roleEntity := range roleEntities {
+			if strings.HasPrefix(roleEntity.Name, prefix) {
+				existingRoles.Add(applicationRoleExternalIdGenerator(application.Name, roleEntity.Name))
+			}
 		}
 	}
 
@@ -589,8 +617,14 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 	dbName := ""
 	var err error
 
-	if isDatabaseRole(accessProvider.Type) {
+	switch {
+	case isDatabaseRole(accessProvider.Type):
 		dbName, actualName, err = parseDatabaseRoleExternalId(externalId)
+		if err != nil {
+			return actualName, err
+		}
+	case isApplicationRole(accessProvider.Type):
+		dbName, actualName, err = parseApplicationRoleExternalId(externalId)
 		if err != nil {
 			return actualName, err
 		}
@@ -672,7 +706,13 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 		}
 
 		if !ignoreWho || !ignoreInheritance {
-			grantsOfRole, err3 := s.accessSyncer.retrieveGrantsOfRole(externalId, accessProvider.Type)
+			apType := ""
+
+			if accessProvider.Type != nil {
+				apType = *accessProvider.Type
+			}
+
+			grantsOfRole, err3 := s.accessSyncer.retrieveGrantsOfRole(externalId, apType)
 			if err3 != nil {
 				return actualName, err3
 			}
@@ -681,19 +721,26 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 			rolesOfRole := make([]string, 0, len(grantsOfRole))
 
 			for _, gor := range grantsOfRole {
-				if strings.EqualFold(gor.GrantedTo, "USER") {
+				switch {
+				case strings.EqualFold(gor.GrantedTo, "USER"):
 					usersOfRole = append(usersOfRole, gor.GranteeName)
-				} else if strings.EqualFold(gor.GrantedTo, "ROLE") {
+				case strings.EqualFold(gor.GrantedTo, "ROLE"):
 					rolesOfRole = append(rolesOfRole, accountRoleExternalIdGenerator(gor.GranteeName))
-				} else if strings.EqualFold(gor.GrantedTo, GrantTypeDatabaseRole) {
-					database, parsedRoleName, err2 := parseDatabaseRoleRoleName(cleanDoubleQuotes(gor.GranteeName))
+				case strings.EqualFold(gor.GrantedTo, GrantTypeDatabaseRole):
+					database, parsedRoleName, err2 := parseNamespacedRoleRoleName(cleanDoubleQuotes(gor.GranteeName))
+					if err2 != nil {
+						return actualName, err2
+					}
+					rolesOfRole = append(rolesOfRole, databaseRoleExternalIdGenerator(database, parsedRoleName))
+				case strings.EqualFold(gor.GrantedTo, "SHARE"):
+					rolesOfRole = append(rolesOfRole, shareExternalIdGenerator(gor.GranteeName))
+				case strings.EqualFold(gor.GrantedTo, GrantTypeApplicationRole):
+					application, parsedRoleName, err2 := parseNamespacedRoleRoleName(cleanDoubleQuotes(gor.GranteeName))
 					if err2 != nil {
 						return actualName, err2
 					}
 
-					rolesOfRole = append(rolesOfRole, databaseRoleExternalIdGenerator(database, parsedRoleName))
-				} else if strings.EqualFold(gor.GrantedTo, "SHARE") {
-					rolesOfRole = append(rolesOfRole, shareExternalIdGenerator(gor.GranteeName))
+					rolesOfRole = append(rolesOfRole, applicationRoleExternalIdGenerator(application, parsedRoleName))
 				}
 			}
 
@@ -965,23 +1012,27 @@ func (s *AccessToTargetSyncer) createGrantsForWhatObjects(accessProvider *import
 	return expectedGrants, nil
 }
 
-func (s *AccessToTargetSyncer) splitRoles(inheritedRoles []string) ([]string, []string) {
+func (s *AccessToTargetSyncer) splitRoles(inheritedRoles []string) ([]string, []string, []string) {
 	databaseRoles := []string{}
+	applicationRoles := []string{}
 	accountRoles := []string{}
 
 	for _, role := range inheritedRoles {
-		if isDatabaseRoleByExternalId(role) {
+		switch {
+		case isDatabaseRoleByExternalId(role):
 			databaseRoles = append(databaseRoles, role)
-		} else {
+		case isApplicationRoleByExternalId(role):
+			applicationRoles = append(applicationRoles, role)
+		default:
 			accountRoles = append(accountRoles, role)
 		}
 	}
 
-	return databaseRoles, accountRoles
+	return databaseRoles, applicationRoles, accountRoles
 }
 
 func (s *AccessToTargetSyncer) grantRolesToRole(ctx context.Context, targetExternalId string, targetApType *string, roles ...string) error {
-	toAddDatabaseRoles, toAddAccountRoles := s.splitRoles(roles)
+	toAddDatabaseRoles, toAddApplicationRoles, toAddAccountRoles := s.splitRoles(roles)
 
 	var filteredAccountRoles []string
 
@@ -996,53 +1047,45 @@ func (s *AccessToTargetSyncer) grantRolesToRole(ctx context.Context, targetExter
 		}
 	}
 
-	if isDatabaseRole(targetApType) {
-		database, parsedRoleName, err := parseDatabaseRoleExternalId(targetExternalId)
+	switch {
+	case isDatabaseRole(targetApType):
+		err := s.grantRolesToDatabaseRoles(ctx, targetExternalId, toAddDatabaseRoles, filteredAccountRoles)
 		if err != nil {
-			return err
+			return fmt.Errorf("grant roles to database roles: %w", err)
 		}
 
-		var filteredDatabaseRoles []string
-		var filteredShares []string
-
-		for _, dbRole := range toAddDatabaseRoles {
-			toDatabase, toParsedRoleName, err2 := parseDatabaseRoleExternalId(dbRole)
-			if err2 != nil {
-				return err2
-			}
-
-			if database != toDatabase {
-				return fmt.Errorf("database role %q is from a different database than %q", parsedRoleName, toParsedRoleName)
-			}
-
-			shouldIgnore, err2 := s.shouldIgnoreLinkedRole(toParsedRoleName)
-			if err2 != nil {
-				return err2
-			}
-
-			if !shouldIgnore {
-				filteredDatabaseRoles = append(filteredDatabaseRoles, toParsedRoleName)
-			}
-		}
-
-		err = s.repo.GrantDatabaseRolesToDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
+		return nil
+	case isApplicationRole(targetApType):
+		err := s.grantRolesToApplicationRoles(ctx, targetExternalId, toAddApplicationRoles, filteredAccountRoles)
 		if err != nil {
-			return err
+			return fmt.Errorf("grant roles to application roles: %w", err)
 		}
 
-		err = s.repo.GrantSharesToDatabaseRole(ctx, database, parsedRoleName, filteredShares...)
-		if err != nil {
-			return err
-		}
-
-		return s.repo.GrantAccountRolesToDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
-	}
-
-	if len(toAddDatabaseRoles) > 0 {
+		return nil
+	case len(toAddDatabaseRoles) > 0:
 		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toAddDatabaseRoles)
 	}
 
-	return s.repo.GrantAccountRolesToAccountRole(ctx, targetExternalId, filteredAccountRoles...)
+	err := s.repo.GrantAccountRolesToAccountRole(ctx, targetExternalId, filteredAccountRoles...)
+	if err != nil {
+		return fmt.Errorf("granting account roles to account role: %w", err)
+	}
+
+	return nil
+}
+
+func (s *AccessToTargetSyncer) grantRolesToDatabaseRoles(ctx context.Context, targetExternalId string, toAddDatabaseRoles []string, filteredAccountRoles []string) error {
+	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toAddDatabaseRoles, filteredAccountRoles,
+		parseDatabaseRoleExternalId,
+		s.repo.GrantDatabaseRolesToDatabaseRole,
+		s.repo.GrantAccountRolesToDatabaseRole)
+}
+
+func (s *AccessToTargetSyncer) grantRolesToApplicationRoles(ctx context.Context, targetExternalId string, toAddApplicationRoles []string, filteredAccountRole []string) error {
+	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toAddApplicationRoles, filteredAccountRole,
+		parseApplicationRoleExternalId,
+		s.repo.GrantApplicationRolesToApplicationRole,
+		s.repo.GrantAccountRolesToApplicationRole)
 }
 
 func (s *AccessToTargetSyncer) shouldIgnoreLinkedRole(roleName string) (bool, error) {
@@ -1055,7 +1098,7 @@ func (s *AccessToTargetSyncer) shouldIgnoreLinkedRole(roleName string) (bool, er
 }
 
 func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetExternalId string, targetApType *string, roles ...string) error {
-	toRemoveDatabaseRoles, toRemoveAccountRoles := s.splitRoles(roles)
+	toRemoveDatabaseRoles, toRemoveApplicationRoles, toRemoveAccountRoles := s.splitRoles(roles)
 
 	var filteredAccountRoles []string
 
@@ -1070,49 +1113,84 @@ func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetEx
 		}
 	}
 
-	if isDatabaseRole(targetApType) {
-		database, parsedRoleName, err := parseDatabaseRoleExternalId(targetExternalId)
+	switch {
+	case isDatabaseRole(targetApType):
+		err := s.revokeRolesFromDatabaseRole(ctx, targetExternalId, toRemoveDatabaseRoles, filteredAccountRoles)
 		if err != nil {
-			return err
+			return fmt.Errorf("revoke roles from database role: %w", err)
 		}
 
-		var filteredDatabaseRoles []string
-		var filteredShares []string
-
-		for _, dbRole := range toRemoveDatabaseRoles {
-			_, toParsedRoleName, err2 := parseDatabaseRoleExternalId(dbRole)
-			if err2 != nil {
-				return err2
-			}
-
-			shouldIgnore, err2 := s.shouldIgnoreLinkedRole(toParsedRoleName)
-			if err2 != nil {
-				return err2
-			}
-
-			if !shouldIgnore {
-				filteredDatabaseRoles = append(filteredDatabaseRoles, toParsedRoleName)
-			}
-		}
-
-		err = s.repo.RevokeDatabaseRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredDatabaseRoles...)
+		return nil
+	case isApplicationRole(targetApType):
+		err := s.revokeRolesFromApplicataionRole(ctx, targetExternalId, toRemoveApplicationRoles, filteredAccountRoles)
 		if err != nil {
-			return err
+			return fmt.Errorf("revoke roles from application role: %w", err)
 		}
 
-		err = s.repo.RevokeSharesFromDatabaseRole(ctx, database, parsedRoleName, filteredShares...)
-		if err != nil {
-			return err
-		}
-
-		return s.repo.RevokeAccountRolesFromDatabaseRole(ctx, database, parsedRoleName, filteredAccountRoles...)
-	}
-
-	if len(toRemoveDatabaseRoles) > 0 {
+		return nil
+	case len(toRemoveDatabaseRoles) > 0:
 		return fmt.Errorf("error can not assign database roles to an account role %q - %v", targetExternalId, toRemoveDatabaseRoles)
 	}
 
 	return s.repo.RevokeAccountRolesFromAccountRole(ctx, targetExternalId, filteredAccountRoles...)
+}
+
+func (s *AccessToTargetSyncer) revokeRolesFromDatabaseRole(ctx context.Context, targetExternalId string, toRemoveDatabaseRoles []string, filteredAccountRoles []string) error {
+	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toRemoveDatabaseRoles, filteredAccountRoles,
+		parseDatabaseRoleExternalId,
+		s.repo.RevokeDatabaseRolesFromDatabaseRole,
+		s.repo.RevokeAccountRolesFromDatabaseRole)
+}
+
+func (s *AccessToTargetSyncer) revokeRolesFromApplicataionRole(ctx context.Context, targetExternalId string, toRemoveApplicationRoles []string, filteredAccountRoles []string) error {
+	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toRemoveApplicationRoles, filteredAccountRoles,
+		parseApplicationRoleExternalId,
+		s.repo.RevokeApplicationRolesFromApplicationRole,
+		s.repo.RevokeAccountRolesFromApplicationRole)
+}
+
+func (s *AccessToTargetSyncer) handleRolesToNamespacedRoles(ctx context.Context, targetExternalId string, toAddNamespacedRoles []string, filteredAccountRoles []string,
+	parseNamespacedRoleExternalId func(string) (string, string, error),
+	handleNamespaceRole func(context.Context, string, string, ...string) error,
+	handleAccountRoles func(context.Context, string, string, ...string) error) error {
+	namespace, parsedRoleName, err := parseNamespacedRoleExternalId(targetExternalId)
+	if err != nil {
+		return fmt.Errorf("parsing namespaced role external id %q: %w", targetExternalId, err)
+	}
+
+	filteredNamespacedRoles := make([]string, 0, len(toAddNamespacedRoles))
+
+	for _, namespacedRole := range toAddNamespacedRoles {
+		toNamespace, toParsedRoleName, err2 := parseNamespacedRoleExternalId(namespacedRole)
+		if err2 != nil {
+			return fmt.Errorf("parsing namespace role %q, %w", namespacedRole, err2)
+		}
+
+		if namespace != toNamespace {
+			return fmt.Errorf("namespaced role %q is from a different namespace than %q", parsedRoleName, toParsedRoleName)
+		}
+
+		shouldIgnore, err2 := s.shouldIgnoreLinkedRole(toParsedRoleName)
+		if err2 != nil {
+			return err2
+		}
+
+		if !shouldIgnore {
+			filteredNamespacedRoles = append(filteredNamespacedRoles, toParsedRoleName)
+		}
+	}
+
+	err = handleNamespaceRole(ctx, namespace, parsedRoleName, filteredNamespacedRoles...)
+	if err != nil {
+		return fmt.Errorf("granting namespace role: %w", err)
+	}
+
+	err = handleAccountRoles(ctx, namespace, parsedRoleName, filteredAccountRoles...)
+	if err != nil {
+		return fmt.Errorf("granting account roles: %w", err)
+	}
+
+	return nil
 }
 
 func (s *AccessToTargetSyncer) createRole(externalId string, apType *string) error {
