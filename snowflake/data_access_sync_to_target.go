@@ -293,7 +293,7 @@ func (s *AccessToTargetSyncer) SyncAccessProviderSharesToTarget(apToRemoveMap ma
 	// Step 1: Update shares and create new shares
 	for _, share := range apMap {
 		shareName, err := s.updateShare(share, metadata)
-		fi := importer.AccessProviderSyncFeedback{AccessProvider: share.Id, ActualName: shareName, ExternalId: &shareName}
+		fi := importer.AccessProviderSyncFeedback{AccessProvider: share.Id, ActualName: shareName, ExternalId: ptr.String(apTypeSharePrefix + shareName)}
 
 		if err != nil {
 			fi.Errors = append(fi.Errors, err.Error())
