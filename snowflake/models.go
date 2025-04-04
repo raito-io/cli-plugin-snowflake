@@ -23,6 +23,15 @@ type DbEntity struct {
 	ShareName    *string `db:"share_name"`
 }
 
+type ApplictionEntity struct {
+	Name       string  `db:"name"`
+	IsDefault  string  `db:"is_default"`
+	IsCurrent  string  `db:"is_current"`
+	SourceType *string `db:"source_type"`
+	Owner      *string `db:"owner"`
+	Version    *string `db:"version"`
+}
+
 type ExtendedDbEntity struct {
 	Entity     DbEntity
 	LinkedTags map[string][]*tag.Tag
@@ -188,6 +197,13 @@ type RoleEntity struct {
 	GrantedToRoles  int    `db:"granted_to_roles"`
 	GrantedRoles    int    `db:"granted_roles"`
 	Owner           string `db:"owner"`
+}
+
+type ApplicationRoleEntity struct {
+	Name          string  `db:"name"`
+	Owner         *string `db:"owner"`
+	Comment       *string `db:"comment"`
+	OwnerRoleType *string `db:"owner_role_type"`
 }
 
 type ShareEntity struct {

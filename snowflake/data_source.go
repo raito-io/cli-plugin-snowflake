@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -36,6 +37,7 @@ type dataSourceRepository interface {
 	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	ExecuteGrantOnAccountRole(perm, on, role string, isSystemGrant bool) error
 	GetIntegrations() ([]DbEntity, error)
+	GetApplications() ([]ApplictionEntity, error)
 }
 
 type DataSourceSyncer struct {
@@ -174,6 +176,22 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	for _, database := range databases {
 		wp.Submit(func() {
 			err2 := s.handleDatabase(database)
+			if err2 != nil {
+				merr = multierror.Append(merr, err2)
+			}
+		})
+	}
+
+	if config.ConfigMap.GetBoolWithDefault(SfApplications, false) {
+		wp.Submit(func() {
+			applicationExcludes := set.NewSet[string]()
+			applicationExcludes.AddSet(dbExcludes)
+
+			for _, share := range inboundShares {
+				applicationExcludes.Add(share.Entity.Name)
+			}
+
+			err2 := s.readApplications(applicationExcludes)
 			if err2 != nil {
 				merr = multierror.Append(merr, err2)
 			}
@@ -533,6 +551,36 @@ func (s *DataSourceSyncer) readShares(excludes set.Set[string], shouldRetrieveTa
 	return enrichedInboundShares, inboundSharesMap, nil
 }
 
+func (s *DataSourceSyncer) readApplications(excludes set.Set[string]) error {
+	applications, err := s.repo.GetApplications()
+	if err != nil {
+		return fmt.Errorf("get applications: %w", err)
+	}
+
+	applicationEntities := make([]DbEntity, len(applications))
+
+	for i, app := range applications {
+		applicationEntities[i] = DbEntity{
+			Name:         app.Name,
+			Kind:         ptr.String("APPLICATION"),
+			OwnerAccount: app.Owner,
+		}
+	}
+
+	_, err = s.addTopLevelEntitiesToImporter(applicationEntities, Application, false,
+		func(name string) (map[string][]*tag.Tag, error) { return nil, nil },
+		func(name string) string { return name },
+		func(name, fullName string) bool {
+			return !excludes.Contains(fullName)
+		})
+
+	if err != nil {
+		return fmt.Errorf("add to importert: %w", err)
+	}
+
+	return nil
+}
+
 func (s *DataSourceSyncer) readWarehouses(shouldRetrieveTags bool) error {
 	dbWarehouses, err := s.repo.GetWarehouses()
 	if err != nil {
@@ -592,7 +640,7 @@ func (s *DataSourceSyncer) readIntegrations(shouldRetrieveTags bool) error {
 }
 
 func (s *DataSourceSyncer) addTopLevelEntitiesToImporter(entities []DbEntity, doType string, shouldRetrieveTags bool, tagRetrieval func(name string) (map[string][]*tag.Tag, error), externalIdGenerator func(name string) string, filter func(name, fullName string) bool) ([]ExtendedDbEntity, error) {
-	dbEntities := make([]ExtendedDbEntity, 0, 20)
+	dbEntities := make([]ExtendedDbEntity, 0, len(entities))
 
 	for _, db := range entities {
 		if db.Name == "" {

@@ -595,6 +595,32 @@ func (repo *SnowflakeRepository) GetDatabaseRolesWithPrefix(database string, pre
 	return roleEntities, nil
 }
 
+func (repo *SnowflakeRepository) GetApplicationRoles(application string) ([]ApplicationRoleEntity, error) {
+	var result []ApplicationRoleEntity
+
+	q := common.FormatQuery("SHOW APPLICATION ROLES IN APPLICATION %s", application)
+
+	rows, _, err := repo.query(q)
+	if err != nil {
+		return nil, err
+	}
+
+	err = scan.Rows(&result, rows)
+	if err != nil {
+		return nil, fmt.Errorf("fetching all application roles: %w", err)
+	}
+
+	return result, nil
+}
+
+func (repo *SnowflakeRepository) GetGrantsOfApplicationRole(application, role string) ([]GrantOfRole, error) {
+	q := fmt.Sprintf("SHOW GRANTS OF APPLICATION ROLE %s", common.FormatQuery("%s.%s", application, role))
+
+	logger.Info(fmt.Sprintf("Executing query: %s", q))
+
+	return repo.grantsOfRoleMapper(q)
+}
+
 func (repo *SnowflakeRepository) CreateDatabaseRole(database string, roleName string) error {
 	if repo.isProtectedRoleName(roleName) {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, roleName))
@@ -693,6 +719,38 @@ func (repo *SnowflakeRepository) GrantSharesToDatabaseRole(ctx context.Context, 
 	return <-done
 }
 
+func (repo *SnowflakeRepository) GrantAccountRolesToApplicationRole(ctx context.Context, application string, applicationRole string, accountRoles ...string) error {
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, otherAccountRole := range accountRoles {
+		q := common.FormatQuery(`CREATE ROLE IF NOT EXISTS %s`, otherAccountRole)
+		statementChan <- q
+
+		q = common.FormatQuery(`GRANT APPLICATION ROLE %s.%s TO ROLE %s`, application, applicationRole, otherAccountRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) GrantApplicationRolesToApplicationRole(ctx context.Context, application string, applicationRole string, applicationRoles ...string) error {
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, otherApplicationRole := range applicationRoles {
+		q := common.FormatQuery(`CREATE APPLICATION ROLE IF NOT EXISTS %s`, otherApplicationRole)
+		statementChan <- q
+
+		q = common.FormatQuery(`GRANT APPLICATION ROLE %s.%s TO APPLICATION ROLE %s`, application, applicationRole, otherApplicationRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
 func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error {
 	if repo.isProtectedRoleName(databaseRole) {
 		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
@@ -739,6 +797,42 @@ func (repo *SnowflakeRepository) RevokeDatabaseRolesFromDatabaseRole(ctx context
 
 	for _, otherRole := range databaseRoles {
 		q := common.FormatQuery(`REVOKE DATABASE ROLE %s.%s FROM DATABASE ROLE %s.%s`, database, databaseRole, database, otherRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) RevokeAccountRolesFromApplicationRole(ctx context.Context, application string, applicationRole string, accountRoles ...string) error {
+	if repo.isProtectedRoleName(applicationRole) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", application, applicationRole))
+		return nil
+	}
+
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, otherRole := range accountRoles {
+		q := common.FormatQuery(`REVOKE APPLICATION ROLE %s.%s FROM ROLE %s`, application, applicationRole, otherRole)
+		statementChan <- q
+	}
+
+	close(statementChan)
+
+	return <-done
+}
+
+func (repo *SnowflakeRepository) RevokeApplicationRolesFromApplicationRole(ctx context.Context, application string, applicationRole string, applicationRoles ...string) error {
+	if repo.isProtectedRoleName(applicationRole) {
+		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", application, applicationRole))
+		return nil
+	}
+
+	statementChan, done := repo.execMultiStatements(ctx)
+
+	for _, otherRole := range applicationRoles {
+		q := common.FormatQuery(`REVOKE APPLICATION ROLE %s.%s FROM APPLICATION ROLE %s`, application, applicationRole, otherRole)
 		statementChan <- q
 	}
 
@@ -1171,6 +1265,17 @@ func (repo *SnowflakeRepository) GetDatabases() ([]DbEntity, error) {
 	return ret, nil
 }
 
+func (repo *SnowflakeRepository) GetApplications() ([]ApplictionEntity, error) {
+	q := "SHOW APPLICATIONS IN ACCOUNT"
+
+	apps, err := getDbRows[ApplictionEntity](repo, q)
+	if err != nil {
+		return nil, fmt.Errorf("fetching applications: %w", err)
+	}
+
+	return apps, nil
+}
+
 func (repo *SnowflakeRepository) GetSchemasInDatabase(databaseName string, handleEntity EntityHandler) error {
 	q := getSchemasInDatabaseQuery(databaseName)
 
@@ -1535,12 +1640,16 @@ func (repo *SnowflakeRepository) getRowFilterForTableIfExists(databaseName strin
 }
 
 func (repo *SnowflakeRepository) getDbEntities(query string) ([]DbEntity, error) {
+	return getDbRows[DbEntity](repo, query)
+}
+
+func getDbRows[T any](repo *SnowflakeRepository, query string) ([]T, error) {
 	rows, _, err := repo.query(query)
 	if err != nil {
 		return nil, err
 	}
 
-	var dbs []DbEntity
+	var dbs []T
 	err = scan.Rows(&dbs, rows)
 
 	if err != nil {

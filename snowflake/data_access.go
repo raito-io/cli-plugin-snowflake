@@ -25,6 +25,7 @@ const (
 	inheritanceLockedReason = "The inheritance for this Snowflake role cannot be changed because it was imported from an external identity store"
 	nameLockedReason        = "This Snowflake role cannot be renamed because it was imported from an external identity store"
 	deleteLockedReason      = "This Snowflake role cannot be deleted because it was imported from an external identity store"
+	deleteLockReasonApp     = "This role cannot be deleted because it is created by a native application"
 	maskPrefix              = "RAITO_"
 	idAlphabet              = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -54,10 +55,13 @@ type dataAccessRepository interface {
 	GetOutboundShares() ([]ShareEntity, error)
 	GetAccountRolesWithPrefix(prefix string) ([]RoleEntity, error)
 	GetDatabaseRoles(database string) ([]RoleEntity, error)
+	GetApplicationRoles(application string) ([]ApplicationRoleEntity, error)
 	GetDatabaseRolesWithPrefix(database string, prefix string) ([]RoleEntity, error)
 	GetDatabases() ([]DbEntity, error)
+	GetApplications() ([]ApplictionEntity, error)
 	GetGrantsOfAccountRole(roleName string) ([]GrantOfRole, error)
 	GetGrantsOfDatabaseRole(database, roleName string) ([]GrantOfRole, error)
+	GetGrantsOfApplicationRole(application, role string) ([]GrantOfRole, error)
 	GetGrantsToAccountRole(roleName string) ([]GrantToRole, error)
 	GetGrantsToShare(shareName string) ([]GrantToRole, error)
 	GetGrantsToDatabaseRole(database, roleName string) ([]GrantToRole, error)
@@ -77,6 +81,8 @@ type dataAccessRepository interface {
 	GrantAccountRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
 	GrantDatabaseRolesToDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
 	GrantSharesToDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error
+	GrantAccountRolesToApplicationRole(ctx context.Context, application string, applicationRole string, accountRoles ...string) error
+	GrantApplicationRolesToApplicationRole(ctx context.Context, application string, applicationRole string, applicationRoles ...string) error
 	GrantUsersToAccountRole(ctx context.Context, role string, users ...string) error
 	RenameAccountRole(oldName, newName string) error
 	RenameDatabaseRole(database, oldName, newName string) error
@@ -84,6 +90,8 @@ type dataAccessRepository interface {
 	RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error
 	RevokeDatabaseRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error
 	RevokeSharesFromDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error
+	RevokeAccountRolesFromApplicationRole(ctx context.Context, application string, applicationRole string, accountRoles ...string) error
+	RevokeApplicationRolesFromApplicationRole(ctx context.Context, application string, applicationRole string, applicationRoles ...string) error
 	RevokeUsersFromAccountRole(ctx context.Context, role string, users ...string) error
 	TotalQueryTime() time.Duration
 	UpdateFilter(databaseName string, schema string, tableName string, filterName string, argumentNames []string, expression string) error
@@ -213,15 +221,23 @@ func (s *AccessSyncer) getGrantsToRole(externalId string, apType *string) ([]Gra
 	return s.repo.GetGrantsToAccountRole(externalId)
 }
 
-func (s *AccessSyncer) retrieveGrantsOfRole(externalId string, apType *string) (grantOfEntities []GrantOfRole, err error) {
-	if isDatabaseRole(apType) {
+func (s *AccessSyncer) retrieveGrantsOfRole(externalId string, apType string) (grantOfEntities []GrantOfRole, err error) {
+	switch apType {
+	case apTypeDatabaseRole:
 		database, parsedRoleName, err2 := parseDatabaseRoleExternalId(externalId)
 		if err2 != nil {
 			return nil, err2
 		}
 
 		grantOfEntities, err = s.repo.GetGrantsOfDatabaseRole(database, parsedRoleName)
-	} else {
+	case apTypeApplicationRole:
+		application, parsedRoleName, err2 := parseApplicationRoleExternalId(externalId)
+		if err2 != nil {
+			return nil, err2
+		}
+
+		grantOfEntities, err = s.repo.GetGrantsOfApplicationRole(application, parsedRoleName)
+	default:
 		grantOfEntities, err = s.repo.GetGrantsOfAccountRole(externalId)
 	}
 

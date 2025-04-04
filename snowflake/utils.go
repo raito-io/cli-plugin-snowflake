@@ -5,6 +5,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
@@ -15,8 +16,9 @@ import (
 )
 
 const (
-	externalIdDatabaseRolePrefix  = "DATABASEROLE###DATABASE:"
-	externalIdDatabaseRoleDivider = "###ROLE:"
+	externalIdDatabaseRolePrefix    = "DATABASEROLE###DATABASE:"
+	externalIdRoleDivider           = "###ROLE:"
+	externalIdApplicationRolePrefix = "APPLICATIONROLE###APPLICATION:"
 )
 
 var logger hclog.Logger
@@ -34,9 +36,17 @@ func cleanDoubleQuotes(input string) string {
 }
 
 func parseDatabaseRoleExternalId(externalId string) (database string, cleanedRoleName string, err error) {
-	if strings.HasPrefix(externalId, externalIdDatabaseRolePrefix) {
-		externalIdWithoutPrefix := strings.TrimPrefix(externalId, externalIdDatabaseRolePrefix)
-		parts := strings.Split(externalIdWithoutPrefix, externalIdDatabaseRoleDivider)
+	return parseRoleWithPrefixFromExternalId(externalId, externalIdDatabaseRolePrefix)
+}
+
+func parseApplicationRoleExternalId(externalId string) (database string, cleanedRoleName string, err error) {
+	return parseRoleWithPrefixFromExternalId(externalId, externalIdApplicationRolePrefix)
+}
+
+func parseRoleWithPrefixFromExternalId(externalId string, prefix string) (database string, cleanedRoleName string, err error) {
+	if strings.HasPrefix(externalId, prefix) {
+		externalIdWithoutPrefix := strings.TrimPrefix(externalId, prefix)
+		parts := strings.Split(externalIdWithoutPrefix, externalIdRoleDivider)
 
 		if len(parts) == 2 && !strings.EqualFold(parts[0], "") && !strings.EqualFold(parts[1], "") {
 			database = parts[0]
@@ -46,23 +56,30 @@ func parseDatabaseRoleExternalId(externalId string) (database string, cleanedRol
 		}
 	}
 
-	return "", "", fmt.Errorf("role %q is not in the expected database role format", externalId)
+	stack := debug.Stack()
+	logger.Info("Stack trace", "stack", string(stack))
+
+	return "", "", fmt.Errorf("role %q is not in the expected format", externalId)
 }
 
-func parseDatabaseRoleRoleName(sfRoleName string) (database string, cleanedRoleName string, err error) {
+func parseNamespacedRoleRoleName(sfRoleName string) (namespace string, cleanedRoleName string, err error) {
 	parts := strings.Split(sfRoleName, ".")
 	if (parts == nil) || (len(parts) < 2) {
-		return "", "", fmt.Errorf("role %q is not a database role", sfRoleName)
+		return "", "", fmt.Errorf("role %q is not a namespaced role", sfRoleName)
 	}
 
-	database = parts[0]
+	namespace = parts[0]
 	cleanedRoleName = parts[1]
 
-	return database, cleanedRoleName, nil
+	return namespace, cleanedRoleName, nil
 }
 
 func databaseRoleExternalIdGenerator(database, roleName string) string {
-	return fmt.Sprintf("%s%s%s%s", externalIdDatabaseRolePrefix, database, externalIdDatabaseRoleDivider, roleName)
+	return fmt.Sprintf("%s%s%s%s", externalIdDatabaseRolePrefix, database, externalIdRoleDivider, roleName)
+}
+
+func applicationRoleExternalIdGenerator(database, roleName string) string {
+	return fmt.Sprintf("%s%s%s%s", externalIdApplicationRolePrefix, database, externalIdRoleDivider, roleName)
 }
 
 func accountRoleExternalIdGenerator(roleName string) string {
@@ -77,6 +94,10 @@ func isDatabaseRole(apType *string) bool {
 	return apType != nil && strings.EqualFold(*apType, apTypeDatabaseRole)
 }
 
+func isApplicationRole(apType *string) bool {
+	return apType != nil && strings.EqualFold(*apType, apTypeApplicationRole)
+}
+
 func getWorkerPoolSize(configMap *config.ConfigMap) int {
 	size := configMap.GetInt(SfWorkerPoolSize)
 	if size <= 0 {
@@ -87,9 +108,17 @@ func getWorkerPoolSize(configMap *config.ConfigMap) int {
 }
 
 func isDatabaseRoleByExternalId(externalId string) bool {
-	if strings.HasPrefix(externalId, externalIdDatabaseRolePrefix) {
-		externalIdWithoutPrefix := strings.TrimPrefix(externalId, externalIdDatabaseRolePrefix)
-		parts := strings.Split(externalIdWithoutPrefix, externalIdDatabaseRoleDivider)
+	return isRoleWithPrefixByExternalId(externalId, externalIdDatabaseRolePrefix)
+}
+
+func isApplicationRoleByExternalId(externalId string) bool {
+	return isRoleWithPrefixByExternalId(externalId, externalIdApplicationRolePrefix)
+}
+
+func isRoleWithPrefixByExternalId(externalId string, prefix string) bool {
+	if strings.HasPrefix(externalId, prefix) {
+		externalIdWithoutPrefix := strings.TrimPrefix(externalId, prefix)
+		parts := strings.Split(externalIdWithoutPrefix, externalIdRoleDivider)
 
 		return len(parts) == 2 && !strings.EqualFold(parts[0], "") && !strings.EqualFold(parts[1], "")
 	}

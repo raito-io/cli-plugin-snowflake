@@ -53,6 +53,14 @@ func Test_IsNotInternalizableRole(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "application role - not internalizable",
+			args: args{
+				roleName: "APPLICATIONROLE###APPLICATION:TEST_APP###ROLE:ApplicationRole1",
+				roleType: ptr.String(apTypeApplicationRole),
+			},
+			want: true,
+		},
+		{
 			name: "database role - invalid",
 			args: args{
 				roleName: "BLAAT",
@@ -125,7 +133,7 @@ func Test_ShouldRetrieveTags(t *testing.T) {
 
 			syncer := createBasicFromTargetSyncer(repoMock, nil, &tt.args.configMap)
 
-			//When
+			// When
 			shouldRetrieveTags := syncer.shouldRetrieveTags()
 
 			// Then
@@ -142,7 +150,7 @@ func TestAccessSyncer_GetFullNameFromGrant(t *testing.T) {
 }
 
 func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
 
@@ -208,10 +216,10 @@ func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
 
 	syncer := createBasicFromTargetSyncer(repoMock, fileCreator, nil)
 
-	//When
+	// When
 	err := syncer.importPoliciesOfType(policyType, types.Grant)
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []sync_from_target.AccessProvider{
 		{

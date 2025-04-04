@@ -18,6 +18,7 @@ const (
 	SfSkipColumns                       = "sf-skip-columns"
 	SfDataUsageWindow                   = "sf-data-usage-window"
 	SfDatabaseRoles                     = "sf-database-roles"
+	SfApplications                      = "sf-applications"
 	SfDriverDebug                       = "sf-driver-debug"
 	SfDriverInsecureMode                = "sf-driver-insecure-mode"
 	SfIgnoreLinksToRoles                = "sf-ignore-links-to-roles"
@@ -38,5 +39,6 @@ const (
 
 	AccountAdminRole = "ACCOUNTADMIN"
 
-	GrantTypeDatabaseRole = "DATABASE_ROLE"
+	GrantTypeDatabaseRole    = "DATABASE_ROLE"
+	GrantTypeApplicationRole = "APPLICATION_ROLE"
 )

@@ -23,7 +23,7 @@ import (
 )
 
 func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
-	//Given
+	// Given
 	configParams := config.ConfigMap{
 		Parameters: map[string]string{"key": "value", SfDatabaseRoles: "true"},
 	}
@@ -36,6 +36,8 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 
 	repoMock := newMockDataAccessRepository(t)
 	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
+
+	repoMock.EXPECT().GetApplications().Return(nil, nil)
 
 	repoMock.EXPECT().DropAccountRole("ToRemove1").Return(nil).Once()
 	repoMock.EXPECT().DropAccountRole("ToRemove2").Return(nil).Once()
@@ -160,10 +162,10 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, feedbackHandler, &configParams)
 
-	//When
+	// When
 	err := syncer.SyncAccessProviderRolesToTarget(context.Background(), rolesToRemove, access)
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []importer.AccessProviderSyncFeedback{{
 		AccessProvider: "xxx",
@@ -208,8 +210,138 @@ func TestAccessSyncer_SyncAccessProviderRolesToTarget(t *testing.T) {
 			Type:           ptr.String("databaseRole"),
 		},
 	}, feedbackHandler.AccessProviderFeedback)
-
 }
+
+func TestAccessSyncer_SyncAccessProviderRolesToTarget_ApplicationRoles(t *testing.T) {
+	// Given
+	configParams := config.ConfigMap{
+		Parameters: map[string]string{"key": "value", SfDatabaseRoles: "true"},
+	}
+
+	rolesToRemove := map[string]*importer.AccessProvider{
+		"ToRemove1": {Id: "xxx", Type: ptr.String(access_provider.Role)},
+	}
+
+	repoMock := newMockDataAccessRepository(t)
+	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
+
+	repoMock.EXPECT().GetApplications().Return([]ApplictionEntity{
+		{
+			Name:      "TEST_APP",
+			IsDefault: "N",
+			IsCurrent: "N",
+		},
+	}, nil)
+	repoMock.EXPECT().GetApplicationRoles("TEST_APP").Return([]ApplicationRoleEntity{
+		{
+			Name: "AccessProvider2",
+		}, {
+			Name: "APP_ROLE_TO_REMOVE",
+		},
+	}, nil)
+	repoMock.EXPECT().GetGrantsOfApplicationRole("TEST_APP", "AccessProvider2").Return([]GrantOfRole{
+		{
+			GrantedTo:   "ROLE",
+			GranteeName: "ROLE_TO_REMOVE",
+		},
+		{
+			GrantedTo:   "ROLE",
+			GranteeName: "EXISTING_ROLE",
+		},
+		{
+			GrantedTo:   "APPLICATION_ROLE",
+			GranteeName: "TEST_APP.APP_ROLE_TO_REMOVE",
+		},
+	}, nil)
+
+	repoMock.EXPECT().GrantApplicationRolesToApplicationRole(mock.Anything, "TEST_APP", "AccessProvider2").Return(nil).Once()
+	repoMock.EXPECT().GrantAccountRolesToApplicationRole(mock.Anything, "TEST_APP", "AccessProvider2", "AccessProvider1").Return(nil)
+	repoMock.EXPECT().RevokeAccountRolesFromApplicationRole(mock.Anything, "TEST_APP", "AccessProvider2", "ROLE_TO_REMOVE").Return(nil).Once()
+	repoMock.EXPECT().RevokeApplicationRolesFromApplicationRole(mock.Anything, "TEST_APP", "AccessProvider2", "APP_ROLE_TO_REMOVE").Return(nil).Once()
+
+	repoMock.EXPECT().DropAccountRole("ToRemove1").Return(nil).Once()
+
+	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
+	repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "RoleName1").Return(nil).Once()
+
+	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
+	repoMock.EXPECT().GrantAccountRolesToAccountRole(mock.Anything, "RoleName1").Return(nil).Once()
+
+	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "RoleName1", false).Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema1", "RoleName1", false).Return(nil).Once()
+	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema1.Table1", "RoleName1", false).Return(nil).Once()
+
+	repoMock.EXPECT().GetAccountRolesWithPrefix("").Return([]RoleEntity{
+		{Name: "ExistingRole1", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
+		{Name: "ROLE_TO_REMOVE", GrantedToRoles: 2, GrantedRoles: 3, AssignedToUsers: 2, Owner: "Owner"},
+	}, nil).Once()
+	repoMock.EXPECT().GetInboundShares().Return([]DbEntity{}, nil).Once()
+	repoMock.EXPECT().GetDatabases().Return([]DbEntity{
+		{Name: "SNOWFLAKE"},
+		{Name: "TEST_DB"},
+	}, nil).Once()
+	repoMock.EXPECT().GetDatabaseRolesWithPrefix("SNOWFLAKE", "").Return([]RoleEntity{}, nil).Once()
+	repoMock.EXPECT().GetDatabaseRolesWithPrefix("TEST_DB", "").Return([]RoleEntity{
+		{Name: "DatabaseRole1", AssignedToUsers: 0, GrantedRoles: 0, GrantedToRoles: 1, Owner: "Owner"},
+	}, nil).Once()
+
+	ap1 := &importer.AccessProvider{
+		Id:         "AccessProviderId1",
+		Name:       "AccessProvider1",
+		ActualName: ptr.String("AccessProvider1"),
+		Who: importer.WhoItem{
+			Users: []string{"User1", "User2"},
+		},
+		What: []importer.WhatItem{
+			{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+		},
+	}
+
+	appRole1 := &importer.AccessProvider{
+		Id:         "AccessProviderId2",
+		Name:       "AccessProvider2",
+		ActualName: ptr.String("AccessProvider2"),
+		ExternalId: ptr.String("share:AccessProvider2"),
+		Type:       ptr.String("applicationRole"),
+		Who: importer.WhoItem{
+			InheritFrom: []string{"AccessProvider1", "EXISTING_ROLE"},
+		},
+		WhoLocked:    ptr.Bool(true),
+		WhatLocked:   ptr.Bool(true),
+		DeleteLocked: ptr.Bool(true),
+	}
+
+	access := map[string]*importer.AccessProvider{
+		"RoleName1": ap1,
+		"APPLICATIONROLE###APPLICATION:TEST_APP###ROLE:AccessProvider2": appRole1,
+	}
+
+	syncer := createBasicToTargetSyncer(repoMock, nil, feedbackHandler, &configParams)
+
+	// When
+	err := syncer.SyncAccessProviderRolesToTarget(context.Background(), rolesToRemove, access)
+
+	// Then
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []importer.AccessProviderSyncFeedback{{
+		AccessProvider: "xxx",
+		ExternalId:     ptr.String("ToRemove1"),
+	},
+		{
+			AccessProvider: "AccessProviderId1",
+			ActualName:     "RoleName1",
+			ExternalId:     ptr.String("RoleName1"),
+			Type:           ptr.String(access_provider.Role),
+		},
+		{
+			AccessProvider: "AccessProviderId2",
+			ActualName:     "AccessProvider2",
+			ExternalId:     ptr.String("APPLICATIONROLE###APPLICATION:TEST_APP###ROLE:AccessProvider2"),
+			Type:           ptr.String("applicationRole"),
+		},
+	}, feedbackHandler.AccessProviderFeedback)
+}
+
 func TestAccessSyncer_SyncAccessProviderMasksToTarget(t *testing.T) {
 	// Given
 	configParams := config.ConfigMap{
@@ -248,7 +380,7 @@ func TestAccessSyncer_SyncAccessProviderMasksToTarget(t *testing.T) {
 		},
 	}
 
-	repoMock.EXPECT().GetPoliciesLike("MASKING", "RAITO_MASK1%").Return(nil, nil).Once() //No existing masks
+	repoMock.EXPECT().GetPoliciesLike("MASKING", "RAITO_MASK1%").Return(nil, nil).Once() // No existing masks
 	repoMock.EXPECT().CreateMaskPolicy("DB1", "Schema1", mock.AnythingOfType("string"), []string{"DB1.Schema1.Table1.Column1"}, ptr.String("SHA256"), &MaskingBeneficiaries{Users: []string{"User1", "User2"}, Roles: []string{"Role1", "Role2"}}).Return(nil)
 	repoMock.EXPECT().CreateMaskPolicy("DB1", "Schema2", mock.AnythingOfType("string"), []string{"DB1.Schema2.Table1.Column1"}, ptr.String("SHA256"), &MaskingBeneficiaries{Users: []string{"User1", "User2"}, Roles: []string{"Role1", "Role2"}}).Return(nil)
 
@@ -425,20 +557,20 @@ func TestAccessSyncer_SyncAccessProviderFiltersToTarget(t *testing.T) {
 }
 
 func TestAccessSyncer_removeRolesToRemove_NoRoles(t *testing.T) {
-	//Given
+	// Given
 	repo := newMockDataAccessRepository(t)
 
 	syncer := createBasicToTargetSyncer(repo, nil, nil, nil)
 
-	//When
+	// When
 	err := syncer.removeRolesToRemove(map[string]*importer.AccessProvider{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func TestAccessSyncer_removeRolesToRemove(t *testing.T) {
-	//Given
+	// Given
 	repo := newMockDataAccessRepository(t)
 
 	rolesToRemove := map[string]*importer.AccessProvider{"Role1": {Id: "xxx"}, "Role2": {Id: "yyy"}, "Role3": {Id: "zzz"}}
@@ -454,15 +586,15 @@ func TestAccessSyncer_removeRolesToRemove(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repo, nil, &dummyFeedbackHandler{}, nil)
 
-	//When
+	// When
 	err := syncer.removeRolesToRemove(rolesToRemove)
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func TestAccessSyncer_removeRolesToRemove_error(t *testing.T) {
-	//Given
+	// Given
 	repo := newMockDataAccessRepository(t)
 
 	rolesToRemove := map[string]*importer.AccessProvider{"Role1": {Id: "xxx"}, "Role2": {Id: "yyy"}}
@@ -473,7 +605,7 @@ func TestAccessSyncer_removeRolesToRemove_error(t *testing.T) {
 	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
 	syncer := createBasicToTargetSyncer(repo, nil, feedbackHandler, nil)
 
-	//When
+	// When
 	err := syncer.removeRolesToRemove(rolesToRemove)
 
 	assert.Len(t, feedbackHandler.AccessProviderFeedback, 2)
@@ -489,12 +621,12 @@ func TestAccessSyncer_removeRolesToRemove_error(t *testing.T) {
 		},
 	})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func generateAccessControls_table(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
@@ -521,15 +653,15 @@ func generateAccessControls_table(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func generateAccessControls_view(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
@@ -556,10 +688,10 @@ func generateAccessControls_view(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
@@ -578,7 +710,7 @@ func createBasicToTargetSyncer(repo dataAccessRepository, accessProviders *impor
 }
 
 func generateAccessControls_schema(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
@@ -624,15 +756,15 @@ func generateAccessControls_schema(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func generateAccessControls_schema_noverify(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
@@ -659,15 +791,15 @@ func generateAccessControls_schema_noverify(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func generateAccessControls_existing_schema(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CommentAccountRoleIfExists(mock.AnythingOfType("string"), "RoleName1").Return(nil).Once()
@@ -715,15 +847,15 @@ func generateAccessControls_existing_schema(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("RoleName1"), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func generateAccessControls_sharedDatabase(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
@@ -748,15 +880,15 @@ func generateAccessControls_sharedDatabase(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func generateAccessControls_database(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
@@ -809,15 +941,15 @@ func generateAccessControls_database(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func generateAccessControls_existing_database(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CommentAccountRoleIfExists(mock.AnythingOfType("string"), "RoleName1").Return(nil).Once()
@@ -894,15 +1026,15 @@ func generateAccessControls_existing_database(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("RoleName1", "DATABASEROLE###DATABASE:DB1###ROLE:DatabaseRole1"), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func generateAccessControls_warehouse(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
@@ -927,15 +1059,15 @@ func generateAccessControls_warehouse(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func generateAccessControls_integration(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
@@ -960,15 +1092,15 @@ func generateAccessControls_integration(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func generateAccessControls_datasource(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
@@ -993,10 +1125,10 @@ func generateAccessControls_datasource(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
@@ -1015,7 +1147,7 @@ func TestAccessSyncer_generateAccessControls(t *testing.T) {
 }
 
 func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CommentAccountRoleIfExists(mock.AnythingOfType("string"), "existingRole1").Return(nil).Once()
@@ -1049,7 +1181,6 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 	expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock, false, "TEST_DB", "existingDBRole1")
 	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1", "Role3").Return(nil).Once()
 	repoMock.EXPECT().RevokeAccountRolesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1").Return(nil).Once()
-	repoMock.EXPECT().RevokeSharesFromDatabaseRole(mock.Anything, "TEST_DB", "existingDBRole1").Return(nil).Once()
 
 	access := map[string]*importer.AccessProvider{
 		"existingRole1": {
@@ -1077,15 +1208,15 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("existingRole1", "DATABASEROLE###DATABASE:TEST_DB###ROLE:existingDBRole1"), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 func TestAccessSyncer_generateAccessControls_inheritance(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
@@ -1146,16 +1277,16 @@ func TestAccessSyncer_generateAccessControls_inheritance(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string](), map[string]string{})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 }
 
 // Testing the normal rename case where we need to rename the role to the new name and then update stuff.
 func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
 
@@ -1197,10 +1328,10 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, feedbackHandler, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName", "DATABASEROLE###DATABASE:TEST_DB###ROLE:oldDBRole"), map[string]string{"NewRoleName": "OldRoleName", "DATABASEROLE###DATABASE:TEST_DB###ROLE:newDBRole": "DATABASEROLE###DATABASE:TEST_DB###ROLE:oldDBRole"})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 	assert.Len(t, feedbackHandler.AccessProviderFeedback, 2)
 	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
@@ -1220,7 +1351,7 @@ func TestAccessSyncer_generateAccessControls_rename(t *testing.T) {
 
 // Testing the rename of APs where the new role name already exists (but not needed), so the old should get dropped
 func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
 
@@ -1244,10 +1375,10 @@ func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, feedbackHandler, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName", "NewRoleName"), map[string]string{"NewRoleName": "OldRoleName"})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 	assert.Len(t, feedbackHandler.AccessProviderFeedback, 1)
 	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
@@ -1264,7 +1395,7 @@ func TestAccessSyncer_generateAccessControls_renameNewExists(t *testing.T) {
 // So it should not get dropped but updated instead.
 // The new role name should be created from scratch.
 func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T) {
-	//Given
+	// Given
 	repoMock := newMockDataAccessRepository(t)
 	feedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(t)
 
@@ -1295,10 +1426,10 @@ func TestAccessSyncer_generateAccessControls_renameOldAlreadyTaken(t *testing.T)
 
 	syncer := createBasicToTargetSyncer(repoMock, nil, feedbackHandler, &config.ConfigMap{})
 
-	//When
+	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("OldRoleName"), map[string]string{"NewRoleName": "OldRoleName"})
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 	assert.Len(t, feedbackHandler.AccessProviderFeedback, 2)
 	assert.ElementsMatch(t, feedbackHandler.AccessProviderFeedback, []importer.AccessProviderSyncFeedback{
@@ -1504,7 +1635,6 @@ func TestGrantRolesToRole_DatabaseFiltering(t *testing.T) {
 
 	repoMock.EXPECT().GrantDatabaseRolesToDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherDBRole").Return(nil).Once()
 	repoMock.EXPECT().GrantAccountRolesToDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherRole").Return(nil).Once()
-	repoMock.EXPECT().GrantSharesToDatabaseRole(mock.Anything, "DB1", "TargetRole").Return(nil).Once()
 
 	dbRoleType := apTypeDatabaseRole
 	err := syncer.grantRolesToRole(context.Background(), databaseRoleExternalIdGenerator("DB1", "TargetRole"), &dbRoleType, "MyRole1", "AnotherRole", databaseRoleExternalIdGenerator("DB1", "MyDBRole"), databaseRoleExternalIdGenerator("DB1", "AnotherDBRole"))
@@ -1529,7 +1659,6 @@ func TestRevokeRolesFromRole_DatabaseFiltering(t *testing.T) {
 
 	repoMock.EXPECT().RevokeDatabaseRolesFromDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherDBRole").Return(nil).Once()
 	repoMock.EXPECT().RevokeAccountRolesFromDatabaseRole(mock.Anything, "DB1", "TargetRole", "AnotherRole").Return(nil).Once()
-	repoMock.EXPECT().RevokeSharesFromDatabaseRole(mock.Anything, "DB1", "TargetRole").Return(nil).Once()
 
 	dbRoleType := apTypeDatabaseRole
 	err := syncer.revokeRolesFromRole(context.Background(), databaseRoleExternalIdGenerator("DB1", "TargetRole"), &dbRoleType, "MyRole1", "AnotherRole", databaseRoleExternalIdGenerator("DB1", "MyDBRole"), databaseRoleExternalIdGenerator("DB1", "AnotherDBRole"))
@@ -1609,7 +1738,6 @@ func expectGrantAccountOrDatabaseRolesToDatabaseRole(repoMock *mockDataAccessRep
 
 	if expectDatabaseRoles {
 		repoMock.EXPECT().GrantDatabaseRolesToDatabaseRole(mock.Anything, database, roleName, arguments...).Return(nil).Once()
-		repoMock.EXPECT().GrantSharesToDatabaseRole(mock.Anything, database, roleName, mock.Anything).Return(nil).Once()
 
 	} else {
 		repoMock.EXPECT().GrantAccountRolesToDatabaseRole(mock.Anything, database, roleName, arguments...).Return(nil).Once()

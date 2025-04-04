@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/cli/base/access_provider"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	ds "github.com/raito-io/cli/base/data_source"
@@ -16,12 +17,14 @@ const USAGE_ON_DATABASE = "USAGE on DATABASE"
 const USAGE_ON_SCHEMA = "USAGE on SCHEMA"
 
 const apTypeDatabaseRole = "databaseRole"
+const apTypeApplicationRole = "applicationRole"
 const apTypeSharePrefix = "share:"
 const ExternalTable = "external-" + ds.Table
 const IcebergTable = "iceberg-" + ds.Table
 const Function = "function"
 const Procedure = "procedure"
 const Integration = "integration"
+const Application = "application"
 const MaterializedView = "materialized-" + ds.View
 
 // RoleNameConstraints is based on https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html#identifier-requirements
@@ -86,6 +89,17 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 				CanBeAssumed:                  false,
 				CanAssumeMultiple:             false,
 				AllowedWhoAccessProviderTypes: []string{access_provider.Role, apTypeDatabaseRole},
+				CommonParentType:              ptr.String(ds.Database),
+			},
+			{
+				Type:                          apTypeApplicationRole,
+				Label:                         "Application Role",
+				IsNamedEntity:                 true,
+				CanBeCreated:                  false,
+				CanBeAssumed:                  false,
+				CanAssumeMultiple:             false,
+				AllowedWhoAccessProviderTypes: []string{access_provider.Role, apTypeApplicationRole},
+				CommonParentType:              ptr.String(Application),
 			},
 		},
 	}
@@ -247,7 +261,7 @@ func DataObjectTypes() []*ds.DataObjectType {
 					Description: "Grants ability to set value for the SHARE_RESTRICTIONS parameter which enables a Business Critical provider account to add a consumer account (with Non-Business Critical edition) to a share.",
 				},
 			},
-			Children: []string{ds.Database, SharedPrefix + ds.Database, "warehouse", Integration},
+			Children: []string{ds.Database, SharedPrefix + ds.Database, "warehouse", Integration, Application},
 		},
 		{
 			Name: "warehouse",
@@ -341,6 +355,11 @@ func DataObjectTypes() []*ds.DataObjectType {
 				ShareablePermissions:     []string{USAGE_ON_DATABASE, "REFERENCE_USAGE"},
 				CorrespondingSharedTypes: []string{SharedPrefix + ds.Database},
 			},
+		},
+		{
+			Name:        Application,
+			Type:        Application,
+			Permissions: []*ds.DataObjectTypePermission{},
 		},
 		{
 			Name: ds.Schema,
