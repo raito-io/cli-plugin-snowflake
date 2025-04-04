@@ -41,16 +41,16 @@ func TestDataAccessTestSuite(t *testing.T) {
 }
 
 func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
-	//Given
+	// Given
 	dataAccessProviderHandler := mocks.NewSimpleAccessProviderHandler(s.T(), 20)
 	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
 
 	config := s.getConfig()
 
-	//When
+	// When
 	err := dataAccessSyncer.SyncAccessProvidersFromTarget(context.Background(), dataAccessProviderHandler, config)
 
-	//Then
+	// Then
 	s.NoError(err)
 	s.True(len(dataAccessProviderHandler.AccessProviders) >= 6)
 
@@ -135,8 +135,8 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFromTarget() {
 	}
 }
 
-func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
-	//Given
+func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersToTarget() {
+	// Given
 	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
 	actualRoleName := generateRole("TESTROLE1", testId)
@@ -266,10 +266,10 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 
 	config := s.getConfig()
 
-	//When
+	// When
 	err := dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
-	//Then
+	// Then
 	s.NoError(err)
 	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 3)
 
@@ -353,8 +353,8 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		Owner:           "ACCOUNTADMIN",
 	})
 
-	//Update database role 1 to attach it to the account role
-	//Given
+	// Update database role 1 to attach it to the account role
+	// Given
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 	accessProviderImport.AccessProviders = []*sync_to_target.AccessProvider{
 		{
@@ -398,11 +398,11 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		},
 	}
 
-	//When
+	// When
 	dataAccessSyncer = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
 	err = dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
-	//Then
+	// Then
 	s.NoError(err)
 	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 2)
 
@@ -451,7 +451,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		Owner:           "ACCOUNTADMIN",
 	})
 
-	//Given
+	// Given
 	id := accountRoleId
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 	accessProviderImport.AccessProviders = []*sync_to_target.AccessProvider{
@@ -478,11 +478,11 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget() {
 		},
 	}
 
-	//When
+	// When
 	dataAccessSyncer = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
 	err = dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
-	//Then
+	// Then
 	s.NoError(err)
 	s.ElementsMatch(dataAccessFeedbackHandler.AccessProviderFeedback, []sync_to_target.AccessProviderSyncFeedback{
 		{
@@ -507,7 +507,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 		s.T().Skip("Skip test as Masking is a non standard edition feature")
 	}
 
-	//Given
+	// Given
 	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
 	database := "RAITO_DATABASE"
@@ -543,10 +543,10 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 
 	config := s.getConfig()
 
-	//When
+	// When
 	err := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
-	//Then
+	// Then
 	s.NoError(err)
 	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 1)
 
@@ -568,10 +568,10 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
-	//When updating the mask will be recreated
+	// When updating the mask will be recreated
 	err = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
-	//Then
+	// Then
 	s.NoError(err)
 	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 1)
 
@@ -591,17 +591,17 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 		Owner:        "ACCOUNTADMIN",
 	})
 
-	//Given
+	// Given
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 	// masksToRemove["RAITO_"+maskName] = &sync_to_target.AccessProvider{}
 	accessProviderImport.AccessProviders = []*sync_to_target.AccessProvider{}
 
 	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
-	//When
+	// When
 	err = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
-	//Then
+	// Then
 	s.NoError(err)
 	s.Len(accessProviderFeedback, 1)
 
@@ -617,8 +617,8 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget()
 	})
 }
 
-func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share() {
-	//Given
+func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersToTarget_Share() {
+	// Given
 	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
 
 	shareName := generateRole("TESTSHARE", testId)
@@ -668,10 +668,10 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share
 
 	config := s.getConfig()
 
-	//When
+	// When
 	err := dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
 
-	//Then
+	// Then
 	s.NoError(err)
 	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 1)
 
@@ -683,7 +683,7 @@ func (s *DataAccessTestSuite) TestAssessSyncer_SyncAccessProvidersToTarget_Share
 		{
 			AccessProvider: accountShareId,
 			ActualName:     actualShareName,
-			ExternalId:     &actualShareName,
+			ExternalId:     ptr.String("share:" + actualShareName),
 		},
 	}, accessProviderFeedback)
 

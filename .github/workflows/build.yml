@@ -117,9 +117,18 @@ jobs:
           SF_STANDARD_EDITION: false
 
       - uses: codecov/codecov-action@v5
+        if: ${{ !cancelled() }}
+        name: Upload coverage to Codecov
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.txt
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./junit-tests.xml
 
 #  cleanup:
 #    needs:
