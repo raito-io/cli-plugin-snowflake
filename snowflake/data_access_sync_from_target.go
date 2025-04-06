@@ -70,14 +70,25 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 		return fmt.Errorf("importing shares: %w", err)
 	}
 
+	excludedDatabases := s.extractExcludeDatabases()
+
 	databaseRoleSupportEnabled := s.configMap.GetBoolWithDefault(SfDatabaseRoles, false)
 	if databaseRoleSupportEnabled {
 		logger.Info("Reading database roles from Snowflake")
-		excludedDatabases := s.extractExcludeDatabases()
 
 		err = s.importAllRolesOnDatabaseLevel(s.accessProviderHandler, excludedDatabases)
 		if err != nil {
 			return err
+		}
+	}
+
+	applicationSupportEnabled := s.configMap.GetBoolWithDefault(SfApplications, false)
+	if applicationSupportEnabled {
+		logger.Info("Reading application roles from Snowflake")
+
+		err = s.importAllRolesOnApplicationLevel(s.accessProviderHandler, excludedDatabases)
+		if err != nil {
+			return fmt.Errorf("application roles: %w", err)
 		}
 	}
 
@@ -270,7 +281,7 @@ func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity
 
 	roleName := roleEntity.Name
 	externalId := roleName
-	currentApType := ptr.String(access_provider.Role)
+	currentApType := access_provider.Role
 	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, s.externalGroupOwners)
 
 	users, groups, accessProviders, incomplete, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS)
@@ -284,7 +295,7 @@ func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity
 	ap, f := processedAps[externalId]
 	if !f {
 		processedAps[externalId] = &exporter.AccessProvider{
-			Type:       currentApType,
+			Type:       &currentApType,
 			ExternalId: externalId,
 			ActualName: roleName,
 			Name:       roleName,
@@ -361,7 +372,7 @@ func (s *AccessFromTargetSyncer) extractExcludeRoleList() map[string]struct{} {
 }
 
 func (s *AccessFromTargetSyncer) importAllRolesOnDatabaseLevel(accessProviderHandler wrappers.AccessProviderHandler, excludedDatabases set.Set[string]) error {
-	//Get all database roles for each database and import them
+	// Get all database roles for each database and import them
 	databases, err := s.getApplicableDatabases(excludedDatabases)
 	if err != nil {
 		return err
@@ -417,6 +428,57 @@ func (s *AccessFromTargetSyncer) importAllRolesOnDatabaseLevel(accessProviderHan
 	return nil
 }
 
+func (s *AccessFromTargetSyncer) importAllRolesOnApplicationLevel(accessProviderHandler wrappers.AccessProviderHandler, excludeDatabases set.Set[string]) error {
+	applications, err := s.getApplicableApplications(excludeDatabases)
+	if err != nil {
+		return fmt.Errorf("retrieving applications: %w", err)
+	}
+
+	wp := workerpool.New(getWorkerPoolSize(s.configMap))
+
+	processedAps := make(map[string]*exporter.AccessProvider)
+
+	for application := range applications {
+		logger.Info(fmt.Sprintf("Reading roles from Snowflake inside application %s", application))
+
+		wp.Submit(func() {
+			roleEntitites, err2 := s.repo.GetApplicationRoles(application)
+			if err2 != nil {
+				logger.Error(fmt.Sprintf("Error retrieving roles for application %q: %s", application, err2.Error()))
+
+				return
+			}
+
+			for _, roleEntity := range roleEntitites {
+				fullRoleName := fmt.Sprintf("%s.%s", application, roleEntity.Name)
+				if _, exclude := s.excludedRoles[fullRoleName]; exclude {
+					logger.Info("Skipping SnowFlake APPLICATION ROLE " + fullRoleName)
+
+					continue
+				}
+
+				err2 = s.importAccessForApplicationRole(application, RoleEntity{
+					Name: roleEntity.Name,
+				}, processedAps)
+				if err2 != nil {
+					logger.Error(fmt.Sprintf("Error importing SnowFlake Application role %q: %s", fullRoleName, err2.Error()))
+
+					return
+				}
+			}
+		})
+	}
+
+	wp.StopWait()
+
+	err = accessProviderHandler.AddAccessProviders(values(processedAps)...)
+	if err != nil {
+		return fmt.Errorf("adding access provider to import file: %w", err)
+	}
+
+	return nil
+}
+
 func (s *AccessFromTargetSyncer) comesFromExternalIdentityStore(roleEntity RoleEntity, externalGroupOwners string) bool {
 	fromExternalIS := false
 
@@ -435,7 +497,7 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 
 	roleName := roleEntity.Name
 	externalId := databaseRoleExternalIdGenerator(database, roleName)
-	currentApType := ptr.String(apTypeDatabaseRole)
+	currentApType := apTypeDatabaseRole
 	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, s.externalGroupOwners)
 
 	users, groups, accessProviders, incomplete, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS)
@@ -448,7 +510,7 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 	ap, f := processedAps[externalId]
 	if !f {
 		processedAps[externalId] = &exporter.AccessProvider{
-			Type:       currentApType,
+			Type:       &currentApType,
 			ExternalId: externalId,
 			// Updated this because of https://github.com/raito-io/appserver/blob/587484940a2e356a486dd8779166852761885353/lambda/appserver/services/access_provider/importer/importer.go#L523
 			ActualName: roleName,
@@ -469,7 +531,8 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 			WhatLocked:       ptr.Bool(true),
 			WhatLockedReason: ptr.String(databaseRoleWhatLockedReason),
 
-			Incomplete: &incomplete,
+			Incomplete:           &incomplete,
+			CommonWhatDataObject: &database,
 		}
 		ap = processedAps[externalId]
 	} else {
@@ -497,6 +560,60 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 		ap.Tags = availableTags[ap.Name]
 		logger.Debug(fmt.Sprintf("Going to add tags to AP %s", ap.ExternalId))
 	}
+
+	return nil
+}
+
+func (s *AccessFromTargetSyncer) importAccessForApplicationRole(application string, roleEntity RoleEntity, processedAps map[string]*exporter.AccessProvider) error {
+	logger.Info(fmt.Sprintf("Reading SnowFlake APPLICATION ROLE %s inside %s", roleEntity.Name, application))
+
+	roleName := roleEntity.Name
+	externalId := applicationRoleExternalIdGenerator(application, roleName)
+	currentApType := apTypeApplicationRole
+	fromExternalIS := s.comesFromExternalIdentityStore(roleEntity, s.externalGroupOwners)
+
+	users, groups, accessProviders, incomplete, err := s.retrieveWhoEntitiesForRole(roleEntity, externalId, currentApType, fromExternalIS)
+	if err != nil {
+		return err
+	}
+
+	s.lock.Lock()
+
+	ap, f := processedAps[externalId]
+	if !f {
+		processedAps[externalId] = &exporter.AccessProvider{
+			Type:       &currentApType,
+			ExternalId: externalId,
+			ActualName: roleName,
+
+			Name:       roleName,
+			NamingHint: fmt.Sprintf("%s.%s", application, roleName),
+			Action:     types.Grant,
+			Who: &exporter.WhoItem{
+				Users:           users,
+				AccessProviders: accessProviders,
+				Groups:          groups,
+			},
+			What: make([]exporter.WhatItem, 0),
+			// In a first implementation, we lock the who and what side for a database role
+			// Who side will always be locked as you can't directly grant access to a database role from a user
+			WhoLocked:          ptr.Bool(true),
+			WhoLockedReason:    ptr.String(databaseRoleWhoLockedReason),
+			WhatLocked:         ptr.Bool(true),
+			WhatLockedReason:   ptr.String(databaseRoleWhatLockedReason),
+			DeleteLocked:       ptr.Bool(true),
+			DeleteLockedReason: ptr.String(deleteLockReasonApp),
+
+			Incomplete:           &incomplete,
+			CommonWhatDataObject: &application,
+		}
+	} else {
+		ap.Who.Users = users
+		ap.Who.AccessProviders = accessProviders
+		ap.Who.Groups = groups
+	}
+
+	s.lock.Unlock()
 
 	return nil
 }
@@ -581,7 +698,7 @@ func mapPrivilege(privilege string, grantedOn string) string {
 	return privilege
 }
 
-func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntity, externalId string, apType *string, fromExternalIS bool) (users []string, groups []string, accessProviders []string, incomplete bool, err error) {
+func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntity, externalId string, apType string, fromExternalIS bool) (users []string, groups []string, accessProviders []string, incomplete bool, err error) {
 	roleName := roleEntity.Name
 
 	users = make([]string, 0)
@@ -620,7 +737,7 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 					continue
 				}
 
-				database, parsedRoleName, err2 := parseDatabaseRoleRoleName(cleanDoubleQuotes(grantee.GranteeName))
+				database, parsedRoleName, err2 := parseNamespacedRoleRoleName(cleanDoubleQuotes(grantee.GranteeName))
 				if err2 != nil {
 					return nil, nil, nil, false, err2
 				}
@@ -759,6 +876,23 @@ func (s *AccessFromTargetSyncer) getApplicableDatabases(dbExcludes set.Set[strin
 	return filteredDatabases, nil
 }
 
+func (s *AccessFromTargetSyncer) getApplicableApplications(dbExcludes set.Set[string]) (set.Set[string], error) {
+	allApplications, err := s.repo.GetApplications()
+	if err != nil {
+		return nil, err
+	}
+
+	filteredApplications := set.NewSet[string]()
+
+	for _, app := range allApplications {
+		if !dbExcludes.Contains(app.Name) {
+			filteredApplications.Add(app.Name)
+		}
+	}
+
+	return filteredApplications, nil
+}
+
 func (s *AccessFromTargetSyncer) extractExcludeDatabases() set.Set[string] {
 	excludedDatabases := "SNOWFLAKE"
 	if v, ok := s.configMap.Parameters[SfExcludedDatabases]; ok {
@@ -778,6 +912,8 @@ func isNotInternalizableRole(externalId string, roleType *string) bool {
 		}
 
 		searchForRole = fmt.Sprintf("%s.%s", database, parsedRoleName)
+	} else if isApplicationRole(roleType) {
+		return true
 	}
 
 	for _, r := range RolesNotInternalizable {

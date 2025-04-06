@@ -59,6 +59,7 @@ func readDatabaseConfig() *config.ConfigMap {
 			snowflake.SfRole:                 sfRole,
 			snowflake.SfStandardEdition:      strconv.FormatBool(sfStandardEdition),
 			snowflake.SfDatabaseRoles:        "true",
+			snowflake.SfApplications:         "true",
 			snowflake.SfRoleOwnerEmailTag:    "RAITO_DATABASE.PUBLIC.\"raito.io:owner\"",
 		},
 	}
