@@ -17,7 +17,7 @@ require (
 	github.com/raito-io/bexpression v0.1.2
 	github.com/raito-io/cli v0.71.1
 	github.com/raito-io/golang-set v0.0.4
-	github.com/snowflakedb/gosnowflake v1.13.1
+	github.com/snowflakedb/gosnowflake v1.13.2
 	github.com/stretchr/testify v1.10.0
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
 )
