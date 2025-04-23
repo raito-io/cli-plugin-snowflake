@@ -86,7 +86,18 @@ func executeQueryUsage(account string, email string, role string, rsaPrivateKey 
 
 			executed++
 
-			rows, err := conn.Query(query)
+			tx, err2 := conn.Begin()
+			if err2 != nil {
+				return fmt.Errorf("begin transaction: %w", err2)
+			}
+
+			_, err2 = tx.Exec("USE SECONDARY ROLES ALL")
+			if err2 != nil {
+				return fmt.Errorf("use secondary roles: %w", err2)
+			}
+
+
+			rows, err := tx.Query(query)
 			if err != nil {
 				logger.Info(fmt.Sprintf("Query %q execution failed: %s", query, err.Error()))
 
@@ -99,6 +110,11 @@ func executeQueryUsage(account string, email string, role string, rsaPrivateKey 
 
 				success++
 				rows.Close()
+			}
+
+			err2 = tx.Commit()
+			if err2 != nil {
+				continue
 			}
 		}
 	}
