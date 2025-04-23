@@ -1,3 +1,22 @@
+resource "snowflake_grant_privileges_to_account_role" "finance_analysis_usage_schema" {
+  account_role_name = "FINANCE"
+  privileges        = ["USAGE"]
+
+  on_schema {
+    schema_name = snowflake_schema.production.name
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "finance_analytics_usage_database" {
+  account_role_name = "FINANCE"
+  privileges        = ["USAGE"]
+
+  on_account_object {
+    object_name = snowflake_schema.production.database
+    object_type = "DATABASE"
+  }
+}
+
 resource "snowflake_grant_privileges_to_account_role" "finance_privileges_bill_of_materials" {
   account_role_name = "FINANCE"
   privileges        = ["SELECT"]
@@ -5,6 +24,25 @@ resource "snowflake_grant_privileges_to_account_role" "finance_privileges_bill_o
   on_schema_object {
     object_name = snowflake_table.bill_of_materials.fully_qualified_name
     object_type = "TABLE"
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "hr_analysis_usage_schema" {
+  account_role_name = "HUMAN_RESOURCES"
+  privileges        = ["USAGE"]
+
+  on_schema {
+    schema_name = snowflake_schema.humanresources.name
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "hr_analytics_usage_database" {
+  account_role_name = "HUMAN_RESOURCES"
+  privileges        = ["USAGE"]
+
+  on_account_object {
+    object_name = snowflake_schema.humanresources.database
+    object_type = "DATABASE"
   }
 }
 
@@ -58,6 +96,25 @@ resource "snowflake_grant_privileges_to_account_role" "human_resources_shift" {
   }
 }
 
+resource "snowflake_grant_privileges_to_account_role" "marketing_analysis_usage_schema" {
+  account_role_name = "MARKETING"
+  privileges        = ["USAGE"]
+
+  on_schema {
+    schema_name = snowflake_schema.production.name
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "marketing_analytics_usage_database" {
+  account_role_name = "MARKETING"
+  privileges        = ["USAGE"]
+
+  on_account_object {
+    object_name = snowflake_schema.production.database
+    object_type = "DATABASE"
+  }
+}
+
 resource "snowflake_grant_privileges_to_account_role" "marketing_bill_of_materials" {
   account_role_name = "MARKETING"
   privileges        = ["SELECT"]
@@ -65,6 +122,25 @@ resource "snowflake_grant_privileges_to_account_role" "marketing_bill_of_materia
   on_schema_object {
     object_name = snowflake_table.bill_of_materials.fully_qualified_name
     object_type = "TABLE"
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "sales_analysis_usage_schema" {
+  account_role_name = "SALES_ANALYSIS"
+  privileges        = ["USAGE"]
+
+  on_schema {
+    schema_name = snowflake_schema.sales.name
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "sales_analytics_usage_database" {
+  account_role_name = "SALES_ANALYSIS"
+  privileges        = ["USAGE"]
+
+  on_account_object {
+    object_name = snowflake_database.master_data.name
+    object_type = "DATABASE"
   }
 }
 
@@ -102,6 +178,25 @@ resource "snowflake_grant_privileges_to_account_role" "sales_analysis_privileges
   on_schema_object {
     object_name = each.value.name
     object_type = each.value.type
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "sales_ext_usage_schema" {
+  account_role_name = "SALES_EXT"
+  privileges        = ["USAGE"]
+
+  on_schema {
+    schema_name = snowflake_schema.sales.name
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "sales_ext_usage_database" {
+  account_role_name = "SALES_EXT"
+  privileges        = ["USAGE"]
+
+  on_account_object {
+    object_name = snowflake_database.master_data.name
+    object_type = "DATABASE"
   }
 }
 
