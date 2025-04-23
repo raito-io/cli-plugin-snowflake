@@ -3,7 +3,7 @@ resource "snowflake_grant_privileges_to_account_role" "finance_analysis_usage_sc
   privileges        = ["USAGE"]
 
   on_schema {
-    schema_name = snowflake_schema.production.name
+    schema_name = snowflake_schema.production.fully_qualified_name
   }
 }
 
@@ -32,7 +32,7 @@ resource "snowflake_grant_privileges_to_account_role" "hr_analysis_usage_schema"
   privileges        = ["USAGE"]
 
   on_schema {
-    schema_name = snowflake_schema.humanresources.name
+    schema_name = snowflake_schema.humanresources.fully_qualified_name
   }
 }
 
@@ -101,7 +101,7 @@ resource "snowflake_grant_privileges_to_account_role" "marketing_analysis_usage_
   privileges        = ["USAGE"]
 
   on_schema {
-    schema_name = snowflake_schema.production.name
+    schema_name = snowflake_schema.production.fully_qualified_name
   }
 }
 
@@ -130,7 +130,7 @@ resource "snowflake_grant_privileges_to_account_role" "sales_analysis_usage_sche
   privileges        = ["USAGE"]
 
   on_schema {
-    schema_name = snowflake_schema.sales.name
+    schema_name = snowflake_schema.sales.fully_qualified_name
   }
 }
 
@@ -186,7 +186,7 @@ resource "snowflake_grant_privileges_to_account_role" "sales_ext_usage_schema" {
   privileges        = ["USAGE"]
 
   on_schema {
-    schema_name = snowflake_schema.sales.name
+    schema_name = snowflake_schema.sales.fully_qualified_name
   }
 }
 
