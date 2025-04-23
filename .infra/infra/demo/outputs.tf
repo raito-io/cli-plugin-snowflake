@@ -13,6 +13,11 @@ output "tables" {
     snowflake_table.person_creditcard.fully_qualified_name,
     snowflake_table.email_address.fully_qualified_name,
     snowflake_table.credit_card.fully_qualified_name,
+
+    snowflake_table.country_region_currency.fully_qualified_name,
+    snowflake_table.currency_rate.fully_qualified_name,
+    snowflake_table.employee.fully_qualified_name,
+
     // This list is not complete but is only used to generate data usage
 
     // Views
