@@ -49,6 +49,8 @@ type SnowflakeRepository struct {
 	workerPoolSize int
 	queryTimeLock  sync.Mutex
 
+	accountNamesPerDelimiter map[rune]string
+
 	maskFactory *MaskFactory
 }
 
@@ -94,6 +96,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 		role:           role,
 		usageBatchSize: usageBatchSize,
 		workerPoolSize: workerPoolSize,
+		accountNamesPerDelimiter: make(map[rune]string),
 
 		maskFactory: NewMaskFactory(params),
 	}, nil
@@ -1061,6 +1064,10 @@ func (repo *SnowflakeRepository) GetSnowFlakeAccountName(ops ...func(options *Ge
 		op(&options)
 	}
 
+	if accountName, found := repo.accountNamesPerDelimiter[options.Delimiter]; found {
+		return accountName, nil
+	}
+
 	rows, _, err := repo.query(fmt.Sprintf(`select CONCAT(CURRENT_ORGANIZATION_NAME(), '%s', CURRENT_ACCOUNT_NAME())`, string(options.Delimiter)))
 	if err != nil {
 		return "", err
@@ -1076,6 +1083,8 @@ func (repo *SnowflakeRepository) GetSnowFlakeAccountName(ops ...func(options *Ge
 	if len(r) != 1 {
 		return "", fmt.Errorf("error retrieving account information from snowflake")
 	}
+
+	repo.accountNamesPerDelimiter[options.Delimiter] = r[0]
 
 	return r[0], nil
 }
