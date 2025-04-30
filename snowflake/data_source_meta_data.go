@@ -807,10 +807,9 @@ func DataObjectTypes() []*ds.DataObjectType {
 				},
 				{
 					// Defining a USAGE permission specifically for database level as it should not be inherited by the schema level.
-					Permission:        USAGE_ON_DATABASE,
-					Description:       "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
-					GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
-					CannotBeGranted:   true,
+					Permission:      USAGE_ON_DATABASE,
+					Description:     "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
+					CannotBeGranted: true,
 				},
 			},
 			Children:   []string{SharedPrefix + ds.Schema},
