@@ -92,10 +92,10 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 	}
 
 	return &SnowflakeRepository{
-		conn:           conn,
-		role:           role,
-		usageBatchSize: usageBatchSize,
-		workerPoolSize: workerPoolSize,
+		conn:                     conn,
+		role:                     role,
+		usageBatchSize:           usageBatchSize,
+		workerPoolSize:           workerPoolSize,
 		accountNamesPerDelimiter: make(map[rune]string),
 
 		maskFactory: NewMaskFactory(params),
