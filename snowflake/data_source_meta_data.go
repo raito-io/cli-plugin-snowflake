@@ -119,7 +119,7 @@ func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam 
 					DataTypes:   []string{"varchar", "char", "string", "text"},
 				},
 			},
-			ApplicableTypes: []string{ds.Table, ds.View, MaterializedView, ExternalTable, IcebergTable},
+			ApplicableTypes:         []string{ds.Table, ds.View, MaterializedView, ExternalTable, IcebergTable},
 			DefaultMaskExternalName: NullMaskId,
 		}
 
