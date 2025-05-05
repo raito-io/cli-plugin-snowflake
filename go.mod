@@ -17,7 +17,7 @@ require (
 	github.com/raito-io/bexpression v0.1.2
 	github.com/raito-io/cli v0.71.1
 	github.com/raito-io/golang-set v0.0.4
-	github.com/snowflakedb/gosnowflake v1.13.2
+	github.com/snowflakedb/gosnowflake v1.14.0
 	github.com/stretchr/testify v1.10.0
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
 )
@@ -29,7 +29,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
-	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/apache/arrow-go/v18 v18.2.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.36.3 // indirect
@@ -110,6 +109,7 @@ require (
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
+	golang.org/x/oauth2 v0.26.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/term v0.31.0 // indirect
