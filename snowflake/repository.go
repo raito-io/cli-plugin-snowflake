@@ -1428,12 +1428,33 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 		maskingForDataObjects[maskingName] = dataObjectTypeMap[columnType]
 	}
 
+	tableDetailCache := make(map[string]*TableEntity)
+
 	// Assign all columns to the correct masking policy
 	for maskingName, columns := range maskingForDataObjects {
 		for _, column := range columns {
 			fullnameSplit := strings.Split(column, ".")
 
-			q := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %q SET MASKING POLICY %s FORCE", common.FormatQuery("%s.%s.%s", fullnameSplit[0], fullnameSplit[1], fullnameSplit[2]), fullnameSplit[3], maskingName)
+			tableName := fmt.Sprintf("%s.%s.%s", fullnameSplit[0], fullnameSplit[1], fullnameSplit[2])
+
+			tableDetails, ok := tableDetailCache[tableName]
+			if !ok {
+				tableDetail, err2 := repo.getTableDetails(fullnameSplit[0], fullnameSplit[1], fullnameSplit[2])
+				if err2 != nil {
+					return fmt.Errorf("get table %s: %w", tableName, err2)
+				} else if tableDetail == nil {
+					return fmt.Errorf("table %s not found", tableName)
+				}
+
+				tableDetailCache[tableName] = tableDetail
+				tableDetails = tableDetail
+			}
+
+			tableType := raitoTypeToSnowflakeGrantType[convertSnowflakeTableTypeToRaito(tableDetails)]
+
+			logger.Debug(fmt.Sprintf("Add masking policy to column %s of %s %s", fullnameSplit[3], tableType, tableName))
+
+			q := fmt.Sprintf("ALTER %s %s ALTER COLUMN %q SET MASKING POLICY %s FORCE", tableType, common.FormatQuery("%s.%s.%s", fullnameSplit[0], fullnameSplit[1], fullnameSplit[2]), fullnameSplit[3], maskingName)
 
 			logger.Debug(fmt.Sprintf("Execute query to assign mask %s to column %s: '%s'", maskingName, column, q))
 
@@ -1817,6 +1838,21 @@ func (repo *SnowflakeRepository) getColumnInformation(databaseName string, colum
 	}
 
 	return nil
+}
+
+func (repo *SnowflakeRepository) getTableDetails(dbName string, schemaName string, tableNAme string) (*TableEntity, error) {
+	q := fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '%s' AND TABLE_SCHEMA = '%s'`, common.FormatQuery("%s", dbName), tableNAme, schemaName)
+
+	results, err := getDbRows[TableEntity](repo, q)
+	if err != nil {
+		return nil, fmt.Errorf("fetching table details: %s", err.Error())
+	} else if len(results) > 1 {
+		return nil, fmt.Errorf("multiple (%d) table details found for %s.%s.%s", len(results), dbName, schemaName, tableNAme)
+	} else if len(results) == 0 {
+		return nil, nil
+	}
+
+	return &results[0], nil
 }
 
 func handleDbEntities(repo *SnowflakeRepository, query string, createEntity EntityCreator, handleEntity EntityHandler) error {
