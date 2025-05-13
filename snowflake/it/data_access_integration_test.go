@@ -742,7 +742,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget_O
 
 	database := "RAITO_DATABASE"
 	schema := "ORDERING"
-	table := "CUSTOMERS_LIMITE"
+	table := "CUSTOMERS_LIMITED"
 	column := "CUSTKEY"
 
 	doFullname := fmt.Sprintf("%s.%s.%s.%s", database, schema, table, column)
