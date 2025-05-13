@@ -128,7 +128,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 	}
 
 	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
+		Logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
 		repo.Close()
 	}()
 
@@ -198,11 +198,11 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 		})
 	}
 
-	logger.Info("All databases submitted for processing")
+	Logger.Info("All databases submitted for processing")
 
 	wp.StopWait()
 
-	logger.Info("All databases processed")
+	Logger.Info("All databases processed")
 
 	if merr != nil {
 		return fmt.Errorf("handling databases: %w", merr)
@@ -212,7 +212,7 @@ func (s *DataSourceSyncer) SyncDataSource(ctx context.Context, dataSourceHandler
 }
 
 func (s *DataSourceSyncer) handleDatabase(database ExtendedDbEntity) error {
-	logger.Info(fmt.Sprintf("Handling database %q", database.Entity.Name))
+	Logger.Info(fmt.Sprintf("Handling database %q", database.Entity.Name))
 
 	err := s.setupDatabasePermissions(database.Entity)
 
@@ -270,7 +270,7 @@ func (s *DataSourceSyncer) readColumnsInDatabase(dbName string, doTypePrefix str
 		fullName := schemaFullName + "." + column.Table + "." + column.Name
 
 		if ff || fs || !s.shouldHandle(fullName) {
-			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
+			Logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
 
@@ -305,7 +305,7 @@ func (s *DataSourceSyncer) readSchemasInDatabase(databaseName string, doTypePref
 		fs := s.schemaExcludes.Contains(schema.Name)
 
 		if ff || fs || !s.shouldHandle(fullName) {
-			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
+			Logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
 
@@ -363,7 +363,7 @@ func (s *DataSourceSyncer) createDataObjectForFunction(doType, database, schema,
 	ff := s.schemaExcludes.Contains(database + "." + schema)
 
 	if ff || !s.shouldHandle(fullName) {
-		logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", doType, fullName))
+		Logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", doType, fullName))
 		return nil
 	}
 
@@ -432,7 +432,7 @@ func (s *DataSourceSyncer) readTablesInDatabase(databaseName string, typePrefix 
 		fullName := schemaFullName + "." + table.Name
 
 		if ff || fs || !s.shouldHandle(fullName) {
-			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
+			Logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", typeName, fullName))
 			return nil
 		}
 
@@ -695,7 +695,7 @@ func (s *DataSourceSyncer) addTopLevelEntitiesToImporter(entities []DbEntity, do
 
 			dbEntities = append(dbEntities, extendedEntity)
 		} else {
-			logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", doType, fullName))
+			Logger.Debug(fmt.Sprintf("Skipping data object (type %s) '%s'", doType, fullName))
 		}
 	}
 

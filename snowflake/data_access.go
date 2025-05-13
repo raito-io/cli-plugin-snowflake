@@ -131,7 +131,7 @@ func (s *AccessSyncer) SyncAccessProvidersFromTarget(ctx context.Context, access
 	s.repo = repo
 
 	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", s.repo.TotalQueryTime()))
+		Logger.Info(fmt.Sprintf("Total snowflake query time:  %s", s.repo.TotalQueryTime()))
 		s.repo.Close()
 	}()
 
@@ -149,7 +149,7 @@ func (s *AccessSyncer) SyncAccessProviderToTarget(ctx context.Context, accessPro
 	s.repo = repo
 
 	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", s.repo.TotalQueryTime()))
+		Logger.Info(fmt.Sprintf("Total snowflake query time:  %s", s.repo.TotalQueryTime()))
 		s.repo.Close()
 	}()
 
@@ -249,7 +249,7 @@ func (s *AccessSyncer) getFullNameFromGrant(name, objectType string) string {
 	if strings.EqualFold(objectType, "ACCOUNT") {
 		accountName, err := s.repo.GetSnowFlakeAccountName()
 		if err != nil {
-			logger.Error(fmt.Sprintf("Failed to get account name from Snowflake: %s", err.Error()))
+			Logger.Error(fmt.Sprintf("Failed to get account name from Snowflake: %s", err.Error()))
 
 			return "UNKNOWN"
 		}

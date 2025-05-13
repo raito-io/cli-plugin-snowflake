@@ -35,7 +35,7 @@ func newIdentityStoreSnowflakeRepo(params map[string]string, role string) (ident
 }
 
 func (s *IdentityStoreSyncer) GetIdentityStoreMetaData(_ context.Context, _ *config.ConfigMap) (*is.MetaData, error) {
-	logger.Debug("Returning meta data for Snowflake identity store")
+	Logger.Debug("Returning meta data for Snowflake identity store")
 
 	return &is.MetaData{
 		Type:        "snowflake",
@@ -68,7 +68,7 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 	}
 
 	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
+		Logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
 		repo.Close()
 	}()
 
@@ -85,10 +85,10 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 	}
 
 	for _, userRow := range userRows {
-		logger.Debug(fmt.Sprintf("Handling user %q", userRow.Name))
+		Logger.Debug(fmt.Sprintf("Handling user %q", userRow.Name))
 
 		if userRow.Email == nil {
-			logger.Warn(fmt.Sprintf("User %q has no email, skipping", userRow.Name))
+			Logger.Warn(fmt.Sprintf("User %q has no email, skipping", userRow.Name))
 
 			continue
 		}

@@ -59,7 +59,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 		err := sf.GetLogger().SetLogLevel("debug")
 
 		if err != nil {
-			logger.Error("Error while setting snowflake sdk to debug level: %s", err.Error())
+			Logger.Error("Error while setting snowflake sdk to debug level: %s", err.Error())
 		}
 	}
 
@@ -68,7 +68,7 @@ func NewSnowflakeRepository(params map[string]string, role string) (*SnowflakeRe
 	if v, f := params[SfWorkerPoolSize]; f {
 		poolSize, err := strconv.Atoi(v)
 		if err != nil {
-			logger.Warn(fmt.Sprintf("Unable to parse parameter %s: %s", SfWorkerPoolSize, err.Error()))
+			Logger.Warn(fmt.Sprintf("Unable to parse parameter %s: %s", SfWorkerPoolSize, err.Error()))
 		} else if poolSize > 0 {
 			workerPoolSize = poolSize
 		}
@@ -123,7 +123,7 @@ func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.
 
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error(fmt.Sprintf("Panic data usage processing: %v\n\n%s", r, string(debug.Stack())))
+				Logger.Error(fmt.Sprintf("Panic data usage processing: %v\n\n%s", r, string(debug.Stack())))
 
 				select {
 				case <-ctx.Done():
@@ -179,20 +179,20 @@ func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.
 		totalDuration := time.Duration(0)
 
 		defer func() {
-			logger.Info(fmt.Sprintf("Fetched %d rows from Snowflake in %s", i, totalDuration))
+			Logger.Info(fmt.Sprintf("Fetched %d rows from Snowflake in %s", i, totalDuration))
 		}()
 
 		if repo.usageBatchSize == 0 {
-			logger.Info("Fetching data usage without batching")
+			Logger.Info("Fetching data usage without batching")
 		} else {
-			logger.Info(fmt.Sprintf("Fetching data usage with batch size %d", repo.usageBatchSize))
+			Logger.Info(fmt.Sprintf("Fetching data usage with batch size %d", repo.usageBatchSize))
 		}
 
 		for {
 			newMostRecentQueryStartTime, numberOfStatements, duration, nextPage := repo.dataUsageBatch(ctx, outputChannel, minTime, queryGen)
 
 			if repo.usageBatchSize != 0 {
-				logger.Debug(fmt.Sprintf("Fetched batch of %d rows from Snowflake in %s", numberOfStatements, duration))
+				Logger.Debug(fmt.Sprintf("Fetched batch of %d rows from Snowflake in %s", numberOfStatements, duration))
 			}
 
 			i += numberOfStatements
@@ -263,7 +263,7 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 		}
 
 		if !result.Query.Valid || !result.User.Valid || !result.QueryType.Valid || !result.Status.Valid {
-			logger.Info(fmt.Sprintf("Skipping usage row with missing values: %v", result))
+			Logger.Info(fmt.Sprintf("Skipping usage row with missing values: %v", result))
 
 			continue
 		}
@@ -356,7 +356,7 @@ func (repo *SnowflakeRepository) GetAccountRolesWithPrefix(prefix string) ([]Rol
 
 func (repo *SnowflakeRepository) CreateAccountRole(roleName string) error {
 	if repo.isProtectedRoleName(roleName) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", roleName))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", roleName))
 		return nil
 	}
 
@@ -369,7 +369,7 @@ func (repo *SnowflakeRepository) CreateAccountRole(roleName string) error {
 
 func (repo *SnowflakeRepository) DropAccountRole(roleName string) error {
 	if repo.isProtectedRoleName(roleName) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", roleName))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", roleName))
 		return nil
 	}
 
@@ -388,7 +388,7 @@ func (repo *SnowflakeRepository) DropAccountRole(roleName string) error {
 
 func (repo *SnowflakeRepository) RenameAccountRole(oldName, newName string) error {
 	if repo.isProtectedRoleName(oldName) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", oldName))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", oldName))
 		return nil
 	}
 
@@ -434,7 +434,7 @@ func (repo *SnowflakeRepository) GrantAccountRolesToAccountRole(ctx context.Cont
 
 func (repo *SnowflakeRepository) RevokeAccountRolesFromAccountRole(ctx context.Context, accountRole string, accountRoles ...string) error {
 	if repo.isProtectedRoleName(accountRole) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
 		return nil
 	}
 
@@ -465,7 +465,7 @@ func (repo *SnowflakeRepository) GrantUsersToAccountRole(ctx context.Context, ro
 
 func (repo *SnowflakeRepository) RevokeUsersFromAccountRole(ctx context.Context, role string, users ...string) error {
 	if repo.isProtectedRoleName(role) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", role))
 		return nil
 	}
 
@@ -483,7 +483,7 @@ func (repo *SnowflakeRepository) RevokeUsersFromAccountRole(ctx context.Context,
 
 func (repo *SnowflakeRepository) ExecuteGrantOnAccountRole(perm, on, accountRole string, isSystemGrant bool) error {
 	if repo.isProtectedRoleName(accountRole) && !isSystemGrant {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
 		return nil
 	}
 
@@ -498,7 +498,7 @@ func (repo *SnowflakeRepository) ExecuteGrantOnAccountRole(perm, on, accountRole
 
 func (repo *SnowflakeRepository) ExecuteRevokeOnAccountRole(perm, on, accountRole string, isSystemRevoke bool) error {
 	if repo.isProtectedRoleName(accountRole) && !isSystemRevoke {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %s", accountRole))
 		return nil
 	}
 
@@ -531,7 +531,7 @@ func (repo *SnowflakeRepository) ExecuteRevokeOnShare(perm, on, shareName string
 
 func (repo *SnowflakeRepository) executeGrant(perm, on, objectId, objectType string) error {
 	q := fmt.Sprintf(`GRANT %s ON %s TO %s %s`, perm, on, objectType, common.FormatQuery("%s", objectId))
-	logger.Debug("Executing grant query", "query", q)
+	Logger.Debug("Executing grant query", "query", q)
 
 	_, _, err := repo.query(q)
 	if err != nil {
@@ -543,7 +543,7 @@ func (repo *SnowflakeRepository) executeGrant(perm, on, objectId, objectType str
 
 func (repo *SnowflakeRepository) revokeGrant(perm, on, objectId, objectType string) error {
 	q := fmt.Sprintf(`REVOKE %s ON %s FROM %s %s`, perm, on, objectType, common.FormatQuery("%s", objectId))
-	logger.Debug("Executing revoke query", "query", q)
+	Logger.Debug("Executing revoke query", "query", q)
 
 	_, _, err := repo.query(q)
 	if err != nil {
@@ -619,14 +619,14 @@ func (repo *SnowflakeRepository) GetApplicationRoles(application string) ([]Appl
 func (repo *SnowflakeRepository) GetGrantsOfApplicationRole(application, role string) ([]GrantOfRole, error) {
 	q := fmt.Sprintf("SHOW GRANTS OF APPLICATION ROLE %s", common.FormatQuery("%s.%s", application, role))
 
-	logger.Info(fmt.Sprintf("Executing query: %s", q))
+	Logger.Info(fmt.Sprintf("Executing query: %s", q))
 
 	return repo.grantsOfRoleMapper(q)
 }
 
 func (repo *SnowflakeRepository) CreateDatabaseRole(database string, roleName string) error {
 	if repo.isProtectedRoleName(roleName) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, roleName))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, roleName))
 		return nil
 	}
 
@@ -652,7 +652,7 @@ func (repo *SnowflakeRepository) DropDatabaseRole(database string, roleName stri
 }
 func (repo *SnowflakeRepository) RenameDatabaseRole(database, oldName, newName string) error {
 	if repo.isProtectedRoleName(oldName) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, oldName))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, oldName))
 		return nil
 	}
 
@@ -756,7 +756,7 @@ func (repo *SnowflakeRepository) GrantApplicationRolesToApplicationRole(ctx cont
 
 func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, accountRoles ...string) error {
 	if repo.isProtectedRoleName(databaseRole) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
 		return nil
 	}
 
@@ -774,7 +774,7 @@ func (repo *SnowflakeRepository) RevokeAccountRolesFromDatabaseRole(ctx context.
 
 func (repo *SnowflakeRepository) RevokeSharesFromDatabaseRole(ctx context.Context, database string, databaseRole string, shares ...string) error {
 	if repo.isProtectedRoleName(databaseRole) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
 		return nil
 	}
 
@@ -792,7 +792,7 @@ func (repo *SnowflakeRepository) RevokeSharesFromDatabaseRole(ctx context.Contex
 
 func (repo *SnowflakeRepository) RevokeDatabaseRolesFromDatabaseRole(ctx context.Context, database string, databaseRole string, databaseRoles ...string) error {
 	if repo.isProtectedRoleName(databaseRole) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", database, databaseRole))
 		return nil
 	}
 
@@ -810,7 +810,7 @@ func (repo *SnowflakeRepository) RevokeDatabaseRolesFromDatabaseRole(ctx context
 
 func (repo *SnowflakeRepository) RevokeAccountRolesFromApplicationRole(ctx context.Context, application string, applicationRole string, accountRoles ...string) error {
 	if repo.isProtectedRoleName(applicationRole) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", application, applicationRole))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", application, applicationRole))
 		return nil
 	}
 
@@ -828,7 +828,7 @@ func (repo *SnowflakeRepository) RevokeAccountRolesFromApplicationRole(ctx conte
 
 func (repo *SnowflakeRepository) RevokeApplicationRolesFromApplicationRole(ctx context.Context, application string, applicationRole string, applicationRoles ...string) error {
 	if repo.isProtectedRoleName(applicationRole) {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", application, applicationRole))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %q.%q", application, applicationRole))
 		return nil
 	}
 
@@ -846,13 +846,13 @@ func (repo *SnowflakeRepository) RevokeApplicationRolesFromApplicationRole(ctx c
 
 func (repo *SnowflakeRepository) ExecuteGrantOnDatabaseRole(perm, on, database, databaseRole string) error {
 	if repo.isProtectedRoleName(databaseRole) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "REFERENCES") {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
 		return nil
 	}
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
 	q := fmt.Sprintf(`GRANT %s ON %s TO DATABASE ROLE %s`, perm, on, common.FormatQuery("%s.%s", database, databaseRole))
-	logger.Debug("Executing grant query", "query", q)
+	Logger.Debug("Executing grant query", "query", q)
 
 	_, _, err := repo.query(q)
 
@@ -865,14 +865,14 @@ func (repo *SnowflakeRepository) ExecuteGrantOnDatabaseRole(perm, on, database, 
 
 func (repo *SnowflakeRepository) ExecuteRevokeOnDatabaseRole(perm, on, database, databaseRole string) error {
 	if repo.isProtectedRoleName(databaseRole) && !strings.EqualFold(perm, "USAGE") && !strings.EqualFold(perm, "IMPORTED PRIVILEGES") && !strings.EqualFold(perm, "SELECT") {
-		logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
+		Logger.Warn(fmt.Sprintf("skipping mutation of protected role %s.%s", database, databaseRole))
 		return nil
 	}
 
 	// TODO: parse the `on` string correctly, usually it is something like: SCHEMA "db.schema.table"
 	// q := fmt.Sprintf(`REVOKE %s %s`, perm, common.FormatQuery(`ON %s FROM ROLE %s`, on, role))
 	q := fmt.Sprintf(`REVOKE %s ON %s FROM DATABASE ROLE %s`, perm, on, common.FormatQuery("%s.%s", database, databaseRole))
-	logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
+	Logger.Debug(fmt.Sprintf("Executing revoke query: %s", q))
 
 	_, _, err := repo.query(q)
 	if err != nil {
@@ -892,7 +892,7 @@ func (repo *SnowflakeRepository) grantsOfRoleMapper(query string) ([]GrantOfRole
 
 	err = scan.Rows(&grantOfEntities, rows)
 	if err != nil {
-		logger.Error(err.Error())
+		Logger.Error(err.Error())
 
 		return nil, fmt.Errorf("error fetching grants of role: %s", err.Error())
 	}
@@ -910,7 +910,7 @@ func (repo *SnowflakeRepository) grantsToRoleMapper(query string) ([]GrantToRole
 
 	err = scan.Rows(&grantToEntities, rows)
 	if err != nil {
-		logger.Error(err.Error())
+		Logger.Error(err.Error())
 
 		return nil, fmt.Errorf("error fetching grants of role: %s", err.Error())
 	}
@@ -948,7 +948,7 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 		wp.Submit(func() {
 			describeRows, _, err := repo.query(fmt.Sprintf(`DESCRIBE USER "%s"`, userRow.Name)) //nolint:gocritic
 			if err != nil {
-				logger.Warn(fmt.Sprintf("Unable to fetch user details for %q: %s", userRow.Name, err.Error()))
+				Logger.Warn(fmt.Sprintf("Unable to fetch user details for %q: %s", userRow.Name, err.Error()))
 				return
 			}
 
@@ -956,7 +956,7 @@ func (repo *SnowflakeRepository) GetUsers() ([]UserEntity, error) {
 			err = scan.Rows(&userDetails, describeRows)
 
 			if err != nil {
-				logger.Warn(fmt.Sprintf("Unable to parse user details for %q: %s", userRow.Name, err.Error()))
+				Logger.Warn(fmt.Sprintf("Unable to parse user details for %q: %s", userRow.Name, err.Error()))
 				return
 			}
 
@@ -995,7 +995,7 @@ func (repo *SnowflakeRepository) GetPolicies(policy string) ([]PolicyEntity, err
 		return nil, fmt.Errorf("error fetching all masking policies: %s", err.Error())
 	}
 
-	logger.Info(fmt.Sprintf("Found %d %s policies", len(policyEntities), policy))
+	Logger.Info(fmt.Sprintf("Found %d %s policies", len(policyEntities), policy))
 
 	return policyEntities, nil
 }
@@ -1170,7 +1170,7 @@ func (repo *SnowflakeRepository) getTags(domain *string, databaseName *string) (
 		if fullName != "" {
 			tagMap[fullName] = append(tagMap[fullName], tagEntity.CreateTag())
 		} else {
-			logger.Warn(fmt.Sprintf("skipping tag (%+v) because cannot construct full name", tagEntity))
+			Logger.Warn(fmt.Sprintf("skipping tag (%+v) because cannot construct full name", tagEntity))
 		}
 	}
 
@@ -1199,7 +1199,7 @@ func (repo *SnowflakeRepository) GetDatabaseRoleTags(databaseName string, roleNa
 		if fullName != "" {
 			tagMap[fullName] = append(tagMap[fullName], tagEntity.CreateTag())
 		} else {
-			logger.Warn(fmt.Sprintf("skipping tag (%+v) because cannot construct full name", tagEntity))
+			Logger.Warn(fmt.Sprintf("skipping tag (%+v) because cannot construct full name", tagEntity))
 		}
 	}
 
@@ -1330,7 +1330,7 @@ func (repo *SnowflakeRepository) CommentAccountRoleIfExists(comment, objectName 
 	_, _, err := repo.query(q)
 
 	if err != nil {
-		logger.Warn(fmt.Sprintf("unable to update comment on role %s, possibly because not owning it. Ignoring: %s ", objectName, err.Error()))
+		Logger.Warn(fmt.Sprintf("unable to update comment on role %s, possibly because not owning it. Ignoring: %s ", objectName, err.Error()))
 	}
 
 	return nil
@@ -1340,7 +1340,7 @@ func (repo *SnowflakeRepository) CommentDatabaseRoleIfExists(comment, database, 
 	_, _, err := repo.query(q)
 
 	if err != nil {
-		logger.Warn(fmt.Sprintf("unable to update comment on database role %s.%s, possibly because not owning it. Ignoring: %s ", database, roleName, err.Error()))
+		Logger.Warn(fmt.Sprintf("unable to update comment on database role %s.%s, possibly because not owning it. Ignoring: %s ", database, roleName, err.Error()))
 	}
 
 	return nil
@@ -1418,7 +1418,7 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 			return err2
 		}
 
-		logger.Debug(fmt.Sprintf("Execute query to create mask %s: '%s'", maskingName, maskingPolicy))
+		Logger.Debug(fmt.Sprintf("Execute query to create mask %s: '%s'", maskingName, maskingPolicy))
 
 		_, err = tx.Exec(string(maskingPolicy))
 		if err != nil {
@@ -1452,11 +1452,11 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 
 			tableType := raitoTypeToSnowflakeGrantType[convertSnowflakeTableTypeToRaito(tableDetails)]
 
-			logger.Debug(fmt.Sprintf("Add masking policy to column %s of %s %s", fullnameSplit[3], tableType, tableName))
+			Logger.Debug(fmt.Sprintf("Add masking policy to column %s of %s %s", fullnameSplit[3], tableType, tableName))
 
 			q := fmt.Sprintf("ALTER %s %s ALTER COLUMN %q SET MASKING POLICY %s FORCE", tableType, common.FormatQuery("%s.%s.%s", fullnameSplit[0], fullnameSplit[1], fullnameSplit[2]), fullnameSplit[3], maskingName)
 
-			logger.Debug(fmt.Sprintf("Execute query to assign mask %s to column %s: '%s'", maskingName, column, q))
+			Logger.Debug(fmt.Sprintf("Execute query to assign mask %s to column %s: '%s'", maskingName, column, q))
 
 			_, err = tx.Exec(q)
 			if err != nil {
@@ -1485,7 +1485,7 @@ func (repo *SnowflakeRepository) GetIntegrations() ([]DbEntity, error) {
 		return nil, err
 	}
 
-	logger.Info(fmt.Sprintf("Found %d integrations", len(integrationEntities)))
+	Logger.Info(fmt.Sprintf("Found %d integrations", len(integrationEntities)))
 
 	return integrationEntities, nil
 }
@@ -1507,7 +1507,7 @@ func (repo *SnowflakeRepository) GetPoliciesLike(policy string, like string) ([]
 		return nil, err
 	}
 
-	logger.Info(fmt.Sprintf("Found %d %s policies", len(policyEntities), policy))
+	Logger.Info(fmt.Sprintf("Found %d %s policies", len(policyEntities), policy))
 
 	return policyEntities, nil
 }
@@ -1695,26 +1695,26 @@ func getDbRows[T any](repo *SnowflakeRepository, query string) ([]T, error) {
 }
 
 func (repo *SnowflakeRepository) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, time.Duration, error) {
-	logger.Debug(fmt.Sprintf("Sending query: %s", query))
+	Logger.Debug(fmt.Sprintf("Sending query: %s", query))
 	startQuery := time.Now()
 	result, err := repo.conn.QueryContext(ctx, query, args...)
 	sec := time.Since(startQuery).Round(time.Millisecond)
 	repo.addToQueryTime(sec)
 
-	logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
+	Logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
 
 	return result, sec, err
 }
 
 func (repo *SnowflakeRepository) query(query string) (*sql.Rows, time.Duration, error) { //nolint:unparam
-	logger.Debug(fmt.Sprintf("Sending query: %s", query))
+	Logger.Debug(fmt.Sprintf("Sending query: %s", query))
 	startQuery := time.Now()
 	result, err := QuerySnowflake(repo.conn, query)
 	sec := time.Since(startQuery).Round(time.Millisecond)
 
 	repo.addToQueryTime(sec)
 
-	logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
+	Logger.Debug(fmt.Sprintf("Query took %s", time.Since(startQuery)))
 
 	return result, sec, err
 }
@@ -1726,7 +1726,7 @@ func (repo *SnowflakeRepository) addToQueryTime(duration time.Duration) {
 }
 
 func (repo *SnowflakeRepository) execute(query ...string) error {
-	logger.Debug(fmt.Sprintf("Sending query execution: %v", query))
+	Logger.Debug(fmt.Sprintf("Sending query execution: %v", query))
 
 	for i := range query {
 		if !strings.HasSuffix(query[i], ";") {
@@ -1791,7 +1791,7 @@ func (repo *SnowflakeRepository) execMultiStatements(ctx context.Context) (chan 
 			}
 		}
 
-		logger.Debug(fmt.Sprintf("executed %d statements in %s", totalStatements, totalDuration))
+		Logger.Debug(fmt.Sprintf("executed %d statements in %s", totalStatements, totalDuration))
 	}()
 
 	return statementChannel, done
@@ -1801,7 +1801,7 @@ func (repo *SnowflakeRepository) execContext(ctx context.Context, statements []s
 	multiContext, _ := sf.WithMultiStatement(ctx, len(statements))
 
 	query := strings.Join(statements, "; ")
-	logger.Debug(fmt.Sprintf("Sending queries: %s", query))
+	Logger.Debug(fmt.Sprintf("Sending queries: %s", query))
 
 	startQuery := time.Now()
 	_, err := repo.conn.ExecContext(multiContext, query)

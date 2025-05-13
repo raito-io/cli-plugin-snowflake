@@ -21,10 +21,10 @@ const (
 	externalIdApplicationRolePrefix = "APPLICATIONROLE###APPLICATION:"
 )
 
-var logger hclog.Logger
+var Logger hclog.Logger
 
 func init() {
-	logger = base.Logger()
+	Logger = base.Logger()
 }
 
 func cleanDoubleQuotes(input string) string {
@@ -57,7 +57,7 @@ func parseRoleWithPrefixFromExternalId(externalId string, prefix string) (databa
 	}
 
 	stack := debug.Stack()
-	logger.Info("Stack trace", "stack", string(stack))
+	Logger.Info("Stack trace", "stack", string(stack))
 
 	return "", "", fmt.Errorf("role %q is not in the expected format", externalId)
 }
