@@ -732,6 +732,121 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget_O
 	})
 }
 
+func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget_OnMaterializedView() {
+	if sfStandardEdition {
+		s.T().Skip("Skip test as Masking is a non standard edition feature")
+	}
+
+	// Given
+	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+
+	database := "RAITO_DATABASE"
+	schema := "ORDERING"
+	table := "CUSTOMERS_LIMITE"
+	column := "CUSTKEY"
+
+	doFullname := fmt.Sprintf("%s.%s.%s.%s", database, schema, table, column)
+
+	maskName := fmt.Sprintf("%s_mask_on_materialized_view_id1", testId)
+
+	accessProviderImport := &sync_to_target.AccessProviderImport{
+		AccessProviders: []*sync_to_target.AccessProvider{{
+			Id:          maskName,
+			Name:        maskName,
+			Action:      types.Mask,
+			Delete:      false,
+			Description: fmt.Sprintf("Mask integration testing for test %s", testId),
+			Who: sync_to_target.WhoItem{
+				Users: []string{snowflakeUserName},
+			},
+			What: []sync_to_target.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: doFullname,
+						Type:     "column",
+					},
+				},
+			},
+		},
+		},
+	}
+
+	config := s.getConfig()
+
+	// When
+	err := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+
+	// Then
+	s.NoError(err)
+	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 1)
+
+	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+	s.Len(accessProviderFeedback, 1)
+
+	s.True(strings.HasPrefix(accessProviderFeedback[0].ActualName, fmt.Sprintf("RAITO_%s", strings.ToUpper(maskName))))
+
+	maskPolicies, err := s.sfRepo.GetPolicies("MASKING")
+	s.NoError(err)
+	s.Contains(maskPolicies, snowflake.PolicyEntity{
+		Name:         fmt.Sprintf("%s_NUMBER", strings.ToUpper(accessProviderFeedback[0].ActualName)),
+		SchemaName:   schema,
+		DatabaseName: database,
+		Kind:         "MASKING_POLICY",
+		Owner:        "ACCOUNTADMIN",
+	})
+
+	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+
+	// When updating the mask will be recreated
+	err = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+
+	// Then
+	s.NoError(err)
+	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 1)
+
+	accessProviderFeedback = filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+	s.Len(accessProviderFeedback, 1)
+
+	s.True(strings.HasPrefix(accessProviderFeedback[0].ActualName, fmt.Sprintf("RAITO_%s", strings.ToUpper(maskName))))
+
+	maskPolicies, err = s.sfRepo.GetPolicies("MASKING")
+	s.NoError(err)
+	s.Contains(maskPolicies, snowflake.PolicyEntity{
+		Name:         fmt.Sprintf("%s_NUMBER", strings.ToUpper(accessProviderFeedback[0].ActualName)),
+		SchemaName:   schema,
+		DatabaseName: database,
+		Kind:         "MASKING_POLICY",
+		Owner:        "ACCOUNTADMIN",
+	})
+
+	// Given
+	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+	// masksToRemove["RAITO_"+maskName] = &sync_to_target.AccessProvider{}
+	accessProviderImport.AccessProviders = []*sync_to_target.AccessProvider{}
+
+	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+
+	// When
+	err = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+
+	// Then
+	s.NoError(err)
+	s.Len(accessProviderFeedback, 1)
+
+	s.True(strings.HasPrefix(accessProviderFeedback[0].ActualName, fmt.Sprintf("RAITO_%s", strings.ToUpper(maskName))))
+
+	maskPolicies, err = s.sfRepo.GetPolicies("MASKING")
+	s.NoError(err)
+	s.NotContains(maskPolicies, snowflake.PolicyEntity{
+		Name:         fmt.Sprintf("RAITO_%s_TEXT", strings.ToUpper(accessProviderFeedback[0].ActualName)),
+		SchemaName:   schema,
+		DatabaseName: database,
+		Owner:        "ACCOUNTADMIN",
+	})
+}
+
 func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersToTarget_Share() {
 	// Given
 	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
