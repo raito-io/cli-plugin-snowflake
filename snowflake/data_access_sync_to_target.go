@@ -149,7 +149,7 @@ func (s *AccessToTargetSyncer) syncAccessProviderToTargetHandler(ap *importer.Ac
 
 	if ap.Delete {
 		if ap.ExternalId == nil {
-			logger.Warn(fmt.Sprintf("No externalId defined for deleted access provider %q. This will be ignored", ap.Id))
+			Logger.Warn(fmt.Sprintf("No externalId defined for deleted access provider %q. This will be ignored", ap.Id))
 
 			err := s.accessProviderFeedbackHandler.AddAccessProviderFeedback(importer.AccessProviderSyncFeedback{
 				AccessProvider: ap.Id,
@@ -195,7 +195,7 @@ func (s *AccessToTargetSyncer) generateUniqueExternalId(ap *importer.AccessProvi
 			return "", err
 		}
 
-		logger.Info(fmt.Sprintf("Generated account role name %q", roleName))
+		Logger.Info(fmt.Sprintf("Generated account role name %q", roleName))
 
 		return accountRoleExternalIdGenerator(roleName), nil
 	}
@@ -244,7 +244,7 @@ func (s *AccessToTargetSyncer) generateNamespacedExternalId(ap *importer.AccessP
 
 	ap.NamingHint = oldNamingHint
 
-	logger.Info(fmt.Sprintf("Generated database role name %q", roleName))
+	Logger.Info(fmt.Sprintf("Generated database role name %q", roleName))
 
 	return externalIdGenerator(database, roleName), nil
 }
@@ -254,7 +254,7 @@ func (s *AccessToTargetSyncer) getUniqueRoleNameGenerator(prefix string, databas
 		return generator, nil
 	}
 
-	uniqueRoleNameGenerator, err := naming_hint.NewUniqueNameGenerator(logger, prefix, &s.namingConstraints)
+	uniqueRoleNameGenerator, err := naming_hint.NewUniqueNameGenerator(Logger, prefix, &s.namingConstraints)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +265,7 @@ func (s *AccessToTargetSyncer) getUniqueRoleNameGenerator(prefix string, databas
 }
 
 func (s *AccessToTargetSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRemoveAps map[string]*importer.AccessProvider, toProcessAps map[string]*importer.AccessProvider) error {
-	logger.Info("Configuring access providers as roles in Snowflake")
+	Logger.Info("Configuring access providers as roles in Snowflake")
 
 	err := s.removeRolesToRemove(toRemoveAps)
 	if err != nil {
@@ -294,7 +294,7 @@ func (s *AccessToTargetSyncer) SyncAccessProviderRolesToTarget(ctx context.Conte
 }
 
 func (s *AccessToTargetSyncer) SyncAccessProviderSharesToTarget(apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider) error {
-	logger.Info(fmt.Sprintf("Configuring access provider as shares in Snowflake. Update %d shares remove %d shares", len(apMap), len(apToRemoveMap)))
+	Logger.Info(fmt.Sprintf("Configuring access provider as shares in Snowflake. Update %d shares remove %d shares", len(apMap), len(apToRemoveMap)))
 
 	metadata := s.buildMetaDataMap()
 
@@ -337,13 +337,13 @@ func (s *AccessToTargetSyncer) SyncAccessProviderMasksToTarget(apToRemoveMap map
 
 	if s.configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		if len(apToRemoveMap) > 0 || len(apMap) > 0 {
-			logger.Error("Skipping masking policies due to Snowflake Standard Edition.")
+			Logger.Error("Skipping masking policies due to Snowflake Standard Edition.")
 		}
 
 		return nil
 	}
 
-	logger.Info(fmt.Sprintf("Configuring access provider as masks in Snowflake. Update %d masks remove %d masks", len(apMap), len(apToRemoveMap)))
+	Logger.Info(fmt.Sprintf("Configuring access provider as masks in Snowflake. Update %d masks remove %d masks", len(apMap), len(apToRemoveMap)))
 
 	// Step 1: Update masks and create new masks
 	for _, mask := range apMap {
@@ -382,13 +382,13 @@ func (s *AccessToTargetSyncer) SyncAccessProviderMasksToTarget(apToRemoveMap map
 func (s *AccessToTargetSyncer) SyncAccessProviderFiltersToTarget(ctx context.Context, apToRemoveMap map[string]*importer.AccessProvider, apMap map[string]*importer.AccessProvider, roleNameMap map[string]string) error {
 	if s.configMap.GetBoolWithDefault(SfStandardEdition, false) {
 		if len(apToRemoveMap) > 0 || len(apMap) > 0 {
-			logger.Error("Skipping filter policies due to Snowflake Standard Edition.")
+			Logger.Error("Skipping filter policies due to Snowflake Standard Edition.")
 		}
 
 		return nil
 	}
 
-	logger.Info(fmt.Sprintf("Configuring access provider as filters in Snowflake. Update %d masks remove %d masks", len(apMap), len(apToRemoveMap)))
+	Logger.Info(fmt.Sprintf("Configuring access provider as filters in Snowflake. Update %d masks remove %d masks", len(apMap), len(apToRemoveMap)))
 
 	// Groups filters by table
 	updateGroupedFilters, err := groupFiltersByTable(apMap, s.accessProviderFeedbackHandler)
@@ -485,11 +485,11 @@ func (s *AccessToTargetSyncer) SyncAccessProviderFiltersToTarget(ctx context.Con
 
 func (s *AccessToTargetSyncer) removeRolesToRemove(toRemoveAps map[string]*importer.AccessProvider) error {
 	if len(toRemoveAps) > 0 {
-		logger.Info(fmt.Sprintf("Removing %d old Raito roles in Snowflake", len(toRemoveAps)))
+		Logger.Info(fmt.Sprintf("Removing %d old Raito roles in Snowflake", len(toRemoveAps)))
 
 		for toRemoveExternalId, ap := range toRemoveAps {
 			if ap == nil {
-				logger.Warn(fmt.Sprintf("no linked access provider found for %q, so just going to remove it from Snowflake", toRemoveExternalId))
+				Logger.Warn(fmt.Sprintf("no linked access provider found for %q, so just going to remove it from Snowflake", toRemoveExternalId))
 
 				err := s.dropRole(toRemoveExternalId, isDatabaseRoleByExternalId(toRemoveExternalId))
 				if err != nil {
@@ -507,7 +507,7 @@ func (s *AccessToTargetSyncer) removeRolesToRemove(toRemoveAps map[string]*impor
 			err := s.dropRole(toRemoveExternalId, isDatabaseRole(ap.Type))
 			// If an error occurs (and not already deleted), we send an error back as feedback
 			if err != nil && !strings.Contains(err.Error(), "does not exist") {
-				logger.Error(fmt.Sprintf("unable to drop role %q: %s", toRemoveExternalId, err.Error()))
+				Logger.Error(fmt.Sprintf("unable to drop role %q: %s", toRemoveExternalId, err.Error()))
 
 				fi.Errors = append(fi.Errors, fmt.Sprintf("unable to drop role %q: %s", toRemoveExternalId, err.Error()))
 			}
@@ -518,7 +518,7 @@ func (s *AccessToTargetSyncer) removeRolesToRemove(toRemoveAps map[string]*impor
 			}
 		}
 	} else {
-		logger.Info("No old Raito roles to remove in Snowflake")
+		Logger.Info("No old Raito roles to remove in Snowflake")
 	}
 
 	return nil
@@ -608,7 +608,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 	ignoreWhat := accessProvider.WhatLocked != nil && *accessProvider.WhatLocked
 	deleteLocked := accessProvider.DeleteLocked != nil && *accessProvider.DeleteLocked
 
-	logger.Info(fmt.Sprintf("Generating access controls for access provider %q (Ignore who: %t; Ignore inheritance: %t; Ignore what: %t)", accessProvider.Name, ignoreWho, ignoreInheritance, ignoreWhat))
+	Logger.Info(fmt.Sprintf("Generating access controls for access provider %q (Ignore who: %t; Ignore inheritance: %t; Ignore what: %t)", accessProvider.Name, ignoreWho, ignoreInheritance, ignoreWhat))
 
 	// Extract RoleNames from Access Providers that are among the whoList of this one
 	inheritedRoles := make([]string, 0)
@@ -663,7 +663,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 				// In this case the old is already taken by another access provider.
 				// For example in the case where R2 was renamed to R3 and R1 was then renamed to R2.
 				// Therefor, we only log a message for this special case
-				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", externalId, oldExternalId))
+				Logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", externalId, oldExternalId))
 			} else {
 				// The old name exists and the new one doesn't exist yet, so we have to do the rename
 				err = s.renameRole(oldExternalId, externalId, accessProvider.Type)
@@ -678,7 +678,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 				// In this case the old is already taken by another access provider.
 				// For example in the case where R2 was renamed to R3 and R1 was then renamed to R2.
 				// Therefor, we only log a message for this special case
-				logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", externalId, oldExternalId))
+				Logger.Info(fmt.Sprintf("Both the old role name (%s) and the new role name (%s) exist. The old role name is already taken by another (new?) access provider.", externalId, oldExternalId))
 			} else {
 				// The old name exists but also the new one already exists. This is a weird case, but we'll delete the old one in this case and the new one will be updated in the next step of this method.
 				err = s.dropRole(oldExternalId, isDatabaseRoleByExternalId(oldExternalId))
@@ -695,7 +695,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 
 	// If the role already exists in the system
 	if existingRoles.Contains(externalId) {
-		logger.Info(fmt.Sprintf("Merging role: %q", externalId))
+		Logger.Info(fmt.Sprintf("Merging role: %q", externalId))
 
 		// Only update the comment if we have full control over the role (who , inheritance and what not ignored)
 		if !ignoreWho && !ignoreWhat && !ignoreInheritance {
@@ -747,7 +747,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 			if !ignoreWho {
 				toAdd := slice.StringSliceDifference(accessProvider.Who.Users, usersOfRole, false)
 				toRemove := slice.StringSliceDifference(usersOfRole, accessProvider.Who.Users, false)
-				logger.Info(fmt.Sprintf("Identified %d users to add and %d users to remove from role %q", len(toAdd), len(toRemove), externalId))
+				Logger.Info(fmt.Sprintf("Identified %d users to add and %d users to remove from role %q", len(toAdd), len(toRemove), externalId))
 
 				if len(toAdd) > 0 {
 					if isDatabaseRole(accessProvider.Type) {
@@ -775,7 +775,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 			if !ignoreInheritance {
 				toAdd := slice.StringSliceDifference(inheritedRoles, rolesOfRole, false)
 				toRemove := slice.StringSliceDifference(rolesOfRole, inheritedRoles, false)
-				logger.Info(fmt.Sprintf("Identified %d roles to add and %d roles to remove from role %q", len(toAdd), len(toRemove), externalId))
+				Logger.Info(fmt.Sprintf("Identified %d roles to add and %d roles to remove from role %q", len(toAdd), len(toRemove), externalId))
 
 				if len(toAdd) > 0 {
 					e := s.grantRolesToRole(ctx, externalId, accessProvider.Type, toAdd...)
@@ -821,7 +821,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 				return actualName, err3
 			}
 
-			logger.Debug(fmt.Sprintf("Found grants for role %q: %+v", externalId, grantsToRole))
+			Logger.Debug(fmt.Sprintf("Found grants for role %q: %+v", externalId, grantsToRole))
 
 			foundGrants = make([]Grant, 0, len(grantsToRole))
 
@@ -829,9 +829,9 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 				if strings.EqualFold(grant.GrantedOn, "ACCOUNT") {
 					foundGrants = append(foundGrants, Grant{grant.Privilege, "account", ""})
 				} else if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
-					logger.Info(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, externalId))
+					Logger.Info(fmt.Sprintf("Ignoring permission %q on %q for Role %q as this will remain untouched", grant.Privilege, grant.Name, externalId))
 				} else if strings.EqualFold(grant.Privilege, "USAGE") && (strings.EqualFold(grant.GrantedOn, "ROLE") || strings.EqualFold(grant.GrantedOn, GrantTypeDatabaseRole)) {
-					logger.Debug(fmt.Sprintf("Ignoring USAGE permission on %s %q", grant.GrantedOn, grant.Name))
+					Logger.Debug(fmt.Sprintf("Ignoring USAGE permission on %s %q", grant.GrantedOn, grant.Name))
 				} else {
 					onType := convertSnowflakeGrantTypeToRaito(grant.GrantedOn)
 					name := grant.Name
@@ -845,15 +845,15 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 			}
 		}
 
-		logger.Info(fmt.Sprintf("Done updating users granted to role %q", externalId))
+		Logger.Info(fmt.Sprintf("Done updating users granted to role %q", externalId))
 	} else {
 		// When delete is locked (so this was originally created/managed in the data source), we don't recreate it again if it is deleted on the data source in the meanwhile.
 		if deleteLocked {
-			logger.Warn(fmt.Sprintf("Role %q does not exist but is marked as delete locked. Not creating the role as it is probably removed externally.", externalId))
+			Logger.Warn(fmt.Sprintf("Role %q does not exist but is marked as delete locked. Not creating the role as it is probably removed externally.", externalId))
 			return actualName, nil
 		}
 
-		logger.Info(fmt.Sprintf("Creating role %q", externalId))
+		Logger.Info(fmt.Sprintf("Creating role %q", externalId))
 
 		if _, rf := rolesCreated[externalId]; !rf {
 			// Create the role if not exists
@@ -1290,7 +1290,7 @@ func (s *AccessToTargetSyncer) generateAccessControls(ctx context.Context, toPro
 
 func (s *AccessToTargetSyncer) handleAccessProviderFeedback(fi *importer.AccessProviderSyncFeedback, err error) error {
 	if err != nil {
-		logger.Error(err.Error())
+		Logger.Error(err.Error())
 		fi.Errors = append(fi.Errors, err.Error())
 	}
 
@@ -1298,7 +1298,7 @@ func (s *AccessToTargetSyncer) handleAccessProviderFeedback(fi *importer.AccessP
 }
 
 func (s *AccessToTargetSyncer) updateShare(share *importer.AccessProvider, metaData map[string]map[string]struct{}) (string, error) {
-	logger.Info(fmt.Sprintf("Updating share %q", share.Name))
+	Logger.Info(fmt.Sprintf("Updating share %q", share.Name))
 
 	databases := set.NewSet[string]()
 
@@ -1330,7 +1330,7 @@ func (s *AccessToTargetSyncer) updateShare(share *importer.AccessProvider, metaD
 
 		for _, grant := range existingsGrants {
 			if strings.EqualFold(grant.Privilege, "OWNERSHIP") {
-				logger.Info(fmt.Sprintf("Ignoring permission %q on %q for Share %q as this will remain untouched", grant.Privilege, grant.Name, share.Name))
+				Logger.Info(fmt.Sprintf("Ignoring permission %q on %q for Share %q as this will remain untouched", grant.Privilege, grant.Name, share.Name))
 			} else {
 				onType := convertSnowflakeGrantTypeToRaito(grant.GrantedOn)
 				name := grant.Name
@@ -1376,14 +1376,14 @@ func (s *AccessToTargetSyncer) updateShare(share *importer.AccessProvider, metaD
 			return shareName, fmt.Errorf("set share accounts: %w", err)
 		}
 	} else {
-		logger.Warn(fmt.Sprintf("Share %s has no database assigned. Cannot add accounts to share", shareName))
+		Logger.Warn(fmt.Sprintf("Share %s has no database assigned. Cannot add accounts to share", shareName))
 	}
 
 	return shareName, nil
 }
 
 func (s *AccessToTargetSyncer) removeShare(shareId string) error {
-	logger.Info(fmt.Sprintf("Remove share %q", shareId))
+	Logger.Info(fmt.Sprintf("Remove share %q", shareId))
 
 	shareName := strings.TrimPrefix(shareId, maskPrefix)
 
@@ -1396,7 +1396,7 @@ func (s *AccessToTargetSyncer) removeShare(shareId string) error {
 }
 
 func (s *AccessToTargetSyncer) updateMask(mask *importer.AccessProvider, roleNameMap map[string]string) (string, error) {
-	logger.Info(fmt.Sprintf("Updating mask %q", mask.Name))
+	Logger.Info(fmt.Sprintf("Updating mask %q", mask.Name))
 
 	globalMaskName := raitoMaskName(mask.Name)
 	uniqueMaskName := raitoMaskUniqueName(mask.Name)
@@ -1422,7 +1422,7 @@ func (s *AccessToTargetSyncer) updateMask(mask *importer.AccessProvider, roleNam
 		fullnameSplit := strings.Split(do.DataObject.FullName, ".")
 
 		if len(fullnameSplit) != 4 {
-			logger.Error(fmt.Sprintf("Invalid fullname for column %s in mask %s", do.DataObject.FullName, mask.Name))
+			Logger.Error(fmt.Sprintf("Invalid fullname for column %s in mask %s", do.DataObject.FullName, mask.Name))
 
 			continue
 		}
@@ -1443,7 +1443,7 @@ func (s *AccessToTargetSyncer) updateMask(mask *importer.AccessProvider, roleNam
 
 	// Step 2: For each schema create a new masking policy and force the DataObjects to use the new policy
 	for schema, dos := range dosPerSchema {
-		logger.Info(fmt.Sprintf("Updating mask %q for schema %q", mask.Name, schema))
+		Logger.Info(fmt.Sprintf("Updating mask %q for schema %q", mask.Name, schema))
 		namesplit := strings.Split(schema, ".")
 
 		database := namesplit[0]
@@ -1470,7 +1470,7 @@ func (s *AccessToTargetSyncer) updateMask(mask *importer.AccessProvider, roleNam
 }
 
 func (s *AccessToTargetSyncer) removeMask(maskName string) error {
-	logger.Info(fmt.Sprintf("Remove mask %q", maskName))
+	Logger.Info(fmt.Sprintf("Remove mask %q", maskName))
 
 	existingPolicies, err := s.repo.GetPoliciesLike("MASKING", fmt.Sprintf("%s%s", maskName, "%"))
 	if err != nil {
@@ -1502,7 +1502,7 @@ func (s *AccessToTargetSyncer) createGrantsForTableOrView(doType string, permiss
 		if _, f := metaData[doType][strings.ToUpper(p)]; f {
 			grants.Add(Grant{p, doType, common.FormatQuery(`%s.%s.%s`, *sfObject.Database, *sfObject.Schema, *sfObject.Table)})
 		} else {
-			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(doType)))
+			Logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(doType)))
 		}
 	}
 
@@ -1519,7 +1519,7 @@ func (s *AccessToTargetSyncer) createGrantsForFunctionOrProcedure(permissions []
 		if _, f := metaData[objType][strings.ToUpper(p)]; f {
 			grants.Add(Grant{p, objType, fullName}) // fullName should already be in the right format
 		} else {
-			logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(objType)))
+			Logger.Warn(fmt.Sprintf("Permission %q does not apply to type %s", p, strings.ToUpper(objType)))
 		}
 	}
 
@@ -1685,7 +1685,7 @@ func (s *AccessToTargetSyncer) createGrantsForSchema(permissions []string, fullN
 		}
 
 		if !permissionMatchFound {
-			logger.Info(fmt.Sprintf("Permission %q does not apply to type SCHEMA or any of its descendants. Skipping", p))
+			Logger.Info(fmt.Sprintf("Permission %q does not apply to type SCHEMA or any of its descendants. Skipping", p))
 		}
 	}
 
@@ -1845,7 +1845,7 @@ func (s *AccessToTargetSyncer) createGrantsForDatabase(permissions []string, dat
 		}
 
 		if !databaseMatchFound {
-			logger.Info(fmt.Sprintf("Permission %q does not apply to type DATABASE or any of its descendants. Skipping", p))
+			Logger.Info(fmt.Sprintf("Permission %q does not apply to type DATABASE or any of its descendants. Skipping", p))
 		}
 	}
 
@@ -1861,7 +1861,7 @@ func (s *AccessToTargetSyncer) createGrantsForDatabase(permissions []string, dat
 func (s *AccessToTargetSyncer) createGrantsForWarehouse(permissions []string, warehouse string, metaData map[string]map[string]struct{}, grants *GrantSet) {
 	for _, p := range permissions {
 		if _, f := metaData["warehouse"][strings.ToUpper(p)]; !f {
-			logger.Warn(fmt.Sprintf("Permission %q does not apply to type WAREHOUSE. Skipping", p))
+			Logger.Warn(fmt.Sprintf("Permission %q does not apply to type WAREHOUSE. Skipping", p))
 			continue
 		}
 
@@ -1872,7 +1872,7 @@ func (s *AccessToTargetSyncer) createGrantsForWarehouse(permissions []string, wa
 func (s *AccessToTargetSyncer) createGrantsForIntegration(permissions []string, warehouse string, metaData map[string]map[string]struct{}, grants *GrantSet) {
 	for _, p := range permissions {
 		if _, f := metaData[Integration][strings.ToUpper(p)]; !f {
-			logger.Warn(fmt.Sprintf("Permission %q does not apply to type INTEGRATION. Skipping", p))
+			Logger.Warn(fmt.Sprintf("Permission %q does not apply to type INTEGRATION. Skipping", p))
 			continue
 		}
 
@@ -1948,7 +1948,7 @@ func (s *AccessToTargetSyncer) createGrantsForAccount(permissions []string, meta
 		}
 
 		if !matchFound {
-			logger.Info(fmt.Sprintf("Permission %q does not apply to type ACCOUNT (datasource) or any of its descendants. Skipping", p))
+			Logger.Info(fmt.Sprintf("Permission %q does not apply to type ACCOUNT (datasource) or any of its descendants. Skipping", p))
 			continue
 		}
 	}
@@ -1981,12 +1981,12 @@ func (s *AccessToTargetSyncer) updateOrCreateFilter(ctx context.Context, tableFu
 
 		arguments.Add(apArguments...)
 
-		logger.Info(fmt.Sprintf("Filter expression for access provider %s: %s (%+v)", ap.Name, fExpression, apArguments))
+		Logger.Info(fmt.Sprintf("Filter expression for access provider %s: %s (%+v)", ap.Name, fExpression, apArguments))
 	}
 
 	if len(filterExpressions) == 0 {
 		// No filter expression for example when no who was defined for the filter
-		logger.Info("No filter expressions found for table %s.", tableFullName)
+		Logger.Info("No filter expressions found for table %s.", tableFullName)
 
 		filterExpressions = append(filterExpressions, "FALSE")
 	}
@@ -2062,7 +2062,7 @@ func (s *AccessToTargetSyncer) mergeGrants(externalId string, apType *string, fo
 	toAdd := slice.SliceDifference(expected, found)
 	toRemove := slice.SliceDifference(found, expected)
 
-	logger.Info(fmt.Sprintf("Found %d grants to add and %d grants to remove for role %q", len(toAdd), len(toRemove), externalId))
+	Logger.Info(fmt.Sprintf("Found %d grants to add and %d grants to remove for role %q", len(toAdd), len(toRemove), externalId))
 
 	for _, grant := range toAdd {
 		if verifyGrant(grant, metaData) {
@@ -2196,7 +2196,7 @@ func verifyGrant(grant Grant, metaData map[string]map[string]struct{}) bool {
 		}
 	}
 
-	logger.Warn(fmt.Sprintf("Unknown permission %q for entity type %s. Skipping. %+v", grant.Permissions, grant.OnType, metaData))
+	Logger.Warn(fmt.Sprintf("Unknown permission %q for entity type %s. Skipping. %+v", grant.Permissions, grant.OnType, metaData))
 
 	return false
 }

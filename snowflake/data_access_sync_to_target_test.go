@@ -1751,7 +1751,7 @@ type dummyFeedbackHandler struct {
 func (d *dummyFeedbackHandler) AddAccessProviderFeedback(accessProviderFeedback importer.AccessProviderSyncFeedback) error {
 	if len(accessProviderFeedback.Errors) > 0 {
 		for _, err := range accessProviderFeedback.Errors {
-			logger.Error(fmt.Sprintf("error during syncing of access provider %q; %s", accessProviderFeedback.AccessProvider, err))
+			Logger.Error(fmt.Sprintf("error during syncing of access provider %q; %s", accessProviderFeedback.AccessProvider, err))
 		}
 	}
 

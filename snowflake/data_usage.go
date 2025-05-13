@@ -50,25 +50,25 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	}
 
 	defer func() {
-		logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
+		Logger.Info(fmt.Sprintf("Total snowflake query time:  %s", repo.TotalQueryTime()))
 		repo.Close()
 	}()
 
 	numberOfDays := configParams.GetIntWithDefault(SfDataUsageWindow, 90)
 	if numberOfDays > 90 {
-		logger.Info(fmt.Sprintf("Capping data usage window to 90 days (from %d days)", numberOfDays))
+		Logger.Info(fmt.Sprintf("Capping data usage window to 90 days (from %d days)", numberOfDays))
 		numberOfDays = 90
 	}
 
 	if numberOfDays <= 0 {
-		logger.Info(fmt.Sprintf("Invalid input for data usage window (%d), setting to default 14 days", numberOfDays))
+		Logger.Info(fmt.Sprintf("Invalid input for data usage window (%d), setting to default 14 days", numberOfDays))
 		numberOfDays = 14
 	}
 
 	startDate := time.Now().Truncate(24*time.Hour).AddDate(0, 0, -numberOfDays)
 
 	if v, found := configParams.Parameters["lastUsed"]; found && v != "" {
-		logger.Info(fmt.Sprintf("last used from config: %s", configParams.Parameters["lastUsed"]))
+		Logger.Info(fmt.Sprintf("last used from config: %s", configParams.Parameters["lastUsed"]))
 		startDateRaw, errLocal := time.Parse(time.RFC3339, configParams.Parameters["lastUsed"])
 
 		if errLocal == nil && startDateRaw.After(startDate) {
@@ -77,10 +77,10 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	}
 
 	if v, found := configParams.Parameters["firstUsed"]; found && v != "" {
-		logger.Info(fmt.Sprintf("first used from config: %s", configParams.Parameters["firstUsed"]))
+		Logger.Info(fmt.Sprintf("first used from config: %s", configParams.Parameters["firstUsed"]))
 	}
 
-	logger.Info(fmt.Sprintf("using start date %s", startDate.Format(time.RFC3339)))
+	Logger.Info(fmt.Sprintf("using start date %s", startDate.Format(time.RFC3339)))
 
 	queryCtx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
@@ -92,7 +92,7 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	i := 0
 
 	defer func() {
-		logger.Info(fmt.Sprintf("Processed %d statements", i))
+		Logger.Info(fmt.Sprintf("Processed %d statements", i))
 	}()
 
 	for usageStatement := range usageStatementSqlRows {
@@ -123,7 +123,7 @@ func logUsageBatch(count int) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	logger.Info(fmt.Sprintf("Processed %d statements (Heap: %v MiB; System memory: %v MiB)", count, bToMb(m.Alloc), bToMb(m.Sys)))
+	Logger.Info(fmt.Sprintf("Processed %d statements (Heap: %v MiB; System memory: %v MiB)", count, bToMb(m.Alloc), bToMb(m.Sys)))
 }
 
 func bToMb(b uint64) uint64 {
@@ -218,7 +218,7 @@ func parseDdlModifiedObject(objectString *NullString, objects []du.UsageDataObje
 	if modifiedObject.OperationType == common.ModifiedObjectByDdlOperationTypeCreate || modifiedObject.OperationType == common.ModifiedObjectByDdlOperationTypeDrop {
 		newObjectType, found := typeParentMap[objectType]
 		if !found {
-			logger.Warn(fmt.Sprintf("Unknown object type '%s' for object '%s'", objectType, fullName))
+			Logger.Warn(fmt.Sprintf("Unknown object type '%s' for object '%s'", objectType, fullName))
 		} else {
 			objectType = newObjectType
 

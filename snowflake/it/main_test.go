@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/blockloop/scan"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/raito-io/cli-plugin-snowflake/common"
 	"github.com/raito-io/cli-plugin-snowflake/snowflake"
@@ -28,6 +29,17 @@ const (
 )
 
 func setup() error {
+	snowflake.Logger = hclog.New(&hclog.LoggerOptions{
+		Name:                 "TestLogger",
+		Level:                hclog.Debug,
+		JSONFormat:           false,
+		JSONEscapeDisabled:   false,
+		IncludeLocation:      false,
+		Color:                hclog.AutoColor,
+		ColorHeaderOnly:      false,
+		ColorHeaderAndFields: false,
+	})
+
 	randomSource := rand.NewSource(time.Now().UnixNano())
 	random := rand.New(randomSource)
 

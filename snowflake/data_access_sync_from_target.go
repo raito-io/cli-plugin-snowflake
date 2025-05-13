@@ -47,7 +47,7 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 	s.excludedRoles = s.extractExcludeRoleList()
 	s.linkToExternalIdentityStoreGroups = s.configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
 
-	logger.Info("Reading account and database roles from Snowflake")
+	Logger.Info("Reading account and database roles from Snowflake")
 
 	inboundShares, err := s.accessSyncer.getInboundShareNames()
 	if err != nil {
@@ -58,7 +58,7 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 	s.externalGroupOwners = s.configMap.GetStringWithDefault(SfExternalIdentityStoreOwners, "")
 	s.linkToExternalIdentityStoreGroups = s.configMap.GetBoolWithDefault(SfLinkToExternalIdentityStoreGroups, false)
 
-	logger.Info("Reading account roles from Snowflake")
+	Logger.Info("Reading account roles from Snowflake")
 
 	err = s.importAllRolesOnAccountLevel(s.accessProviderHandler)
 	if err != nil {
@@ -74,7 +74,7 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 
 	databaseRoleSupportEnabled := s.configMap.GetBoolWithDefault(SfDatabaseRoles, false)
 	if databaseRoleSupportEnabled {
-		logger.Info("Reading database roles from Snowflake")
+		Logger.Info("Reading database roles from Snowflake")
 
 		err = s.importAllRolesOnDatabaseLevel(s.accessProviderHandler, excludedDatabases)
 		if err != nil {
@@ -84,7 +84,7 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 
 	applicationSupportEnabled := s.configMap.GetBoolWithDefault(SfApplications, false)
 	if applicationSupportEnabled {
-		logger.Info("Reading application roles from Snowflake")
+		Logger.Info("Reading application roles from Snowflake")
 
 		err = s.importAllRolesOnApplicationLevel(s.accessProviderHandler, excludedDatabases)
 		if err != nil {
@@ -97,24 +97,24 @@ func (s *AccessFromTargetSyncer) syncFromTarget() error {
 
 	if !standardEdition {
 		if !skipColumns {
-			logger.Info("Reading masking policies from Snowflake")
+			Logger.Info("Reading masking policies from Snowflake")
 
 			err = s.importMaskingPolicies()
 			if err != nil {
 				return err
 			}
 		} else {
-			logger.Info("Skipping masking policies")
+			Logger.Info("Skipping masking policies")
 		}
 
-		logger.Info("Reading row access policies from Snowflake")
+		Logger.Info("Reading row access policies from Snowflake")
 
 		err = s.importRowAccessPolicies()
 		if err != nil {
 			return err
 		}
 	} else {
-		logger.Info("Skipping masking policies and row access policies due to Snowflake Standard Edition.")
+		Logger.Info("Skipping masking policies and row access policies due to Snowflake Standard Edition.")
 	}
 
 	return nil
@@ -139,14 +139,14 @@ func (s *AccessFromTargetSyncer) importOutboundShares(accessProviderHandler wrap
 
 	for shareName, shareEntityItems := range shareMap {
 		if _, exclude := s.excludedRoles[shareName]; exclude {
-			logger.Info("Skipping SnowFlake SHARE " + shareName)
+			Logger.Info("Skipping SnowFlake SHARE " + shareName)
 			continue
 		}
 
 		wp.Submit(func() {
 			err2 := s.transformShareToAccessProvider(shareName, shareEntityItems, processedAps)
 			if err2 != nil {
-				logger.Warn(fmt.Sprintf("Error importing SnowFlake share %q: %s", shareName, err2.Error()))
+				Logger.Warn(fmt.Sprintf("Error importing SnowFlake share %q: %s", shareName, err2.Error()))
 				return
 			}
 		})
@@ -170,7 +170,7 @@ func (s *AccessFromTargetSyncer) importAllRolesOnAccountLevel(accessProviderHand
 
 		availableTags, err = s.repo.GetTagsByDomain("ROLE")
 		if err != nil {
-			logger.Error(fmt.Sprintf("Error retrieving tags for account roles: %s", err.Error()))
+			Logger.Error(fmt.Sprintf("Error retrieving tags for account roles: %s", err.Error()))
 		}
 	}
 
@@ -186,14 +186,14 @@ func (s *AccessFromTargetSyncer) importAllRolesOnAccountLevel(accessProviderHand
 
 	for _, roleEntity := range roleEntities {
 		if _, exclude := s.excludedRoles[roleEntity.Name]; exclude {
-			logger.Info("Skipping SnowFlake ROLE " + roleEntity.Name)
+			Logger.Info("Skipping SnowFlake ROLE " + roleEntity.Name)
 			continue
 		}
 
 		wp.Submit(func() {
 			err2 := s.transformAccountRoleToAccessProvider(roleEntity, processedAps, availableTags)
 			if err2 != nil {
-				logger.Warn(fmt.Sprintf("Error importing SnowFlake role %q: %s", roleEntity.Name, err2.Error()))
+				Logger.Warn(fmt.Sprintf("Error importing SnowFlake role %q: %s", roleEntity.Name, err2.Error()))
 			}
 		})
 	}
@@ -218,7 +218,7 @@ func (s *AccessFromTargetSyncer) shouldRetrieveTags() bool {
 }
 
 func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareName string, shareEntity []ShareEntity, processedAps map[string]*exporter.AccessProvider) error {
-	logger.Info(fmt.Sprintf("Reading SnowFlake SHARE %s (%d items)", shareName, len(shareEntity)))
+	Logger.Info(fmt.Sprintf("Reading SnowFlake SHARE %s (%d items)", shareName, len(shareEntity)))
 
 	externalId := apTypeSharePrefix + shareName
 
@@ -277,7 +277,7 @@ func (s *AccessFromTargetSyncer) transformShareToAccessProvider(shareName string
 }
 
 func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity RoleEntity, processedAps map[string]*exporter.AccessProvider, availableTags map[string][]*tag.Tag) error {
-	logger.Info(fmt.Sprintf("Reading SnowFlake ROLE %s", roleEntity.Name))
+	Logger.Info(fmt.Sprintf("Reading SnowFlake ROLE %s", roleEntity.Name))
 
 	roleName := roleEntity.Name
 	externalId := roleName
@@ -344,13 +344,13 @@ func (s *AccessFromTargetSyncer) transformAccountRoleToAccessProvider(roleEntity
 	ap.What = append(ap.What, s.mapGrantToRoleToWhatItems(grantToEntities)...)
 
 	if isNotInternalizableRole(ap.ExternalId, ap.Type) {
-		logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", ap.ExternalId))
+		Logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", ap.ExternalId))
 		ap.NotInternalizable = true
 	}
 
 	if len(availableTags) > 0 && availableTags[ap.Name] != nil {
 		ap.Tags = availableTags[ap.Name]
-		logger.Debug(fmt.Sprintf("Going to add tags to AP %s", ap.ExternalId))
+		Logger.Debug(fmt.Sprintf("Going to add tags to AP %s", ap.ExternalId))
 	}
 
 	return nil
@@ -383,7 +383,7 @@ func (s *AccessFromTargetSyncer) importAllRolesOnDatabaseLevel(accessProviderHan
 	processedAps := make(map[string]*exporter.AccessProvider)
 
 	for database := range databases {
-		logger.Info(fmt.Sprintf("Reading roles from Snowflake inside database %s", database))
+		Logger.Info(fmt.Sprintf("Reading roles from Snowflake inside database %s", database))
 
 		// Get all database roles for database
 		roleEntities, err2 := s.repo.GetDatabaseRoles(database)
@@ -394,7 +394,7 @@ func (s *AccessFromTargetSyncer) importAllRolesOnDatabaseLevel(accessProviderHan
 		for _, roleEntity := range roleEntities {
 			fullRoleName := fmt.Sprintf("%s.%s", database, roleEntity.Name)
 			if _, exclude := s.excludedRoles[fullRoleName]; exclude {
-				logger.Info("Skipping SnowFlake DATABASE ROLE " + fullRoleName)
+				Logger.Info("Skipping SnowFlake DATABASE ROLE " + fullRoleName)
 				continue
 			}
 
@@ -406,13 +406,13 @@ func (s *AccessFromTargetSyncer) importAllRolesOnDatabaseLevel(accessProviderHan
 
 					availableTags, err3 = s.repo.GetDatabaseRoleTags(database, roleEntity.Name)
 					if err3 != nil {
-						logger.Error(fmt.Sprintf("Error retrieving tags for database role: %q - %s", fullRoleName, err3.Error()))
+						Logger.Error(fmt.Sprintf("Error retrieving tags for database role: %q - %s", fullRoleName, err3.Error()))
 					}
 				}
 
 				err2 := s.importAccessForDatabaseRole(database, roleEntity, availableTags, processedAps)
 				if err2 != nil {
-					logger.Warn(fmt.Sprintf("Error importing SnowFlake Database role %q: %s", fullRoleName, err2.Error()))
+					Logger.Warn(fmt.Sprintf("Error importing SnowFlake Database role %q: %s", fullRoleName, err2.Error()))
 				}
 			})
 		}
@@ -439,12 +439,12 @@ func (s *AccessFromTargetSyncer) importAllRolesOnApplicationLevel(accessProvider
 	processedAps := make(map[string]*exporter.AccessProvider)
 
 	for application := range applications {
-		logger.Info(fmt.Sprintf("Reading roles from Snowflake inside application %s", application))
+		Logger.Info(fmt.Sprintf("Reading roles from Snowflake inside application %s", application))
 
 		wp.Submit(func() {
 			roleEntitites, err2 := s.repo.GetApplicationRoles(application)
 			if err2 != nil {
-				logger.Error(fmt.Sprintf("Error retrieving roles for application %q: %s", application, err2.Error()))
+				Logger.Error(fmt.Sprintf("Error retrieving roles for application %q: %s", application, err2.Error()))
 
 				return
 			}
@@ -452,7 +452,7 @@ func (s *AccessFromTargetSyncer) importAllRolesOnApplicationLevel(accessProvider
 			for _, roleEntity := range roleEntitites {
 				fullRoleName := fmt.Sprintf("%s.%s", application, roleEntity.Name)
 				if _, exclude := s.excludedRoles[fullRoleName]; exclude {
-					logger.Info("Skipping SnowFlake APPLICATION ROLE " + fullRoleName)
+					Logger.Info("Skipping SnowFlake APPLICATION ROLE " + fullRoleName)
 
 					continue
 				}
@@ -461,7 +461,7 @@ func (s *AccessFromTargetSyncer) importAllRolesOnApplicationLevel(accessProvider
 					Name: roleEntity.Name,
 				}, processedAps)
 				if err2 != nil {
-					logger.Error(fmt.Sprintf("Error importing SnowFlake Application role %q: %s", fullRoleName, err2.Error()))
+					Logger.Error(fmt.Sprintf("Error importing SnowFlake Application role %q: %s", fullRoleName, err2.Error()))
 
 					return
 				}
@@ -493,7 +493,7 @@ func (s *AccessFromTargetSyncer) comesFromExternalIdentityStore(roleEntity RoleE
 }
 
 func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, roleEntity RoleEntity, availableTags map[string][]*tag.Tag, processedAps map[string]*exporter.AccessProvider) error {
-	logger.Info(fmt.Sprintf("Reading SnowFlake DATABASE ROLE %s inside %s", roleEntity.Name, database))
+	Logger.Info(fmt.Sprintf("Reading SnowFlake DATABASE ROLE %s inside %s", roleEntity.Name, database))
 
 	roleName := roleEntity.Name
 	externalId := databaseRoleExternalIdGenerator(database, roleName)
@@ -552,20 +552,20 @@ func (s *AccessFromTargetSyncer) importAccessForDatabaseRole(database string, ro
 	ap.What = append(ap.What, s.mapGrantToRoleToWhatItems(grantToEntities)...)
 
 	if isNotInternalizableRole(ap.ExternalId, ap.Type) {
-		logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", ap.ExternalId))
+		Logger.Info(fmt.Sprintf("Marking role %s as read-only (notInternalizable)", ap.ExternalId))
 		ap.NotInternalizable = true
 	}
 
 	if len(availableTags) > 0 && availableTags[ap.Name] != nil {
 		ap.Tags = availableTags[ap.Name]
-		logger.Debug(fmt.Sprintf("Going to add tags to AP %s", ap.ExternalId))
+		Logger.Debug(fmt.Sprintf("Going to add tags to AP %s", ap.ExternalId))
 	}
 
 	return nil
 }
 
 func (s *AccessFromTargetSyncer) importAccessForApplicationRole(application string, roleEntity RoleEntity, processedAps map[string]*exporter.AccessProvider) error {
-	logger.Info(fmt.Sprintf("Reading SnowFlake APPLICATION ROLE %s inside %s", roleEntity.Name, application))
+	Logger.Info(fmt.Sprintf("Reading SnowFlake APPLICATION ROLE %s inside %s", roleEntity.Name, application))
 
 	roleName := roleEntity.Name
 	externalId := applicationRoleExternalIdGenerator(application, roleName)
@@ -718,7 +718,7 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 				users = append(users, cleanDoubleQuotes(grantee.GranteeName))
 			} else if grantee.GrantedTo == "ROLE" { //nolint:goconst
 				if _, exclude := s.excludedRoles[grantee.GranteeName]; exclude {
-					logger.Warn(fmt.Sprintf("Skipping Snowflake ROLE %q may break the hierarchy for role %q", grantee.GranteeName, roleName))
+					Logger.Warn(fmt.Sprintf("Skipping Snowflake ROLE %q may break the hierarchy for role %q", grantee.GranteeName, roleName))
 
 					incomplete = true
 
@@ -730,7 +730,7 @@ func (s *AccessFromTargetSyncer) retrieveWhoEntitiesForRole(roleEntity RoleEntit
 				accessProviders = append(accessProviders, shareExternalIdGenerator(cleanDoubleQuotes(grantee.GranteeName)))
 			} else if grantee.GrantedTo == GrantTypeDatabaseRole {
 				if _, exclude := s.excludedRoles[grantee.GranteeName]; exclude {
-					logger.Warn(fmt.Sprintf("Skipping Snowflake DATABASE ROLE %q may break the hierarchy for role %q", grantee.GranteeName, roleName))
+					Logger.Warn(fmt.Sprintf("Skipping Snowflake DATABASE ROLE %q may break the hierarchy for role %q", grantee.GranteeName, roleName))
 
 					incomplete = true
 
@@ -756,7 +756,7 @@ func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action 
 		// For Standard edition, row access policies are not supported. Failsafe in case `sf-standard-edition` is overlooked.
 		// You can see the Snowflake edition in the UI, or through the 'show organization accounts;' query (ORGADMIN role needed).
 		if strings.Contains(err.Error(), "Unsupported feature") {
-			logger.Warn(fmt.Sprintf("Could not fetch policies of type %s; unsupported feature.", policyType))
+			Logger.Warn(fmt.Sprintf("Could not fetch policies of type %s; unsupported feature.", policyType))
 		} else {
 			return fmt.Errorf("error fetching all %s policies: %s", policyType, err.Error())
 		}
@@ -764,14 +764,14 @@ func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action 
 
 	for _, policy := range policyEntities {
 		if !strings.HasPrefix(strings.Replace(policy.Kind, "_", " ", -1), policyType) {
-			logger.Warn(fmt.Sprintf("Skipping policy %s of kind %s, expected: %s", policy.Name, policyType, policy.Kind))
+			Logger.Warn(fmt.Sprintf("Skipping policy %s of kind %s, expected: %s", policy.Name, policyType, policy.Kind))
 			continue
 		} else if strings.HasPrefix(policy.Name, maskPrefix) {
-			logger.Debug(fmt.Sprintf("Masking policy %s defined by RAITO. Not exporting this", policy.Name))
+			Logger.Debug(fmt.Sprintf("Masking policy %s defined by RAITO. Not exporting this", policy.Name))
 			continue
 		}
 
-		logger.Info(fmt.Sprintf("Reading SnowFlake %s policy %s in Schema %s, Table %s", policyType, policy.Name, policy.SchemaName, policy.DatabaseName))
+		Logger.Info(fmt.Sprintf("Reading SnowFlake %s policy %s in Schema %s, Table %s", policyType, policy.Name, policy.SchemaName, policy.DatabaseName))
 
 		fullName := fmt.Sprintf("%s-%s-%s", policy.DatabaseName, policy.SchemaName, policy.Name)
 
@@ -789,13 +789,13 @@ func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action 
 		// get policy definition
 		describeMaskingPolicyEntities, err2 := s.repo.DescribePolicy(policyType, policy.DatabaseName, policy.SchemaName, policy.Name)
 		if err2 != nil {
-			logger.Warn(fmt.Sprintf("Error fetching description for policy %s.%s.%s: %s", policy.DatabaseName, policy.SchemaName, policy.Name, err2.Error()))
+			Logger.Warn(fmt.Sprintf("Error fetching description for policy %s.%s.%s: %s", policy.DatabaseName, policy.SchemaName, policy.Name, err2.Error()))
 
 			continue
 		}
 
 		if len(describeMaskingPolicyEntities) != 1 {
-			logger.Warn(fmt.Sprintf("Found %d definitions for %s policy %s.%s.%s, only expecting one", len(describeMaskingPolicyEntities), policyType, policy.DatabaseName, policy.SchemaName, policy.Name))
+			Logger.Warn(fmt.Sprintf("Found %d definitions for %s policy %s.%s.%s, only expecting one", len(describeMaskingPolicyEntities), policyType, policy.DatabaseName, policy.SchemaName, policy.Name))
 
 			continue
 		}
@@ -805,7 +805,7 @@ func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action 
 		// get policy references
 		policyReferenceEntities, err2 := s.repo.GetPolicyReferences(policy.DatabaseName, policy.SchemaName, policy.Name)
 		if err2 != nil {
-			logger.Warn(fmt.Sprintf("Error fetching policy references for %s.%s.%s: %s", policy.DatabaseName, policy.SchemaName, policy.Name, err2.Error()))
+			Logger.Warn(fmt.Sprintf("Error fetching policy references for %s.%s.%s: %s", policy.DatabaseName, policy.SchemaName, policy.Name, err2.Error()))
 
 			continue
 		}
@@ -825,7 +825,7 @@ func (s *AccessFromTargetSyncer) importPoliciesOfType(policyType string, action 
 						FullName: common.FormatQuery(`%s.%s.%s.%s`, policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.REF_ENTITY_NAME, policyReference.REF_COLUMN_NAME.String),
 					}
 				} else {
-					logger.Info(fmt.Sprintf("Masking policy %s.%s.%s refers to something that isn't a column. Skipping", policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.POLICY_NAME))
+					Logger.Info(fmt.Sprintf("Masking policy %s.%s.%s refers to something that isn't a column. Skipping", policyReference.REF_DATABASE_NAME, policyReference.REF_SCHEMA_NAME, policyReference.POLICY_NAME))
 				}
 			} else if policyReference.POLICY_KIND == "ROW_ACCESS_POLICY" {
 				dor = &ds.DataObjectReference{

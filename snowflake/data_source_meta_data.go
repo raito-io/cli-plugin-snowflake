@@ -37,7 +37,7 @@ var RoleNameConstraints = naming_hint.NamingConstraints{
 }
 
 func (s *DataSourceSyncer) GetDataSourceMetaData(_ context.Context, configParam *config.ConfigMap) (*ds.MetaData, error) {
-	logger.Debug("Returning meta data for Snowflake data source")
+	Logger.Debug("Returning meta data for Snowflake data source")
 
 	repo, err := s.repoProvider(configParam.Parameters, "")
 	if err != nil {
