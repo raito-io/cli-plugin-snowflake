@@ -674,7 +674,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget_O
 	maskPolicies, err := s.sfRepo.GetPolicies("MASKING")
 	s.NoError(err)
 	s.Contains(maskPolicies, snowflake.PolicyEntity{
-		Name:         fmt.Sprintf("%s_TEXT", strings.ToUpper(accessProviderFeedback[0].ActualName)),
+		Name:         fmt.Sprintf("%s_NUMBER", strings.ToUpper(accessProviderFeedback[0].ActualName)),
 		SchemaName:   schema,
 		DatabaseName: database,
 		Kind:         "MASKING_POLICY",
@@ -699,7 +699,7 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget_O
 	maskPolicies, err = s.sfRepo.GetPolicies("MASKING")
 	s.NoError(err)
 	s.Contains(maskPolicies, snowflake.PolicyEntity{
-		Name:         fmt.Sprintf("%s_TEXT", strings.ToUpper(accessProviderFeedback[0].ActualName)),
+		Name:         fmt.Sprintf("%s_NUMBER", strings.ToUpper(accessProviderFeedback[0].ActualName)),
 		SchemaName:   schema,
 		DatabaseName: database,
 		Kind:         "MASKING_POLICY",
