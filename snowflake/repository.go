@@ -49,7 +49,8 @@ type SnowflakeRepository struct {
 	workerPoolSize int
 	queryTimeLock  sync.Mutex
 
-	accountNamesPerDelimiter map[rune]string
+	accountNamesPerDelimiterMutex sync.Mutex
+	accountNamesPerDelimiter      map[rune]string
 
 	maskFactory *MaskFactory
 }
@@ -1063,6 +1064,9 @@ func (repo *SnowflakeRepository) GetSnowFlakeAccountName(ops ...func(options *Ge
 	for _, op := range ops {
 		op(&options)
 	}
+
+	repo.accountNamesPerDelimiterMutex.Lock()
+	defer repo.accountNamesPerDelimiterMutex.Unlock()
 
 	if accountName, found := repo.accountNamesPerDelimiter[options.Delimiter]; found {
 		return accountName, nil
