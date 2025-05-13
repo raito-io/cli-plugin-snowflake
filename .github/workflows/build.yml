@@ -28,15 +28,15 @@ jobs:
       - remove-old-infra
     if: always()
 
-#  generate-usage:
-#    name: "Generate usage"
-#    uses: ./.github/workflows/generate-usage.yml
-#    with:
-#      targetEnvironment: integration_testing
-#    secrets: inherit
-#
-#    needs:
-#      - setup-infra
+  generate-usage:
+    name: "Generate usage"
+    uses: ./.github/workflows/generate-usage.yml
+    with:
+      targetEnvironment: integration_testing
+    secrets: inherit
+
+    needs:
+      - setup-infra
 
   lint:
     name: "Linting"
@@ -76,7 +76,7 @@ jobs:
 
     needs:
       - setup-infra
-#      - generate-usage
+      - generate-usage
       - lint
 
     steps:
