@@ -256,14 +256,22 @@ func (s *AccessToTargetSyncer) grantUpdateItem(ctx context.Context, toProcessAp 
 		}
 	}
 
-	err = s.grantUpdateItemWhoPart(ctx, accessProvider, externalId, isWhoLocked, isInheritanceLocked, apsById, existingRoles)
-	if err != nil {
-		return fmt.Errorf("updating who part on role %q: %w", actualName, err)
+	// if whoLock or inheritanceLock is not enabled, we will update the beneficiaries for this role
+	if !isWhoLocked || !isInheritanceLocked {
+		err = s.grantUpdateItemWhoPart(ctx, accessProvider, externalId, isWhoLocked, isInheritanceLocked, apsById, existingRoles)
+		if err != nil {
+			return fmt.Errorf("updating who part on role %q: %w", actualName, err)
+		}
 	}
 
-	err = s.grantUpdateItemWhatPart(accessProvider, externalId, apType, isWhatLocked, existingRoles, metaData)
-	if err != nil {
-		return fmt.Errorf("updating what part on role %q: %w", actualName, err)
+	// if whatLock is set, we will not update the grants for this role
+	if !isWhatLocked {
+		isNewlyCreatedAp := toProcessAp.mutationAction == ApMutationActionCreate
+
+		err = s.grantUpdateItemWhatPart(accessProvider, externalId, apType, isNewlyCreatedAp, existingRoles, metaData)
+		if err != nil {
+			return fmt.Errorf("updating what part on role %q: %w", actualName, err)
+		}
 	}
 
 	Logger.Info(fmt.Sprintf("Done updating users granted to role %q", actualName))
@@ -281,31 +289,28 @@ func (s *AccessToTargetSyncer) grantUpdateItem(ctx context.Context, toProcessAp 
 	return nil
 }
 
-func (s *AccessToTargetSyncer) grantUpdateItemWhatPart(accessProvider *importer.AccessProvider, externalId string, apType *string, isWhatLocked bool, existingRoles set.Set[string], metaData map[string]map[string]struct{}) error {
-	// if whatLock is set, we will not update the grants for this role
-	if isWhatLocked {
-		return nil
-	}
-
+func (s *AccessToTargetSyncer) grantUpdateItemWhatPart(accessProvider *importer.AccessProvider, externalId string, apType *string, isNewAccessProvider bool, existingRoles set.Set[string], metaData map[string]map[string]struct{}) error {
 	// Remove all future grants on schema and database if applicable.
 	// Since these are future grants, it's safe to just remove them and re-add them again (if required).
 	// We assume nobody manually added others to this role manually.
-	for _, what := range accessProvider.What {
-		switch what.DataObject.Type {
-		case "database":
-			err := s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), externalId, apType)
-			if err != nil {
-				return fmt.Errorf("error while assigning future schema grants in database %q to role %q: %w", what.DataObject.FullName, externalId, err)
-			}
+	if !isNewAccessProvider {
+		for _, what := range accessProvider.What {
+			switch what.DataObject.Type {
+			case "database":
+				err := s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE SCHEMAS IN DATABASE %s`, what.DataObject.FullName), externalId, apType)
+				if err != nil {
+					return fmt.Errorf("error while assigning future schema grants in database %q to role %q: %w", what.DataObject.FullName, externalId, err)
+				}
 
-			err = s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), externalId, apType)
-			if err != nil {
-				return fmt.Errorf("error while assigning future table grants in database %q to role %q: %w", what.DataObject.FullName, externalId, err)
-			}
-		case "schema":
-			err := s.executeRevokeOnRole("ALL", common.FormatQuery("FUTURE TABLES IN SCHEMA %s", what.DataObject.FullName), externalId, apType)
-			if err != nil {
-				return fmt.Errorf("error while assigning future table grants in schema %q to role %q: %w", what.DataObject.FullName, externalId, err)
+				err = s.executeRevokeOnRole("ALL", common.FormatQuery(`FUTURE TABLES IN DATABASE %s`, what.DataObject.FullName), externalId, apType)
+				if err != nil {
+					return fmt.Errorf("error while assigning future table grants in database %q to role %q: %w", what.DataObject.FullName, externalId, err)
+				}
+			case "schema":
+				err := s.executeRevokeOnRole("ALL", common.FormatQuery("FUTURE TABLES IN SCHEMA %s", what.DataObject.FullName), externalId, apType)
+				if err != nil {
+					return fmt.Errorf("error while assigning future table grants in schema %q to role %q: %w", what.DataObject.FullName, externalId, err)
+				}
 			}
 		}
 	}
@@ -359,11 +364,6 @@ func (s *AccessToTargetSyncer) grantUpdateItemWhatPart(accessProvider *importer.
 
 func (s *AccessToTargetSyncer) grantUpdateItemWhoPart(ctx context.Context, accessProvider *importer.AccessProvider, externalId string, isWhoLocked bool, isInheritanceLocked bool, apsById map[string]*ApSyncToTargetItem, existingRoles set.Set[string]) error {
 	apType := ptr.String(s.retrieveAccessProviderType(accessProvider))
-
-	// if whoLock and inheritanceLock are set, we will not update the beneficiaries for this role
-	if isWhoLocked && isInheritanceLocked {
-		return nil
-	}
 
 	grantsOfRole := make([]GrantOfRole, 0)
 	var err error

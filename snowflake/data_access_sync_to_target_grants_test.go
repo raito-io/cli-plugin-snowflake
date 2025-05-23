@@ -639,9 +639,6 @@ func grantsHandleAllUpdatesOrCreatesSchema(t *testing.T) {
 	repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
 
-	//ToDo: validate it's ok to add this call
-	repoMock.EXPECT().ExecuteRevokeOnAccountRole("ALL", "FUTURE TABLES IN SCHEMA \"DB1.Schema2\"", "RoleName1", false).Return(nil).Once()
-
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "RoleName1", false).Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema2", "RoleName1", false).Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema2.Table3", "RoleName1", false).Return(nil).Once()
@@ -698,9 +695,6 @@ func grantsHandleAllUpdatesOrCreatesSchemaNoVerify(t *testing.T) {
 	repoMock.EXPECT().CreateAccountRole("RoleName1").Return(nil).Once()
 	repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "RoleName1").Return(nil).Once()
 	expectGrantUsersToRole(repoMock, "RoleName1", "User1", "User2")
-
-	//ToDo: validate it's ok to add this call
-	repoMock.EXPECT().ExecuteRevokeOnAccountRole("ALL", "FUTURE TABLES IN SCHEMA \"DB1.Schema2\"", "RoleName1", false).Return(nil).Once()
 
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "RoleName1", false).Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema2", "RoleName1", false).Return(nil).Once()
@@ -849,10 +843,6 @@ func grantsHandleAllUpdatesOrCreatesDatabase(t *testing.T) {
 		handler(&SchemaEntity{Database: s, Name: "Schema2"})
 		return nil
 	}).Once()
-
-	//ToDo: validate it's ok to add this call
-	repoMock.EXPECT().ExecuteRevokeOnAccountRole("ALL", "FUTURE SCHEMAS IN DATABASE DB1", "RoleName1", false).Return(nil).Once()
-	repoMock.EXPECT().ExecuteRevokeOnAccountRole("ALL", "FUTURE TABLES IN DATABASE DB1", "RoleName1", false).Return(nil).Once()
 
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "RoleName1", false).Return(nil).Once()
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema2", "RoleName1", false).Return(nil).Once()
