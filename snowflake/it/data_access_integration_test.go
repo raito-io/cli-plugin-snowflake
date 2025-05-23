@@ -929,6 +929,227 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersToTarget_Share
 	s.Contains(shareNames, actualShareName)
 }
 
+
+
+func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersToTarget_Rename() {
+	// Given
+	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+
+	grantId := fmt.Sprintf("%s_RENAME_GRANT", testId)
+	grantActualName := generateRole("TESTROLE_A_RANDOM_NAME", testId)
+	grantExternalId := ptr.String(generateRole("TESTROLE_A_RANDOM_NAME", testId))
+
+	purposeId := fmt.Sprintf("%s_RENAME_PURPOSE", testId)
+	purposeActualName := generateRole("TESTROLE_A_SECOND_NAME", testId)
+	purposeExternalId := ptr.String(generateRole("TESTROLE_A_SECOND_NAME", testId))
+
+	accessProviderImport := &sync_to_target.AccessProviderImport{
+		AccessProviders: []*sync_to_target.AccessProvider{
+			{
+				Id:          purposeId,
+				Name:        fmt.Sprintf("%s_purpose", testId),
+				Action:      types.Grant,
+				NamingHint:  purposeActualName,
+				Delete:      false,
+				Description: fmt.Sprintf("Integration testing for test %s - purpose", testId),
+				Who: sync_to_target.WhoItem{
+
+				},
+				What: []sync_to_target.WhatItem{
+				},
+				Owners: []sync_to_target.Owner{
+					{
+						Email: ptr.String("owner1@raito.io"),
+					},
+				},
+			},
+			{
+				Id:          grantId,
+				Name:        fmt.Sprintf("%s_ap", testId),
+				Action:      types.Grant,
+				NamingHint:  grantActualName,
+				Delete:      false,
+				Description: fmt.Sprintf("Integration testing for test %s - grant", testId),
+				Who: sync_to_target.WhoItem{
+					Users: []string{snowflakeUserName},
+					InheritFrom: []string{fmt.Sprintf("ID:%s", purposeId)},
+				},
+				What: []sync_to_target.WhatItem{},
+				Owners: []sync_to_target.Owner{
+					{
+						Email: ptr.String("owner1@raito.io"),
+					},
+				},
+			},
+		},
+	}
+
+	dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
+
+	config := s.getConfig()
+
+	// When
+	err := dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+
+	// Then
+	s.NoError(err)
+	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 2)
+
+	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+	s.Len(accessProviderFeedback, 2)
+	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
+		{
+			AccessProvider: grantId,
+			ActualName:     grantActualName,
+			ExternalId:     grantExternalId,
+			Type:           ptr.String(access_provider.Role),
+		},
+		{
+			AccessProvider: purposeId,
+			ActualName:     purposeActualName,
+			ExternalId:     purposeExternalId,
+			Type:           ptr.String(access_provider.Role),
+		},
+	}, accessProviderFeedback)
+
+	roles, err := s.sfRepo.GetAccountRoles()
+	s.NoError(err)
+	s.Contains(roles, snowflake.RoleEntity{
+		Name:            grantActualName,
+		AssignedToUsers: 1,
+		GrantedToRoles:  1,
+		GrantedRoles:    0,
+		Owner:           "ACCOUNTADMIN",
+	})
+	s.Contains(roles, snowflake.RoleEntity{
+		Name:            purposeActualName,
+		AssignedToUsers: 0,
+		GrantedToRoles:  0,
+		GrantedRoles:    1,
+		Owner:           "ACCOUNTADMIN",
+	})
+
+	// Rename grant to a new actual name and rename purpose to the old (existing) actual name
+	// Given
+	purposeActualName = generateRole("TESTROLE_A_RANDOM_NAME", testId)
+	grantActualName = generateRole("TESTROLE_A_THIRD_RANDOM_NAME", testId)
+	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+	accessProviderImport.AccessProviders = []*sync_to_target.AccessProvider{
+		{
+			Id:          purposeId,
+			Name:        fmt.Sprintf("%s_purpose", testId),
+			Action:      types.Grant,
+			NamingHint:  purposeActualName,
+			ExternalId: purposeExternalId,
+			Delete:      false,
+			Description: fmt.Sprintf("Integration testing for test %s - purpose", testId),
+			Who: sync_to_target.WhoItem{},
+			What: []sync_to_target.WhatItem{},
+			Owners: []sync_to_target.Owner{
+				{
+					Email: ptr.String("owner1@raito.io"),
+				},
+			},
+		},
+		{
+			Id:          grantId,
+			Name:        fmt.Sprintf("%s_ap", testId),
+			Action:      types.Grant,
+			NamingHint:  grantActualName,
+			ExternalId:  grantExternalId,
+			Delete:      false,
+			Description: fmt.Sprintf("Integration testing for test %s - grant", testId),
+			Who: sync_to_target.WhoItem{
+				Users: []string{snowflakeUserName},
+				InheritFrom: []string{fmt.Sprintf("ID:%s", purposeId)},
+			},
+			What: []sync_to_target.WhatItem{
+				{
+					DataObject: &data_source.DataObjectReference{
+						FullName: "RAITO_DATABASE.ORDERING.ORDERS",
+						Type:     "table",
+					},
+					Permissions: []string{"SELECT"},
+				},
+			},
+			Owners: []sync_to_target.Owner{
+				{
+					Email: ptr.String("owner1@raito.io"),
+				},
+			},
+		},
+	}
+
+	grantActualName = generateRole("TESTROLE_A_THIRD_RANDOM_NAME", testId)
+	grantExternalId = ptr.String(generateRole("TESTROLE_A_THIRD_RANDOM_NAME", testId))
+
+	purposeActualName = generateRole("TESTROLE_A_RANDOM_NAME__0", testId)
+	purposeExternalId = ptr.String(generateRole("TESTROLE_A_RANDOM_NAME__0", testId))
+
+
+	// When
+	dataAccessSyncer = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
+	err = dataAccessSyncer.SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+
+	// Then
+	s.NoError(err)
+	s.True(len(dataAccessFeedbackHandler.AccessProviderFeedback) >= 2)
+
+	accessProviderFeedback = filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+	s.Len(accessProviderFeedback, 2)
+	s.ElementsMatch([]sync_to_target.AccessProviderSyncFeedback{
+		{
+			AccessProvider: grantId,
+			ActualName:     grantActualName,
+			ExternalId:     grantExternalId,
+			Type:           ptr.String(access_provider.Role),
+		},
+		{
+			AccessProvider: purposeId,
+			ActualName:     purposeActualName,
+			ExternalId:     purposeExternalId,
+			Type:           ptr.String(access_provider.Role),
+		},
+	}, accessProviderFeedback)
+
+	roles, err = s.sfRepo.GetAccountRoles()
+	s.NoError(err)
+	s.Contains(roles, snowflake.RoleEntity{
+		Name:            grantActualName,
+		AssignedToUsers: 1,
+		GrantedToRoles:  1,
+		GrantedRoles:    0,
+		Owner:           "ACCOUNTADMIN",
+	})
+	s.Contains(roles, snowflake.RoleEntity{
+		Name:            purposeActualName,
+		AssignedToUsers: 0,
+		GrantedToRoles:  0,
+		GrantedRoles:    1,
+		Owner:           "ACCOUNTADMIN",
+	})
+
+	grants, err2 := s.sfRepo.GetGrantsOfAccountRole(grantActualName)
+	s.NoError(err2)
+	s.Len(grants, 2)
+	s.Contains(grants, snowflake.GrantOfRole{
+		GrantedTo: "ROLE",
+		GranteeName: *purposeExternalId,
+	})
+
+	grantsToRole, err3 := s.sfRepo.GetGrantsToAccountRole(purposeActualName)
+	s.NoError(err3)
+	s.Len(grantsToRole, 1)
+	s.Contains(grantsToRole, snowflake.GrantToRole{
+		Privilege: "USAGE",
+		GrantedOn: "ROLE",
+		Name: *grantExternalId,
+	})
+
+}
+
 func generateRole(username string, prefix string) string {
 	if prefix == "" {
 		prefix = fmt.Sprintf("%s_", testId)
