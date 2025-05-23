@@ -612,17 +612,11 @@ func (s *AccessToTargetSyncer) grantRolesToRole(ctx context.Context, targetExter
 }
 
 func (s *AccessToTargetSyncer) grantRolesToDatabaseRoles(ctx context.Context, targetExternalId string, toAddDatabaseRoles []string, filteredAccountRoles []string) error {
-	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toAddDatabaseRoles, filteredAccountRoles,
-		parseDatabaseRoleExternalId,
-		s.repo.GrantDatabaseRolesToDatabaseRole,
-		s.repo.GrantAccountRolesToDatabaseRole)
+	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toAddDatabaseRoles, filteredAccountRoles, parseDatabaseRoleExternalId, s.repo.GrantDatabaseRolesToDatabaseRole, s.repo.GrantAccountRolesToDatabaseRole)
 }
 
 func (s *AccessToTargetSyncer) grantRolesToApplicationRoles(ctx context.Context, targetExternalId string, toAddApplicationRoles []string, filteredAccountRole []string) error {
-	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toAddApplicationRoles, filteredAccountRole,
-		parseApplicationRoleExternalId,
-		s.repo.GrantApplicationRolesToApplicationRole,
-		s.repo.GrantAccountRolesToApplicationRole)
+	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toAddApplicationRoles, filteredAccountRole, parseApplicationRoleExternalId, s.repo.GrantApplicationRolesToApplicationRole, s.repo.GrantAccountRolesToApplicationRole)
 }
 
 func (s *AccessToTargetSyncer) shouldIgnoreLinkedRole(roleName string) (bool, error) {
@@ -673,23 +667,14 @@ func (s *AccessToTargetSyncer) revokeRolesFromRole(ctx context.Context, targetEx
 }
 
 func (s *AccessToTargetSyncer) revokeRolesFromDatabaseRole(ctx context.Context, targetExternalId string, toRemoveDatabaseRoles []string, filteredAccountRoles []string) error {
-	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toRemoveDatabaseRoles, filteredAccountRoles,
-		parseDatabaseRoleExternalId,
-		s.repo.RevokeDatabaseRolesFromDatabaseRole,
-		s.repo.RevokeAccountRolesFromDatabaseRole)
+	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toRemoveDatabaseRoles, filteredAccountRoles, parseDatabaseRoleExternalId, s.repo.RevokeDatabaseRolesFromDatabaseRole, s.repo.RevokeAccountRolesFromDatabaseRole)
 }
 
 func (s *AccessToTargetSyncer) revokeRolesFromApplicationRole(ctx context.Context, targetExternalId string, toRemoveApplicationRoles []string, filteredAccountRoles []string) error {
-	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toRemoveApplicationRoles, filteredAccountRoles,
-		parseApplicationRoleExternalId,
-		s.repo.RevokeApplicationRolesFromApplicationRole,
-		s.repo.RevokeAccountRolesFromApplicationRole)
+	return s.handleRolesToNamespacedRoles(ctx, targetExternalId, toRemoveApplicationRoles, filteredAccountRoles, parseApplicationRoleExternalId, s.repo.RevokeApplicationRolesFromApplicationRole, s.repo.RevokeAccountRolesFromApplicationRole)
 }
 
-func (s *AccessToTargetSyncer) handleRolesToNamespacedRoles(ctx context.Context, targetExternalId string, toAddNamespacedRoles []string, filteredAccountRoles []string,
-	parseNamespacedRoleExternalId func(string) (string, string, error),
-	handleNamespaceRole func(context.Context, string, string, ...string) error,
-	handleAccountRoles func(context.Context, string, string, ...string) error) error {
+func (s *AccessToTargetSyncer) handleRolesToNamespacedRoles(ctx context.Context, targetExternalId string, toAddNamespacedRoles []string, filteredAccountRoles []string, parseNamespacedRoleExternalId func(string) (string, string, error), handleNamespaceRole func(context.Context, string, string, ...string) error, handleAccountRoles func(context.Context, string, string, ...string) error) error {
 	namespace, parsedRoleName, err := parseNamespacedRoleExternalId(targetExternalId)
 	if err != nil {
 		return fmt.Errorf("parsing namespaced role external id %q: %w", targetExternalId, err)
@@ -833,8 +818,7 @@ func (s *AccessToTargetSyncer) createGrantsForTableOrView(doType string, permiss
 	}
 
 	if grants.Size() > 0 {
-		grants.Add(Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, *sfObject.Database)},
-			Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
+		grants.Add(Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, *sfObject.Database)}, Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, *sfObject.Database, *sfObject.Schema)})
 	}
 
 	return nil
@@ -853,8 +837,7 @@ func (s *AccessToTargetSyncer) createGrantsForFunctionOrProcedure(permissions []
 		split := strings.Split(fullName, ".")
 
 		if len(split) >= 3 {
-			grants.Add(Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, split[0])},
-				Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, split[0], split[1])})
+			grants.Add(Grant{"USAGE", ds.Database, common.FormatQuery(`%s`, split[0])}, Grant{"USAGE", ds.Schema, common.FormatQuery(`%s.%s`, split[0], split[1])})
 		}
 	}
 }
