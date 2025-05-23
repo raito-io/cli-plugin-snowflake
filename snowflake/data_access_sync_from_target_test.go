@@ -149,7 +149,7 @@ func TestAccessSyncer_GetFullNameFromGrant(t *testing.T) {
 	assert.Equal(t, `MASTER_DATA.PUBLIC."DECRYPTIT"(VARCHAR, VARCHAR)`, accessSyncer.getFullNameFromGrant(`MASTER_DATA.PUBLIC."DECRYPTIT(VAL VARCHAR, ENCRYPTIONTYPE VARCHAR):VARCHAR(16777216)"`, Procedure))
 }
 
-func TestAccessSyncer_importPoliciesOfType(t *testing.T) {
+func TestAccessSyncer_ImportPoliciesOfType(t *testing.T) {
 	// Given
 	repoMock := newMockDataAccessRepository(t)
 	fileCreator := mocks.NewSimpleAccessProviderHandler(t, 1)
