@@ -475,7 +475,7 @@ func (s *DataSourceSyncer) setupDatabasePermissions(db DbEntity) error {
 			permission string
 			on         string
 		}{
-			{"USAGE", fmt.Sprintf("ALL SCHEMA IN DATABASE %s", common.FormatQuery("%s", db.Name))},
+			{"USAGE", fmt.Sprintf("ALL SCHEMAS IN DATABASE %s", common.FormatQuery("%s", db.Name))},
 			{"REFERENCES", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name))},
 			{"REFERENCES", fmt.Sprintf("FUTURE TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name))},
 			{"REFERENCES", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name))},
