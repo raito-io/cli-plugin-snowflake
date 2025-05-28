@@ -3,6 +3,7 @@ package snowflake
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime/debug"
@@ -1391,15 +1392,11 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 	dataObjectTypeMap := map[string][]string{}
 	columnTypes := set.Set[string]{}
 
-	ciIdx := 0
-
 	err = repo.getColumnInformation(databaseName, columnsFullName, func(columnName string, dataType string) error {
 		dataObjectTypeMap[dataType] = append(dataObjectTypeMap[dataType], columnName)
 		columnTypes.Add(dataType)
 
 		Logger.Debug(fmt.Sprintf("Column %s has type %s", columnName, dataType))
-
-		ciIdx++
 
 		return nil
 	})
@@ -1407,7 +1404,11 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 		return err
 	}
 
-	Logger.Debug(fmt.Sprintf("Found %d column types for %d data objects: %v", len(columnTypes), ciIdx, columnTypes.Slice()))
+	Logger.Debug(fmt.Sprintf("Found %d column types for %d data objects: %v", len(columnTypes), len(columnsFullName), columnTypes.Slice()))
+
+	if len(columnsFullName) != len(columnTypes) {
+		return errors.New("unable to load column details")
+	}
 
 	tx, err := repo.conn.Begin()
 	if err != nil {
