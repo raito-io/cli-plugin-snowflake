@@ -9,6 +9,20 @@ resource "snowflake_schema" "dbo" {
   name     = "DBO"
 }
 
+resource "snowflake_tag" "tag_classification" {
+  database       = snowflake_schema.dbo.database
+  schema         = snowflake_schema.dbo.name
+  name           = "CLASSIFICATION"
+  allowed_values = ["PCI", "PII", "PHI"]
+}
+
+resource "snowflake_tag" "tag_category" {
+  database       = snowflake_schema.dbo.database
+  schema         = snowflake_schema.dbo.name
+  name           = "CATEGORY"
+  allowed_values = ["customer", "order", "person", "store"]
+}
+
 // -- -- Table AWSBUILDVERSION
 resource "snowflake_table" "awsbuildversion" {
   database = snowflake_schema.dbo.database
@@ -207,6 +221,22 @@ resource "snowflake_table" "employee" {
   }
 }
 
+resource "snowflake_tag_association" "employee_category" {
+  object_identifiers = ["${snowflake_table.employee.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "person"
+}
+
+resource "snowflake_tag_association" "employee_nationalidnumber_classification" {
+  object_identifiers = ["${snowflake_table.employee.fully_qualified_name}.NationalIDNumber"]
+
+  object_type = "COLUMN"
+  tag_id      = snowflake_tag.tag_classification.fully_qualified_name
+  tag_value   = "PII"
+}
+
 // -- -- Table EMPLOYEEDEPARTMENTHISTORY
 resource "snowflake_table" "empoyee_department_history" {
   database = snowflake_schema.humanresources.database
@@ -245,6 +275,14 @@ resource "snowflake_table" "empoyee_department_history" {
   }
 }
 
+resource "snowflake_tag_association" "empoyee_department_history_category" {
+  object_identifiers = ["${snowflake_table.empoyee_department_history.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "person"
+}
+
 // -- -- Table JOBCANDIDATE
 resource "snowflake_table" "job_candidate" {
   database = snowflake_schema.humanresources.database
@@ -271,6 +309,14 @@ resource "snowflake_table" "job_candidate" {
     name = "Resume"
     type = "VARCHAR"
   }
+}
+
+resource "snowflake_tag_association" "job_candidate_category" {
+  object_identifiers = ["${snowflake_table.job_candidate.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "person"
 }
 
 // -- -- Table SHIFT
@@ -311,6 +357,14 @@ resource "snowflake_table" "shift" {
 resource "snowflake_schema" "person" {
   database = snowflake_database.master_data.name
   name     = "PERSON"
+}
+
+resource "snowflake_tag_association" "person_category" {
+  object_identifiers = ["${snowflake_schema.person.fully_qualified_name}"]
+
+  object_type = "SCHEMA"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "person"
 }
 
 // -- -- Table ADDRESS
@@ -567,6 +621,14 @@ resource "snowflake_table" "email_address" {
   }
 }
 
+resource "snowflake_tag_association" "email_address_email_classification" {
+  object_identifiers = ["${snowflake_table.email_address.fully_qualified_name}.EmailAddress"]
+
+  object_type = "COLUMN"
+  tag_id      = snowflake_tag.tag_classification.fully_qualified_name
+  tag_value   = "PII"
+}
+
 // -- -- Table PERSONPHONE
 resource "snowflake_table" "person_phone" {
   database = snowflake_schema.person.database
@@ -594,6 +656,14 @@ resource "snowflake_table" "person_phone" {
     name = "PhoneNumberTypeID"
     type = "NUMBER(38,0)"
   }
+}
+
+resource "snowflake_tag_association" "person_phone_number_classification" {
+  object_identifiers = ["${snowflake_table.person_phone.fully_qualified_name}.PhoneNumber"]
+
+  object_type = "COLUMN"
+  tag_id      = snowflake_tag.tag_classification.fully_qualified_name
+  tag_value   = "PII"
 }
 
 // -- -- Table PHONENUMBERTYPE
@@ -1645,6 +1715,14 @@ resource "snowflake_table" "work_order" {
   }
 }
 
+resource "snowflake_tag_association" "work_order_category" {
+  object_identifiers = ["${snowflake_table.work_order.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "order"
+}
+
 // -- -- Table WORKORDERROUTING
 resource "snowflake_table" "work_order_routing" {
   database = snowflake_schema.production.database
@@ -1711,6 +1789,14 @@ resource "snowflake_table" "work_order_routing" {
     name = "WorkOrderID"
     type = "NUMBER(38,0)"
   }
+}
+
+resource "snowflake_tag_association" "work_order_routing_category" {
+  object_identifiers = ["${snowflake_table.work_order_routing.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "order"
 }
 
 // -- Schema PURCHASING
@@ -1845,6 +1931,14 @@ resource "snowflake_table" "purchase_order_det" {
   }
 }
 
+resource "snowflake_tag_association" "purchase_order_det_category" {
+  object_identifiers = ["${snowflake_table.purchase_order_det.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "order"
+}
+
 // -- -- Table PURCHASEORDERHEADER
 resource "snowflake_table" "purchase_order_hea" {
   database = snowflake_schema.purchasing.database
@@ -1916,6 +2010,14 @@ resource "snowflake_table" "purchase_order_hea" {
     name = "VendorID"
     type = "NUMBER(38,0)"
   }
+}
+
+resource "snowflake_tag_association" "purchase_order_hea_category" {
+  object_identifiers = ["${snowflake_table.purchase_order_hea.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "order"
 }
 
 // -- -- Table SHIPMETHOD
@@ -2004,25 +2106,18 @@ resource "snowflake_table" "vendor" {
   }
 }
 
+resource "snowflake_tag_association" "vendor_creditrating_classification" {
+  object_identifiers = ["${snowflake_table.vendor.fully_qualified_name}.CreditRating"]
+
+  object_type = "COLUMN"
+  tag_id      = snowflake_tag.tag_classification.fully_qualified_name
+  tag_value   = "PCI"
+}
+
 // -- Schema SALES
 resource "snowflake_schema" "sales" {
   database = snowflake_schema.production.database
   name     = "SALES"
-}
-
-resource "snowflake_tag" "sales_sensitivity" {
-  database       = snowflake_schema.sales.database
-  schema         = snowflake_schema.sales.name
-  name           = "SENSITIVITY"
-  allowed_values = ["PCI", "PII"]
-}
-
-resource "snowflake_tag_association" "sales_sensitivity" {
-  object_identifiers = [snowflake_schema.sales.fully_qualified_name]
-
-  object_type = "SCHEMA"
-  tag_id      = snowflake_tag.sales_sensitivity.fully_qualified_name
-  tag_value   = "PII"
 }
 
 // -- -- Table COUNTRYREGIONCURRENCY
@@ -2084,6 +2179,14 @@ resource "snowflake_table" "credit_card" {
     name = "ModifiedDate"
     type = "TIMESTAMP_NTZ(9)"
   }
+}
+
+resource "snowflake_tag_association" "credit_card_classification" {
+  object_identifiers = ["${snowflake_table.credit_card.fully_qualified_name}.CreditCardID"]
+
+  object_type = "COLUMN"
+  tag_id      = snowflake_tag.tag_classification.fully_qualified_name
+  tag_value   = "PCI"
 }
 
 // -- -- Table CURRENCY
@@ -2195,6 +2298,14 @@ resource "snowflake_table" "customer" {
   }
 }
 
+resource "snowflake_tag_association" "customer_category" {
+  object_identifiers = ["${snowflake_table.customer.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "customer"
+}
+
 // -- -- View CUSTOMER_EU
 resource "snowflake_materialized_view" "customer_eu" {
   database  = snowflake_schema.sales.database
@@ -2227,11 +2338,11 @@ resource "snowflake_table" "person_creditcard" {
   }
 }
 
-resource "snowflake_tag_association" "preson_creditcard_sensitivity" {
+resource "snowflake_tag_association" "preson_creditcard_classification" {
   object_identifiers = ["${snowflake_table.person_creditcard.fully_qualified_name}.CreditCardID"]
 
   object_type = "COLUMN"
-  tag_id      = snowflake_tag.sales_sensitivity.fully_qualified_name
+  tag_id      = snowflake_tag.tag_classification.fully_qualified_name
   tag_value   = "PCI"
 }
 
@@ -2298,14 +2409,20 @@ resource "snowflake_table" "sales_order_detail" {
   }
 }
 
+resource "snowflake_tag_association" "sales_order_detail_category" {
+  object_identifiers = ["${snowflake_table.sales_order_detail.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "order"
+}
+
 // -- -- Table SALESORDERHEADER
 resource "snowflake_table" "sales_order_header" {
   database = snowflake_schema.sales.database
   schema   = snowflake_schema.sales.name
   name     = "SALESORDERHEADER"
   comment  = "General sales order information."
-
-
 
   column {
     name = "AccountNumber"
@@ -2438,6 +2555,14 @@ resource "snowflake_table" "sales_order_header" {
   }
 }
 
+resource "snowflake_tag_association" "sales_order_header_category" {
+  object_identifiers = ["${snowflake_table.sales_order_header.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "order"
+}
+
 // -- -- Table SALESORDERHEADERSALESREASON
 resource "snowflake_table" "sales_order_header_sales_reason" {
   database = snowflake_schema.sales.database
@@ -2517,6 +2642,14 @@ resource "snowflake_table" "sales_person" {
     name = "TerritoryID"
     type = "NUMBER(38,0)"
   }
+}
+
+resource "snowflake_tag_association" "sales_person_category" {
+  object_identifiers = ["${snowflake_table.sales_person.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "person"
 }
 
 // -- -- Table SALESPERSONQUOTAHISTORY
@@ -2885,4 +3018,12 @@ resource "snowflake_table" "store" {
     name = "SalesPersonID"
     type = "NUMBER(38,0)"
   }
+}
+
+resource "snowflake_tag_association" "store_category" {
+  object_identifiers = ["${snowflake_table.store.fully_qualified_name}"]
+
+  object_type = "TABLE"
+  tag_id      = snowflake_tag.tag_category.fully_qualified_name
+  tag_value   = "store"
 }
