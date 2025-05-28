@@ -2181,7 +2181,7 @@ resource "snowflake_table" "credit_card" {
   }
 }
 
-resource "snowflake_tag_association" "preson_creditcard_classification" {
+resource "snowflake_tag_association" "credit_card_classification" {
   object_identifiers = ["${snowflake_table.credit_card.fully_qualified_name}.CreditCardID"]
 
   object_type = "COLUMN"
