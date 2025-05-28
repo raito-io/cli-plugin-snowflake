@@ -465,37 +465,31 @@ func (s *DataSourceSyncer) setupDatabasePermissions(db DbEntity) error {
 			if err2 != nil {
 				return err2
 			}
+
+			return nil
 		} else if err != nil {
 			return err
-		} else {
-			err2 := s.repo.ExecuteGrantOnAccountRole("USAGE", fmt.Sprintf("ALL SCHEMAS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole, true)
+		}
 
+		permissions := []struct {
+			permission string
+			on         string
+		}{
+			{"USAGE", fmt.Sprintf("ALL SCHEMA IN DATABASE %s", common.FormatQuery("%s", db.Name))},
+			{"REFERENCES", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name))},
+			{"REFERENCES", fmt.Sprintf("FUTURE TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name))},
+			{"REFERENCES", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name))},
+			{"REFERENCES", fmt.Sprintf("FUTURE EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name))},
+			{"REFERENCES", fmt.Sprintf("ALL VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name))},
+			{"REFERENCES", fmt.Sprintf("FUTURE VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name))},
+			{"REFERENCES", fmt.Sprintf("ALL MATERIALIZED VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name))},
+			{"REFERENCES", fmt.Sprintf("FUTURE MATERIALIZED VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name))},
+		}
+
+		for _, perm := range permissions {
+			err2 := s.repo.ExecuteGrantOnAccountRole(perm.permission, perm.on, s.SfSyncRole, true)
 			if err2 != nil {
-				return err2
-			}
-
-			err2 = s.repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole, true)
-
-			if err2 != nil {
-				return err2
-			}
-
-			err2 = s.repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL EXTERNAL TABLES IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole, true)
-
-			if err2 != nil {
-				return err2
-			}
-
-			err2 = s.repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole, true)
-
-			if err2 != nil {
-				return err2
-			}
-
-			err2 = s.repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("ALL MATERIALIZED VIEWS IN DATABASE %s", common.FormatQuery("%s", db.Name)), s.SfSyncRole, true)
-
-			if err2 != nil {
-				return err2
+				return fmt.Errorf("granting %s on %s: %w", perm.permission, perm.on, err2)
 			}
 		}
 	}
