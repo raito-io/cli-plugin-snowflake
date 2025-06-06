@@ -1096,12 +1096,11 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 				setup: func(repoMock *mockDataAccessRepository, feedbackHandlerMock *mocks.SimpleAccessProviderFeedbackHandler) {
 					repoMock.EXPECT().Close().Return(nil).Once()
 					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
-					repoMock.EXPECT().GetAccountRolesWithPrefix("").Return([]RoleEntity{}, nil).Once()
+					repoMock.EXPECT().GetAccountRolesWithPrefix("").Return([]RoleEntity{}, nil).Twice()
 
 					repoMock.EXPECT().CreateAccountRole("ACCESS_PROVIDER1").Return(nil).Once()
 					repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "ACCESS_PROVIDER1").Return(nil).Once()
 					expectGrantUsersToRole(repoMock, "ACCESS_PROVIDER1", "User1", "User2")
-					repoMock.EXPECT().GrantAccountRolesToAccountRole(mock.Anything, "ACCESS_PROVIDER1").Return(nil).Once()
 
 					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "ACCESS_PROVIDER1", false).Return(nil).Once()
 					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema1", "ACCESS_PROVIDER1", false).Return(nil).Once()
@@ -1161,7 +1160,7 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 					repoMock.EXPECT().GetAccountRolesWithPrefix("").Return([]RoleEntity{
 						{Name: "ACCESS_PROVIDER1_OLD"},
 						{Name: "DATABASEROLE###DATABASE:TEST_DB###ROLE:DATABASE_ROLE1_OLD"},
-					}, nil).Once()
+					}, nil).Twice()
 
 					repoMock.EXPECT().RenameAccountRole("ACCESS_PROVIDER1_OLD", "ACCESS_PROVIDER1").Return(nil).Once()
 					repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "ACCESS_PROVIDER1").Return(nil).Once()
@@ -1332,6 +1331,99 @@ func TestAccessSyncer_SyncAccessProviderToTarget(t *testing.T) {
 								InheritFrom: []string{"Role1"},
 							},
 							PolicyRule: ptr.String("{state} = 'NJ'"),
+						},
+					},
+				},
+				configMap: &config.ConfigMap{
+					Parameters: map[string]string{
+						SfStandardEdition: "false",
+					},
+				},
+			},
+			wantErr: require.NoError,
+		},
+		{
+			name: "ignore links to role",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository, feedbackHandlerMock *mocks.SimpleAccessProviderFeedbackHandler) {
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+					repoMock.EXPECT().GetAccountRolesWithPrefix("").Return([]RoleEntity{
+						{Name: "ACCESS_PROVIDER1_OLD"},
+						{Name: "DATABASEROLE###DATABASE:TEST_DB###ROLE:DATABASE_ROLE1_OLD"},
+					}, nil).Twice()
+
+					repoMock.EXPECT().CommentAccountRoleIfExists(mock.Anything, "ACCESS_PROVIDER1").Return(nil).Once()
+					repoMock.EXPECT().GrantAccountRolesToAccountRole(mock.Anything, "ACCESS_PROVIDER1", "blaat").Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "DATABASE DB1", "ACCESS_PROVIDER1", false).Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "SCHEMA DB1.Schema1", "ACCESS_PROVIDER1", false).Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnAccountRole("SELECT", "TABLE DB1.Schema1.Table1", "ACCESS_PROVIDER1", false).Return(nil).Once()
+				},
+			},
+			args: args{
+				accessProviders: &sync_to_target.AccessProviderImport{
+					AccessProviders: []*importer.AccessProvider{
+						{
+							Id:         "AccessProviderId1",
+							ExternalId: ptr.String("ACCESS_PROVIDER1"),
+							Action:     types.Grant,
+							Type:       ptr.String(access_provider.Role),
+							Name:       "AccessProvider1",
+							NamingHint: "AccessProvider1",
+							Who: importer.WhoItem{
+								InheritFrom: []string{"test_1", "blaat"},
+							},
+							What: []importer.WhatItem{
+								{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+							},
+						},
+					},
+				},
+				configMap: &config.ConfigMap{
+					Parameters: map[string]string{
+						SfStandardEdition:    "false",
+						SfIgnoreLinksToRoles: "test_.*",
+					},
+				},
+			},
+			wantErr: require.NoError,
+		},
+		{
+			name: "shares",
+			fields: fields{
+				setup: func(repoMock *mockDataAccessRepository, feedbackHandlerMock *mocks.SimpleAccessProviderFeedbackHandler) {
+					repoMock.EXPECT().Close().Return(nil).Once()
+					repoMock.EXPECT().TotalQueryTime().Return(time.Minute).Once()
+
+					repoMock.EXPECT().GetAccountRolesWithPrefix("").Return([]RoleEntity{}, nil).Once()
+					repoMock.EXPECT().CreateShare("RAITO_SHARE1").Return(nil).Once()
+
+					repoMock.EXPECT().ExecuteGrantOnShare("USAGE", "DATABASE DB1", "RAITO_SHARE1").Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnShare("USAGE", "SCHEMA DB1.Schema1", "RAITO_SHARE1").Return(nil).Once()
+					repoMock.EXPECT().ExecuteGrantOnShare("SELECT", "TABLE DB1.Schema1.Table1", "RAITO_SHARE1").Return(nil).Once()
+
+					repoMock.EXPECT().SetShareAccounts("RAITO_SHARE1", []string{"acc1", "acc2"}).Return(nil).Once()
+
+					repoMock.EXPECT().GetGrantsToShare("RAITO_SHARE1").Return([]GrantToRole{}, nil).Once()
+				},
+			},
+			args: args{
+				accessProviders: &sync_to_target.AccessProviderImport{
+					AccessProviders: []*importer.AccessProvider{
+						{
+							Id:         "Share1",
+							ExternalId: ptr.String(apTypeSharePrefix + "Share1"),
+
+							Action:     types.Share,
+							Type:       ptr.String(access_provider.Role),
+							Name:       "Share1",
+							NamingHint: "Share1",
+							Who: importer.WhoItem{
+								Recipients: []string{"acc1", "acc2"},
+							},
+							What: []importer.WhatItem{
+								{DataObject: &data_source.DataObjectReference{FullName: "DB1.Schema1.Table1", Type: "table"}, Permissions: []string{"SELECT"}},
+							},
 						},
 					},
 				},

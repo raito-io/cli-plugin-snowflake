@@ -5,6 +5,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/go-errors/errors"
 	"strings"
 )
 
@@ -69,7 +70,7 @@ func ModifiedObjectByDdlOperationTypeString(s string) (ModifiedObjectByDdlOperat
 	if val, ok := _ModifiedObjectByDdlOperationTypeNameToValueMap[strings.ToLower(s)]; ok {
 		return val, nil
 	}
-	return 0, fmt.Errorf("%s does not belong to ModifiedObjectByDdlOperationType values", s)
+	return 0, errors.Errorf("%s does not belong to ModifiedObjectByDdlOperationType values", s)
 }
 
 // ModifiedObjectByDdlOperationTypeValues returns all values of the enum
@@ -103,7 +104,7 @@ func (i ModifiedObjectByDdlOperationType) MarshalJSON() ([]byte, error) {
 func (i *ModifiedObjectByDdlOperationType) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
-		return fmt.Errorf("ModifiedObjectByDdlOperationType should be a string, got %s", data)
+		return errors.Errorf("ModifiedObjectByDdlOperationType should be a string, got %s", data)
 	}
 
 	var err error
