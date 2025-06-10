@@ -1531,6 +1531,8 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 		return err
 	}
 
+	Logger.Info(fmt.Sprintf("Found %d policies for mask %s.%s.%s", len(policies), databaseName, schema, maskName))
+
 	var policyEntries []PolicyReferenceEntity
 
 	for _, policy := range policies {
@@ -1541,6 +1543,8 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 
 		policyEntries = append(policyEntries, entities...)
 	}
+
+	Logger.Info(fmt.Sprintf("Found %d policy references for mask %s.%s.%s", len(policyEntries), databaseName, schema, maskName))
 
 	tx, err := repo.conn.Begin()
 	if err != nil {
@@ -1555,6 +1559,8 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 	}()
 
 	for i := range policyEntries {
+		Logger.Debug(fmt.Sprintf("Removing masking policy %s from column %s in table %s", policyEntries[i].POLICY_NAME, policyEntries[i].REF_COLUMN_NAME.String, policyEntries[i].REF_ENTITY_NAME))
+
 		_, err = tx.Exec(common.FormatQuery("ALTER TABLE %s.%s.%s ALTER COLUMN %s UNSET MASKING POLICY", databaseName, schema, policyEntries[i].REF_ENTITY_NAME, policyEntries[i].REF_COLUMN_NAME.String))
 		if err != nil {
 			return err
@@ -1562,6 +1568,8 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 	}
 
 	for _, policy := range policies {
+		Logger.Debug(fmt.Sprintf("Dropping masking policy %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name))
+
 		_, err = tx.Exec(common.FormatQuery("DROP MASKING POLICY %s.%s.%s", policy.DatabaseName, policy.SchemaName, policy.Name))
 		if err != nil {
 			return err
