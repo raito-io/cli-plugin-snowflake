@@ -1392,9 +1392,13 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 	dataObjectTypeMap := map[string][]string{}
 	columnTypes := set.Set[string]{}
 
+	foundDataTypeCounter := 0
+
 	err = repo.getColumnInformation(databaseName, columnsFullName, func(columnName string, dataType string) error {
 		dataObjectTypeMap[dataType] = append(dataObjectTypeMap[dataType], columnName)
 		columnTypes.Add(dataType)
+
+		foundDataTypeCounter++
 
 		Logger.Debug(fmt.Sprintf("Column %s has type %s", columnName, dataType))
 
@@ -1404,9 +1408,9 @@ func (repo *SnowflakeRepository) CreateMaskPolicy(databaseName string, schema st
 		return err
 	}
 
-	Logger.Debug(fmt.Sprintf("Found %d column types for %d data objects: %v", len(columnTypes), len(columnsFullName), columnTypes.Slice()))
+	Logger.Debug(fmt.Sprintf("Found %d column types for %d data objects: %v", foundDataTypeCounter, len(columnsFullName), columnTypes.Slice()))
 
-	if len(columnsFullName) != len(columnTypes) {
+	if len(columnsFullName) != foundDataTypeCounter {
 		return errors.New("unable to load column details")
 	}
 
