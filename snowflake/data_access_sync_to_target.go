@@ -304,6 +304,8 @@ func (s *AccessToTargetSyncer) SyncAccessProviderSharesToTarget(apToRemoveMap ma
 		fi := importer.AccessProviderSyncFeedback{AccessProvider: share.Id, ActualName: shareName, ExternalId: ptr.String(apTypeSharePrefix + shareName)}
 
 		if err != nil {
+			Logger.Warn(fmt.Sprintf("Unable to update share %q: %s", shareName, err.Error()))
+
 			fi.Errors = append(fi.Errors, err.Error())
 		}
 
@@ -320,6 +322,8 @@ func (s *AccessToTargetSyncer) SyncAccessProviderSharesToTarget(apToRemoveMap ma
 
 		err := s.removeShare(shareToRemove)
 		if err != nil {
+			Logger.Warn(fmt.Sprintf("Unable to remove share %q: %s", shareToRemove, err.Error()))
+
 			fi.Errors = append(fi.Errors, err.Error())
 		}
 
@@ -351,6 +355,8 @@ func (s *AccessToTargetSyncer) SyncAccessProviderMasksToTarget(apToRemoveMap map
 		fi := importer.AccessProviderSyncFeedback{AccessProvider: mask.Id, ActualName: maskName, ExternalId: &maskName}
 
 		if err2 != nil {
+			Logger.Warn(fmt.Sprintf("Unable to update mask %q: %s", maskName, err2.Error()))
+
 			fi.Errors = append(fi.Errors, err2.Error())
 		}
 
@@ -367,6 +373,8 @@ func (s *AccessToTargetSyncer) SyncAccessProviderMasksToTarget(apToRemoveMap map
 
 		err = s.removeMask(maskToRemove)
 		if err != nil {
+			Logger.Warn(fmt.Sprintf("Unable to remove mask %q: %s", maskToRemove, err.Error()))
+
 			fi.Errors = append(fi.Errors, err.Error())
 		}
 
@@ -407,6 +415,8 @@ func (s *AccessToTargetSyncer) SyncAccessProviderFiltersToTarget(ctx context.Con
 		var errorMessages []string
 
 		if err != nil {
+			Logger.Warn("Error while processing filters: " + err.Error())
+
 			errorMessages = []string{err.Error()}
 		}
 
