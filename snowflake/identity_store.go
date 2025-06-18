@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	is "github.com/raito-io/cli/base/identity_store"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
@@ -87,25 +86,6 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 	for _, userRow := range userRows {
 		Logger.Debug(fmt.Sprintf("Handling user %q", userRow.Name))
 
-		if userRow.Email == nil {
-			Logger.Warn(fmt.Sprintf("User %q has no email, skipping", userRow.Name))
-
-			continue
-		}
-
-		userRow.Email = ptr.String(strings.ToLower(*userRow.Email))
-
-		// this is a PATCH for RAITO-349, will be removed after appserver fix is in production
-		if *userRow.Email != "" {
-			if !visitedEmailSet.Contains(*userRow.Email) {
-				visitedEmailSet.Add(*userRow.Email)
-			} else {
-				emailParts := strings.Split(*userRow.Email, "@")
-				userRow.Email = ptr.String(fmt.Sprintf("%s+%s@%s", emailParts[0], strings.ToLower(userRow.LoginName), emailParts[1]))
-				visitedEmailSet.Add(*userRow.Email)
-			}
-		}
-
 		var tags []*tag.Tag
 		if len(allUserTags[userRow.Name]) > 0 {
 			tags = allUserTags[userRow.Name]
@@ -118,11 +98,28 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 
 		isMachine := userRow.Type != nil && (strings.EqualFold(*userRow.Type, "SERVICE") || strings.EqualFold(*userRow.Type, "LEGACY_SERVICE"))
 
+		email := ""
+
+		if userRow.Email != nil {
+			email = strings.ToLower(*userRow.Email)
+
+			// this is a PATCH for RAITO-349, will be removed after appserver fix is in production
+			if email != "" {
+				if !visitedEmailSet.Contains(email) {
+					visitedEmailSet.Add(email)
+				} else {
+					emailParts := strings.Split(email, "@")
+					email = fmt.Sprintf("%s+%s@%s", emailParts[0], strings.ToLower(userRow.LoginName), emailParts[1])
+					visitedEmailSet.Add(email)
+				}
+			}
+		}
+
 		user := is.User{
 			ExternalId: cleanDoubleQuotes(userRow.LoginName),
 			UserName:   cleanDoubleQuotes(userRow.Name),
 			Name:       cleanDoubleQuotes(displayName),
-			Email:      *userRow.Email,
+			Email:      email,
 			Tags:       tags,
 			IsMachine:  &isMachine,
 		}
