@@ -87,6 +87,12 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 
 	excludedUsers := parseCommaSeparatedList(configParams.GetString(SfUsageUserExcludes))
 
+	if len(excludedUsers) > 0 {
+		Logger.Info("Excluding %d users from data usage sync", len(excludedUsers))
+	} else {
+		Logger.Info("No users excluded from data usage sync")
+	}
+
 	usageStatementSqlRows := repo.GetDataUsage(queryCtx, startDate, nil, excludedUsers)
 
 	i := 0
