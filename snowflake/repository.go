@@ -243,7 +243,7 @@ func (repo *SnowflakeRepository) dataUsageBatch(ctx context.Context, outputChann
 
 	query, args := queryGen(startTime)
 
-	Logger.Info(fmt.Sprintf("Executing usage query: %s", query))
+	Logger.Info(fmt.Sprintf("Executing usage query: %q, args: %+v", query, args))
 
 	rows, sec, err := repo.queryContext(ctx, query, args...)
 	if err != nil {
