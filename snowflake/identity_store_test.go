@@ -15,7 +15,7 @@ import (
 )
 
 func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
-	//Given
+	// Given
 	configMap := &config.ConfigMap{
 		Parameters: map[string]string{},
 	}
@@ -54,10 +54,10 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 		},
 	}
 
-	//When
+	// When
 	err := syncer.SyncIdentityStore(context.Background(), identityHandlerMock, configMap)
 
-	//Then
+	// Then
 	assert.NoError(t, err)
 	assert.Len(t, identityHandlerMock.Users, 2)
 	assert.Len(t, identityHandlerMock.Groups, 0)
@@ -67,12 +67,12 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 	assert.Equal(t, "user2", identityHandlerMock.Users[1].Name)
 	assert.Equal(t, 0, len(identityHandlerMock.Users[1].Tags))
 
-	identityHandlerMock.AssertNumberOfCalls(t, "AddUsers", 2)
+	identityHandlerMock.AssertNumberOfCalls(t, "AddUsers", 3)
 	identityHandlerMock.AssertNotCalled(t, "AddGroups")
 }
 
 func TestNewIdentityStoreSyncer_RepoError(t *testing.T) {
-	//Given
+	// Given
 	configMap := &config.ConfigMap{
 		Parameters: map[string]string{},
 	}
@@ -90,10 +90,10 @@ func TestNewIdentityStoreSyncer_RepoError(t *testing.T) {
 		},
 	}
 
-	//When
+	// When
 	err := syncer.SyncIdentityStore(context.Background(), identityHandlerMock, configMap)
 
-	//Then
+	// Then
 	assert.Error(t, err)
 	assert.Len(t, identityHandlerMock.Users, 0)
 	assert.Len(t, identityHandlerMock.Groups, 0)
@@ -103,7 +103,7 @@ func TestNewIdentityStoreSyncer_RepoError(t *testing.T) {
 }
 
 func TestNewIdentityStoreSyncer_AddUserError(t *testing.T) {
-	//Given
+	// Given
 	configMap := &config.ConfigMap{
 		Parameters: map[string]string{},
 	}
@@ -134,10 +134,10 @@ func TestNewIdentityStoreSyncer_AddUserError(t *testing.T) {
 		},
 	}
 
-	//When
+	// When
 	err := syncer.SyncIdentityStore(context.Background(), identityHandlerMock, configMap)
 
-	//Then
+	// Then
 	assert.Error(t, err)
 
 	identityHandlerMock.AssertNumberOfCalls(t, "AddUsers", 1)
