@@ -1678,7 +1678,6 @@ func (repo *SnowflakeRepository) DropFilter(databaseName string, schema string, 
 			if err != nil {
 				return fmt.Errorf("enable reference on table: \"%s.%s.%s\": %w", databaseName, schema, tableFullName, err)
 			}
-
 		}
 
 		err = repo.execute(fmt.Sprintf("ALTER TABLE %[1]s.%[2]s.%[3]s DROP ROW ACCESS POLICY %[1]s.%[2]s.%[4]s;", databaseName, schema, tableName, *existingPolicy))
