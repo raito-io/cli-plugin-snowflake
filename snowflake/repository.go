@@ -1573,7 +1573,7 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 			tableFullName := common.FormatQuery("%s.%s.%s", databaseName, schema, policyEntries[i].REF_ENTITY_NAME)
 
 			if !referencedTables.Contains(tableFullName) {
-				err = repo.ExecuteGrantOnAccountRole("REFERENCE", fmt.Sprintf("TABLE %s", tableFullName), repo.role, true)
+				err = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("TABLE %s", tableFullName), repo.role, true)
 				if err != nil {
 					return fmt.Errorf("enable reference on table: \"%s.%s.%s\": %w", databaseName, schema, policyEntries[i].REF_ENTITY_NAME, err)
 				}
