@@ -1582,7 +1582,10 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 			}
 		}
 
-		_, err = tx.Exec(common.FormatQuery("ALTER TABLE %s.%s.%s ALTER COLUMN %s UNSET MASKING POLICY", databaseName, schema, policyEntries[i].REF_ENTITY_NAME, policyEntries[i].REF_COLUMN_NAME.String))
+		query := common.FormatQuery("ALTER TABLE %s.%s.%s ALTER COLUMN %s UNSET MASKING POLICY", databaseName, schema, policyEntries[i].REF_ENTITY_NAME, policyEntries[i].REF_COLUMN_NAME.String)
+		Logger.Debug(fmt.Sprintf("Unset masking policy %s from column %s in table %s: %s", policyEntries[i].POLICY_NAME, policyEntries[i].REF_COLUMN_NAME.String, policyEntries[i].REF_ENTITY_NAME, query))
+
+		_, err = tx.Exec(query)
 		if err != nil {
 			return err
 		}
