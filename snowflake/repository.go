@@ -1680,7 +1680,7 @@ func (repo *SnowflakeRepository) DropFilter(databaseName string, schema string, 
 			}
 		}
 
-		err = repo.execute(fmt.Sprintf("ALTER TABLE %[1]s.%[2]s.%[3]s DROP ROW ACCESS POLICY %[1]s.%[2]s.%[4]s;", databaseName, schema, tableName, *existingPolicy))
+		err = repo.execute(common.FormatQuery("ALTER TABLE %[1]s.%[2]s.%[3]s DROP ROW ACCESS POLICY %[1]s.%[2]s.%[4]s;", databaseName, schema, tableName, *existingPolicy))
 		if err != nil {
 			return err
 		}
