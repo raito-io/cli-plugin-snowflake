@@ -1564,10 +1564,28 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 		tx.Commit() //nolint
 	}()
 
+	referencedTables := set.NewSet[string]()
+
 	for i := range policyEntries {
 		Logger.Debug(fmt.Sprintf("Removing masking policy %s from column %s in table %s", policyEntries[i].POLICY_NAME, policyEntries[i].REF_COLUMN_NAME.String, policyEntries[i].REF_ENTITY_NAME))
 
-		_, err = tx.Exec(common.FormatQuery("ALTER TABLE %s.%s.%s ALTER COLUMN %s UNSET MASKING POLICY", databaseName, schema, policyEntries[i].REF_ENTITY_NAME, policyEntries[i].REF_COLUMN_NAME.String))
+		tableFullName := common.FormatQuery("%s.%s.%s", databaseName, schema, policyEntries[i].REF_ENTITY_NAME)
+
+		if repo.role != AccountAdminRole {
+			if !referencedTables.Contains(tableFullName) {
+				err = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("TABLE %s", tableFullName), repo.role, true)
+				if err != nil {
+					return fmt.Errorf("enable reference on table: \"%s.%s.%s\": %w", databaseName, schema, policyEntries[i].REF_ENTITY_NAME, err)
+				}
+
+				referencedTables.Add(tableFullName)
+			}
+		}
+
+		query := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %q UNSET MASKING POLICY", tableFullName, policyEntries[i].REF_COLUMN_NAME.String)
+		Logger.Debug(fmt.Sprintf("Unset masking policy %s from column %s in table %s: %s", policyEntries[i].POLICY_NAME, policyEntries[i].REF_COLUMN_NAME.String, policyEntries[i].REF_ENTITY_NAME, query))
+
+		_, err = tx.Exec(query)
 		if err != nil {
 			return err
 		}
@@ -1653,6 +1671,15 @@ func (repo *SnowflakeRepository) DropFilter(databaseName string, schema string, 
 	}
 
 	if existingPolicy != nil {
+		tableFullName := common.FormatQuery("%s.%s.%s", databaseName, schema, tableName)
+
+		if repo.role != AccountAdminRole {
+			err = repo.ExecuteGrantOnAccountRole("REFERENCES", fmt.Sprintf("TABLE %s", tableFullName), repo.role, true)
+			if err != nil {
+				return fmt.Errorf("enable reference on table: \"%s.%s.%s\": %w", databaseName, schema, tableFullName, err)
+			}
+		}
+
 		err = repo.execute(common.FormatQuery("ALTER TABLE %[1]s.%[2]s.%[3]s DROP ROW ACCESS POLICY %[1]s.%[2]s.%[4]s;", databaseName, schema, tableName, *existingPolicy))
 		if err != nil {
 			return err
