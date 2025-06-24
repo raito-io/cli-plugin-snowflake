@@ -1569,7 +1569,7 @@ func (repo *SnowflakeRepository) DropMaskingPolicy(databaseName string, schema s
 	for i := range policyEntries {
 		Logger.Debug(fmt.Sprintf("Removing masking policy %s from column %s in table %s", policyEntries[i].POLICY_NAME, policyEntries[i].REF_COLUMN_NAME.String, policyEntries[i].REF_ENTITY_NAME))
 
-		tableFullName := common.FormatQuery("%s.%s.%s", databaseName, schema, policyEntries[i].REF_ENTITY_NAME)
+		tableFullName := common.FormatQuery("%s.%s.%s", policyEntries[i].REF_DATABASE_NAME, policyEntries[i].REF_SCHEMA_NAME, policyEntries[i].REF_ENTITY_NAME)
 
 		if repo.role != AccountAdminRole {
 			if !referencedTables.Contains(tableFullName) {
