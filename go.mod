@@ -8,7 +8,7 @@ tool (
 )
 
 require (
-	github.com/aws/smithy-go v1.22.3
+	github.com/aws/smithy-go v1.22.4
 	github.com/blockloop/scan v1.3.0
 	github.com/gammazero/workerpool v1.1.3
 	github.com/hashicorp/go-hclog v1.6.3
