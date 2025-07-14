@@ -91,9 +91,16 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 			tags = allUserTags[userRow.Name]
 		}
 
-		displayName := userRow.DisplayName
-		if displayName == "" {
-			displayName = userRow.Name
+		name := userRow.Name
+
+		displayName := name
+		if userRow.DisplayName != nil && *userRow.DisplayName != "" {
+			displayName = *userRow.DisplayName
+		}
+
+		loginName := name
+		if userRow.LoginName != nil && *userRow.LoginName != "" {
+			loginName = *userRow.LoginName
 		}
 
 		isMachine := userRow.Type != nil && (strings.EqualFold(*userRow.Type, "SERVICE") || strings.EqualFold(*userRow.Type, "LEGACY_SERVICE"))
@@ -109,15 +116,15 @@ func (s *IdentityStoreSyncer) SyncIdentityStore(ctx context.Context, identityHan
 					visitedEmailSet.Add(email)
 				} else {
 					emailParts := strings.Split(email, "@")
-					email = fmt.Sprintf("%s+%s@%s", emailParts[0], strings.ToLower(userRow.LoginName), emailParts[1])
+					email = fmt.Sprintf("%s+%s@%s", emailParts[0], strings.ToLower(loginName), emailParts[1])
 					visitedEmailSet.Add(email)
 				}
 			}
 		}
 
 		user := is.User{
-			ExternalId: cleanDoubleQuotes(userRow.LoginName),
-			UserName:   cleanDoubleQuotes(userRow.Name),
+			ExternalId: cleanDoubleQuotes(loginName),
+			UserName:   cleanDoubleQuotes(name),
 			Name:       cleanDoubleQuotes(displayName),
 			Email:      email,
 			Tags:       tags,

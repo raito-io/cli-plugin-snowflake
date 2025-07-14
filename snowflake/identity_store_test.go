@@ -28,12 +28,12 @@ func TestIdentityStoreSyncer_SyncIdentityStore(t *testing.T) {
 	repoMock.EXPECT().GetUsers().Return([]UserEntity{
 		{
 			Name:        "UserName1",
-			DisplayName: "user1",
+			DisplayName: ptr.String("user1"),
 			Email:       ptr.String("user1@raito.io"),
 		},
 		{
 			Name:        "UserName2",
-			DisplayName: "user2",
+			DisplayName: ptr.String("user2"),
 			Email:       ptr.String("user2@raito.io"),
 		},
 		{
@@ -120,12 +120,12 @@ func TestNewIdentityStoreSyncer_AddUserError(t *testing.T) {
 	repoMock.EXPECT().GetUsers().Return([]UserEntity{
 		{
 			Name:        "UserName1",
-			DisplayName: "user1",
+			DisplayName: ptr.String("user1"),
 			Email:       ptr.String("user1@raito.io"),
 		},
 		{
 			Name:        "UserName2",
-			DisplayName: "user2",
+			DisplayName: ptr.String("user2"),
 			Email:       ptr.String("user2@raito.io"),
 		},
 	}, nil)
