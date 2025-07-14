@@ -606,8 +606,8 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 		Name:        "BENJAMINSTEWART",
 		Email:       ptr.String("b_stewart@raito.io"),
 		Owner:       "ACCOUNTADMIN",
-		DisplayName: "Benjamin Stewart",
-		LoginName:   "BENJAMINSTEWART",
+		DisplayName: ptr.String("Benjamin Stewart"),
+		LoginName:   ptr.String("BENJAMINSTEWART"),
 		Type:        ptr.String("SERVICE"),
 	})
 
@@ -615,8 +615,8 @@ func (s *RepositoryTestSuite) TestSnowflakeRepository_GetUsers() {
 		Name:        "data_engineering",
 		Email:       ptr.String("data_engineer@raito.io"),
 		Owner:       "ACCOUNTADMIN",
-		DisplayName: "Data Engineer service account",
-		LoginName:   "DATA_ENGINEERING",
+		DisplayName: ptr.String("Data Engineer service account"),
+		LoginName:   ptr.String("DATA_ENGINEERING"),
 		Type:        ptr.String("SERVICE"),
 	})
 }
