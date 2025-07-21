@@ -8,7 +8,7 @@ tool (
 )
 
 require (
-	github.com/aws/smithy-go v1.22.3
+	github.com/aws/smithy-go v1.22.4
 	github.com/blockloop/scan v1.3.0
 	github.com/gammazero/workerpool v1.1.3
 	github.com/hashicorp/go-hclog v1.6.3
@@ -17,7 +17,7 @@ require (
 	github.com/raito-io/bexpression v0.1.2
 	github.com/raito-io/cli v0.72.0
 	github.com/raito-io/golang-set v0.0.4
-	github.com/snowflakedb/gosnowflake v1.14.1
+	github.com/snowflakedb/gosnowflake v1.15.0
 	github.com/stretchr/testify v1.10.0
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
 )
