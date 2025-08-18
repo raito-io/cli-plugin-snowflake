@@ -16,7 +16,7 @@ jobs:
         run: git config --global url."https://${{ secrets.CI_SECRETS_TOKEN }}:x-oauth-basic@github.com/raito-io".insteadOf "https://github.com/raito-io"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
