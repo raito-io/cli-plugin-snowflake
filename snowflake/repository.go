@@ -350,23 +350,26 @@ func (repo *SnowflakeRepository) GetAccountRolesWithPrefix(prefix string) ([]Rol
 			return nil, err
 		}
 
-		err = scan.Rows(&roleEntities, rows)
+		roles := make([]RoleEntity, 0, 1000)
+
+		err = scan.Rows(&roles, rows)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching all roles: %s", err.Error())
 		}
 
 		// filter out role used to sync snowflake to raito
-		for i, roleEntity := range roleEntities {
-			if repo.isProtectedRoleName(roleEntity.Name) {
-				roleEntities[i] = roleEntities[len(roleEntities)-1]
-				return roleEntities[:len(roleEntities)-1], nil
+		for _, roleEntity := range roles {
+			if !repo.isProtectedRoleName(roleEntity.Name) {
+				roleEntities = append(roleEntities, roleEntity)
 			}
 		}
 
-		if len(roleEntities) < 1000 {
+		// If we didn't get the full 1000 rows, we know we've reached the end and can stop paging
+		if len(roles) < 1000 {
 			break
 		}
 
+		// Take the last role name as the 'from' for the next page
 		from = roleEntities[len(roleEntities)-1].Name
 	}
 
