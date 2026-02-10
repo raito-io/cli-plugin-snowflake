@@ -330,29 +330,47 @@ func (repo *SnowflakeRepository) GetAccountRolesWithPrefix(prefix string) ([]Rol
 		q += " LIKE '" + prefix + "%'"
 	}
 
-	rows, _, err := repo.query(q)
-	if err != nil {
-		return nil, err
-	}
+	// Do paging per 1000 items.
+	q += " LIMIT 1000"
+	from := ""
 
-	var roleEntities []RoleEntity
+	roleEntities := make([]RoleEntity, 0, 1000)
 
-	err = scan.Rows(&roleEntities, rows)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching all roles: %s", err.Error())
-	}
+	for {
+		query := q
 
-	err = CheckSFLimitExceeded(q, len(roleEntities))
-	if err != nil {
-		return nil, fmt.Errorf("error while finding existing roles: %s", err.Error())
-	}
-
-	// filter out role used to sync snowflake to raito
-	for i, roleEntity := range roleEntities {
-		if repo.isProtectedRoleName(roleEntity.Name) {
-			roleEntities[i] = roleEntities[len(roleEntities)-1]
-			return roleEntities[:len(roleEntities)-1], nil
+		if from != "" {
+			// Escape single quotes in 'from' by doubling them
+			escapedFrom := strings.ReplaceAll(from, "'", "''")
+			query = fmt.Sprintf("%s FROM '%s'", query, escapedFrom)
 		}
+
+		rows, _, err := repo.query(query)
+		if err != nil {
+			return nil, err
+		}
+
+		roles := make([]RoleEntity, 0, 1000)
+
+		err = scan.Rows(&roles, rows)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching all roles: %s", err.Error())
+		}
+
+		// filter out role used to sync snowflake to raito
+		for _, roleEntity := range roles {
+			if !repo.isProtectedRoleName(roleEntity.Name) {
+				roleEntities = append(roleEntities, roleEntity)
+			}
+		}
+
+		// If we didn't get the full 1000 rows, we know we've reached the end and can stop paging
+		if len(roles) < 1000 {
+			break
+		}
+
+		// Take the last role name as the 'from' for the next page
+		from = roleEntities[len(roleEntities)-1].Name
 	}
 
 	return roleEntities, nil
