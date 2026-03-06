@@ -3,10 +3,10 @@ package snowflake
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	"github.com/raito-io/cli/base/tag"
@@ -260,27 +260,37 @@ func (s *AccessSyncer) getFullNameFromGrant(name, objectType string) string {
 	sfObject := common.ParseFullName(name)
 
 	if (strings.EqualFold(objectType, Function) || strings.EqualFold(objectType, Procedure)) && sfObject.Table != nil {
-		function := *sfObject.Table
+		function := correctFunctionName(*sfObject.Table)
 
-		if strings.Contains(function, "(") {
-			funcName := function[:strings.Index(function, "(")] //nolint:gocritic
-
-			paramString := function[strings.Index(function, "(")+1:]
-			if strings.Contains(paramString, "):") {
-				paramString = paramString[:strings.Index(paramString, "):")] //nolint:gocritic
-			}
-
-			paramString = strings.TrimSuffix(paramString, ")")
-
-			params := strings.Split(paramString, ",")
-			for i, param := range params {
-				p := strings.TrimSpace(param)
-				params[i] = p[strings.LastIndex(p, " ")+1:]
-			}
-
-			sfObject.Table = ptr.String(fmt.Sprintf(`%q(%s)`, funcName, strings.Join(params, ", ")))
-		}
+		sfObject.Table = &function
 	}
 
 	return sfObject.GetFullName(false)
+}
+
+var _oldFunctionStyleRegex = regexp.MustCompile(`^"?[a-zA-Z]+\([a-zA-Z ,()0-9]+\):[a-zA-Z()0-9]+$`)
+
+func correctFunctionName(name string) string {
+	if _oldFunctionStyleRegex.MatchString(name) {
+		// Old style
+		funcName := name[:strings.Index(name, "(")] //nolint:gocritic
+
+		paramString := name[strings.Index(name, "(")+1:]
+		if strings.Contains(paramString, "):") {
+			paramString = paramString[:strings.Index(paramString, "):")] //nolint:gocritic
+		}
+
+		paramString = strings.TrimSuffix(paramString, ")")
+
+		params := strings.Split(paramString, ",")
+		for i, param := range params {
+			p := strings.TrimSpace(param)
+			params[i] = p[strings.LastIndex(p, " ")+1:]
+		}
+
+		return fmt.Sprintf(`%q(%s)`, funcName, strings.Join(params, ", "))
+	}
+
+	// New style or not a function/procedure
+	return name
 }
