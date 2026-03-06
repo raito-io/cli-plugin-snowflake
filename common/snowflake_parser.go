@@ -110,8 +110,6 @@ func trimCircumfix(name string, circumfix string) string {
 }
 
 // unquoteSnowflakeIdentifier unquotes a single token from splitFullName.
-// Unlike trimCircumfix + ReplaceAll, it correctly handles tokens that have a suffix after
-// the closing quote (e.g. `"decrypt"(VARCHAR)` → `decrypt(VARCHAR)`).
 func unquoteSnowflakeIdentifier(part string) string {
 	if !strings.HasPrefix(part, `"`) {
 		return strings.ReplaceAll(part, `""`, `"`)
@@ -124,10 +122,14 @@ func unquoteSnowflakeIdentifier(part string) string {
 		return strings.ReplaceAll(part, `""`, `"`)
 	}
 
-	identifier := strings.ReplaceAll(part[1:closeIdx+1], `""`, `"`)
-	suffix := part[closeIdx+2:] // everything after the closing "
+	if closeIdx != len(part)-2 {
+		// This is probably a function in that case we should keep the quotes
+		return part
+	}
 
-	return identifier + suffix
+	identifier := strings.ReplaceAll(part[1:closeIdx+1], `""`, `"`)
+
+	return identifier
 }
 
 // Parse the fully-qualitied Snowflake resource name in a SnowflakeObject: https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html

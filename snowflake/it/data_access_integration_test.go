@@ -321,9 +321,9 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersToTarget() {
 			dbUsageFound = true
 		} else if strings.EqualFold(grant.GrantedOn, "SCHEMA") && grant.Name == "RAITO_DATABASE.ORDERING" && grant.Privilege == "USAGE" {
 			schemaUsageFound = true
-		} else if strings.EqualFold(grant.GrantedOn, "FUNCTION") && grant.Name == "RAITO_DATABASE.ORDERING.\"decrypt(val VARCHAR):VARCHAR(16777216)\"" && grant.Privilege == "USAGE" {
+		} else if strings.EqualFold(grant.GrantedOn, "FUNCTION") && grant.Name == "RAITO_DATABASE.ORDERING.\"decrypt\"(VARCHAR)" && grant.Privilege == "USAGE" {
 			functionUsageFound = true
-		} else if strings.EqualFold(grant.GrantedOn, "PROCEDURE") && strings.Contains(grant.Name, "RAITO_DATABASE.ORDERING.\"myProcedure(x VARCHAR)") && grant.Privilege == "USAGE" {
+		} else if strings.EqualFold(grant.GrantedOn, "PROCEDURE") && strings.Contains(grant.Name, "RAITO_DATABASE.ORDERING.\"myProcedure\"(VARCHAR)\"") && grant.Privilege == "USAGE" {
 			procedureUsageFound = true
 		} else if strings.EqualFold(grant.GrantedOn, "INTEGRATION") && grant.Name == "\"SCIM Integration\"" && grant.Privilege == "USAGE" {
 			integrationUsageFound = true
