@@ -1352,36 +1352,48 @@ func (repo *SnowflakeRepository) GetSchemasInDatabase(databaseName string, handl
 	}, handleEntity)
 }
 
-func (repo *SnowflakeRepository) GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error {
-	q := getFunctionsInDatabaseQuery(databaseName)
+func handleFunctionEntity(entity any, handleEntity EntityHandler) error {
+	functionEntity := entity.(*FunctionEntity)
 
-	showFunctionsHandler := func(entity any) error {
-		functionEntity := entity.(*FunctionEntity)
-
-		if functionEntity.IsBuiltin == "Y" {
-			// Skip built-in functions
-			return nil
-		}
-
-		// In Snowflake, the "SHOW FUNCTIONS" command returns a full signature in the "arguments" column,
-		// which includes both the function name, argument types and return type.
-		// For example: "SUM3(NUMBER, NUMBER, NUMBER) RETURN NUMBER".
-		// We need to parse this signature to extract just the arguments for our FunctionEntity.
-		// For example: "(NUMBER, NUMBER, NUMBER)"
-
-		argumentSignature, err := parseFunctionOrProcedureSignature(functionEntity.ArgumentSignature)
-		if err != nil {
-			return fmt.Errorf("error parsing signature for function %s.%s.%s: %w", *functionEntity.Database, *functionEntity.Schema, functionEntity.Name, err)
-		}
-
-		functionEntity.ArgumentSignature = argumentSignature
-
-		return handleEntity(functionEntity)
+	if functionEntity.IsBuiltin == "Y" {
+		// Skip built-in functions
+		return nil
 	}
+
+	// In Snowflake, the "SHOW FUNCTIONS" command returns a full signature in the "arguments" column,
+	// which includes both the function name, argument types and return type.
+	// For example: "SUM3(NUMBER, NUMBER, NUMBER) RETURN NUMBER".
+	// We need to parse this signature to extract just the arguments for our FunctionEntity.
+	// For example: "(NUMBER, NUMBER, NUMBER)"
+
+	argumentSignature, err := parseFunctionOrProcedureSignature(functionEntity.ArgumentSignature)
+	if err != nil {
+		return fmt.Errorf("error parsing signature for function %s.%s.%s: %w", *functionEntity.Database, *functionEntity.Schema, functionEntity.Name, err)
+	}
+
+	functionEntity.ArgumentSignature = argumentSignature
+
+	return handleEntity(functionEntity)
+}
+
+func (repo *SnowflakeRepository) GetFunctionsInSchema(databaseName string, schema string, handleEntity EntityHandler) error {
+	q := common.FormatQuery("SHOW FUNCTIONS IN SCHEMA %s.%s LIMIT 10000", databaseName, schema)
 
 	return handleDbEntities(repo, q, func() any {
 		return &FunctionEntity{}
-	}, showFunctionsHandler)
+	}, func(entity any) error {
+		return handleFunctionEntity(entity, handleEntity)
+	})
+}
+
+func (repo *SnowflakeRepository) GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error {
+	q := getFunctionsInDatabaseQuery(databaseName)
+
+	return handleDbEntities(repo, q, func() any {
+		return &FunctionEntity{}
+	}, func(entity any) error {
+		return handleFunctionEntity(entity, handleEntity)
+	})
 }
 
 func parseFunctionOrProcedureSignature(signature string) (string, error) {
@@ -1398,36 +1410,48 @@ func parseFunctionOrProcedureSignature(signature string) (string, error) {
 	return signature[openParenIndex : closeParenIndex+1], nil
 }
 
-func (repo *SnowflakeRepository) GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error {
-	q := getProceduresInDatabaseQuery(databaseName)
+func showProceduresHandler(entity any, handleEntity EntityHandler) error {
+	procedureEntity := entity.(*ProcedureEntity)
 
-	showProceduresHandler := func(entity any) error {
-		procedureEntity := entity.(*ProcedureEntity)
-
-		if procedureEntity.IsBuiltin == "Y" {
-			// Skip built-in procedures
-			return nil
-		}
-
-		// In Snowflake, the "SHOW PROCEDURES" command returns a full signature in the "arguments" column,
-		// which includes both the procedure name, argument types and return type.
-		// For example: "SUM3(NUMBER, NUMBER, NUMBER) RETURN NUMBER".
-		// We need to parse this signature to extract just the arguments for our ProcedureEntity.
-		// For example: "(NUMBER, NUMBER, NUMBER)"
-
-		argumentSignature, err := parseFunctionOrProcedureSignature(procedureEntity.ArgumentSignature)
-		if err != nil {
-			return fmt.Errorf("error parsing signature for procedure %s.%s.%s: %w", *procedureEntity.Database, *procedureEntity.Schema, procedureEntity.Name, err)
-		}
-
-		procedureEntity.ArgumentSignature = argumentSignature
-
-		return handleEntity(procedureEntity)
+	if procedureEntity.IsBuiltin == "Y" {
+		// Skip built-in procedures
+		return nil
 	}
+
+	// In Snowflake, the "SHOW PROCEDURES" command returns a full signature in the "arguments" column,
+	// which includes both the procedure name, argument types and return type.
+	// For example: "SUM3(NUMBER, NUMBER, NUMBER) RETURN NUMBER".
+	// We need to parse this signature to extract just the arguments for our ProcedureEntity.
+	// For example: "(NUMBER, NUMBER, NUMBER)"
+
+	argumentSignature, err := parseFunctionOrProcedureSignature(procedureEntity.ArgumentSignature)
+	if err != nil {
+		return fmt.Errorf("error parsing signature for procedure %s.%s.%s: %w", *procedureEntity.Database, *procedureEntity.Schema, procedureEntity.Name, err)
+	}
+
+	procedureEntity.ArgumentSignature = argumentSignature
+
+	return handleEntity(procedureEntity)
+}
+
+func (repo *SnowflakeRepository) GetProceduresInSchema(databaseName string, schema string, handleEntity EntityHandler) error {
+	q := common.FormatQuery("SHOW PROCEDURES IN SCHEMA %s.%s LIMIT 10000", databaseName, schema)
 
 	return handleDbEntities(repo, q, func() any {
 		return &ProcedureEntity{}
-	}, showProceduresHandler)
+	}, func(entity any) error {
+		return showProceduresHandler(entity, handleEntity)
+	})
+}
+
+func (repo *SnowflakeRepository) GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error {
+	q := getProceduresInDatabaseQuery(databaseName)
+
+	return handleDbEntities(repo, q, func() any {
+		return &ProcedureEntity{}
+	}, func(entity any) error {
+		return showProceduresHandler(entity, handleEntity)
+	})
 }
 
 func (repo *SnowflakeRepository) GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {

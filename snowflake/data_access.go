@@ -73,7 +73,9 @@ type dataAccessRepository interface {
 	GetInboundShares() ([]DbEntity, error)
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetFunctionsInSchema(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetProceduresInSchema(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	GetDatabaseRoleTags(databaseName string, roleName string) (map[string][]*tag.Tag, error)
 	GetWarehouses() ([]DbEntity, error)
@@ -269,7 +271,7 @@ func (s *AccessSyncer) getFullNameFromGrant(name, objectType string) string {
 	return sfObject.GetFullName(false)
 }
 
-var _oldFunctionStyleRegex = regexp.MustCompile(`^"?[a-zA-Z]+\([a-zA-Z ,()0-9]+\):[a-zA-Z()0-9]+$`)
+var _oldFunctionStyleRegex = regexp.MustCompile(`^"?[a-zA-Z0-9_]+\([a-zA-Z ,()0-9]+\)(:[a-zA-Z()0-9]+)?"?$`)
 
 func correctFunctionName(name string) string {
 	if _oldFunctionStyleRegex.MatchString(name) {

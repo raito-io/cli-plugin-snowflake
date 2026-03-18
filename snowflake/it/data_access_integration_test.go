@@ -502,6 +502,309 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersToTarget() {
 	})
 }
 
+func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFunctionToTarget() {
+	// Given
+	actualRoleName := generateRole("TESTROLE2", testId)
+	accountRoleId := fmt.Sprintf("%s_ACCOUNT_ID2", testId)
+
+	accessProviderImport := []*access_control.ToTargetItem{
+		access_control.ToTargetItem_builder{
+			AccessControl: access_control.AccessControlToTarget_builder{
+				Id:          new(accountRoleId),
+				Name:        new(fmt.Sprintf("%s_ap2", testId)),
+				Action:      new(access_control.Action_GRANT),
+				NamingHint:  &actualRoleName,
+				Delete:      new(false),
+				Description: new(fmt.Sprintf("Integration testing for test %s", testId)),
+				Who: access_control.Who_builder{
+					Users: []string{snowflakeUserName},
+				}.Build(),
+				What: []*access_control.WhatToTarget{
+					access_control.WhatToTarget_builder{
+						DataObject:  createFullName("database", []string{"RAITO_DATABASE"}),
+						Permissions: []string{"USAGE", "USAGE on SCHEMA", "REFERENCE", "USAGE on DATABASE"},
+					}.Build(),
+				},
+				Owners: []*access_control.OwnerToTarget{
+					access_control.OwnerToTarget_builder{
+						Email: new("owner1@raito.io"),
+					}.Build(),
+				},
+			}.Build(),
+		}.Build(),
+	}
+
+	for i := range 2 {
+		s.Run(fmt.Sprintf("Pass %d", i), func() {
+			dataAccessFeedbackHandler := &accessFeedbackCache{}
+
+			dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
+			connectionConfig := s.getConfig()
+
+			c := access_control.AccessToTargetSyncConfig_builder{
+				GlobalConfig: config.GlobalConfig_builder{
+					GlobalConfig: config.MustNewConfigMap(map[string]any{}),
+					Connection:   connectionConfig,
+				}.Build(),
+			}.Build()
+
+			cancelCtx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// When
+			err := dataAccessSyncer.SyncToTarget(cancelCtx, c, stream.ArrayToChannel(cancelCtx, accessProviderImport), dataAccessFeedbackHandler)
+
+			// Then
+			s.Require().NoError(err)
+			s.GreaterOrEqual(len(dataAccessFeedbackHandler.AccessProviderFeedback), 1)
+
+			accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+			s.Len(accessProviderFeedback, 1)
+			s.ElementsMatch([]*access_control.Feedback{
+				access_control.Feedback_builder{
+					Id:         &accountRoleId,
+					Name:       &actualRoleName,
+					ExternalId: &actualRoleName,
+					Type:       new(access_control.Role),
+					State: access_control.FeedbackState_builder{
+						Who: access_control.Who_builder{
+							Users: []string{snowflakeUserName},
+						}.Build(),
+					}.Build(),
+				}.Build(),
+			}, accessProviderFeedback)
+
+			roles, err := s.sfRepo.GetAccountRoles()
+			s.Require().NoError(err)
+			s.Contains(roles, snowflake.RoleEntity{
+				Name:            actualRoleName,
+				AssignedToUsers: 1,
+				GrantedToRoles:  0,
+				GrantedRoles:    0,
+				Owner:           "ACCOUNTADMIN",
+			})
+
+			grants, err := s.sfRepo.GetGrantsToAccountRole(actualRoleName)
+			s.Require().NoError(err)
+			s.Len(grants, 5)
+
+			functionUsageFound := false
+			procedureUsageFound := false
+
+			for _, grant := range grants {
+				switch {
+				case strings.EqualFold(grant.GrantedOn, "FUNCTION") && grant.Name == "RAITO_DATABASE.ORDERING.\"decrypt\"(VARCHAR)" && grant.Privilege == "USAGE":
+					functionUsageFound = true
+				case strings.EqualFold(grant.GrantedOn, "PROCEDURE") && strings.Contains(grant.Name, "RAITO_DATABASE.ORDERING.\"myProcedure\"(VARCHAR)") && grant.Privilege == "USAGE":
+					procedureUsageFound = true
+				}
+			}
+
+			s.True(functionUsageFound)
+			s.True(procedureUsageFound)
+		})
+	}
+}
+
+func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersFunctionWithRevokeToTarget() {
+	// Given
+	actualRoleName := generateRole("TESTROLE3", testId)
+	accountRoleId := fmt.Sprintf("%s_ACCOUNT_ID3", testId)
+
+	accessProviderImport := []*access_control.ToTargetItem{
+		access_control.ToTargetItem_builder{
+			AccessControl: access_control.AccessControlToTarget_builder{
+				Id:          new(accountRoleId),
+				Name:        new(fmt.Sprintf("%s_ap2", testId)),
+				Action:      new(access_control.Action_GRANT),
+				NamingHint:  &actualRoleName,
+				Delete:      new(false),
+				Description: new(fmt.Sprintf("Integration testing for test %s", testId)),
+				Who: access_control.Who_builder{
+					Users: []string{snowflakeUserName},
+				}.Build(),
+				What: []*access_control.WhatToTarget{
+					access_control.WhatToTarget_builder{
+						DataObject:  createFullName("schema", []string{"RAITO_DATABASE", "ORDERING"}),
+						Permissions: []string{"USAGE", "USAGE on SCHEMA", "REFERENCE"},
+					}.Build(),
+				},
+				Owners: []*access_control.OwnerToTarget{
+					access_control.OwnerToTarget_builder{
+						Email: new("owner1@raito.io"),
+					}.Build(),
+				},
+			}.Build(),
+		}.Build(),
+	}
+
+	func() {
+		dataAccessFeedbackHandler := &accessFeedbackCache{}
+
+		dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
+		connectionConfig := s.getConfig()
+
+		c := access_control.AccessToTargetSyncConfig_builder{
+			GlobalConfig: config.GlobalConfig_builder{
+				GlobalConfig: config.MustNewConfigMap(map[string]any{}),
+				Connection:   connectionConfig,
+			}.Build(),
+		}.Build()
+
+		cancelCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// When
+		err := dataAccessSyncer.SyncToTarget(cancelCtx, c, stream.ArrayToChannel(cancelCtx, accessProviderImport), dataAccessFeedbackHandler)
+
+		// Then
+		s.Require().NoError(err)
+		s.GreaterOrEqual(len(dataAccessFeedbackHandler.AccessProviderFeedback), 1)
+
+		accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+		s.Len(accessProviderFeedback, 1)
+		s.ElementsMatch([]*access_control.Feedback{
+			access_control.Feedback_builder{
+				Id:         &accountRoleId,
+				Name:       &actualRoleName,
+				ExternalId: &actualRoleName,
+				Type:       new(access_control.Role),
+				State: access_control.FeedbackState_builder{
+					Who: access_control.Who_builder{
+						Users: []string{snowflakeUserName},
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		}, accessProviderFeedback)
+
+		roles, err := s.sfRepo.GetAccountRoles()
+		s.Require().NoError(err)
+		s.Contains(roles, snowflake.RoleEntity{
+			Name:            actualRoleName,
+			AssignedToUsers: 1,
+			GrantedToRoles:  0,
+			GrantedRoles:    0,
+			Owner:           "ACCOUNTADMIN",
+		})
+
+		grants, err := s.sfRepo.GetGrantsToAccountRole(actualRoleName)
+		s.Require().NoError(err)
+		s.Len(grants, 4)
+
+		functionUsageFound := false
+		procedureUsageFound := false
+
+		for _, grant := range grants {
+			switch {
+			case strings.EqualFold(grant.GrantedOn, "FUNCTION") && grant.Name == "RAITO_DATABASE.ORDERING.\"decrypt\"(VARCHAR)" && grant.Privilege == "USAGE":
+				functionUsageFound = true
+			case strings.EqualFold(grant.GrantedOn, "PROCEDURE") && strings.Contains(grant.Name, "RAITO_DATABASE.ORDERING.\"myProcedure\"(VARCHAR)") && grant.Privilege == "USAGE":
+				procedureUsageFound = true
+			}
+		}
+
+		s.True(functionUsageFound)
+		s.True(procedureUsageFound)
+	}()
+
+	accessProviderImport = []*access_control.ToTargetItem{
+		access_control.ToTargetItem_builder{
+			AccessControl: access_control.AccessControlToTarget_builder{
+				Id:          new(accountRoleId),
+				Name:        new(fmt.Sprintf("%s_ap2", testId)),
+				Action:      new(access_control.Action_GRANT),
+				NamingHint:  &actualRoleName,
+				Delete:      new(false),
+				Description: new(fmt.Sprintf("Integration testing for test %s", testId)),
+				Who: access_control.Who_builder{
+					Users: []string{snowflakeUserName},
+				}.Build(),
+				What: []*access_control.WhatToTarget{
+					access_control.WhatToTarget_builder{}.Build(),
+				},
+				Owners: []*access_control.OwnerToTarget{
+					access_control.OwnerToTarget_builder{
+						Email: new("owner1@raito.io"),
+					}.Build(),
+				},
+			}.Build(),
+		}.Build(),
+	}
+
+	func() {
+		dataAccessFeedbackHandler := &accessFeedbackCache{}
+
+		dataAccessSyncer := snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints)
+		connectionConfig := s.getConfig()
+
+		c := access_control.AccessToTargetSyncConfig_builder{
+			GlobalConfig: config.GlobalConfig_builder{
+				GlobalConfig: config.MustNewConfigMap(map[string]any{}),
+				Connection:   connectionConfig,
+			}.Build(),
+		}.Build()
+
+		cancelCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// When
+		err := dataAccessSyncer.SyncToTarget(cancelCtx, c, stream.ArrayToChannel(cancelCtx, accessProviderImport), dataAccessFeedbackHandler)
+
+		// Then
+		s.Require().NoError(err)
+		s.GreaterOrEqual(len(dataAccessFeedbackHandler.AccessProviderFeedback), 1)
+
+		accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+		s.Len(accessProviderFeedback, 1)
+		s.ElementsMatch([]*access_control.Feedback{
+			access_control.Feedback_builder{
+				Id:         &accountRoleId,
+				Name:       &actualRoleName,
+				ExternalId: &actualRoleName,
+				Type:       new(access_control.Role),
+				State: access_control.FeedbackState_builder{
+					Who: access_control.Who_builder{
+						Users: []string{snowflakeUserName},
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		}, accessProviderFeedback)
+
+		roles, err := s.sfRepo.GetAccountRoles()
+		s.Require().NoError(err)
+		s.Contains(roles, snowflake.RoleEntity{
+			Name:            actualRoleName,
+			AssignedToUsers: 1,
+			GrantedToRoles:  0,
+			GrantedRoles:    0,
+			Owner:           "ACCOUNTADMIN",
+		})
+
+		grants, err := s.sfRepo.GetGrantsToAccountRole(actualRoleName)
+		s.Require().NoError(err)
+		s.Empty(grants)
+
+		functionUsageFound := false
+		procedureUsageFound := false
+
+		for _, grant := range grants {
+			switch {
+			case strings.EqualFold(grant.GrantedOn, "FUNCTION") && grant.Name == "RAITO_DATABASE.ORDERING.\"decrypt\"(VARCHAR)" && grant.Privilege == "USAGE":
+				functionUsageFound = true
+			case strings.EqualFold(grant.GrantedOn, "PROCEDURE") && strings.Contains(grant.Name, "RAITO_DATABASE.ORDERING.\"myProcedure\"(VARCHAR)") && grant.Privilege == "USAGE":
+				procedureUsageFound = true
+			}
+		}
+
+		s.False(functionUsageFound)
+		s.False(procedureUsageFound)
+	}()
+}
+
+
 func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProviderMasksToTarget() {
 	if sfStandardEdition {
 		s.T().Skip("Skip test as Masking is a non standard edition feature")

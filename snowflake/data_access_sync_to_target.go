@@ -871,7 +871,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 
 					name := grant.Name
 
-					if onType == Function || onType == Procedure { // For functions and stored procedures we need to do a special conversion
+					if strings.EqualFold(onType, Function) || strings.EqualFold(onType, Procedure) { // For functions and stored procedures we need to do a special conversion
 						name = s.accessSyncer.getFullNameFromGrant(name, onType)
 					}
 
@@ -1602,7 +1602,7 @@ func (s *AccessToTargetSyncer) getFunctionsForSchema(database, schema string) ([
 
 	functions := make([]FunctionEntity, 0, 10)
 
-	err := s.repo.GetFunctionsInDatabase(database, func(entity interface{}) error {
+	err := s.repo.GetFunctionsInSchema(database, schema, func(entity any) error {
 		function := entity.(*FunctionEntity)
 		if *function.Schema == schema {
 			functions = append(functions, *function)
@@ -1629,7 +1629,7 @@ func (s *AccessToTargetSyncer) getProceduresForSchema(database, schema string) (
 
 	procs := make([]ProcedureEntity, 0, 10)
 
-	err := s.repo.GetProceduresInDatabase(database, func(entity interface{}) error {
+	err := s.repo.GetProceduresInSchema(database, schema, func(entity any) error {
 		proc := entity.(*ProcedureEntity)
 		if *proc.Schema == schema {
 			procs = append(procs, *proc)
@@ -1652,7 +1652,7 @@ func (s *AccessToTargetSyncer) getSchemasForDatabase(database string) ([]SchemaE
 		return schemas, nil
 	}
 
-	schemas := make([]SchemaEntity, 10)
+	schemas := make([]SchemaEntity, 0, 10)
 
 	err := s.repo.GetSchemasInDatabase(database, func(entity interface{}) error {
 		schema := entity.(*SchemaEntity)
