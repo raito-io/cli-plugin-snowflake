@@ -132,6 +132,26 @@ func unquoteSnowflakeIdentifier(part string) string {
 	return identifier
 }
 
+// FindMatchingCloseParen returns the index of the ')' matching the '(' at openPos in s.
+// Handles nested parentheses. Returns -1 and an error if no match is found.
+func FindMatchingCloseParen(s string, openPos int) (int, error) {
+	depth := 0
+
+	for i := openPos; i < len(s); i++ {
+		switch s[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i, nil
+			}
+		}
+	}
+
+	return -1, fmt.Errorf("no matching closing parenthesis in %s", s)
+}
+
 // Parse the fully-qualitied Snowflake resource name in a SnowflakeObject: https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html
 func ParseFullName(fullName string) SnowflakeObject {
 	split, err := splitFullName(fullName, nil)

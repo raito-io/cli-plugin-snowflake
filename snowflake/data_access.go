@@ -58,6 +58,7 @@ type dataAccessRepository interface {
 	GetApplicationRoles(application string) ([]ApplicationRoleEntity, error)
 	GetDatabaseRolesWithPrefix(database string, prefix string) ([]RoleEntity, error)
 	GetDatabases() ([]DbEntity, error)
+	GetDatabasesByKind(kind string) ([]DbEntity, error)
 	GetApplications() ([]ApplictionEntity, error)
 	GetGrantsOfAccountRole(roleName string) ([]GrantOfRole, error)
 	GetGrantsOfDatabaseRole(database, roleName string) ([]GrantOfRole, error)

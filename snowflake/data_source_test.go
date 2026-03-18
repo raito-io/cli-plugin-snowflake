@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/raito-io/bexpression/utils"
 	"github.com/raito-io/cli/base/data_source"
 	"github.com/raito-io/cli/base/tag"
 	"github.com/raito-io/cli/base/util/config"
@@ -87,7 +88,7 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetFunctionsInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
-		handler(&FunctionEntity{Database: s, Schema: "schema1", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		handler(&FunctionEntity{Database: &s, Schema: utils.Ptr("schema1"), Name: "Decrypt", ArgumentSignature: "(VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -100,7 +101,7 @@ func TestDataSourceSyncer_SyncDataSource(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetProceduresInDatabase("Database2", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
-		handler(&ProcedureEntity{Database: s, Schema: "schema2", Name: "myProc", ArgumentSignature: "(VAL VARCHAR)"})
+		handler(&ProcedureEntity{Database: &s, Schema: utils.Ptr("schema2"), Name: "myProc", ArgumentSignature: "(VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -520,7 +521,7 @@ func TestDataSourceSyncer_SyncDataSource_partial(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetFunctionsInDatabase("Database1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
-		handler(&FunctionEntity{Database: s, Schema: "schema1", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		handler(&FunctionEntity{Database: &s, Schema: utils.Ptr("schema1"), Name: "Decrypt", ArgumentSignature: "(VARCHAR)"})
 		return nil
 	}).Once()
 

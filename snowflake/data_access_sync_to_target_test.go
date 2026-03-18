@@ -9,6 +9,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/bexpression"
 	"github.com/raito-io/bexpression/datacomparison"
+	"github.com/raito-io/bexpression/utils"
 	"github.com/raito-io/cli/base/access_provider"
 	importer "github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/types"
@@ -733,7 +734,7 @@ func generateAccessControls_schema(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
-		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		handler(&FunctionEntity{Database: &s, Schema: utils.Ptr("Schema2"), Name: "Decrypt", ArgumentSignature: "(VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -917,12 +918,12 @@ func generateAccessControls_database(t *testing.T) {
 	repoMock.EXPECT().ExecuteGrantOnAccountRole("USAGE", "FUNCTION DB1.Schema2.\"Decrypt\"(VARCHAR)", "RoleName1", false).Return(nil).Once()
 
 	repoMock.EXPECT().GetFunctionsInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
-		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		handler(&FunctionEntity{Database: &s, Schema: utils.Ptr("Schema2"), Name: "Decrypt", ArgumentSignature: "(VARCHAR)"})
 		return nil
 	}).Once()
 
 	repoMock.EXPECT().GetProceduresInDatabase(database, mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
-		handler(&ProcedureEntity{Database: s, Schema: "Schema2", Name: "procMe", ArgumentSignature: "(VAL VARCHAR)"})
+		handler(&ProcedureEntity{Database: &s, Schema: utils.Ptr("Schema2"), Name: "procMe", ArgumentSignature: "(VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -968,7 +969,7 @@ func generateAccessControls_existing_database(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetSchemasInDatabase("DB1", mock.Anything).RunAndReturn(func(s string, handler EntityHandler) error {
-		handler(&SchemaEntity{Database: s, Name: "Schema2"})
+		handler(&FunctionEntity{Database: &s, Schema: utils.Ptr("Schema2"), Name: "Decrypt", ArgumentSignature: "(VARCHAR)"})
 		return nil
 	}).Once()
 

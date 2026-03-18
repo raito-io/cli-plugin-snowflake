@@ -929,6 +929,164 @@ func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersToTarget_Share
 	s.Contains(shareNames, actualShareName)
 }
 
+func (s *DataAccessTestSuite) TestAccessSyncer_SyncAccessProvidersToTarget_DigitPrefixedGranteeRole() {
+	// Regression test: when a role with a digit-prefixed name (e.g. "3RD_PARTY_SERVICES") is a
+	// grantee of the role being synced, Snowflake returns it quoted in SHOW GRANTS output (e.g.
+	// "\"3FOO\""). Without the fix the code would double-quote it again, producing triple quotes
+	// and a SQL compilation error like: Role '""3FOO""' does not exist.
+
+	// Given
+	accountRoleId := fmt.Sprintf("%s_ACCOUNT_ID1", testId)
+	// Digit-prefixed so Snowflake quotes it in SHOW GRANTS OF ROLE output
+	targetRoleName := fmt.Sprintf("3RD_PARTY_SERVICES_TARGET_%s", testId)
+	granteeRoleName := fmt.Sprintf("3RD_PARTY_SERVICES_GRANTEE_%s", testId)
+
+	config := s.getConfig()
+
+	// Create both roles directly
+	err := s.sfRepo.CreateAccountRole(targetRoleName)
+	s.Require().NoError(err)
+
+	err = s.sfRepo.CreateAccountRole(granteeRoleName)
+	s.Require().NoError(err)
+
+	// Grant targetRole to granteeRole so that granteeRole appears in SHOW GRANTS OF ROLE targetRole
+	err = s.sfRepo.GrantAccountRolesToAccountRole(context.Background(), targetRoleName, granteeRoleName)
+	s.Require().NoError(err)
+
+	// Verify pre-condition: granteeRole is a grantee of targetRole
+	grants, err := s.sfRepo.GetGrantsOfAccountRole(targetRoleName)
+	s.Require().NoError(err)
+	s.Require().Len(grants, 1)
+
+	// Sync with empty who — this should revoke granteeRole
+	accessProviderImport := &sync_to_target.AccessProviderImport{
+		AccessProviders: []*sync_to_target.AccessProvider{{
+			Id:          accountRoleId,
+			Name:        fmt.Sprintf("%s_ap1", testId),
+			Action:      types.Grant,
+			Delete:      false,
+			Description: fmt.Sprintf("Integration testing for test %s", testId),
+			Who:         sync_to_target.WhoItem{},
+			What:        []sync_to_target.WhatItem{},
+		},
+		},
+	}
+
+	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+
+	// When
+	err = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+
+	// Then: no error (before the fix this failed with triple-quoted role name)
+	s.Require().NoError(err)
+
+	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+	s.Len(accessProviderFeedback, 1)
+	s.Len(accessProviderFeedback[0].Errors, 0)
+
+	// Verify the grant was revoked
+	grants, err = s.sfRepo.GetGrantsOfAccountRole(targetRoleName)
+	s.Require().NoError(err)
+	s.Empty(grants)
+}
+
+func (s *DataAccessTestSuite) TestAccessSyncer_SyncToTarget_SharedDatabase_RevokeImportedPrivileges() {
+	// Regression test: when revoking access to an inbound shared database, the connector should issue REVOKE IMPORTED PRIVILEGES.
+	sharedDatabase := "SNOWFLAKE_SAMPLE_DATA"
+	roleName := generateRole("SHARED_DB_REVOKE_TEST", testId)
+	roleId := fmt.Sprintf("%s_SHARED_DB_REVOKE_ID1", testId)
+
+	config := s.getConfig()
+
+	err := connectAndExecute(config.Parameters, "", "CREATE DATABASE IF NOT EXISTS SNOWFLAKE_SAMPLE_DATA FROM SHARE SFC_SAMPLES.SAMPLE_DATA")
+	s.Require().NoError(err)
+
+	// Step 1: grant IMPORTED PRIVILEGES on the shared database via SyncToTarget.
+	dataAccessFeedbackHandler := mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+	accessProviderImport := &sync_to_target.AccessProviderImport{
+		AccessProviders: []*sync_to_target.AccessProvider{{
+			Id:          roleId,
+			Name:        fmt.Sprintf("%s_shared_db_ap1", testId),
+			Action:      types.Grant,
+			NamingHint:  roleName,
+			Delete:      false,
+			Description: fmt.Sprintf("Integration testing for test %s", testId),
+			Who:         sync_to_target.WhoItem{},
+			What: []sync_to_target.WhatItem{
+				{
+					DataObject:  &data_source.DataObjectReference{FullName: sharedDatabase, Type: "database"},
+					Permissions: []string{"IMPORTED PRIVILEGES"},
+				},
+			},
+		},
+		},
+	}
+
+	// When
+	err = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+	s.Require().NoError(err)
+
+	accessProviderFeedback := filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+	s.Len(accessProviderFeedback, 1)
+	s.Len(accessProviderFeedback[0].Errors, 0)
+
+	// Verify IMPORTED PRIVILEGES was granted.
+	grants, err := s.sfRepo.GetGrantsToAccountRole(roleName)
+	s.Require().NoError(err)
+
+	importedPrivilegesFound := false
+
+	for _, grant := range grants {
+		if grant.Name == sharedDatabase {
+			// Reminder IMPORTED PRIVILEGES on a shared database result in a grant with GrantedOn = DATABASE and Privilege = USAGE
+			s.Require().Equal("DATABASE", grant.GrantedOn)
+			s.Require().Equal("USAGE", grant.Privilege)
+
+			importedPrivilegesFound = true
+		}
+	}
+
+	s.True(importedPrivilegesFound, "IMPORTED PRIVILEGES should have been granted on %s", sharedDatabase)
+
+	// Step 2: revoke access by syncing with an empty what list.
+	// The connector should issue REVOKE IMPORTED PRIVILEGES ON DATABASE <sharedDatabase>.
+	dataAccessFeedbackHandler = mocks.NewSimpleAccessProviderFeedbackHandler(s.T())
+	accessProviderImport = &sync_to_target.AccessProviderImport{
+		AccessProviders: []*sync_to_target.AccessProvider{{
+			Id:          roleId,
+			Name:        fmt.Sprintf("%s_shared_db_ap1", testId),
+			Action:      types.Grant,
+			NamingHint:  roleName,
+			Delete:      false,
+			Description: fmt.Sprintf("Integration testing for test %s", testId),
+			Who:         sync_to_target.WhoItem{},
+			What:        []sync_to_target.WhatItem{},
+		},
+		},
+	}
+
+	// When
+	err = snowflake.NewDataAccessSyncer(snowflake.RoleNameConstraints).SyncAccessProviderToTarget(context.Background(), accessProviderImport, dataAccessFeedbackHandler, config)
+	s.Require().NoError(err)
+
+	accessProviderFeedback = filterFeedbackInformation(dataAccessFeedbackHandler.AccessProviderFeedback)
+
+	s.Len(accessProviderFeedback, 1)
+	s.Len(accessProviderFeedback[0].Errors, 0)
+
+	// Verify IMPORTED PRIVILEGES was revoked.
+	grants, err = s.sfRepo.GetGrantsToAccountRole(roleName)
+	s.Require().NoError(err)
+
+	for _, grant := range grants {
+		if grant.Name == sharedDatabase {
+			s.Failf("IMPORTED PRIVILEGES should have been revoked from shared database %s, but a grant still exists: %+v", sharedDatabase, grant)
+		}
+	}
+}
+
 func generateRole(username string, prefix string) string {
 	if prefix == "" {
 		prefix = fmt.Sprintf("%s_", testId)

@@ -117,6 +117,12 @@ func (repo *SnowflakeRepository) isProtectedRoleName(rn string) bool {
 	return !strings.EqualFold(repo.role, AccountAdminRole) && strings.EqualFold(repo.role, rn)
 }
 
+// escapeSingleQuote escapes single quotes in a string for use in SQL queries
+// by replacing each single quote (') with two single quotes (”)
+func escapeSingleQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
+}
+
 func (repo *SnowflakeRepository) GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time, excludedUsers set.Set[string]) <-chan stream.MaybeError[UsageQueryResult] {
 	outputChannel := make(chan stream.MaybeError[UsageQueryResult], 10000)
 
@@ -1281,22 +1287,50 @@ func (repo *SnowflakeRepository) GetInboundShares() ([]DbEntity, error) {
 }
 
 func (repo *SnowflakeRepository) GetDatabases() ([]DbEntity, error) {
-	q := "SHOW DATABASES IN ACCOUNT"
+	return repo.GetDatabasesByKind("STANDARD")
+}
 
-	dbs, err := repo.getDbEntities(q)
-	if err != nil {
-		return nil, fmt.Errorf("fetching databases: %w", err)
-	}
+func (repo *SnowflakeRepository) GetDatabasesByKind(kind string) ([]DbEntity, error) {
+	const pageSize = 1000
+	var allDbs []DbEntity
+	var lastDbName string
 
-	ret := make([]DbEntity, 0, len(dbs))
+	for {
+		q := fmt.Sprintf("SHOW DATABASES IN ACCOUNT LIMIT %d", pageSize)
 
-	for _, db := range dbs {
-		if db.Kind != nil && strings.EqualFold(*db.Kind, "STANDARD") {
-			ret = append(ret, db)
+		if lastDbName != "" {
+			q += fmt.Sprintf(" FROM '%s'", escapeSingleQuote(lastDbName))
 		}
+
+		rows, _, err := repo.query(q)
+		if err != nil {
+			return nil, fmt.Errorf("fetching databases: %w", err)
+		}
+
+		var dbs []DbEntity
+
+		err = scan.Rows(&dbs, rows)
+		if err != nil {
+			return nil, fmt.Errorf("scanning databases: %w", err)
+		}
+
+		// Filter databases only before appending
+		for _, db := range dbs {
+			if db.Kind != nil && strings.EqualFold(*db.Kind, kind) {
+				allDbs = append(allDbs, db)
+			}
+		}
+
+		// If we got fewer results than the page size, we've reached the last page
+		if len(dbs) < pageSize {
+			break
+		}
+
+		// Set the last database name for the next iteration
+		lastDbName = dbs[len(dbs)-1].Name
 	}
 
-	return ret, nil
+	return allDbs, nil
 }
 
 func (repo *SnowflakeRepository) GetApplications() ([]ApplictionEntity, error) {
@@ -1321,17 +1355,79 @@ func (repo *SnowflakeRepository) GetSchemasInDatabase(databaseName string, handl
 func (repo *SnowflakeRepository) GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error {
 	q := getFunctionsInDatabaseQuery(databaseName)
 
-	return handleDbEntities(repo, q, func() interface{} {
+	showFunctionsHandler := func(entity any) error {
+		functionEntity := entity.(*FunctionEntity)
+
+		if functionEntity.IsBuiltin == "Y" {
+			// Skip built-in functions
+			return nil
+		}
+
+		// In Snowflake, the "SHOW FUNCTIONS" command returns a full signature in the "arguments" column,
+		// which includes both the function name, argument types and return type.
+		// For example: "SUM3(NUMBER, NUMBER, NUMBER) RETURN NUMBER".
+		// We need to parse this signature to extract just the arguments for our FunctionEntity.
+		// For example: "(NUMBER, NUMBER, NUMBER)"
+
+		argumentSignature, err := parseFunctionOrProcedureSignature(functionEntity.ArgumentSignature)
+		if err != nil {
+			return fmt.Errorf("error parsing signature for function %s.%s.%s: %w", *functionEntity.Database, *functionEntity.Schema, functionEntity.Name, err)
+		}
+
+		functionEntity.ArgumentSignature = argumentSignature
+
+		return handleEntity(functionEntity)
+	}
+
+	return handleDbEntities(repo, q, func() any {
 		return &FunctionEntity{}
-	}, handleEntity)
+	}, showFunctionsHandler)
+}
+
+func parseFunctionOrProcedureSignature(signature string) (string, error) {
+	openParenIndex := strings.Index(signature, "(")
+	if openParenIndex == -1 {
+		return "", fmt.Errorf("signature has no opening parenthesis: %s", signature)
+	}
+
+	closeParenIndex, err := common.FindMatchingCloseParen(signature, openParenIndex)
+	if err != nil {
+		return "", fmt.Errorf("error parsing signature: %w", err)
+	}
+
+	return signature[openParenIndex : closeParenIndex+1], nil
 }
 
 func (repo *SnowflakeRepository) GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error {
 	q := getProceduresInDatabaseQuery(databaseName)
 
-	return handleDbEntities(repo, q, func() interface{} {
+	showProceduresHandler := func(entity any) error {
+		procedureEntity := entity.(*ProcedureEntity)
+
+		if procedureEntity.IsBuiltin == "Y" {
+			// Skip built-in procedures
+			return nil
+		}
+
+		// In Snowflake, the "SHOW PROCEDURES" command returns a full signature in the "arguments" column,
+		// which includes both the procedure name, argument types and return type.
+		// For example: "SUM3(NUMBER, NUMBER, NUMBER) RETURN NUMBER".
+		// We need to parse this signature to extract just the arguments for our ProcedureEntity.
+		// For example: "(NUMBER, NUMBER, NUMBER)"
+
+		argumentSignature, err := parseFunctionOrProcedureSignature(procedureEntity.ArgumentSignature)
+		if err != nil {
+			return fmt.Errorf("error parsing signature for procedure %s.%s.%s: %w", *procedureEntity.Database, *procedureEntity.Schema, procedureEntity.Name, err)
+		}
+
+		procedureEntity.ArgumentSignature = argumentSignature
+
+		return handleEntity(procedureEntity)
+	}
+
+	return handleDbEntities(repo, q, func() any {
 		return &ProcedureEntity{}
-	}, handleEntity)
+	}, showProceduresHandler)
 }
 
 func (repo *SnowflakeRepository) GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error {
@@ -1956,11 +2052,11 @@ func getSchemasInDatabaseQuery(dbName string) string {
 }
 
 func getFunctionsInDatabaseQuery(dbName string) string {
-	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.FUNCTIONS`, common.FormatQuery("%s", dbName))
+	return common.FormatQuery("SHOW FUNCTIONS IN DATABASE %s LIMIT 10000", dbName)
 }
 
 func getProceduresInDatabaseQuery(dbName string) string {
-	return fmt.Sprintf(`SELECT * FROM %s.INFORMATION_SCHEMA.PROCEDURES`, common.FormatQuery("%s", dbName))
+	return common.FormatQuery("SHOW PROCEDURES IN DATABASE %s LIMIT 10000", dbName)
 }
 
 func getTablesInDatabaseQuery(dbName string, schemaName string) string {
