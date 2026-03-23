@@ -344,16 +344,10 @@ func DataObjectTypes() []*ds.DataObjectType {
 					UsageGlobalPermissions: []string{ds.Read, ds.Write, ds.Admin},
 					CannotBeGranted:        true,
 				},
-				{
-					Permission:             "REFERENCE_USAGE",
-					Description:            "Enables using an object (e.g. secure view in a share) when the object references another object in a different database.",
-					UsageGlobalPermissions: []string{ds.Read},
-					GlobalPermissions:      ds.ReadGlobalPermission().StringValues(),
-				},
 			},
 			Children: []string{ds.Schema},
 			ShareProperties: &ds.DataObjectShareProperties{
-				ShareablePermissions:     []string{USAGE_ON_DATABASE, "REFERENCE_USAGE"},
+				ShareablePermissions:     []string{USAGE_ON_DATABASE},
 				CorrespondingSharedTypes: []string{SharedPrefix + ds.Database},
 			},
 		},
@@ -806,41 +800,21 @@ func DataObjectTypes() []*ds.DataObjectType {
 					Description:       "Enables roles other than the owning role to access a shared database; applies only to shared databases.",
 					GlobalPermissions: ds.ReadGlobalPermission().StringValues(),
 				},
-				{
-					// Defining a USAGE permission specifically for database level as it should not be inherited by the schema level.
-					Permission:      USAGE_ON_DATABASE,
-					Description:     "Enables using a database, including returning the database details in the SHOW DATABASES command output. Additional privileges are required to view or take actions on objects in a database.",
-					CannotBeGranted: true,
-				},
 			},
 			Children:   []string{SharedPrefix + ds.Schema},
 			DataOrigin: ds.OriginShared,
 		},
 		{
-			Name: SharedPrefix + ds.Schema,
-			Type: ds.Schema,
-			Permissions: []*ds.DataObjectTypePermission{
-				{
-					// Defining a USAGE permission specifically for schema level as we should not inherit it from the database level.
-					Permission:      USAGE_ON_SCHEMA,
-					Description:     "Enables using a schema, including returning the schema details in the SHOW SCHEMAS command output. To execute SHOW <objects> commands for objects (tables, views, stages, file formats, sequences, pipes, or functions) in the schema, a role must have at least one privilege granted on the object.",
-					CannotBeGranted: true,
-				},
-			},
-			Children:   []string{SharedPrefix + ds.Table, SharedPrefix + ds.View},
-			DataOrigin: ds.OriginShared,
+			Name:        SharedPrefix + ds.Schema,
+			Type:        ds.Schema,
+			Permissions: []*ds.DataObjectTypePermission{},
+			Children:    []string{SharedPrefix + ds.Table, SharedPrefix + ds.View},
+			DataOrigin:  ds.OriginShared,
 		},
 		{
-			Name: SharedPrefix + ds.Table,
-			Type: ds.Table,
-			Permissions: []*ds.DataObjectTypePermission{
-				{
-					Permission:             "SELECT",
-					Description:            "Enables executing a SELECT statement on a table.",
-					UsageGlobalPermissions: []string{ds.Read},
-					CannotBeGranted:        true,
-				},
-			},
+			Name:        SharedPrefix + ds.Table,
+			Type:        ds.Table,
+			Permissions: []*ds.DataObjectTypePermission{},
 			Actions: []*ds.DataObjectTypeAction{
 				{
 					Action:        "SELECT",
@@ -851,16 +825,9 @@ func DataObjectTypes() []*ds.DataObjectType {
 			DataOrigin: ds.OriginShared,
 		},
 		{
-			Name: SharedPrefix + ds.View,
-			Type: ds.View,
-			Permissions: []*ds.DataObjectTypePermission{
-				{
-					Permission:             "SELECT",
-					Description:            "Enables executing a SELECT statement on a view.",
-					UsageGlobalPermissions: []string{ds.Read},
-					CannotBeGranted:        true,
-				},
-			},
+			Name:        SharedPrefix + ds.View,
+			Type:        ds.View,
+			Permissions: []*ds.DataObjectTypePermission{},
 			Actions: []*ds.DataObjectTypeAction{
 				{
 					Action:        "SELECT",

@@ -733,9 +733,9 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 			for _, gor := range grantsOfRole {
 				switch {
 				case strings.EqualFold(gor.GrantedTo, "USER"):
-					usersOfRole = append(usersOfRole, gor.GranteeName)
+					usersOfRole = append(usersOfRole, cleanDoubleQuotes(gor.GranteeName))
 				case strings.EqualFold(gor.GrantedTo, "ROLE"):
-					rolesOfRole = append(rolesOfRole, accountRoleExternalIdGenerator(gor.GranteeName))
+					rolesOfRole = append(rolesOfRole, accountRoleExternalIdGenerator(cleanDoubleQuotes(gor.GranteeName)))
 				case strings.EqualFold(gor.GrantedTo, GrantTypeDatabaseRole):
 					database, parsedRoleName, err2 := parseNamespacedRoleRoleName(cleanDoubleQuotes(gor.GranteeName))
 					if err2 != nil {
@@ -835,6 +835,9 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 
 			foundGrants = make([]Grant, 0, len(grantsToRole))
 
+			importedDbs := make(map[string]DbEntity)
+			importedDbsFetched := false
+
 			for _, grant := range grantsToRole {
 				if strings.EqualFold(grant.GrantedOn, "ACCOUNT") {
 					foundGrants = append(foundGrants, Grant{grant.Privilege, "account", ""})
@@ -844,9 +847,31 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 					Logger.Debug(fmt.Sprintf("Ignoring USAGE permission on %s %q", grant.GrantedOn, grant.Name))
 				} else {
 					onType := convertSnowflakeGrantTypeToRaito(grant.GrantedOn)
+
+					// Snowflake reports Privilege="USAGE" and GrantedOn="DATABASE" for IMPORTED PRIVILEGES on shared databases.
+					if strings.EqualFold(grant.Privilege, "USAGE") && strings.EqualFold(grant.GrantedOn, "DATABASE") {
+						if !importedDbsFetched {
+							dbs, dgsErr := s.repo.GetDatabasesByKind("IMPORTED DATABASE")
+							if dgsErr != nil {
+								return actualName, fmt.Errorf("error while retrieving databases: %s", dgsErr.Error())
+							}
+
+							for _, db := range dbs {
+								importedDbs[db.Name] = db
+							}
+
+							importedDbsFetched = true
+						}
+
+						if _, found := importedDbs[grant.Name]; found {
+							onType = SharedPrefix + ds.Database
+							grant.Privilege = "IMPORTED PRIVILEGES"
+						}
+					}
+
 					name := grant.Name
 
-					if onType == Function || onType == Procedure { // For functions and stored procedures we need to do a special conversion
+					if strings.EqualFold(onType, Function) || strings.EqualFold(onType, Procedure) { // For functions and stored procedures we need to do a special conversion
 						name = s.accessSyncer.getFullNameFromGrant(name, onType)
 					}
 
@@ -1577,9 +1602,9 @@ func (s *AccessToTargetSyncer) getFunctionsForSchema(database, schema string) ([
 
 	functions := make([]FunctionEntity, 0, 10)
 
-	err := s.repo.GetFunctionsInDatabase(database, func(entity interface{}) error {
+	err := s.repo.GetFunctionsInSchema(database, schema, func(entity any) error {
 		function := entity.(*FunctionEntity)
-		if function.Schema == schema {
+		if *function.Schema == schema {
 			functions = append(functions, *function)
 		}
 
@@ -1604,9 +1629,9 @@ func (s *AccessToTargetSyncer) getProceduresForSchema(database, schema string) (
 
 	procs := make([]ProcedureEntity, 0, 10)
 
-	err := s.repo.GetProceduresInDatabase(database, func(entity interface{}) error {
+	err := s.repo.GetProceduresInSchema(database, schema, func(entity any) error {
 		proc := entity.(*ProcedureEntity)
-		if proc.Schema == schema {
+		if *proc.Schema == schema {
 			procs = append(procs, *proc)
 		}
 
@@ -1627,7 +1652,7 @@ func (s *AccessToTargetSyncer) getSchemasForDatabase(database string) ([]SchemaE
 		return schemas, nil
 	}
 
-	schemas := make([]SchemaEntity, 10)
+	schemas := make([]SchemaEntity, 0, 10)
 
 	err := s.repo.GetSchemasInDatabase(database, func(entity interface{}) error {
 		schema := entity.(*SchemaEntity)
@@ -1830,11 +1855,9 @@ func (s *AccessToTargetSyncer) createPermissionGrantsForTable(database string, s
 	return false
 }
 
-func (s *AccessToTargetSyncer) createPermissionGrantsForFunctionOrProcedure(database string, schema string, name, signature, p string, metaData map[string]map[string]struct{}, grants *GrantSet, objType string) bool {
+func (s *AccessToTargetSyncer) createPermissionGrantsForFunctionOrProcedure(database string, schema string, name string, argumentSignature string, p string, metaData map[string]map[string]struct{}, grants *GrantSet, objType string) bool {
 	// Check if the permission is applicable on the data object type
 	if _, f2 := metaData[objType][strings.ToUpper(p)]; f2 {
-		argumentSignature := convertFunctionArgumentSignature(signature)
-
 		grants.Add(Grant{p, objType, common.FormatQuery(`%s.%s.`, database, schema) + `"` + name + `"` + argumentSignature})
 
 		return true

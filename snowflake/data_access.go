@@ -3,10 +3,10 @@ package snowflake
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target"
 	"github.com/raito-io/cli/base/access_provider/sync_to_target/naming_hint"
 	"github.com/raito-io/cli/base/tag"
@@ -58,6 +58,7 @@ type dataAccessRepository interface {
 	GetApplicationRoles(application string) ([]ApplicationRoleEntity, error)
 	GetDatabaseRolesWithPrefix(database string, prefix string) ([]RoleEntity, error)
 	GetDatabases() ([]DbEntity, error)
+	GetDatabasesByKind(kind string) ([]DbEntity, error)
 	GetApplications() ([]ApplictionEntity, error)
 	GetGrantsOfAccountRole(roleName string) ([]GrantOfRole, error)
 	GetGrantsOfDatabaseRole(database, roleName string) ([]GrantOfRole, error)
@@ -72,7 +73,9 @@ type dataAccessRepository interface {
 	GetInboundShares() ([]DbEntity, error)
 	GetTablesInDatabase(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetFunctionsInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetFunctionsInSchema(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetProceduresInDatabase(databaseName string, handleEntity EntityHandler) error
+	GetProceduresInSchema(databaseName string, schemaName string, handleEntity EntityHandler) error
 	GetTagsByDomain(domain string) (map[string][]*tag.Tag, error)
 	GetDatabaseRoleTags(databaseName string, roleName string) (map[string][]*tag.Tag, error)
 	GetWarehouses() ([]DbEntity, error)
@@ -260,27 +263,37 @@ func (s *AccessSyncer) getFullNameFromGrant(name, objectType string) string {
 	sfObject := common.ParseFullName(name)
 
 	if (strings.EqualFold(objectType, Function) || strings.EqualFold(objectType, Procedure)) && sfObject.Table != nil {
-		function := *sfObject.Table
+		function := correctFunctionName(*sfObject.Table)
 
-		if strings.Contains(function, "(") {
-			funcName := function[:strings.Index(function, "(")] //nolint:gocritic
-
-			paramString := function[strings.Index(function, "(")+1:]
-			if strings.Contains(paramString, "):") {
-				paramString = paramString[:strings.Index(paramString, "):")] //nolint:gocritic
-			}
-
-			paramString = strings.TrimSuffix(paramString, ")")
-
-			params := strings.Split(paramString, ",")
-			for i, param := range params {
-				p := strings.TrimSpace(param)
-				params[i] = p[strings.LastIndex(p, " ")+1:]
-			}
-
-			sfObject.Table = ptr.String(fmt.Sprintf(`%q(%s)`, funcName, strings.Join(params, ", ")))
-		}
+		sfObject.Table = &function
 	}
 
 	return sfObject.GetFullName(false)
+}
+
+var _oldFunctionStyleRegex = regexp.MustCompile(`^"?[a-zA-Z0-9_]+\([a-zA-Z ,()0-9]+\)(:[a-zA-Z()0-9]+)?"?$`)
+
+func correctFunctionName(name string) string {
+	if _oldFunctionStyleRegex.MatchString(name) {
+		// Old style
+		funcName := name[:strings.Index(name, "(")] //nolint:gocritic
+
+		paramString := name[strings.Index(name, "(")+1:]
+		if strings.Contains(paramString, "):") {
+			paramString = paramString[:strings.Index(paramString, "):")] //nolint:gocritic
+		}
+
+		paramString = strings.TrimSuffix(paramString, ")")
+
+		params := strings.Split(paramString, ",")
+		for i, param := range params {
+			p := strings.TrimSpace(param)
+			params[i] = p[strings.LastIndex(p, " ")+1:]
+		}
+
+		return fmt.Sprintf(`%q(%s)`, funcName, strings.Join(params, ", "))
+	}
+
+	// New style or not a function/procedure
+	return name
 }

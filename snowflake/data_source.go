@@ -334,31 +334,9 @@ func (s *DataSourceSyncer) addDataObjects(dataObjects ...*ds.DataObject) error {
 	return s.dataSourceHandler.AddDataObjects(dataObjects...)
 }
 
-// convertFunctionArgumentSignature converts the ARGUMENT_SIGNATURE field of a function to remove the argument names
-// For example: "(val VARCHAR, type VARCHAR)" -> "(VARCHAR, VARCHAR)"
-func convertFunctionArgumentSignature(signature string) string {
-	signature = strings.TrimSpace(signature)
-	signature, f := strings.CutPrefix(signature, "(")
-	signature, f2 := strings.CutSuffix(signature, ")")
-
-	if !f || !f2 { // Not the expected format
-		return signature
-	}
-
-	args := strings.Split(signature, ",")
-	for i, arg := range args {
-		arg = strings.TrimSpace(arg)
-		args[i] = arg[strings.LastIndex(arg, " ")+1:]
-	}
-
-	return fmt.Sprintf("(%s)", strings.Join(args, ", "))
-}
-
 func (s *DataSourceSyncer) createDataObjectForFunction(doType, database, schema, name, argumentSignature string, comment *string, tagMap map[string][]*tag.Tag) *ds.DataObject {
 	parent := database + "." + schema
 	fullName := parent + `."` + name + `"`
-
-	argumentSignature = convertFunctionArgumentSignature(argumentSignature)
 
 	ff := s.schemaExcludes.Contains(database + "." + schema)
 
@@ -389,7 +367,7 @@ func (s *DataSourceSyncer) readFunctionsInDatabase(databaseName string, tagMap m
 	return s.repo.GetFunctionsInDatabase(databaseName, func(entity interface{}) error {
 		function := entity.(*FunctionEntity)
 
-		do := s.createDataObjectForFunction(Function, function.Database, function.Schema, function.Name, function.ArgumentSignature, function.Comment, tagMap)
+		do := s.createDataObjectForFunction(Function, *function.Database, *function.Schema, function.Name, function.ArgumentSignature, function.Comment, tagMap)
 		if do != nil {
 			return s.addDataObjects(do)
 		}
@@ -402,7 +380,7 @@ func (s *DataSourceSyncer) readProceduresInDatabase(databaseName string, tagMap 
 	return s.repo.GetProceduresInDatabase(databaseName, func(entity interface{}) error {
 		proc := entity.(*ProcedureEntity)
 
-		do := s.createDataObjectForFunction(Procedure, proc.Database, proc.Schema, proc.Name, proc.ArgumentSignature, proc.Comment, tagMap)
+		do := s.createDataObjectForFunction(Procedure, *proc.Database, *proc.Schema, proc.Name, proc.ArgumentSignature, proc.Comment, tagMap)
 		if do != nil {
 			return s.addDataObjects(do)
 		}

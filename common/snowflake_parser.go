@@ -109,19 +109,59 @@ func trimCircumfix(name string, circumfix string) string {
 	return name
 }
 
+// unquoteSnowflakeIdentifier unquotes a single token from splitFullName.
+func unquoteSnowflakeIdentifier(part string) string {
+	if !strings.HasPrefix(part, `"`) {
+		return strings.ReplaceAll(part, `""`, `"`)
+	}
+
+	closeIdx := findNextStandaloneChar(part[1:], `"`)
+	if closeIdx == -1 {
+		// malformed: fall back to old behaviour
+		part = trimCircumfix(part, `"`)
+		return strings.ReplaceAll(part, `""`, `"`)
+	}
+
+	if closeIdx != len(part)-2 {
+		// This is probably a function in that case we should keep the quotes
+		return part
+	}
+
+	identifier := strings.ReplaceAll(part[1:closeIdx+1], `""`, `"`)
+
+	return identifier
+}
+
+// FindMatchingCloseParen returns the index of the ')' matching the '(' at openPos in s.
+// Handles nested parentheses. Returns -1 and an error if no match is found.
+func FindMatchingCloseParen(s string, openPos int) (int, error) {
+	depth := 0
+
+	for i := openPos; i < len(s); i++ {
+		switch s[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i, nil
+			}
+		}
+	}
+
+	return -1, fmt.Errorf("no matching closing parenthesis in %s", s)
+}
+
 // Parse the fully-qualitied Snowflake resource name in a SnowflakeObject: https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html
 func ParseFullName(fullName string) SnowflakeObject {
-	split, err := splitFullName(fullName, nil, nil)
+	split, err := splitFullName(fullName, nil)
 	if err != nil {
 		return SnowflakeObject{}
 	}
 	parts := []string{}
 
 	for i := range split {
-		newPart := split[i]
-		newPart = trimCircumfix(newPart, `"`)
-		newPart = strings.ReplaceAll(newPart, `""`, `"`)
-		parts = append(parts, newPart)
+		parts = append(parts, unquoteSnowflakeIdentifier(split[i]))
 	}
 
 	var database, schema, table, column *string
@@ -149,17 +189,34 @@ func ParseFullName(fullName string) SnowflakeObject {
 	return SnowflakeObject{database, schema, table, column}
 }
 
+// findMatchingCloseParen returns the index of the ')' matching the '(' at openPos in s.
+// Handles nested parentheses. Returns -1 and an error if no match is found.
+func findMatchingCloseParen(s string, openPos int) (int, error) {
+	depth := 0
+
+	for i := openPos; i < len(s); i++ {
+		switch s[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i, nil
+			}
+		}
+	}
+
+	return -1, fmt.Errorf("no matching closing parenthesis in %s", s)
+}
+
 // Split a fully-qualitied Snowflake resource object into individual objects.
 // Single data objects (database, schema, table, ...) can be double-quoted or not.
 // If not double-quoted, no special characters allowed. Keep in mind you can have a `fullName` with some fields quoted, others not
 // Else all unicode characters are allowed. A double quote in the name (`"`) is encoded as a double-double quote (`""`),
 // therefore, double quotes are allowed at the beginning and end, but otherwise they always need to come in pairs (`""`).
 // Dots are ignored as a data object/field separator until the field-delimiting double quote has passed.
-func splitFullName(fullName string, currentResults []string, err error) ([]string, error) {
-	if err != nil {
-		return nil, err
-	}
-
+// Functions and procedures may include an argument type signature after the identifier, e.g. `"decrypt"(VARCHAR)`.
+func splitFullName(fullName string, currentResults []string) ([]string, error) {
 	if fullName == "" {
 		return currentResults, nil
 	}
@@ -175,7 +232,7 @@ func splitFullName(fullName string, currentResults []string, err error) ([]strin
 		} else {
 			currentResults = append(currentResults, fullName[:i])
 			if i+1 < len(fullName) {
-				return splitFullName(fullName[i+1:], currentResults, nil)
+				return splitFullName(fullName[i+1:], currentResults)
 			} else {
 				// if the last char is a dot (malformed through)
 				return currentResults, fmt.Errorf("malformed fullName, last char can't be a dot if no double quote is used")
@@ -188,27 +245,27 @@ func splitFullName(fullName string, currentResults []string, err error) ([]strin
 			return append(currentResults, fullName), fmt.Errorf("no corresponding ending \" found for %s", fullName)
 		}
 
-		i_quote++
-		subStr := fullName[i_quote:]
+		i_quote++ // position of closing " in fullName
+		tokenEnd := i_quote + 1
 
-		i_dot := strings.Index(subStr, `.`)
-		if i_dot > -1 {
-			i_dot += i_quote
+		// handle argument list for functions/procedures, e.g. "decrypt"(VARCHAR)
+		if tokenEnd < len(fullName) && fullName[tokenEnd] == '(' {
+			end, err := findMatchingCloseParen(fullName, tokenEnd)
+			if err != nil {
+				return nil, err
+			}
+
+			tokenEnd = end + 1
 		}
 
-		if i_dot == -1 && i_quote == len(fullName)-1 {
-			// no dot found -> last entry in the list
-			currentResults = append(currentResults, fullName)
-			return currentResults, nil
-		} else if i_dot == -1 {
-			return nil, fmt.Errorf("badly-formatted fullName, should end with \"")
-		} else if i_dot == i_quote+1 {
-			// dot should follow " to have a next entry
-			currentResults = append(currentResults, fullName[:i_quote+1])
-			return splitFullName(fullName[i_dot+1:], currentResults, nil)
-		} else {
-			// This actually points to a malformed fullName
-			return append(currentResults, fullName), fmt.Errorf("badly-formatted fullName, dot should follow \"")
+		switch {
+		case tokenEnd >= len(fullName):
+			return append(currentResults, fullName[:tokenEnd]), nil
+		case fullName[tokenEnd] == '.':
+			currentResults = append(currentResults, fullName[:tokenEnd])
+			return splitFullName(fullName[tokenEnd+1:], currentResults)
+		default:
+			return nil, fmt.Errorf("badly-formatted fullName, dot should follow identifier")
 		}
 	}
 }

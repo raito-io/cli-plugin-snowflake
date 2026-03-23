@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFullNameWithoutSpecialChars(t *testing.T) {
@@ -135,69 +136,90 @@ func TestFullNameParser(t *testing.T) {
 }
 
 func TestSplit(t *testing.T) {
+	type testCase struct {
+		input    string
+		expected []string
+		hasError bool
+	}
 
-	var test string
-	var expected, res []string
-	var err error
+	tests := []testCase{
+		{
+			input:    "A.B.C.D.E.F",
+			expected: []string{"A", "B", "C", "D", "E", "F"},
+		},
+		{
+			input:    `ONE."TWO".THREE."FOUR".FIVE`,
+			expected: []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, "FIVE"},
+		},
+		{
+			input:    `ONE."TWO".THREE."FOUR".FIVE."""SIX"."SEVEN""""EIGHT"""`,
+			expected: []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, "FIVE", `"""SIX"`, `"SEVEN""""EIGHT"""`},
+		},
+		{
+			input:    `ONE."TWO".THREE."FOUR"."""...""""."".""."""""".".FIVE."""SIX"."SEVEN""""EIGHT"""`,
+			expected: []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, `"""..."""".""."".""""""."`, "FIVE", `"""SIX"`, `"SEVEN""""EIGHT"""`},
+		},
+		{
+			input:    `ONE."TWO".THREE."FOUR".""".,.""|""."".""."""""".".FIVE."""SIX"."SEVEN""""EIGHT"""`,
+			expected: []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, `""".,.""|"".""."".""""""."`, "FIVE", `"""SIX"`, `"SEVEN""""EIGHT"""`},
+		},
+		{
+			input:    `"db🫘"."🛟schema"."ta🥹ble"."c🫶olumn"`,
+			expected: []string{`"db🫘"`, `"🛟schema"`, `"ta🥹ble"`, `"c🫶olumn"`},
+		},
+		// Quoted function name with arg list
+		{
+			input:    `RAITO_DATABASE.ORDERING."decrypt"(VARCHAR)`,
+			expected: []string{"RAITO_DATABASE", "ORDERING", `"decrypt"(VARCHAR)`},
+		},
+		// Unquoted function name with arg list (regression)
+		{
+			input:    `RAITO_DATABASE.ORDERING.decrypt(VARCHAR)`,
+			expected: []string{"RAITO_DATABASE", "ORDERING", "decrypt(VARCHAR)"},
+		},
+		// Nested parens in arg list
+		{
+			input:    `DB.SCHEMA."func"(TABLE(VARCHAR), NUMBER)`,
+			expected: []string{"DB", "SCHEMA", `"func"(TABLE(VARCHAR), NUMBER)`},
+		},
+		// Quoted function + more tokens after
+		{
+			input:    `DB.SCHEMA."func"(VARCHAR).col`,
+			expected: []string{"DB", "SCHEMA", `"func"(VARCHAR)`, "col"},
+		},
+		// Badly formatted Snowflake strings
+		{
+			input:    "A.B.C.D.E.F.",
+			hasError: true,
+		},
+		{
+			input:    "A.B.C.D.E.\"F",
+			hasError: true,
+		},
+		{
+			input:    `A.B.C.D.E."LAST"aaa`,
+			hasError: true,
+		},
+		{
+			input:    `A.B.C.D.E."LAST"aaa.a`,
+			hasError: true,
+		},
+		// Unbalanced parens in arg list
+		{
+			input:    `DB.SCHEMA."func"(VARCHAR`,
+			hasError: true,
+		},
+	}
 
-	test = "A.B.C.D.E.F"
-	expected = []string{"A", "B", "C", "D", "E", "F"}
-	res, err = splitFullName(test, nil, nil)
-	assert.Nil(t, err)
-	assert.ElementsMatch(t, expected, res)
-
-	test = `ONE."TWO".THREE."FOUR".FIVE`
-	expected = []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, "FIVE"}
-	res, err = splitFullName(test, nil, nil)
-	assert.Nil(t, err)
-	assert.ElementsMatch(t, expected, res)
-
-	test = `ONE."TWO".THREE."FOUR".FIVE."""SIX"."SEVEN""""EIGHT"""`
-	expected = []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, "FIVE", `"""SIX"`, `"SEVEN""""EIGHT"""`}
-	res, err = splitFullName(test, nil, nil)
-	assert.Nil(t, err)
-	assert.ElementsMatch(t, expected, res)
-
-	test = `ONE."TWO".THREE."FOUR"."""...""""."".""."""""".".FIVE."""SIX"."SEVEN""""EIGHT"""`
-	expected = []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, `"""..."""".""."".""""""."`, "FIVE", `"""SIX"`, `"SEVEN""""EIGHT"""`}
-	res, err = splitFullName(test, nil, nil)
-	assert.Nil(t, err)
-	assert.ElementsMatch(t, expected, res)
-
-	test = `ONE."TWO".THREE."FOUR".""".,.""|""."".""."""""".".FIVE."""SIX"."SEVEN""""EIGHT"""`
-	expected = []string{"ONE", `"TWO"`, "THREE", `"FOUR"`, `""".,.""|"".""."".""""""."`, "FIVE", `"""SIX"`, `"SEVEN""""EIGHT"""`}
-	res, err = splitFullName(test, nil, nil)
-	assert.Nil(t, err)
-	assert.ElementsMatch(t, expected, res)
-
-	test = `"db🫘"."🛟schema"."ta🥹ble"."c🫶olumn"`
-	expected = []string{`"db🫘"`, `"🛟schema"`, `"ta🥹ble"`, `"c🫶olumn"`}
-	res, err = splitFullName(test, nil, nil)
-	assert.Nil(t, err)
-	assert.ElementsMatch(t, expected, res)
-
-	// Badly formatted Snowflake strings
-
-	test = "A.B.C.D.E.F."
-	expected = []string{"A", "B", "C", "D", "E", "F"}
-	res, err = splitFullName(test, nil, nil)
-	assert.NotNil(t, err)
-
-	test = "A.B.C.D.E.\"F"
-	expected = []string{"A", "B", "C", "D", "E", "F"}
-	res, err = splitFullName(test, nil, nil)
-	assert.NotNil(t, err)
-
-	test = `A.B.C.D.E."LAST"aaa`
-	expected = []string{"A", "B", "C", "D", "E", `"LAST"aaa`}
-	res, err = splitFullName(test, nil, nil)
-	assert.NotNil(t, err)
-
-	test = `A.B.C.D.E."LAST"aaa.a`
-	expected = []string{"A", "B", "C", "D", "E", `"LAST"aaa.a`}
-	res, err = splitFullName(test, nil, nil)
-	assert.NotNil(t, err)
-
+	for _, tc := range tests {
+		res, err := splitFullName(tc.input, nil)
+		if tc.hasError {
+			require.Error(t, err, "input: %s", tc.input)
+		} else {
+			require.NoError(t, err, "input: %s", tc.input)
+			assert.ElementsMatch(t, tc.expected, res, "input: %s", tc.input)
+		}
+	}
 }
 
 func TestFindNextQuote(t *testing.T) {

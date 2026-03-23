@@ -150,3 +150,15 @@ func connectAndQuery(params map[string]string, role, query string) (*sql.Rows, e
 
 	return snowflake.QuerySnowflake(conn, query)
 }
+
+func connectAndExecute(params map[string]string, role, query string) error { //nolint:unparam
+	conn, _, err := snowflake.ConnectToSnowflake(params, role)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	ctx := context.Background()
+
+	return snowflake.ExecuteSnowflake(ctx, conn, query)
+}

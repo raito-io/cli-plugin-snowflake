@@ -43,19 +43,21 @@ type SchemaEntity struct {
 }
 
 type FunctionEntity struct {
-	Database          string  `db:"FUNCTION_CATALOG"`
-	Schema            string  `db:"FUNCTION_SCHEMA"`
-	Name              string  `db:"FUNCTION_NAME"`
-	Comment           *string `db:"COMMENT"`
-	ArgumentSignature string  `db:"ARGUMENT_SIGNATURE"`
+	Database          *string `db:"catalog_name"`
+	Schema            *string `db:"schema_name"`
+	Name              string  `db:"name"`
+	Comment           *string `db:"description"`
+	ArgumentSignature string  `db:"arguments"`
+	IsBuiltin         string  `db:"is_builtin"`
 }
 
 type ProcedureEntity struct {
-	Database          string  `db:"PROCEDURE_CATALOG"`
-	Schema            string  `db:"PROCEDURE_SCHEMA"`
-	Name              string  `db:"PROCEDURE_NAME"`
-	Comment           *string `db:"COMMENT"`
-	ArgumentSignature string  `db:"ARGUMENT_SIGNATURE"`
+		Database          *string `db:"catalog_name"`
+		Schema            *string `db:"schema_name"`
+		Name              string  `db:"name"`
+		Comment           *string `db:"description"`
+		ArgumentSignature string  `db:"arguments"`
+		IsBuiltin         string  `db:"is_builtin"`
 }
 
 type TagEntity struct {

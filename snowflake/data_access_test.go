@@ -1372,3 +1372,29 @@ func createAccessSyncer(repo dataAccessRepository) *AccessSyncer {
 		namingConstraints: RoleNameConstraints,
 	}
 }
+
+func TestCorrectFunctionName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"single param no underscores", "TESTFUNC00087(NUMBER)", `"TESTFUNC00087"(NUMBER)`},
+		{"underscored name single param", "TEST_FUNC_00005(NUMBER)", `"TEST_FUNC_00005"(NUMBER)`},
+		{"camelCase name", "testFunc(VARCHAR)", `"testFunc"(VARCHAR)`},
+		{"return type stripped", "TEST_FUNC_OTHER(STRING):NUMBER", `"TEST_FUNC_OTHER"(STRING)`},
+		{"lowercase return type stripped", "testFunc(VARCHAR):varchar", `"testFunc"(VARCHAR)`},
+		{"multiple params", "MY_FUNC(NUMBER, VARCHAR)", `"MY_FUNC"(NUMBER, VARCHAR)`},
+		{"named params stripped", "FN(arg1 NUMBER, arg2 VARCHAR)", `"FN"(NUMBER, VARCHAR)`},
+		{"new style passed through", `"TEST_FUNC_OTHER"(STRING)`, `"TEST_FUNC_OTHER"(STRING)`},
+		{"non-function input passed through", "some_plain_name", "some_plain_name"},
+		{"empty input passed through", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := correctFunctionName(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
