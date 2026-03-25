@@ -37,13 +37,13 @@ type AccessToTargetSyncer struct {
 	ignoreLinksToRole          []string
 	databaseRoleSupportEnabled bool
 
-	uniqueRoleNameGeneratorsCache map[*string]naming_hint.UniqueGenerator
-	tablesPerSchemaCache          map[string][]TableEntity
-	functionsPerSchemaCache       map[string][]FunctionEntity
-	proceduresPerSchemaCache      map[string][]ProcedureEntity
-	schemasPerDataBaseCache       map[string][]SchemaEntity
-	warehousesCache               []DbEntity
-	integrationsCache             []DbEntity
+	roleNameGenerator        *RoleNameGenerator
+	tablesPerSchemaCache     map[string][]TableEntity
+	functionsPerSchemaCache  map[string][]FunctionEntity
+	proceduresPerSchemaCache map[string][]ProcedureEntity
+	schemasPerDataBaseCache  map[string][]SchemaEntity
+	warehousesCache          []DbEntity
+	integrationsCache        []DbEntity
 }
 
 func NewAccessToTargetSyncer(accessSyncer *AccessSyncer, namingConstraints naming_hint.NamingConstraints, repo dataAccessRepository, accessProviders *importer.AccessProviderImport, accessProviderFeedbackHandler wrappers.AccessProviderFeedbackHandler, configMap *config.ConfigMap) *AccessToTargetSyncer {
@@ -57,7 +57,6 @@ func NewAccessToTargetSyncer(accessSyncer *AccessSyncer, namingConstraints namin
 		functionsPerSchemaCache:       make(map[string][]FunctionEntity),
 		proceduresPerSchemaCache:      make(map[string][]ProcedureEntity),
 		schemasPerDataBaseCache:       make(map[string][]SchemaEntity),
-		uniqueRoleNameGeneratorsCache: make(map[*string]naming_hint.UniqueGenerator),
 		namingConstraints:             namingConstraints,
 	}
 }
@@ -69,6 +68,13 @@ func (s *AccessToTargetSyncer) syncToTarget(ctx context.Context) error {
 	if ignoreLinksToRoles != "" {
 		s.ignoreLinksToRole = slice.ParseCommaSeparatedList(ignoreLinksToRoles)
 	}
+
+	roleNameGen, err := NewRoleNameGenerator(&s.namingConstraints, s.repo)
+	if err != nil {
+		return fmt.Errorf("creating role name generator: %w", err)
+	}
+
+	s.roleNameGenerator = roleNameGen
 
 	apList := s.accessProviders.AccessProviders
 	apIdNameMap := make(map[string]string)
@@ -136,7 +142,7 @@ func (s *AccessToTargetSyncer) syncToTarget(ctx context.Context) error {
 	}
 
 	// Step 4 then initiate all the roles
-	err := s.SyncAccessProviderRolesToTarget(ctx, rolesToRemove, rolesMap)
+	err = s.SyncAccessProviderRolesToTarget(ctx, rolesToRemove, rolesMap)
 	if err != nil {
 		return fmt.Errorf("sync roles to target: %w", err)
 	}
@@ -165,7 +171,7 @@ func (s *AccessToTargetSyncer) syncAccessProviderToTargetHandler(ap *importer.Ac
 
 		apToRemoveMap[externalId] = ap
 	} else {
-		uniqueExternalId, err := s.generateUniqueExternalId(ap, "")
+		uniqueExternalId, _, err := s.generateUniqueExternalId(ap)
 		if err != nil {
 			return "", nil, nil, err
 		}
@@ -179,89 +185,59 @@ func (s *AccessToTargetSyncer) syncAccessProviderToTargetHandler(ap *importer.Ac
 	return externalId, toProcessAps, apToRemoveMap, nil
 }
 
-func (s *AccessToTargetSyncer) generateUniqueExternalId(ap *importer.AccessProvider, prefix string) (string, error) {
+func (s *AccessToTargetSyncer) generateUniqueExternalId(ap *importer.AccessProvider) (string, RoleNameGenerationResultType, error) {
 	if isDatabaseRole(ap.Type) {
-		return s.generateNamespacedExternalId(ap, prefix, parseDatabaseRoleExternalId, databaseRoleExternalIdGenerator)
+		database, err := s.extractRoleNamespace(ap, parseDatabaseRoleExternalId)
+		if err != nil {
+			return "", 0, err
+		}
+
+		roleName, resultType, err := s.roleNameGenerator.GenerateDatabaseRole(ap, database)
+		if err != nil {
+			return "", 0, err
+		}
+
+		Logger.Info(fmt.Sprintf("Generated database role name %q for database %q", roleName, database))
+
+		return databaseRoleExternalIdGenerator(database, roleName), resultType, nil
 	} else if isApplicationRole(ap.Type) {
-		return s.generateNamespacedExternalId(ap, prefix, parseApplicationRoleExternalId, applicationRoleExternalIdGenerator)
-	} else {
-		uniqueRoleNameGenerator, err := s.getUniqueRoleNameGenerator(prefix, nil)
+		application, err := s.extractRoleNamespace(ap, parseApplicationRoleExternalId)
 		if err != nil {
-			return "", err
+			return "", 0, err
 		}
 
-		roleName, err := uniqueRoleNameGenerator.Generate(ap)
+		roleName, resultType, err := s.roleNameGenerator.GenerateApplicationRole(ap, application)
 		if err != nil {
-			return "", err
+			return "", 0, err
 		}
 
-		Logger.Info(fmt.Sprintf("Generated account role name %q", roleName))
+		Logger.Info(fmt.Sprintf("Generated application role name %q for application %q", roleName, application))
 
-		return accountRoleExternalIdGenerator(roleName), nil
+		return applicationRoleExternalIdGenerator(application, roleName), resultType, nil
 	}
+
+	roleName, resultType, err := s.roleNameGenerator.GenerateAccountRole(ap)
+	if err != nil {
+		return "", 0, err
+	}
+
+	Logger.Info(fmt.Sprintf("Generated account role name %q", roleName))
+
+	return accountRoleExternalIdGenerator(roleName), resultType, nil
 }
 
-func (s *AccessToTargetSyncer) generateNamespacedExternalId(ap *importer.AccessProvider, prefix string,
-	parseNamespaceRoleExternalId func(string) (string, string, error),
-	externalIdGenerator func(string, string) string) (string, error) {
-	sfRoleName := ap.Name
-	if ap.NamingHint != "" {
-		sfRoleName = ap.NamingHint
-	}
-
-	// Finding the database this db role is linked to
-	var database string
-	var err error
-
+func (s *AccessToTargetSyncer) extractRoleNamespace(ap *importer.AccessProvider, parseExternalId func(string) (string, string, error)) (string, error) {
 	if len(ap.What) > 0 {
-		// If there is a WHAT, we look for the database of the first element
-		parts := strings.Split(ap.What[0].DataObject.FullName, ".")
-		database = parts[0]
+		fullName := ap.What[0].DataObject.FullName
+		fullNameSplit := strings.SplitN(fullName, ".", 2)
+
+		return fullNameSplit[0], nil
 	} else if ap.ExternalId != nil {
-		// Otherwise, we try to parse the externalId
-		database, _, err = parseNamespaceRoleExternalId(*ap.ExternalId)
-
-		if err != nil {
-			return "", err
-		}
-	} else {
-		return "", errors.New("unable to determine database for database role")
+		ns, _, err := parseExternalId(*ap.ExternalId)
+		return ns, err
 	}
 
-	uniqueRoleNameGenerator, err := s.getUniqueRoleNameGenerator(prefix, &database)
-	if err != nil {
-		return "", err
-	}
-
-	// Temp updating namingHint to "resource only without database" as this is the way Generate will create a unique resource name
-	oldNamingHint := ap.NamingHint
-	ap.NamingHint = sfRoleName
-
-	roleName, err := uniqueRoleNameGenerator.Generate(ap)
-	if err != nil {
-		return "", err
-	}
-
-	ap.NamingHint = oldNamingHint
-
-	Logger.Info(fmt.Sprintf("Generated database role name %q", roleName))
-
-	return externalIdGenerator(database, roleName), nil
-}
-
-func (s *AccessToTargetSyncer) getUniqueRoleNameGenerator(prefix string, database *string) (naming_hint.UniqueGenerator, error) {
-	if generator, found := s.uniqueRoleNameGeneratorsCache[database]; found {
-		return generator, nil
-	}
-
-	uniqueRoleNameGenerator, err := naming_hint.NewUniqueNameGenerator(Logger, prefix, &s.namingConstraints)
-	if err != nil {
-		return nil, err
-	}
-
-	s.uniqueRoleNameGeneratorsCache[database] = uniqueRoleNameGenerator
-
-	return s.uniqueRoleNameGeneratorsCache[database], nil
+	return "", errors.New("unable to determine namespace for scoped role")
 }
 
 func (s *AccessToTargetSyncer) SyncAccessProviderRolesToTarget(ctx context.Context, toRemoveAps map[string]*importer.AccessProvider, toProcessAps map[string]*importer.AccessProvider) error {
