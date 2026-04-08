@@ -98,6 +98,8 @@ func (t *TagEntity) GetFullName() string {
 		return t.Name
 	case "USER":
 		return t.Name
+	case "INTEGRATION":
+		return t.Name
 	}
 
 	return ""
