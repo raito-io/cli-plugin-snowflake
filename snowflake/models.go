@@ -52,12 +52,12 @@ type FunctionEntity struct {
 }
 
 type ProcedureEntity struct {
-		Database          *string `db:"catalog_name"`
-		Schema            *string `db:"schema_name"`
-		Name              string  `db:"name"`
-		Comment           *string `db:"description"`
-		ArgumentSignature string  `db:"arguments"`
-		IsBuiltin         string  `db:"is_builtin"`
+	Database          *string `db:"catalog_name"`
+	Schema            *string `db:"schema_name"`
+	Name              string  `db:"name"`
+	Comment           *string `db:"description"`
+	ArgumentSignature string  `db:"arguments"`
+	IsBuiltin         string  `db:"is_builtin"`
 }
 
 type TagEntity struct {
