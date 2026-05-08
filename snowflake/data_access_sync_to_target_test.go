@@ -728,13 +728,13 @@ func generateAccessControls_schema(t *testing.T) {
 	schema := "Schema2"
 
 	repoMock.EXPECT().GetFunctionsInSchema(database, schema, mock.Anything).RunAndReturn(func(d string, s string, handler EntityHandler) error {
-		handler(&TableEntity{Database: s, Schema: s2, Name: "Table3", TableType: "BASE TABLE"})
-		handler(&TableEntity{Database: s, Schema: s2, Name: "View3", TableType: "VIEW"})
+		handler(&TableEntity{Database: d, Schema: s, Name: "Table3", TableType: "BASE TABLE"})
+		handler(&TableEntity{Database: d, Schema: s, Name: "View3", TableType: "VIEW"})
 		return nil
 	}).Once()
 
 	repoMock.EXPECT().GetProceduresInSchema(database, schema, mock.Anything).RunAndReturn(func(d string, s string, handler EntityHandler) error {
-		handler(&FunctionEntity{Database: &s, Schema: utils.Ptr("Schema2"), Name: "Decrypt", ArgumentSignature: "(VARCHAR)"})
+		handler(&FunctionEntity{Database: &d, Schema: &s, Name: "Decrypt", ArgumentSignature: "(VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -974,7 +974,7 @@ func generateAccessControls_existing_database(t *testing.T) {
 	}).Once()
 
 	repoMock.EXPECT().GetProceduresInSchema(database, schema, mock.Anything).RunAndReturn(func(d string, s string, handler EntityHandler) error {
-		handler(&FunctionEntity{Database: s, Schema: "Schema2", Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
+		handler(&FunctionEntity{Database: &d, Schema: &s, Name: "Decrypt", ArgumentSignature: "(VAL VARCHAR)"})
 		return nil
 	}).Once()
 
@@ -1211,6 +1211,41 @@ func TestAccessSyncer_generateAccessControls_existingRole(t *testing.T) {
 
 	// When
 	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("existingRole1", "DATABASEROLE###DATABASE:TEST_DB###ROLE:existingDBRole1"), map[string]string{})
+
+	// Then
+	assert.NoError(t, err)
+}
+
+// Regression: SHOW GRANTS OF ROLE returns synthetic SYSTEM$MANAGED rows on Streamlit owner roles, which cannot be REVOKEd.
+func TestAccessSyncer_generateAccessControls_existingRole_skipsSystemPrincipals(t *testing.T) {
+	// Given
+	repoMock := newMockDataAccessRepository(t)
+
+	repoMock.EXPECT().CommentAccountRoleIfExists(mock.AnythingOfType("string"), "existingRole1").Return(nil).Once()
+	repoMock.EXPECT().GetGrantsOfAccountRole("existingRole1").Return([]GrantOfRole{
+		{GrantedTo: "ROLE", GranteeName: "Role1"},
+		{GrantedTo: "ROLE", GranteeName: "SYSTEM$MANAGED"},
+		{GrantedTo: "USER", GranteeName: "User1"},
+	}, nil).Once()
+	repoMock.EXPECT().GetGrantsToAccountRole("existingRole1").Return([]GrantToRole{}, nil).Once()
+	// No Revoke* expectations — mockery fails on an unexpected RevokeAccountRolesFromAccountRole if SYSTEM$MANAGED leaks through.
+
+	access := map[string]*importer.AccessProvider{
+		"existingRole1": {
+			Id:   "AccessProviderId1",
+			Name: "AccessProvider1",
+			Who: importer.WhoItem{
+				Users:       []string{"User1"},
+				InheritFrom: []string{"Role1"},
+			},
+			What: []importer.WhatItem{},
+		},
+	}
+
+	syncer := createBasicToTargetSyncer(repoMock, nil, &dummyFeedbackHandler{}, &config.ConfigMap{})
+
+	// When
+	err := syncer.generateAccessControls(context.Background(), access, set.NewSet[string]("existingRole1"), map[string]string{})
 
 	// Then
 	assert.NoError(t, err)

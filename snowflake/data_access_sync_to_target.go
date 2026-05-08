@@ -707,13 +707,21 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 			rolesOfRole := make([]string, 0, len(grantsOfRole))
 
 			for _, gor := range grantsOfRole {
+				granteeName := cleanDoubleQuotes(gor.GranteeName)
+
+				// Snowflake-synthetic principals (e.g. SYSTEM$MANAGED on Streamlit owner roles) cannot be the target of GRANT/REVOKE.
+				if strings.HasPrefix(granteeName, "SYSTEM$") {
+					Logger.Debug(fmt.Sprintf("Skipping synthetic Snowflake principal %q (granted_to=%s) in grants of role %q", granteeName, gor.GrantedTo, externalId))
+					continue
+				}
+
 				switch {
 				case strings.EqualFold(gor.GrantedTo, "USER"):
-					usersOfRole = append(usersOfRole, cleanDoubleQuotes(gor.GranteeName))
+					usersOfRole = append(usersOfRole, granteeName)
 				case strings.EqualFold(gor.GrantedTo, "ROLE"):
-					rolesOfRole = append(rolesOfRole, accountRoleExternalIdGenerator(cleanDoubleQuotes(gor.GranteeName)))
+					rolesOfRole = append(rolesOfRole, accountRoleExternalIdGenerator(granteeName))
 				case strings.EqualFold(gor.GrantedTo, GrantTypeDatabaseRole):
-					database, parsedRoleName, err2 := parseNamespacedRoleRoleName(cleanDoubleQuotes(gor.GranteeName))
+					database, parsedRoleName, err2 := parseNamespacedRoleRoleName(granteeName)
 					if err2 != nil {
 						return actualName, err2
 					}
@@ -721,7 +729,7 @@ func (s *AccessToTargetSyncer) handleAccessProvider(ctx context.Context, externa
 				case strings.EqualFold(gor.GrantedTo, "SHARE"):
 					rolesOfRole = append(rolesOfRole, shareExternalIdGenerator(gor.GranteeName))
 				case strings.EqualFold(gor.GrantedTo, GrantTypeApplicationRole):
-					application, parsedRoleName, err2 := parseNamespacedRoleRoleName(cleanDoubleQuotes(gor.GranteeName))
+					application, parsedRoleName, err2 := parseNamespacedRoleRoleName(granteeName)
 					if err2 != nil {
 						return actualName, err2
 					}
