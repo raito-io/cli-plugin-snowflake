@@ -13,6 +13,8 @@ import (
 
 	du "github.com/raito-io/cli/base/data_usage"
 	"github.com/raito-io/cli/base/util/config"
+	"github.com/raito-io/cli/base/util/match"
+	"github.com/raito-io/cli/base/util/slice"
 	"github.com/raito-io/cli/base/wrappers"
 	"github.com/raito-io/golang-set/set"
 
@@ -24,6 +26,7 @@ import (
 type dataUsageRepository interface {
 	Close() error
 	TotalQueryTime() time.Duration
+	GetUsers() ([]UserEntity, error)
 	GetDataUsage(ctx context.Context, minTime time.Time, maxTime *time.Time, excludedUsers set.Set[string]) <-chan stream.MaybeError[UsageQueryResult]
 }
 
@@ -85,7 +88,26 @@ func (s *DataUsageSyncer) SyncDataUsage(ctx context.Context, fileCreator wrapper
 	queryCtx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
 
-	excludedUsers := parseCommaSeparatedList(configParams.GetString(SfUsageUserExcludes))
+	excludePatterns := slice.ParseCommaSeparatedList(configParams.GetString(SfUsageUserExcludes))
+	excludedUsers := set.NewSet[string]()
+
+	if len(excludePatterns) > 0 {
+		users, err2 := repo.GetUsers()
+		if err2 != nil {
+			return fmt.Errorf("fetching users for %q: %w", SfUsageUserExcludes, err2)
+		}
+
+		for _, u := range users {
+			matched, err3 := match.MatchesAny(u.Name, excludePatterns)
+			if err3 != nil {
+				return fmt.Errorf("parsing regular expressions in parameter %q: %w", SfUsageUserExcludes, err3)
+			}
+
+			if matched {
+				excludedUsers.Add(u.Name)
+			}
+		}
+	}
 
 	if len(excludedUsers) > 0 {
 		Logger.Info(fmt.Sprintf("Excluding %d users from data usage sync", len(excludedUsers)))
